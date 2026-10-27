@@ -9,7 +9,7 @@ from genes.models import CdotDataVersion, TranscriptVersion
 from snpdb.models import GenomeBuild
 from snpdb.models.models_somalier import SomalierConfig
 
-_VARIANTGRID_DOWNLOAD_BASE_DIR = "http://variantgrid.com/download/annotation"
+_VARIANTGRID_DOWNLOAD_BASE_DIR = "https://variantgrid.com/download/annotation"
 
 
 def _get_fix_instructions(filename) -> str:
@@ -21,12 +21,18 @@ def _get_fix_instructions(filename) -> str:
     return fix_instructions
 
 
-def annotation_data_exists(flat=False, include_tbi_for_gz=False) -> dict:
+def annotation_data_exists(flat=False, include_tbi_for_gz=False, include_csi=False) -> dict:
+    """Per build (or flat as '<build>/<key>'), each annotation file as {"valid": exists, "fix": "cd ..;wget .."}.
+
+    include_csi adds a '<key>_csi' entry, marked "optional": True, beside every .tbi: a fine-binned CSI index that
+    htslib prefers over the .tbi and that makes VEP's custom/plugin lookups several times faster (#2499). It is
+    optional because variantgrid.com only hosts one for the files it builds, and a deployment runs correctly on the
+    .tbi alone; annotation/annotation_data/generate_annotation/build_tabix_csi.sh builds the rest locally."""
     all_build_data = {}
     # We can sometimes use files twice, only report once
     unique_filenames = set()
     active_builds = list(GenomeBuild.builds_with_annotation())
-    active_build_names = set(str(gb) for gb in active_builds)
+    active_build_names = {str(gb) for gb in active_builds}
 
     for genome_build in active_builds:
         check_files = {}
@@ -65,16 +71,22 @@ def annotation_data_exists(flat=False, include_tbi_for_gz=False) -> dict:
 
             unique_filenames.add(base_filename)
             files = {base_key: base_filename}
-            tbi_for_gz = (include_tbi_for_gz and base_filename.endswith((".gz", ".bgz"))
-                          and base_filename.startswith(settings.ANNOTATION_VEP_BASE_DIR))
-            if ".vcf" in base_filename or tbi_for_gz:
+            vep_gz = (base_filename.endswith((".gz", ".bgz"))
+                      and base_filename.startswith(settings.ANNOTATION_VEP_BASE_DIR))
+            optional_keys = set()
+            if ".vcf" in base_filename or (include_tbi_for_gz and vep_gz):
                 files[f"{base_key}_tbi"] = base_filename + ".tbi"
+            if include_csi and (".vcf" in base_filename or vep_gz):
+                files[f"{base_key}_csi"] = base_filename + ".csi"
+                optional_keys.add(f"{base_key}_csi")
 
             for key, filename in files.items():
                 file_data[key] = {
                     "valid": os.path.exists(filename),
                     "fix": _get_fix_instructions(filename),
                 }
+                if key in optional_keys:
+                    file_data[key]["optional"] = True
 
         # A plugin can be newer than the VEP_plugins checkout (AVI.pm, #2426), so comes from Ensembl rather than us
         for plugin_name, filename in get_vep_plugin_files(genome_build).items():

@@ -49,18 +49,22 @@ class Command(BaseCommand):
         force = options["force"]
         bash_script = options["bash_script"]
 
-        checks = annotation_data_exists(flat=True, include_tbi_for_gz=True)
+        checks = annotation_data_exists(flat=True, include_tbi_for_gz=True, include_csi=True)
 
         if bash_script is not None:
             self._write_bash_script(checks, bash_script)
             return
 
         missing = []
+        not_hosted = []
         for key, data in checks.items():
             if force or not data.get("valid"):
                 url, dirname = _parse_fix(data.get("fix", ""))
                 if url is None:
                     self.stderr.write(f"Could not parse fix for {key}: {data.get('fix')}")
+                    continue
+                if data.get("optional") and not _is_hosted(url):
+                    not_hosted.append((key, url))
                     continue
                 is_archive = _is_directory_archive(key)
                 if is_archive:
@@ -68,6 +72,12 @@ class Command(BaseCommand):
                     url = url + ".tar.gz"
                 filename = os.path.join(dirname, os.path.basename(urlparse(url).path))
                 missing.append((key, url, dirname, filename, is_archive))
+
+        if not_hosted:
+            self.stdout.write(f"{len(not_hosted)} optional index file(s) are not hosted on variantgrid.com, skipped "
+                              f"(build them with annotation/annotation_data/generate_annotation/build_tabix_csi.sh):")
+            for key, url in not_hosted:
+                self.stdout.write(f"  {key}: {url}")
 
         if not missing:
             self.stdout.write("All annotation data files present.")
@@ -126,6 +136,8 @@ class Command(BaseCommand):
                 lines.append(f"wget -c -P {shlex.quote(dirname)} {shlex.quote(url)}")
                 lines.append(f"tar -xzf {shlex.quote(tarball)} -C {shlex.quote(dirname)}")
                 lines.append(f"rm {shlex.quote(tarball)}")
+            elif data.get("optional"):
+                lines.append(f"wget -c -P {shlex.quote(dirname)} {shlex.quote(url)} || echo 'optional, not hosted: {key}'")
             else:
                 lines.append(f"wget -c -P {shlex.quote(dirname)} {shlex.quote(url)}")
                 if _is_executable(key):
@@ -156,6 +168,15 @@ def _parse_fix(fix):
     if not cd_part.startswith("cd ") or not wget_part.startswith("wget "):
         return None, None
     return wget_part[len("wget "):].strip(), cd_part[len("cd "):].strip()
+
+
+def _is_hosted(url) -> bool:
+    """Whether variantgrid.com serves this URL; optional files (CSI indexes) are only fetched when it does."""
+    try:
+        resp = requests.head(url, allow_redirects=True, timeout=30)
+    except requests.RequestException:
+        return False
+    return resp.ok
 
 
 def _extract_tarball(tarball, dest):

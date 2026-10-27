@@ -228,7 +228,11 @@ migrating, whose ManualOperation (`annotation/migrations/0005_utr_annotator_avi_
 carries the steps; `annotation/migrations/0007_alphagenome_splicing.py` does the same for AlphaGenome splicing. Otherwise, per build, under ANNOTATION_VEP_BASE_DIR:
 
 1. Data files. With the paths set in the env settings (step 2), `manage.py download_annotation_data` fetches each
-   one, already converted, from variantgrid.com. The sources, for building them from scratch:
+   one, already converted, from variantgrid.com, plus a `.csi` beside each `.tbi` where one is hosted: a 4 kb-bin
+   CSI index that htslib prefers over the `.tbi` and that makes VEP's custom/plugin lookups several times faster
+   (#2499). A file without a hosted `.csi` is reported and still works on its `.tbi`;
+   `annotation/annotation_data/generate_annotation/build_tabix_csi.sh` builds the missing ones in place. The
+   sources, for building them from scratch:
    - uORF_5UTR_GRCh37_PUBLIC.txt / uORF_5UTR_GRCh38_PUBLIC.txt from https://github.com/Ensembl/UTRannotator into
      `annotation_data/<build>/` (the plugin computes effects from the transcript sequence and runs with every
      `Evidence` NA without it).

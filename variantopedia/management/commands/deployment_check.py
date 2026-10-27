@@ -46,7 +46,7 @@ class Command(BaseCommand):
         checks = {
             "Settings": check_system_checks(),
             "Settings references": check_settings_references(),
-            "Annotation data exists": annotation_data_exists(flat=True),
+            "Annotation data exists": annotation_data_exists(flat=True, include_csi=True),
             "Annotation Versions": check_annotation_versions(),
             "Gene Annotation": check_gene_annotation_versions(),
             "Variant Annotation status": check_variant_annotation_runs_status(),
@@ -71,6 +71,12 @@ class Command(BaseCommand):
                 if data.get("valid"):
                     if not quiet:
                         logging.info("%s, %s: OK", check_type, k)
+                elif data.get("optional"):
+                    # A CSI index: VEP runs without it, several times slower on custom/plugin lookups (#2499)
+                    logging.warning("%s, %s missing: VEP is faster with it. Run 'python manage.py "
+                                    "download_annotation_data', or build it with "
+                                    "annotation/annotation_data/generate_annotation/build_tabix_csi.sh",
+                                    check_type, k)
                 else:
                     fix = data.get("fix")
                     msg = f"{check_type=} {k} INVALID. Fix: {fix}"
