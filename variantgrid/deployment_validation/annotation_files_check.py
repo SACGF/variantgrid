@@ -18,12 +18,14 @@ _VARIANTGRID_DOWNLOAD_BASE_DIR = "https://variantgrid.com/download/annotation"
 
 
 def _get_fix_instructions(filename) -> str:
-    # Anchor at ANNOTATION_BASE_DIR (not the narrower VEP subdir) so files outside
-    # /data/annotation/VEP - eg reference_fasta in fasta/, liftover chains - map to a real URL
+    """'cd <dir>;wget <url>' for a file variantgrid.com hosts, anchored at ANNOTATION_BASE_DIR (not the narrower VEP
+    subdir) so reference_fasta in fasta/ and the liftover chains map to a real URL. A file outside it ships with the
+    repo (the cytobands under VARIANTGRID_REPO_REFERENCE_DIR), so the fix is a checkout, not a download."""
+    if not filename.startswith(settings.ANNOTATION_BASE_DIR):
+        return f"git checkout -- {os.path.relpath(filename, settings.BASE_DIR)}"
     dirname = os.path.dirname(filename)
     vg_path = filename.replace(settings.ANNOTATION_BASE_DIR, _VARIANTGRID_DOWNLOAD_BASE_DIR)
-    fix_instructions = f"cd {dirname};wget {vg_path}"
-    return fix_instructions
+    return f"cd {dirname};wget {vg_path}"
 
 
 def annotation_data_exists(flat=False, include_tbi_for_gz=False, include_csi=False) -> dict:

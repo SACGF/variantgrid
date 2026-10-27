@@ -1,6 +1,7 @@
 import os
 import shlex
 import tarfile
+from typing import NamedTuple
 from urllib.parse import urlparse
 
 import requests
@@ -31,6 +32,16 @@ def _is_executable(key):
     return _base_key(key) in _EXECUTABLE_KEYS
 
 
+class _Download(NamedTuple):
+    key: str
+    url: str
+    dirname: str
+    filename: str
+    is_archive: bool
+    optional: bool
+    refresh: bool
+
+
 class Command(BaseCommand):
     category = "ops"
     help = "Check for missing annotation data files and download them from variantgrid.com"
@@ -41,73 +52,65 @@ class Command(BaseCommand):
         parser.add_argument('--force', action='store_true',
                             help="Re-download even if file already exists")
         parser.add_argument('--bash-script', nargs='?', const='-', metavar='PATH',
-                            help="Write a bash script that downloads every annotation file "
+                            help="Write a bash script that downloads the missing and outdated annotation files "
                                  "(to PATH, or stdout if no path given) instead of downloading now")
+        parser.add_argument('--download-all', action='store_true',
+                            help="With --bash-script, write every annotation file into the script, not just the "
+                                 "missing and outdated ones (same as --force)")
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
-        force = options["force"]
+        force = options["force"] or options["download_all"]
         bash_script = options["bash_script"]
 
         checks = annotation_data_exists(flat=True, include_tbi_for_gz=True, include_csi=True)
+        downloads = self._select_downloads(checks, force)
 
         if bash_script is not None:
-            self._write_bash_script(checks, bash_script)
+            self._write_bash_script(downloads, bash_script)
             return
 
         missing = []
         not_hosted = []
-        for key, data in checks.items():
-            url, dirname = _parse_fix(data.get("fix", ""))
-            if url is None:
-                self.stderr.write(f"Could not parse fix for {key}: {data.get('fix')}")
-                continue
-            filename = os.path.join(dirname, os.path.basename(urlparse(url).path))
-            stale = data.get("refresh") and data.get("valid") and _differs_from_hosted(url, filename)
-            if force or stale or not data.get("valid"):
-                if data.get("optional") and not _is_hosted(url):
-                    not_hosted.append((key, url))
-                    continue
-                is_archive = _is_directory_archive(key)
-                if is_archive:
-                    # The config value is a directory; download the hosted tarball and extract it
-                    url = url + ".tar.gz"
-                filename = os.path.join(dirname, os.path.basename(urlparse(url).path))
-                missing.append((key, url, dirname, filename, is_archive))
+        for download in downloads:
+            if download.optional and not _is_hosted(download.url):
+                not_hosted.append(download)
+            else:
+                missing.append(download)
 
         if not_hosted:
             self.stdout.write(f"{len(not_hosted)} optional index file(s) are not hosted on variantgrid.com, skipped "
                               f"(build them with annotation/annotation_data/generate_annotation/build_tabix_csi.sh):")
-            for key, url in not_hosted:
-                self.stdout.write(f"  {key}: {url}")
+            for download in not_hosted:
+                self.stdout.write(f"  {download.key}: {download.url}")
 
         if not missing:
             self.stdout.write("All annotation data files present.")
             return
 
         self.stdout.write(f"Found {len(missing)} missing or outdated annotation file(s):")
-        for key, url, _dirname, _filename, _is_archive in missing:
-            self.stdout.write(f"  {key}: {url}")
+        for download in missing:
+            self.stdout.write(f"  {download.key}: {download.url}")
 
         if dry_run:
             self.stdout.write("Dry run; not downloading.")
             return
 
         failures = []
-        for key, url, dirname, filename, is_archive in missing:
-            self.stdout.write(f"\nDownloading {key}: {url}")
+        for download in missing:
+            self.stdout.write(f"\nDownloading {download.key}: {download.url}")
             try:
-                os.makedirs(dirname, exist_ok=True)
-                _download(url, filename)
-                if is_archive:
-                    _extract_tarball(filename, dirname)
-                    os.remove(filename)
-                elif _is_executable(key):
-                    os.chmod(filename, 0o755)
-                self.stdout.write(f"  -> {filename}")
+                os.makedirs(download.dirname, exist_ok=True)
+                _download(download.url, download.filename)
+                if download.is_archive:
+                    _extract_tarball(download.filename, download.dirname)
+                    os.remove(download.filename)
+                elif _is_executable(download.key):
+                    os.chmod(download.filename, 0o755)
+                self.stdout.write(f"  -> {download.filename}")
             except Exception as e:
                 self.stderr.write(f"  FAILED: {e}")
-                failures.append((key, url, str(e)))
+                failures.append((download.key, download.url, str(e)))
 
         if failures:
             self.stdout.write(f"\n{len(failures)} download(s) failed:")
@@ -116,43 +119,61 @@ class Command(BaseCommand):
         else:
             self.stdout.write("\nAll downloads complete.")
 
-    def _write_bash_script(self, checks, path):
+    def _select_downloads(self, checks, force) -> list[_Download]:
+        """The files to fetch: missing, stale (a plugin we ship whose hosted copy differs) or all of them with force.
+        A file whose fix is not a wget ships with the repo and is never downloaded."""
+        downloads = []
+        for key, data in checks.items():
+            fix = data.get("fix", "")
+            if "wget" not in fix:
+                continue
+            url, dirname = _parse_fix(fix)
+            if url is None:
+                self.stderr.write(f"Could not parse fix for {key}: {fix}")
+                continue
+            filename = os.path.join(dirname, os.path.basename(urlparse(url).path))
+            stale = data.get("refresh") and data.get("valid") and _differs_from_hosted(url, filename)
+            if not (force or stale or not data.get("valid")):
+                continue
+            is_archive = _is_directory_archive(key)
+            if is_archive:
+                # The config value is a directory; download the hosted tarball and extract it
+                url = url + ".tar.gz"
+                filename = os.path.join(dirname, os.path.basename(urlparse(url).path))
+            downloads.append(_Download(key, url, dirname, filename, is_archive,
+                                       optional=bool(data.get("optional")), refresh=bool(data.get("refresh"))))
+        return downloads
+
+    def _write_bash_script(self, downloads, path):
         lines = [
             "#!/bin/bash",
             "# Generated by 'manage.py download_annotation_data --bash-script'",
-            "# Downloads all VariantGrid annotation data files.",
+            "# Downloads VariantGrid annotation data files.",
             "set -euo pipefail",
             "",
         ]
-        skipped = []
-        for key, data in checks.items():
-            url, dirname = _parse_fix(data.get("fix", ""))
-            if url is None:
-                skipped.append(key)
-                continue
-            lines.append(f"# {key}")
-            lines.append(f"mkdir -p {shlex.quote(dirname)}")
-            if _is_directory_archive(key):
-                url = url + ".tar.gz"
-                tarball = os.path.join(dirname, os.path.basename(urlparse(url).path))
-                lines.append(f"wget -c -P {shlex.quote(dirname)} {shlex.quote(url)}")
-                lines.append(f"tar -xzf {shlex.quote(tarball)} -C {shlex.quote(dirname)}")
-                lines.append(f"rm {shlex.quote(tarball)}")
-            elif data.get("optional"):
-                lines.append(f"wget -c -P {shlex.quote(dirname)} {shlex.quote(url)} || echo 'optional, not hosted: {key}'")
-            elif data.get("refresh"):
+        if not downloads:
+            lines.append("# All annotation data files present.")
+        for download in downloads:
+            quoted_dir = shlex.quote(download.dirname)
+            quoted_url = shlex.quote(download.url)
+            quoted_filename = shlex.quote(download.filename)
+            lines.append(f"# {download.key}")
+            lines.append(f"mkdir -p {quoted_dir}")
+            if download.is_archive:
+                lines.append(f"wget -c -P {quoted_dir} {quoted_url}")
+                lines.append(f"tar -xzf {quoted_filename} -C {quoted_dir}")
+                lines.append(f"rm {quoted_filename}")
+            elif download.optional:
+                lines.append(f"wget -c -P {quoted_dir} {quoted_url} || echo 'optional, not hosted: {download.key}'")
+            elif download.refresh:
                 # ours; the hosted copy replaces whatever the plugins checkout holds
-                filename = os.path.join(dirname, os.path.basename(urlparse(url).path))
-                lines.append(f"wget -O {shlex.quote(filename)} {shlex.quote(url)}")
+                lines.append(f"wget -O {quoted_filename} {quoted_url}")
             else:
-                lines.append(f"wget -c -P {shlex.quote(dirname)} {shlex.quote(url)}")
-                if _is_executable(key):
-                    filename = os.path.join(dirname, os.path.basename(urlparse(url).path))
-                    lines.append(f"chmod a+x {shlex.quote(filename)}")
+                lines.append(f"wget -c -P {quoted_dir} {quoted_url}")
+                if _is_executable(download.key):
+                    lines.append(f"chmod a+x {quoted_filename}")
             lines.append("")
-
-        for key in skipped:
-            self.stderr.write(f"Could not parse fix for {key}: {checks[key].get('fix')}")
 
         script = "\n".join(lines)
         if path == "-":
