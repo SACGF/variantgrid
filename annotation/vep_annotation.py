@@ -341,6 +341,17 @@ def is_variantgrid_vep_plugin(plugin_name: str) -> bool:
     return plugin_name in _VARIANTGRID_VEP_PLUGINS
 
 
+def installed_vep_plugin_is_ours(plugin_name: str) -> bool:
+    """ Whether the .pm in the plugins dir is this checkout's copy of a plugin we serve - the one
+        download_annotation_data installs, byte for byte """
+    source = os.path.join(os.path.dirname(__file__), "annotation_data", "generate_annotation", f"{plugin_name}.pm")
+    installed = os.path.join(settings.ANNOTATION_VEP_PLUGINS_DIR, f"{plugin_name}.pm")
+    if not os.path.exists(installed):
+        return False
+    with open(source, "rb") as s, open(installed, "rb") as i:
+        return s.read() == i.read()
+
+
 def get_vep_plugin_url(plugin_name: str) -> str:
     """ Ensembl's VEP_plugins branch for the installed VEP, or our repo for a plugin Ensembl doesn't have """
     if is_variantgrid_vep_plugin(plugin_name):

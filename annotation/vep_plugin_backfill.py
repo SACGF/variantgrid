@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Union
 
 from django.conf import settings
-from django.db.models import Max
+from django.db.models import Max, Q
 
 from annotation import vep_columns
 from annotation.enums import VariantAnnotationPipelineType, VEPCustom, VEPPlugin
@@ -33,7 +33,13 @@ SOURCE_PINS: dict[str, VEPSource] = {
     "alphagenome_splicing": VEPCustom.ALPHAGENOME_SPLICING,
 }
 BACKFILL_FLAG = "backfilled_utr_avi_splicevault"
+# Variants annotated by Ensembl's UTRAnnotator, which dropped all but one of a variant's effects at random (#2499): their
+# utr_annotator columns are re-imported from a UTRAnnotator-only pass. A version still waiting for the plugin backfill
+# above gets both in that one pass, over every variant rather than only those annotated before the switch-on
+UTR_EFFECTS_FLAG = "backfilled_utr_effects"
+UTR_EFFECTS_COLUMNS = ("utr_annotator_consequence", "utr_annotator_annotation")
 ENABLE_COMMAND = "python3 manage.py enable_vep_plugin_backfill"
+DOWNLOAD_COMMAND = "python3 manage.py download_annotation_data"
 ACTIVE_STATUSES = ("NEW", "ACTIVE")  # HISTORICAL versions are never looked up by config again
 # Flags that only add CSQ fields the backfill doesn't import. Dropping them leaves the PICK'd entry the same and runs
 # VEP ~1.5x faster
@@ -179,13 +185,34 @@ def backfill_vep_command(vav, vep_sources, csq_fields: list[str], input_vcf: str
     return cmd
 
 
+def pending_backfill_flags(vav) -> list[str]:
+    """ The backfilled_* flags this version still has False, of the ones one VEP pass here can set """
+    return [flag for flag in (BACKFILL_FLAG, UTR_EFFECTS_FLAG) if not getattr(vav, flag, True)]
+
+
 def backfill_steps(vav, annotation_range_lock_model) -> list[str]:
-    """ One version's commands, bounded by the last variant it had locked for annotation when the plugins were
-        switched on - anything after that is annotated with them """
+    """ One version's commands: one VEP pass and one import, whichever flags it has pending.
+
+        The plugin backfill alone is bounded by the last variant locked when the plugins were switched on - anything
+        after that is annotated with them. The UTR effects pass alone runs UTRAnnotator over the variants that have a
+        consequence, the only ones the old plugin could have mis-reported. A version needing both gets one unbounded
+        pass with every source: the variants annotated after the switch-on by the old plugin need UTRAnnotator again,
+        and re-importing the other sources' values for them changes nothing. """
+    flags = pending_backfill_flags(vav)
+    if not flags:
+        return []
     build = vav.genome_build_id
     columns_by_source = backfill_source_columns(vav)
+    dump_args = ["--pipeline-type STANDARD"]
+    if BACKFILL_FLAG not in flags:
+        columns_by_source = {source: {column: csq_field for column, csq_field in columns.items()
+                                      if column in UTR_EFFECTS_COLUMNS}
+                             for source, columns in columns_by_source.items() if source == VEPPlugin.UTR_ANNOTATOR}
+        dump_args.append(f"--not-null {UTR_EFFECTS_COLUMNS[0]}")
+    elif UTR_EFFECTS_FLAG not in flags:
+        max_variant_id = annotation_range_lock_model.objects.filter(version=vav).aggregate(Max("max_variant_id"))
+        dump_args.append(f"--max-variant-id {max_variant_id['max_variant_id__max']}")
     columns = {column: csq_field for c in columns_by_source.values() for column, csq_field in c.items()}
-    max_variant_id = annotation_range_lock_model.objects.filter(version=vav).aggregate(Max("max_variant_id"))
     common = f"--genome-build {build} --variant-annotation-version {vav.pk} --columns {','.join(columns)}"
     csq_args = " ".join(f"--csq {column}={csq_field}" for column, csq_field in columns.items())
     dump_vcf = os.path.join(settings.ANNOTATION_VCF_DUMP_DIR, f"vep_plugins_{build}.vcf.gz")
@@ -194,26 +221,30 @@ def backfill_steps(vav, annotation_range_lock_model) -> list[str]:
                                    dump_vcf, annotated_vcf)
     import_cmd = (f"python3 manage.py annotation_backfill_columns --import {common} {csq_args} "
                   f"--vcf {annotated_vcf} --dump-vcf {dump_vcf}")
-    return [
-        f"{build} (VariantAnnotationVersion {vav.pk}):",
-        f"1. python3 manage.py annotation_backfill_columns --dump {common} --pipeline-type STANDARD "
-        f"--max-variant-id {max_variant_id['max_variant_id__max']} --output {dump_vcf}",
-        f"2. {shlex.join(vep_cmd)}",
-        f"3. {import_cmd} --dry-run",
-        f"4. {import_cmd} --mark-backfilled {BACKFILL_FLAG}",
-        f"5. rm -f {dump_vcf} {annotated_vcf} {annotated_vcf}_warnings.txt "
+    steps = []
+    if UTR_EFFECTS_FLAG in flags:
+        # The pass is only a fix with our UTRAnnotator.pm installed over Ensembl's; the import checks before marking
+        steps.append(f"{DOWNLOAD_COMMAND}  (installs VariantGrid's UTRAnnotator.pm over the plugins dir's copy)")
+    steps.extend([
+        f"python3 manage.py annotation_backfill_columns --dump {common} {' '.join(dump_args)} --output {dump_vcf}",
+        shlex.join(vep_cmd),
+        f"{import_cmd} --dry-run",
+        f"{import_cmd} --mark-backfilled {','.join(flags)}",
+        f"rm -f {dump_vcf} {annotated_vcf} {annotated_vcf}_warnings.txt "
         f"{get_vep_skipped_variants_filename(annotated_vcf)}",
-    ]
+    ])
+    return [f"{build} (VariantAnnotationVersion {vav.pk}):"] + [f"{i}. {step}" for i, step in enumerate(steps, 1)]
 
 
 def backfill_note(variant_annotation_version_model, annotation_range_lock_model,
                   genome_build_name: Optional[str] = None) -> str:
-    """ Steps for every version still flagged for the backfill """
-    qs = variant_annotation_version_model.objects.filter(**{BACKFILL_FLAG: False})
+    """ Steps for every version still flagged for a backfill """
+    qs = variant_annotation_version_model.objects.filter(Q(**{BACKFILL_FLAG: False}) | Q(**{UTR_EFFECTS_FLAG: False}))
     if genome_build_name:
         qs = qs.filter(genome_build_id=genome_build_name)
     lines = ["Fill in UTRAnnotator, AVI, SpliceVault and AlphaGenome splicing annotation of variants annotated "
-             "before they were switched on (#2426, #2433), with one VEP run per version. Admin steps: "
+             "before they were switched on (#2426, #2433), and re-annotate the 5' UTR effects Ensembl's UTRAnnotator "
+             "reported one of at random (#2499), with one VEP run per version. Admin steps: "
              "https://github.com/SACGF/variantgrid/issues/2433#issuecomment-6393595562. For each version:"]
     for vav in qs.order_by("genome_build_id", "pk"):
         lines.append("")

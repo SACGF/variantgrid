@@ -32,6 +32,7 @@ from annotation.vep_plugin_backfill import (
     SOURCE_PINS,
     backfill_fork,
     backfill_source_columns,
+    backfill_steps,
     backfill_vep_command,
     vep_mismatch_fix,
 )
@@ -52,6 +53,8 @@ _stamp_pins_and_flag_backfill = import_module(
     "annotation.migrations.0004_utr_annotator_avi_splicevault")._stamp_pins_and_flag_backfill
 _backfill_note = import_module(
     "annotation.migrations.0005_utr_annotator_avi_splicevault_manual_backfill")._backfill_note
+_flag_versions_annotated_by_old_plugin = import_module(
+    "annotation.migrations.0009_utr_effects_backfill")._flag_versions_annotated_by_old_plugin
 
 
 def _settings_with_plugins(vep_version: str = "116") -> dict:
@@ -301,6 +304,115 @@ class PluginPinStampTests(TestCase):
         self.assertEqual(cmd[-6:], ["--fork", str(backfill_fork()), "--buffer_size", "5000",
                                     "--fields", "Feature,PICK,AVI_PHRED"])
         self.assertEqual(cmd.count("--buffer_size"), 1)
+
+    def _steps(self, vav) -> list[str]:
+        with override_settings(**_settings_with_plugins()):
+            vav.refresh_from_db()
+            return backfill_steps(vav, AnnotationRangeLock)
+
+    def test_utr_effects_migration_flags_versions_that_ran_utr_annotator(self):
+        """ #2499: only a NEW/ACTIVE version with the pin and annotated variants ran the old plugin """
+        ran = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)
+        unannotated = self._vav(self.grch37, VariantAnnotationVersion.Status.NEW, annotated=False)
+        historical = self._vav(self.grch37, VariantAnnotationVersion.Status.HISTORICAL)
+        no_utr = self._vav(self.grch38, VariantAnnotationVersion.Status.ACTIVE)
+        VariantAnnotationVersion.objects.filter(pk__in=[ran.pk, unannotated.pk, historical.pk]) \
+            .update(utr_annotator="uORF_5UTR_GRCh37_PUBLIC.txt")
+        _flag_versions_annotated_by_old_plugin(apps, None)
+        for vav in (ran, unannotated, historical, no_utr):
+            vav.refresh_from_db()
+        self.assertFalse(ran.backfilled_utr_effects)
+        self.assertTrue(unannotated.backfilled_utr_effects)
+        self.assertTrue(historical.backfilled_utr_effects)
+        self.assertTrue(no_utr.backfilled_utr_effects)
+
+    @staticmethod
+    def _step(steps: list[str], needle: str) -> str:
+        """ The one numbered step containing this """
+        matches = [s for s in steps[1:] if needle in s]
+        assert len(matches) == 1, (needle, steps)
+        return matches[0]
+
+    def test_utr_effects_pass_alone_reruns_utr_annotator_over_variants_with_a_consequence(self):
+        vav = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)
+        self._enable("--genome-build", "GRCh37")
+        VariantAnnotationVersion.objects.filter(pk=vav.pk).update(backfilled_utr_avi_splicevault=True,
+                                                                    backfilled_utr_effects=False)
+        steps = self._steps(vav)
+        # our UTRAnnotator.pm must be installed before VEP runs
+        self.assertTrue(steps[1].startswith("1. python3 manage.py download_annotation_data"))
+        dump = self._step(steps, "python3 manage.py annotation_backfill_columns --dump")
+        vep = self._step(steps, "--fields Feature,PICK")
+        import_step = self._step(steps, "--mark-backfilled")
+        self.assertIn("--columns utr_annotator_consequence,utr_annotator_annotation ", dump)
+        self.assertIn("--not-null utr_annotator_consequence", dump)
+        self.assertNotIn("--max-variant-id", dump)
+        self.assertIn("--plugin UTRAnnotator,", vep)
+        self.assertNotIn("SpliceVault", vep)
+        self.assertNotIn("splicevault", import_step)
+        self.assertTrue(import_step.endswith("--mark-backfilled backfilled_utr_effects"))
+
+    def test_both_pending_is_one_unbounded_pass_marking_both_flags(self):
+        vav = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)
+        self._enable("--genome-build", "GRCh37")
+        VariantAnnotationVersion.objects.filter(pk=vav.pk).update(backfilled_utr_effects=False)
+        steps = self._steps(vav)
+        self.assertTrue(steps[1].startswith("1. python3 manage.py download_annotation_data"))
+        dump = self._step(steps, "python3 manage.py annotation_backfill_columns --dump")
+        vep = self._step(steps, "--fields Feature,PICK")
+        import_step = self._step(steps, "--mark-backfilled")
+        self.assertNotIn("--max-variant-id", dump)
+        self.assertNotIn("--not-null", dump)
+        self.assertIn("--csq splicevault_spliceai_delta=SpliceVault_SpliceAI_delta", import_step)
+        self.assertIn("--plugin UTRAnnotator,", vep)
+        self.assertIn("--plugin SpliceVault,", vep)
+        self.assertTrue(import_step.endswith(
+            "--mark-backfilled backfilled_utr_avi_splicevault,backfilled_utr_effects"))
+
+    def test_plugin_backfill_alone_stays_bounded(self):
+        vav = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)
+        self._enable("--genome-build", "GRCh37")
+        steps = self._steps(vav)
+        self.assertNotIn("download_annotation_data", "\n".join(steps))
+        self.assertIn("--max-variant-id", self._step(steps, "python3 manage.py annotation_backfill_columns --dump"))
+        self.assertTrue(self._step(steps, "--mark-backfilled")
+                        .endswith("--mark-backfilled backfilled_utr_avi_splicevault"))
+        VariantAnnotationVersion.objects.filter(pk=vav.pk).update(backfilled_utr_avi_splicevault=True)
+        self.assertEqual(self._steps(vav), [])
+
+    def _import_empty_vcf_marking(self, vav, flags: str):
+        with tempfile.NamedTemporaryFile(suffix=".vcf") as empty_vcf, override_settings(**_settings_with_plugins()):
+            empty_vcf.write(b"##fileformat=VCFv4.2\n"
+                            b'##INFO=<ID=CSQ,Number=.,Type=String,Description="Format: Feature|PICK|5UTR_consequence">\n'
+                            b"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n")
+            empty_vcf.flush()
+            call_command("annotation_backfill_columns", "--import", "--genome-build", "GRCh37",
+                         "--variant-annotation-version", str(vav.pk), "--columns", "utr_annotator_consequence",
+                         "--csq", "utr_annotator_consequence=5UTR_consequence", "--vcf", empty_vcf.name,
+                         "--mark-backfilled", flags, stdout=io.StringIO())
+
+    def test_mark_backfilled_accepts_several_flags(self):
+        vav = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)
+        VariantAnnotationVersion.objects.filter(pk=vav.pk).update(backfilled_utr_avi_splicevault=False,
+                                                                    backfilled_utr_effects=False)
+        with patch("annotation.management.commands.annotation_backfill_columns.installed_vep_plugin_is_ours",
+                   return_value=True):
+            self._import_empty_vcf_marking(vav, "backfilled_utr_avi_splicevault,backfilled_utr_effects")
+        vav.refresh_from_db()
+        self.assertTrue(vav.backfilled_utr_avi_splicevault)
+        self.assertTrue(vav.backfilled_utr_effects)
+
+    def test_utr_effects_not_marked_with_ensembls_plugin_installed(self):
+        """ VEP output from Ensembl's UTRAnnotator has the same one-effect-at-random values """
+        vav = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)
+        VariantAnnotationVersion.objects.filter(pk=vav.pk).update(backfilled_utr_effects=False)
+        with patch("annotation.management.commands.annotation_backfill_columns.installed_vep_plugin_is_ours",
+                   return_value=False) as is_ours, \
+                self.assertRaisesRegex(CommandError, "download_annotation_data"):
+            self._import_empty_vcf_marking(vav, "backfilled_utr_effects")
+        is_ours.assert_called_once_with("UTRAnnotator")
+        vav.refresh_from_db()
+        self.assertFalse(vav.backfilled_utr_effects)
 
 
 class UTRAnnotatorEffectsTests(TestCase):
