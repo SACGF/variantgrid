@@ -4,7 +4,12 @@ import requests
 from cdot.data_release import _get_version_from_tag_name, get_latest_data_release_tag_name
 from django.conf import settings
 
-from annotation.vep_annotation import VEPConfig, get_vep_plugin_files, get_vep_plugin_url
+from annotation.vep_annotation import (
+    VEPConfig,
+    get_vep_plugin_files,
+    get_vep_plugin_url,
+    is_variantgrid_vep_plugin,
+)
 from genes.models import CdotDataVersion, TranscriptVersion
 from snpdb.models import GenomeBuild
 from snpdb.models.models_somalier import SomalierConfig
@@ -88,7 +93,8 @@ def annotation_data_exists(flat=False, include_tbi_for_gz=False, include_csi=Fal
                 if key in optional_keys:
                     file_data[key]["optional"] = True
 
-        # A plugin can be newer than the VEP_plugins checkout (AVI.pm, #2426), so comes from Ensembl rather than us
+        # A plugin can be newer than the VEP_plugins checkout (AVI.pm, #2426), so comes from Ensembl rather than us.
+        # Our own plugins are "refresh": the hosted copy is authoritative and replaces whatever is installed
         for plugin_name, filename in get_vep_plugin_files(genome_build).items():
             if filename in unique_filenames:
                 continue
@@ -97,6 +103,8 @@ def annotation_data_exists(flat=False, include_tbi_for_gz=False, include_csi=Fal
                 "valid": os.path.exists(filename),
                 "fix": f"cd {os.path.dirname(filename)};wget {get_vep_plugin_url(plugin_name)}",
             }
+            if is_variantgrid_vep_plugin(plugin_name):
+                file_data[f"plugin_{plugin_name}"]["refresh"] = True
         all_build_data[genome_build.name] = file_data
 
     if flat:

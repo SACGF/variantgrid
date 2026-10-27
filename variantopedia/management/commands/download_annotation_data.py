@@ -58,11 +58,13 @@ class Command(BaseCommand):
         missing = []
         not_hosted = []
         for key, data in checks.items():
-            if force or not data.get("valid"):
-                url, dirname = _parse_fix(data.get("fix", ""))
-                if url is None:
-                    self.stderr.write(f"Could not parse fix for {key}: {data.get('fix')}")
-                    continue
+            url, dirname = _parse_fix(data.get("fix", ""))
+            if url is None:
+                self.stderr.write(f"Could not parse fix for {key}: {data.get('fix')}")
+                continue
+            filename = os.path.join(dirname, os.path.basename(urlparse(url).path))
+            stale = data.get("refresh") and data.get("valid") and _differs_from_hosted(url, filename)
+            if force or stale or not data.get("valid"):
                 if data.get("optional") and not _is_hosted(url):
                     not_hosted.append((key, url))
                     continue
@@ -83,7 +85,7 @@ class Command(BaseCommand):
             self.stdout.write("All annotation data files present.")
             return
 
-        self.stdout.write(f"Found {len(missing)} missing annotation file(s):")
+        self.stdout.write(f"Found {len(missing)} missing or outdated annotation file(s):")
         for key, url, _dirname, _filename, _is_archive in missing:
             self.stdout.write(f"  {key}: {url}")
 
@@ -138,6 +140,10 @@ class Command(BaseCommand):
                 lines.append(f"rm {shlex.quote(tarball)}")
             elif data.get("optional"):
                 lines.append(f"wget -c -P {shlex.quote(dirname)} {shlex.quote(url)} || echo 'optional, not hosted: {key}'")
+            elif data.get("refresh"):
+                # ours; the hosted copy replaces whatever the plugins checkout holds
+                filename = os.path.join(dirname, os.path.basename(urlparse(url).path))
+                lines.append(f"wget -O {shlex.quote(filename)} {shlex.quote(url)}")
             else:
                 lines.append(f"wget -c -P {shlex.quote(dirname)} {shlex.quote(url)}")
                 if _is_executable(key):
@@ -168,6 +174,18 @@ def _parse_fix(fix):
     if not cd_part.startswith("cd ") or not wget_part.startswith("wget "):
         return None, None
     return wget_part[len("wget "):].strip(), cd_part[len("cd "):].strip()
+
+
+def _differs_from_hosted(url, filename) -> bool:
+    """For a "refresh" entry (a plugin we ship), whether the installed file differs from the hosted one, which is
+    authoritative. Unreachable counts as unchanged so an offline run does not re-download."""
+    try:
+        resp = requests.get(url, timeout=60)
+        resp.raise_for_status()
+    except requests.RequestException:
+        return False
+    with open(filename, "rb") as f:
+        return f.read() != resp.content
 
 
 def _is_hosted(url) -> bool:

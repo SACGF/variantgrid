@@ -35,8 +35,10 @@ from library.utils import execute_cmd
 from library.utils.file_utils import get_extension_without_gzip, mk_path_for_file, open_handle_gzip
 from snpdb.models.models_genome import GenomeBuild
 
-# Plugins in annotation/annotation_data/generate_annotation rather than Ensembl's VEP_plugins
-_VARIANTGRID_VEP_PLUGINS = {"Grantham"}
+# Plugins in annotation/annotation_data/generate_annotation rather than Ensembl's VEP_plugins. download_annotation_data
+# installs these over whatever the plugins dir holds, so a fix can ship ahead of Ensembl: UTRAnnotator carries
+# Ensembl/VEP_plugins#869 (every 5' UTR effect reported, deterministically) and comes out once that is released
+_VARIANTGRID_VEP_PLUGINS = {"Grantham", "UTRAnnotator"}
 
 
 class VEPVersionMismatchError(ValueError):
@@ -335,9 +337,13 @@ def get_vep_plugin_files(genome_build: GenomeBuild) -> dict[str, str]:
     return plugin_files
 
 
+def is_variantgrid_vep_plugin(plugin_name: str) -> bool:
+    return plugin_name in _VARIANTGRID_VEP_PLUGINS
+
+
 def get_vep_plugin_url(plugin_name: str) -> str:
     """ Ensembl's VEP_plugins branch for the installed VEP, or our repo for a plugin Ensembl doesn't have """
-    if plugin_name in _VARIANTGRID_VEP_PLUGINS:
+    if is_variantgrid_vep_plugin(plugin_name):
         return ("https://raw.githubusercontent.com/SACGF/variantgrid/refs/heads/master/annotation/annotation_data/"
                 f"generate_annotation/{plugin_name}.pm")
     return (f"https://raw.githubusercontent.com/Ensembl/VEP_plugins/release/{settings.ANNOTATION_VEP_VERSION}/"

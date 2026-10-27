@@ -245,6 +245,11 @@ carries the steps; `annotation/migrations/0007_alphagenome_splicing.py` does the
      alphagenome_variant_impact_score_snvs.tsv.gz (`#CHROM POS REF ALT raw_score PHRED`, `chr` contigs, which the plugin maps) is about
      as big: extract it and the .tbi into `annotation_data/GRCh38/` from a zip on another filesystem, or stream it
      (`curl <download url> | bsdtar -xf -`) so the zip never lands, as zip + extract need ~177 GB on one disk.
+   - `UTRAnnotator.pm` comes from our repo (`annotation/annotation_data/generate_annotation/UTRAnnotator.pm`), not
+     Ensembl's: it carries Ensembl/VEP_plugins#869, which reports every 5' UTR effect in a fixed order where the stock
+     plugin picks one by hash order and so differs between runs. `download_annotation_data` replaces the installed copy
+     whenever it differs from ours (`annotation/vep_annotation.py:is_variantgrid_vep_plugin`). Drop it from
+     `_VARIANTGRID_VEP_PLUGINS` once that PR is on the release branch we download from.
    - `AVI.pm`, which `download_annotation_data` fetches from VEP_plugins `release/<ANNOTATION_VEP_VERSION>` into
      ANNOTATION_VEP_PLUGINS_DIR along with any other configured plugin missing there.
    - GRCh38, non-commercial deployments only: "AlphaGenome SNV merged splicing scores",
