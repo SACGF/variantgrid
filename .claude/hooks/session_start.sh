@@ -9,6 +9,9 @@ if [ -n "$dirty" ]; then
 else
   echo "working tree: clean"
 fi
+# claude/runbooks/upstream_watch.md: a row per fork / patched copy we carry, with its "Next check" date in column 5
+due=$(awk -F'|' -v today="$(date +%F)" '/^\|/ && $5 ~ /[0-9]{4}-[0-9]{2}-[0-9]{2}/ { gsub(/ /, "", $5); if ($5 <= today) n++ } END { print n + 0 }' claude/runbooks/upstream_watch.md 2>/dev/null)
+[ "${due:-0}" -gt 0 ] && echo "upstream watch: $due check(s) due - claude/runbooks/upstream_watch.md"
 newest_plan=$(ls -t claude/plans/*.md 2>/dev/null | head -1)
 [ -n "$newest_plan" ] && echo "newest plan: $newest_plan ($(sed -n 's/^Status: *//p' "$newest_plan" | head -1))"
 # claude/maps/*.md are gitignored: regenerate in the background so they are fresh and never in a diff.
