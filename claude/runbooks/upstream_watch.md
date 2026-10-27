@@ -12,6 +12,16 @@ columns, so keep the table shape.
 | UTRAnnotator copy | Ensembl/VEP_plugins#869 on the `release/<VEP>` branch | 2026-10-27 | 2026-11-27 |
 | VEP plugin per-variant cache | Ensembl/ensembl-variation#1220, Ensembl/VEP_plugins#871 | 2026-10-27 | 2026-11-27 |
 | CSI index docs | Ensembl/ensembl-vep#2068 | 2026-10-27 | 2027-01-27 |
+| uv cooldown exceptions | the 7-day cooldown passing the pinned cutoffs | 2026-10-27 | 2026-10-30 |
+
+## uv cooldown exceptions
+
+`uv.toml` names packages whose security fix was less than seven days old when it was needed, each with a fixed
+cutoff date that admits it. The entry freezes that package at the cutoff, so it comes out once the default cooldown
+has passed the date: certifi and pillow after 2026-10-28, pypdf after 2026-10-29.
+
+Check: `grep exclude-newer-package uv.toml` against today's date. When resolved: delete the expired entries, recompile
+both requirements files (root `AGENTS.md`, Python packages), and delete this row when none are left.
 
 ## hgvs fork
 

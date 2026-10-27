@@ -28,7 +28,7 @@ django-postgres-extra
 django_recaptcha>=4.0.0
 django-registration-redux
 django_termsandconditions
-djangorestframework>=3.18.0
+djangorestframework>=3.18.2  # GHSA-3547-9m27-7rxg, GHSA-33wh-fxxf-88vv, GHSA-xw6w-gcfp-cf8m
 drf-spectacular
 drf-spectacular-sidecar
 easy_thumbnails
@@ -55,7 +55,7 @@ pillow>=13.0.0
 pronto>=2.4.7
 psycopg[binary]
 pyBigWig>=0.3.22
-pypdf>=6.15.0
+pypdf>=6.21.2  # long-runtime / memory advisories up to GHSA-6c7f-9265-g8fw; inside the cooldown, see uv.toml
 pysam
 python_dateutil
 redis
