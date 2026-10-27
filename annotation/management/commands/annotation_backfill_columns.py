@@ -76,9 +76,9 @@ class Command(BaseCommand):
                                  "authoritative for the dumped variants (default: leave it alone)")
         parser.add_argument("--dry-run", action="store_true",
                             help="--import: report how many rows would change, changing nothing")
-        parser.add_argument("--mark-backfilled", metavar="FLAG",
-                            help="--import: once the import finishes, set this VariantAnnotationVersion "
-                                 "flag True, eg 'backfilled_utr_avi_splicevault'. Only on the import of the "
+        parser.add_argument("--mark-backfilled", metavar="FLAG[,FLAG]",
+                            help="--import: once the import finishes, set these VariantAnnotationVersion "
+                                 "flags True, eg 'backfilled_utr_avi_splicevault'. Only on the import of the "
                                  "last (or only) piece of a split dump")
 
     def handle(self, *args, **options):
@@ -87,11 +87,12 @@ class Command(BaseCommand):
         column_ids = [c.strip() for c in options["columns"].split(",") if c.strip()]
         if not column_ids:
             raise CommandError("--columns needs at least one VariantGrid column id")
-        if flag := options["mark_backfilled"]:
+        if options["mark_backfilled"]:
             if options["dump"]:
                 raise CommandError("--mark-backfilled is an --import option")
             try:
-                validate_backfill_flag(flag)
+                for flag in self._mark_backfilled_flags(options):
+                    validate_backfill_flag(flag)
             except BackfillColumnError as e:
                 raise CommandError(str(e)) from e
 
@@ -100,7 +101,7 @@ class Command(BaseCommand):
                                                info_overrides=self._parse_overrides(options["info"], "--info"),
                                                csq_overrides=self._parse_overrides(options["csq"], "--csq"))
         except BackfillColumnError as e:
-            raise CommandError(str(e))
+            raise CommandError(str(e)) from e
 
         for target in targets:
             tables = ", ".join(target.base_table_names)
@@ -117,7 +118,7 @@ class Command(BaseCommand):
             try:
                 variant_annotation_version = VariantAnnotationVersion.objects.get(pk=pk)
             except VariantAnnotationVersion.DoesNotExist:
-                raise CommandError(f"No VariantAnnotationVersion with pk={pk}")
+                raise CommandError(f"No VariantAnnotationVersion with pk={pk}") from None
             if variant_annotation_version.genome_build != genome_build:
                 raise CommandError(f"VariantAnnotationVersion pk={pk} is "
                                    f"{variant_annotation_version.genome_build}, not {genome_build}")
@@ -156,7 +157,7 @@ class Command(BaseCommand):
                                             max_variant_id=options["max_variant_id"],
                                             pipeline_type=pipeline_type)
         except BackfillColumnError as e:
-            raise CommandError(str(e))
+            raise CommandError(str(e)) from e
         self.stdout.write(f"Dumped {count} variants annotated by {variant_annotation_version} "
                           f"to '{output_filename}'")
 
@@ -183,15 +184,19 @@ class Command(BaseCommand):
                                          clear_missing=options["clear_missing"],
                                          dry_run=options["dry_run"], emit=emit)
         except BackfillColumnError as e:
-            raise CommandError(str(e))
+            raise CommandError(str(e)) from e
 
         verb = "would change" if options["dry_run"] else "changed"
         self.stdout.write(f"{variant_annotation_version}: read {report['records_read']} records, "
                           f"{verb} {report['rows_changed']} rows")
 
-        if flag := options["mark_backfilled"]:
+        for flag in self._mark_backfilled_flags(options):
             if options["dry_run"]:
                 self.stdout.write(f"Would set {flag} on {variant_annotation_version}")
             else:
                 mark_backfilled(variant_annotation_version, flag)
                 self.stdout.write(f"Set {flag} on {variant_annotation_version}")
+
+    @staticmethod
+    def _mark_backfilled_flags(options) -> list[str]:
+        return [f.strip() for f in (options["mark_backfilled"] or "").split(",") if f.strip()]

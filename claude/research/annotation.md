@@ -185,6 +185,15 @@ order and flags as the pipeline so the PICK'd transcript matches, then `--import
 - `--mark-backfilled <flag>` sets the VAV's `backfilled_*` flag once the import finishes. With a split dump, pass it
   on the last import only.
 
+**UTRAnnotator effects (#2499).** Ensembl's UTRAnnotator reported one of a variant's 5' UTR effects, chosen by Perl
+hash order; our copy of the plugin reports all of them. `backfilled_utr_effects` is False on the NEW/ACTIVE versions
+that ran the old plugin (migration 0009), and `annotation/vep_plugin_backfill.py:backfill_steps` prints one pass per
+version for whichever flags it has pending: UTRAnnotator alone over the variants with a consequence
+(`--not-null utr_annotator_consequence`) when only this one is, or every source over every variant with no
+`--max-variant-id` when the #2426 backfill is pending too, since the variants annotated after that switch-on were
+annotated by the old plugin. `--mark-backfilled` takes both flags comma separated. The transcript rows keep the old
+plugin's values, as for any `--csq` import.
+
 **UTRAnnotator, AVI and SpliceVault (#2426)** are this recipe applied to three plugins at once, so a deployment runs
 one backfill VEP pass and one import:
 

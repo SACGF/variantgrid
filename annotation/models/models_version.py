@@ -231,6 +231,14 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # annotation/vep_plugin_backfill.py:stamp_plugin_pins sets it False on the NEW/ACTIVE versions one applies to.
     backfilled_utr_avi_splicevault = models.BooleanField(default=True)
 
+    # #2499 - Ensembl's UTRAnnotator reported one of a variant's 5' UTR effects chosen by Perl hash order, so a
+    # variant with two effects (a uAUG gain that also frameshifts a uORF) lost one at random. Our copy of the plugin
+    # reports all of them: utr_annotator_consequence / utr_annotator_annotation of variants annotated by the old
+    # plugin are re-imported from one UTRAnnotator-only VEP pass over variants that have a consequence
+    # (annotation/vep_plugin_backfill.py:backfill_steps). The migration sets it False on the NEW/ACTIVE versions
+    # that ran the old plugin.
+    backfilled_utr_effects = models.BooleanField(default=True)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
