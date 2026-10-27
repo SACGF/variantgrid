@@ -5,9 +5,9 @@ from typing import Any, Optional
 import numpy as np
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import Count, F, Q, QuerySet
+from django.db import connection
+from django.db.models import Count, F, QuerySet
 from django.db.models.fields.json import KT
-from django.db.models.lookups import In, IsNull
 
 from classification.enums.classification_enums import CriteriaEvaluation, ShareLevel
 from classification.models import EvidenceKeyMap
@@ -107,20 +107,25 @@ def get_grouped_classification_counts(user: User,
     if evidence_key and field_labels:
         raise ValueError("Can't supply both 'evidence_key' and 'field_labels'")
 
-    group_path = f"{field}__{evidence_key}__value" if evidence_key else field
-    group_value = KT(group_path) if evidence_key else F(group_path)
-    vc_qs = get_visible_classifications_qs(user, allele_origin_buckets) \
-        .annotate(group_value=group_value).filter(group_value__isnull=False)
+    group_value = KT(f"{field}__{evidence_key}__value") if evidence_key else F(field)
+    vc_qs = get_visible_classifications_qs(user, allele_origin_buckets).annotate(group_value=group_value)
+    rows_sql, params = vc_qs.values_list("pk", "created", "clinical_significance", ALLELE_PATH, "group_value") \
+        .order_by().query.sql_with_params()
+    # OFFSET 0 keeps the rows subquery from being flattened, so an evidence value is extracted once per record
+    # rather than again for each of the WHERE, DISTINCT ON and GROUP BY that use it
+    rows_sql = f"SELECT * FROM ({rows_sql} OFFSET 0) visible (id, created, clinical_significance, allele_id, group_value)"
     if allele_level:
-        latest_per_group_allele_qs = vc_qs.filter(classification__allele_info__allele__isnull=False) \
-            .order_by(group_path, ALLELE_PATH, *LATEST_FIRST).distinct(group_path, ALLELE_PATH)
-        vc_qs = ClassificationModification.objects.filter(pk__in=latest_per_group_allele_qs.values("pk")) \
-            .annotate(group_value=group_value)
-    group_counts_qs = vc_qs.values_list("clinical_significance", "group_value").annotate(count=Count("pk")).order_by()
+        rows_sql = f"""SELECT DISTINCT ON (group_value, allele_id) * FROM ({rows_sql}) all_rows
+                       WHERE allele_id IS NOT NULL ORDER BY group_value, allele_id, created DESC, id DESC"""
+    group_counts_sql = f"""SELECT clinical_significance, group_value, COUNT(*) FROM ({rows_sql}) counted_rows
+                           WHERE group_value IS NOT NULL GROUP BY 1, 2"""
+    with connection.cursor() as cursor:
+        cursor.execute(group_counts_sql, params)
+        group_counts_rows = cursor.fetchall()
 
     counts = Counter()
     classification_counts = defaultdict(Counter)
-    for clinical_significance, value, count in group_counts_qs:
+    for clinical_significance, value, count in group_counts_rows:
         if field_labels:
             value = field_labels.get(value, value)
         counts[value] += count
@@ -163,30 +168,44 @@ def get_criteria_counts(
         critera="acmg",
         allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None
     ) -> dict[str, list[dict]]:
-    """ Per clinical significance, the fraction of records where each criterion is met, not met, or not set.
-        Met is CriteriaEvaluation.is_met: any value other than NM, NA or N """
+    """ Per clinical significance, the fraction of records where each criterion is met (CriteriaEvaluation.is_met),
+        not met (NM, NA or N), or not set """
     acmg_labels = {e.key: e.pretty_label for e in EvidenceKeyMap.instance().criteria_for(critera)}
-    not_met_values = [CriteriaEvaluation.NOT_MET, CriteriaEvaluation.NOT_APPLICABLE, CriteriaEvaluation.NEUTRAL]
-
-    aggregates = {"total": Count("pk")}
-    for i, key in enumerate(acmg_labels):
-        value = KT(f"{evidence_field}__{key}__value")
-        aggregates[f"met_{i}"] = Count("pk", filter=Q(IsNull(value, False)) & ~Q(In(value, ["", *not_met_values])))
-        aggregates[f"not_met_{i}"] = Count("pk", filter=Q(In(value, not_met_values)))
+    criteria_index = {key: i for i, key in enumerate(acmg_labels)}
 
     vc_qs = get_visible_classifications_qs(user, allele_origin_buckets=allele_origin_buckets)
-    vc_qs = vc_qs.filter(clinical_significance__isnull=False)
-    counts_qs = vc_qs.values("clinical_significance").annotate(**aggregates).order_by()
+    vc_qs = vc_qs.filter(clinical_significance__isnull=False).order_by()
+    totals = dict(vc_qs.values_list("clinical_significance").annotate(count=Count("pk")))
+
+    # jsonb_each expands each record's evidence once - a -> per criterion would read the whole blob again each time
+    rows_sql, params = vc_qs.values_list("clinical_significance", evidence_field).query.sql_with_params()
+    value_counts_sql = f"""
+        SELECT visible.clinical_significance, evidence.key,
+               CASE WHEN jsonb_typeof(evidence.value) = 'object' THEN evidence.value ->> 'value'
+                    ELSE evidence.value #>> '{{}}' END AS criteria_value,
+               COUNT(*)
+        FROM ({rows_sql}) visible (clinical_significance, evidence)
+        CROSS JOIN LATERAL jsonb_each(visible.evidence) evidence
+        WHERE evidence.key = ANY(%s)
+        GROUP BY 1, 2, 3"""
+    with connection.cursor() as cursor:
+        cursor.execute(value_counts_sql, [*params, list(acmg_labels)])
+        value_counts = cursor.fetchall()
+
+    n = len(acmg_labels)
+    met_not_met = defaultdict(lambda: (np.zeros(n), np.zeros(n)))
+    for clinical_significance, key, value, count in value_counts:
+        if value:
+            met, not_met = met_not_met[clinical_significance]
+            (met if CriteriaEvaluation.is_met(value) else not_met)[criteria_index[key]] += count
 
     acmg_data = {}
     labels = list(acmg_labels.values())
-    for counts in counts_qs:
-        total = counts["total"]
-        met = np.array([counts[f"met_{i}"] for i in range(len(labels))]) / total
-        not_met = np.array([counts[f"not_met_{i}"] for i in range(len(labels))]) / total
+    for clinical_significance, total in totals.items():
+        met, not_met = (counts / total for counts in met_not_met[clinical_significance])
         not_set = 1 - met - not_met
 
-        acmg_data[counts["clinical_significance"]] = [
+        acmg_data[clinical_significance] = [
             {"x": labels,
              "y": met.tolist(),
              "name": "Met",

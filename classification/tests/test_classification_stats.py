@@ -7,7 +7,7 @@ from classification.classification_stats import (
     get_grouped_classification_counts,
 )
 from classification.enums import ShareLevel, SpecialEKeys, SubmissionSource
-from classification.models import Classification, ImportedAlleleInfo
+from classification.models import Classification, EvidenceKeyMap, ImportedAlleleInfo
 from classification.tests.models.test_utils import ClassificationTestUtils
 from snpdb.enums import ClinicalSignificance
 from snpdb.models import Allele, GenomeBuild, GenomeBuildPatchVersion, Lab
@@ -59,8 +59,10 @@ class ClassificationStatsTest(TestCase):
 
     def test_criteria_met_not_met_not_set(self):
         """ Met is any strength - NM, NA and N are "not met", a missing value is "not set" """
-        self._classify(self.lab, Allele.objects.create(), "P", pvs1="PVS", pm2="NM")
-        self._classify(self.lab, Allele.objects.create(), "P", pvs1="PM", pm2="N")
+        key_for_label = {e.pretty_label: e.key for e in EvidenceKeyMap.instance().criteria_for("acmg")}
+        pvs1, pm2 = key_for_label["PVS1"], key_for_label["PM2"]
+        self._classify(self.lab, Allele.objects.create(), "P", **{pvs1: "PVS", pm2: "NM"})
+        self._classify(self.lab, Allele.objects.create(), "P", **{pvs1: "PM", pm2: "N"})
 
         pathogenic = get_criteria_counts(self.viewer, "published_evidence")[ClinicalSignificance.PATHOGENIC]
         met, not_met, not_set = (dict(zip(series["x"], series["y"])) for series in pathogenic)
