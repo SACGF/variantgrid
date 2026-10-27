@@ -326,13 +326,24 @@ class PluginPinStampTests(TestCase):
         self.assertTrue(historical.backfilled_utr_effects)
         self.assertTrue(no_utr.backfilled_utr_effects)
 
+    @staticmethod
+    def _step(steps: list[str], needle: str) -> str:
+        """ The one numbered step containing this """
+        matches = [s for s in steps[1:] if needle in s]
+        assert len(matches) == 1, (needle, steps)
+        return matches[0]
+
     def test_utr_effects_pass_alone_reruns_utr_annotator_over_variants_with_a_consequence(self):
         vav = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)
         self._enable("--genome-build", "GRCh37")
         VariantAnnotationVersion.objects.filter(pk=vav.pk).update(backfilled_utr_avi_splicevault=True,
                                                                     backfilled_utr_effects=False)
         steps = self._steps(vav)
-        dump, vep, _dry_run, import_step = steps[1], steps[2], steps[3], steps[4]
+        # our UTRAnnotator.pm must be installed before VEP runs
+        self.assertTrue(steps[1].startswith("1. python3 manage.py download_annotation_data"))
+        dump = self._step(steps, "python3 manage.py annotation_backfill_columns --dump")
+        vep = self._step(steps, "--fields Feature,PICK")
+        import_step = self._step(steps, "--mark-backfilled")
         self.assertIn("--columns utr_annotator_consequence,utr_annotator_annotation ", dump)
         self.assertIn("--not-null utr_annotator_consequence", dump)
         self.assertNotIn("--max-variant-id", dump)
@@ -346,7 +357,10 @@ class PluginPinStampTests(TestCase):
         self._enable("--genome-build", "GRCh37")
         VariantAnnotationVersion.objects.filter(pk=vav.pk).update(backfilled_utr_effects=False)
         steps = self._steps(vav)
-        dump, vep, import_step = steps[1], steps[2], steps[4]
+        self.assertTrue(steps[1].startswith("1. python3 manage.py download_annotation_data"))
+        dump = self._step(steps, "python3 manage.py annotation_backfill_columns --dump")
+        vep = self._step(steps, "--fields Feature,PICK")
+        import_step = self._step(steps, "--mark-backfilled")
         self.assertNotIn("--max-variant-id", dump)
         self.assertNotIn("--not-null", dump)
         self.assertIn("--csq splicevault_spliceai_delta=SpliceVault_SpliceAI_delta", import_step)
@@ -359,15 +373,14 @@ class PluginPinStampTests(TestCase):
         vav = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)
         self._enable("--genome-build", "GRCh37")
         steps = self._steps(vav)
-        self.assertIn("--max-variant-id", steps[1])
-        self.assertTrue(steps[4].endswith("--mark-backfilled backfilled_utr_avi_splicevault"))
+        self.assertNotIn("download_annotation_data", "\n".join(steps))
+        self.assertIn("--max-variant-id", self._step(steps, "python3 manage.py annotation_backfill_columns --dump"))
+        self.assertTrue(self._step(steps, "--mark-backfilled")
+                        .endswith("--mark-backfilled backfilled_utr_avi_splicevault"))
         VariantAnnotationVersion.objects.filter(pk=vav.pk).update(backfilled_utr_avi_splicevault=True)
         self.assertEqual(self._steps(vav), [])
 
-    def test_mark_backfilled_accepts_several_flags(self):
-        vav = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)
-        VariantAnnotationVersion.objects.filter(pk=vav.pk).update(backfilled_utr_avi_splicevault=False,
-                                                                    backfilled_utr_effects=False)
+    def _import_empty_vcf_marking(self, vav, flags: str):
         with tempfile.NamedTemporaryFile(suffix=".vcf") as empty_vcf, override_settings(**_settings_with_plugins()):
             empty_vcf.write(b"##fileformat=VCFv4.2\n"
                             b'##INFO=<ID=CSQ,Number=.,Type=String,Description="Format: Feature|PICK|5UTR_consequence">\n'
@@ -376,11 +389,30 @@ class PluginPinStampTests(TestCase):
             call_command("annotation_backfill_columns", "--import", "--genome-build", "GRCh37",
                          "--variant-annotation-version", str(vav.pk), "--columns", "utr_annotator_consequence",
                          "--csq", "utr_annotator_consequence=5UTR_consequence", "--vcf", empty_vcf.name,
-                         "--mark-backfilled", "backfilled_utr_avi_splicevault,backfilled_utr_effects",
-                         stdout=io.StringIO())
+                         "--mark-backfilled", flags, stdout=io.StringIO())
+
+    def test_mark_backfilled_accepts_several_flags(self):
+        vav = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)
+        VariantAnnotationVersion.objects.filter(pk=vav.pk).update(backfilled_utr_avi_splicevault=False,
+                                                                    backfilled_utr_effects=False)
+        with patch("annotation.management.commands.annotation_backfill_columns.installed_vep_plugin_is_ours",
+                   return_value=True):
+            self._import_empty_vcf_marking(vav, "backfilled_utr_avi_splicevault,backfilled_utr_effects")
         vav.refresh_from_db()
         self.assertTrue(vav.backfilled_utr_avi_splicevault)
         self.assertTrue(vav.backfilled_utr_effects)
+
+    def test_utr_effects_not_marked_with_ensembls_plugin_installed(self):
+        """ VEP output from Ensembl's UTRAnnotator has the same one-effect-at-random values """
+        vav = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)
+        VariantAnnotationVersion.objects.filter(pk=vav.pk).update(backfilled_utr_effects=False)
+        with patch("annotation.management.commands.annotation_backfill_columns.installed_vep_plugin_is_ours",
+                   return_value=False) as is_ours, \
+                self.assertRaisesRegex(CommandError, "download_annotation_data"):
+            self._import_empty_vcf_marking(vav, "backfilled_utr_effects")
+        is_ours.assert_called_once_with("UTRAnnotator")
+        vav.refresh_from_db()
+        self.assertFalse(vav.backfilled_utr_effects)
 
 
 class UTRAnnotatorEffectsTests(TestCase):

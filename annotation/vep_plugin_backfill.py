@@ -39,6 +39,7 @@ BACKFILL_FLAG = "backfilled_utr_avi_splicevault"
 UTR_EFFECTS_FLAG = "backfilled_utr_effects"
 UTR_EFFECTS_COLUMNS = ("utr_annotator_consequence", "utr_annotator_annotation")
 ENABLE_COMMAND = "python3 manage.py enable_vep_plugin_backfill"
+DOWNLOAD_COMMAND = "python3 manage.py download_annotation_data"
 ACTIVE_STATUSES = ("NEW", "ACTIVE")  # HISTORICAL versions are never looked up by config again
 # Flags that only add CSQ fields the backfill doesn't import. Dropping them leaves the PICK'd entry the same and runs
 # VEP ~1.5x faster
@@ -220,16 +221,19 @@ def backfill_steps(vav, annotation_range_lock_model) -> list[str]:
                                    dump_vcf, annotated_vcf)
     import_cmd = (f"python3 manage.py annotation_backfill_columns --import {common} {csq_args} "
                   f"--vcf {annotated_vcf} --dump-vcf {dump_vcf}")
-    return [
-        f"{build} (VariantAnnotationVersion {vav.pk}):",
-        f"1. python3 manage.py annotation_backfill_columns --dump {common} {' '.join(dump_args)} "
-        f"--output {dump_vcf}",
-        f"2. {shlex.join(vep_cmd)}",
-        f"3. {import_cmd} --dry-run",
-        f"4. {import_cmd} --mark-backfilled {','.join(flags)}",
-        f"5. rm -f {dump_vcf} {annotated_vcf} {annotated_vcf}_warnings.txt "
+    steps = []
+    if UTR_EFFECTS_FLAG in flags:
+        # The pass is only a fix with our UTRAnnotator.pm installed over Ensembl's; the import checks before marking
+        steps.append(f"{DOWNLOAD_COMMAND}  (installs VariantGrid's UTRAnnotator.pm over the plugins dir's copy)")
+    steps.extend([
+        f"python3 manage.py annotation_backfill_columns --dump {common} {' '.join(dump_args)} --output {dump_vcf}",
+        shlex.join(vep_cmd),
+        f"{import_cmd} --dry-run",
+        f"{import_cmd} --mark-backfilled {','.join(flags)}",
+        f"rm -f {dump_vcf} {annotated_vcf} {annotated_vcf}_warnings.txt "
         f"{get_vep_skipped_variants_filename(annotated_vcf)}",
-    ]
+    ])
+    return [f"{build} (VariantAnnotationVersion {vav.pk}):"] + [f"{i}. {step}" for i, step in enumerate(steps, 1)]
 
 
 def backfill_note(variant_annotation_version_model, annotation_range_lock_model,

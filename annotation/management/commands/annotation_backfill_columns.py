@@ -23,6 +23,8 @@ from annotation.backfill_columns import (
 )
 from annotation.enums import VariantAnnotationPipelineType
 from annotation.models.models_version import VariantAnnotationVersion
+from annotation.vep_annotation import installed_vep_plugin_is_ours
+from annotation.vep_plugin_backfill import DOWNLOAD_COMMAND, UTR_EFFECTS_FLAG
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -95,6 +97,11 @@ class Command(BaseCommand):
                     validate_backfill_flag(flag)
             except BackfillColumnError as e:
                 raise CommandError(str(e)) from e
+            if UTR_EFFECTS_FLAG in self._mark_backfilled_flags(options) \
+                    and not installed_vep_plugin_is_ours("UTRAnnotator"):
+                raise CommandError(f"The plugins dir's UTRAnnotator.pm is not VariantGrid's copy, so this VEP output "
+                                   f"has the same one-effect-at-random values (#2499). Run '{DOWNLOAD_COMMAND}' "
+                                   f"and the VEP step again before marking {UTR_EFFECTS_FLAG}")
 
         try:
             targets = resolve_backfill_columns(variant_annotation_version, column_ids,
