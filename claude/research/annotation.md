@@ -278,7 +278,10 @@ carries the steps; `annotation/migrations/0007_alphagenome_splicing.py` does the
    including a `--plugin` with no `.pm`), and while STANDARD runs on those versions have VEP output not yet imported:
    imported once the inserter expects the new CSQ fields they fail with VEPMissingColumnsError, so let the import lane
    drain or pass `--force` and re-run them. It prints each version's pin changes and backfill steps
-   (`annotation/vep_plugin_backfill.py:backfill_steps`, the same text the ManualOperation note holds).
+   (`annotation/vep_plugin_backfill.py:backfill_steps`, the same text the ManualOperation note holds). With
+   `--bash-script PATH` it also writes them as one `set -e` script
+   (`annotation/vep_plugin_backfill.py:backfill_script`) that runs each version in order and stops at the first
+   failure, keeping the import `--dry-run` so its counts are in the log.
 4. Start annotation_workers and restart the other celery workers and gunicorn so they read the settings. If a run
    did latch VEPVersionMismatchError, the re-check on the annotation runs page clears it.
 5. The printed backfill:

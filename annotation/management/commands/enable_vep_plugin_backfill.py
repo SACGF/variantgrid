@@ -3,6 +3,9 @@ Switch on a VEP plugin / custom VCF (those in vep_plugin_backfill.SOURCE_PINS, f
 VariantAnnotationVersions in use, after setting its file in settings.ANNOTATION[build]["vep_config"]: stamps the pins,
 flags versions for the backfill and prints its steps. @see annotation/vep_plugin_backfill.py
 """
+import os
+import stat
+
 from django.core.management.base import BaseCommand, CommandError
 
 from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
@@ -13,6 +16,7 @@ from annotation.vep_config import disallowed_non_commercial_keys
 from annotation.vep_plugin_backfill import (
     ACTIVE_STATUSES,
     SOURCE_PINS,
+    backfill_script,
     backfill_steps,
     stamp_plugin_pins,
 )
@@ -27,7 +31,8 @@ _VEP_RUN_NOT_IMPORTED = [AnnotationStatus.EXTERNAL_DUMP_COMPLETED, AnnotationSta
 class Command(BaseCommand):
     category = "ops"
     help = ("Switch on VEP plugin / custom VCF files newly set in settings for the VariantAnnotationVersions in use, "
-            "without a new version: stamps their pins and prints the backfill for variants already annotated")
+            "without a new version: stamps their pins and prints the backfill for variants already annotated, "
+            "or writes it as a bash script with --bash-script")
 
     def add_arguments(self, parser):
         parser.add_argument("--genome-build", help="Default: every build with annotation")
@@ -35,6 +40,9 @@ class Command(BaseCommand):
         parser.add_argument("--force", action="store_true",
                             help="Stamp even with runs VEP-annotated but not yet imported (they will fail to "
                                  "import and need re-running)")
+        parser.add_argument("--bash-script", metavar="PATH",
+                            help="Also write the backfill steps as a bash script to PATH, to run under screen "
+                                 "or nohup (with --dry-run, the script for what would be flagged)")
 
     def handle(self, *args, **options):
         if build_name := options["genome_build"]:
@@ -87,10 +95,18 @@ class Command(BaseCommand):
                               "settings at start. A VEP run on the old settings latches VEPVersionMismatchError on "
                               "its version - clear it with the re-check on the annotation runs page.")
 
-        if to_backfill := [stamp.variant_annotation_version for stamp in stamps if stamp.needs_backfill]:
+        to_backfill = [stamp.variant_annotation_version for stamp in stamps if stamp.needs_backfill]
+        if to_backfill:
             self.stdout.write("\nThen backfill the variants annotated before they were switched on, running each "
                               "build's commands in order "
-                              "(https://github.com/SACGF/variantgrid/issues/2433#issuecomment-6393595562):")
+                              "(https://github.com/SACGF/variantgrid/issues/2433#issuecomment-6393595562), or "
+                              "re-run this with --bash-script PATH to write them as one script:")
             for vav in to_backfill:
                 self.stdout.write("")
                 self.stdout.write("\n".join(backfill_steps(vav, AnnotationRangeLock)))
+
+        if script_path := options["bash_script"]:
+            with open(script_path, "w", encoding="utf-8") as f:
+                f.write(backfill_script(to_backfill, AnnotationRangeLock))
+            os.chmod(script_path, os.stat(script_path).st_mode | stat.S_IXUSR)
+            self.stdout.write(f"\nWrote the backfill as a script to {script_path}")

@@ -4,6 +4,8 @@ VariantAnnotationVersions already in use: the VEP command, enable_vep_plugin_bac
 pins and flagging versions for the backfill, the non-commercial data setting, and the display parsing.
 """
 import io
+import os
+import stat
 import tempfile
 from importlib import import_module
 from unittest.mock import patch
@@ -368,6 +370,33 @@ class PluginPinStampTests(TestCase):
         self.assertIn("--plugin SpliceVault,", vep)
         self.assertTrue(import_step.endswith(
             "--mark-backfilled backfilled_utr_avi_splicevault,backfilled_utr_effects"))
+
+    def test_bash_script_runs_each_version_in_order_and_stops_on_failure(self):
+        grch37 = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)
+        grch38 = self._vav(self.grch38, VariantAnnotationVersion.Status.ACTIVE)
+        VariantAnnotationVersion.objects.filter(pk=grch37.pk).update(backfilled_utr_effects=False)
+        with tempfile.NamedTemporaryFile(suffix=".sh") as script_file:
+            self._enable("--bash-script", script_file.name)
+            self.assertTrue(os.stat(script_file.name).st_mode & stat.S_IXUSR)
+            script = script_file.read().decode()
+        lines = script.splitlines()
+        self.assertEqual(lines[0], "#!/bin/bash")
+        self.assertIn("set -euo pipefail", lines)
+        self.assertIn(f"cd {settings.BASE_DIR}", lines)
+        self.assertLess(script.index(f"GRCh37 (VariantAnnotationVersion {grch37.pk})"),
+                        script.index(f"GRCh38 (VariantAnnotationVersion {grch38.pk})"))
+        commands = [line for line in lines if line and not line.startswith(("#", "echo", "set ", "cd "))]
+        # GRCh37 needs both passes: download first, then dump, VEP, dry-run import, import, cleanup; GRCh38 skips the download
+        self.assertEqual([c.split()[2] if c.startswith("python3") else c.split()[0] for c in commands],
+                         ["download_annotation_data", "annotation_backfill_columns", "prlimit",
+                          "annotation_backfill_columns", "annotation_backfill_columns", "rm",
+                          "annotation_backfill_columns", "prlimit", "annotation_backfill_columns",
+                          "annotation_backfill_columns", "rm"])
+        self.assertIn("--mark-backfilled backfilled_utr_avi_splicevault,backfilled_utr_effects", commands[4])
+        self.assertIn("--mark-backfilled backfilled_utr_avi_splicevault", commands[9])
+        self.assertEqual(commands[9].count("--mark-backfilled backfilled_utr_avi_splicevault,"), 0)
+        self.assertEqual(commands.index(commands[3]), commands.index(commands[4]) - 1)  # dry run right before the import
+        self.assertTrue(commands[3].endswith("--dry-run"))
 
     def test_plugin_backfill_alone_stays_bounded(self):
         vav = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)

@@ -101,8 +101,9 @@ Gotchas:
   (not the transcript rows). A variant not yet backfilled shows nothing, like any other missing value.
 - UTRAnnotator / AVI / SpliceVault and the AlphaGenome splicing custom VCF (#2433) are off in the package defaults. A deployment downloads (and for SpliceVault
   converts) the files, sets them in its env settings, runs `enable_vep_plugin_backfill` (stamps the pins on the
-  NEW/ACTIVE versions, flags each build's newest, prints its backfill; annotation/vep_plugin_backfill.py), restarts annotation_workers,
-  then runs the backfill - setting a file without the command halts the VEP lane on VEPVersionMismatchError.
+  NEW/ACTIVE versions, flags each build's newest, prints its backfill, or `--bash-script PATH` writes it as one script;
+  annotation/vep_plugin_backfill.py), restarts annotation_workers, then runs the backfill - setting a file without the
+  command halts the VEP lane on VEPVersionMismatchError.
 - Non-commercial data (annotation/vep_config.py:NON_COMMERCIAL_VEP_CONFIG_KEYS) is cleared from VEPConfig and the pins
   when ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED is False, so it never reaches the command line, the pins or the page.
   Read vep_config through VEPConfig / vep_component_version_kwargs, never genome_build.settings directly.
