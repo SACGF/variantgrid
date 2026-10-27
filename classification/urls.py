@@ -282,6 +282,7 @@ urlpatterns = [
     path('imported_allele_info/download', download_allele_info, name='imported_allele_info_download'),
 
     path('classification_graphs', views.classification_graphs, name='classification_graphs'),
+    path('classification_graphs/data/<slug:graph>', views.classification_graph_data, name='classification_graph_data'),
     path('lab_gene_classification_counts', views.lab_gene_classification_counts, name='lab_gene_classification_counts'),
     path('autocomplete/EvidenceKey/', views_autocomplete.EvidenceKeyAutocompleteView.as_view(), name='evidence_key_autocomplete'),
 

@@ -17,90 +17,9 @@
         }
 
     </style>
+    <script type="text/javascript" src="{% static 'js/classification/classification_graphs.js' %}"></script>
     <script>
-        var PATHOGENIC_COLORS = ['#666666', // other
-                                '#7777ff', // Benign
-                                '#aaaaff', // Likely benign
-                                '#cccccc', // VUS
-                                '#ffaaaa', // Likely pathogenic
-                                '#ff7777', // pathogenic
-                                ];
-
-        var PATHOGENIC_LABELS = [   'Other',
-                                    'Benign',
-                                    'Likely Benign',
-                                    'VUS',
-                                    'Likely Pathogenic',
-                                    'Pathogenic',
-        ];
-        {%  if show_unclassified %}
-            PATHOGENIC_COLORS.push('#1f77b4');
-            PATHOGENIC_LABELS.push('Unclassified');
-        {%  endif %}
-
-        var PATHOGENIC_DICT = dictFromLabelsAndValues(PATHOGENIC_LABELS, PATHOGENIC_COLORS);
-
-        function plotClassificationPie(selector, title, width, height) {
-            let colors = [...PATHOGENIC_COLORS];
-            colors.reverse();
-            var classificationCounts = [{
-              values: {{ classification_values | jsonify }},
-              labels: {{ classification_labels | jsonify }},
-              type: 'pie',
-              sort : false,
-              marker : {colors : colors},
-            }];
-
-            var layout = defaultLayout(title, width, height);
-            Plotly.newPlot(selector, classificationCounts, layout);
-        }
-
-
-        function plotGeneClassifications(selector, title, width, height) {
-            {% if vc_gene_data %}
-            var vc_gene_data = {{ vc_gene_data | jsonify }};
-            for (var i=0 ; i < vc_gene_data.length ; ++i) {
-                vc_gene_data[i]["marker"] = {color : PATHOGENIC_COLORS[i]};
-            }
-            var layout = defaultLayout(title, width, height);
-            layout["barmode"] = 'stack';
-            console.log(selector);
-            console.log(vc_gene_data);
-            console.log(layout);
-            Plotly.newPlot(selector, vc_gene_data, layout);
-            {% endif %}
-        }
-
-
-        function plotCriteriaGraphs() {
-            {% if acmg_by_significance %}
-            let acmg_by_significance = {{ acmg_by_significance | jsonify }};
-            let criteriaContainer = $("#criteria-usage-container");
-            let width = $("#container_table_content").width() * 0.7;
-
-            for (let clinSig=PATHOGENIC_LABELS.length-1; clinSig >= 0; clinSig--) {
-                let label = PATHOGENIC_LABELS[clinSig];
-
-                let data = acmg_by_significance[`${clinSig}`];
-                if (data) {
-                    let graphId = "criteria-usage-" + clinSig;
-                    let graphDiv = $("<div />").attr({"id" : graphId});
-                    criteriaContainer.append(graphDiv);
-
-                    let layout = defaultLayout(label, width, 400);
-                    layout["barmode"] = 'stack';
-                    Plotly.newPlot(graphId, data, layout);
-                }
-            }
-            {% endif %}
-        }
-
-        $(document).ready(() => {
-            plotGeneClassifications('gene-classifications-graph', 'Unique Classified Alleles by Gene');
-            plotClassificationPie('classifications-graph', 'Unique Classified Alleles');
-            plotCriteriaGraphs();
-        });
-
+        $(document).ready(() => initClassificationGraphs({showUnclassified: {{ show_unclassified|jsonify }}}));
     </script>
 {% endblock head %}
 {% block content %}

@@ -11,6 +11,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_not_required
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.db.models import QuerySet
@@ -918,43 +919,71 @@ def evidence_keys(request: HttpRequest) -> HttpResponse:
     return render(request, 'classification/evidence_keys.html', context)
 
 
+CLASSIFICATION_GRAPHS_CACHE_SECONDS = 60 * 60
+CLASSIFICATION_GRAPHS_GERMLINE_BUCKETS = {AlleleOriginBucket.GERMLINE, AlleleOriginBucket.UNKNOWN}
+
+
 def classification_graphs(request):
-
-    germline_buckets = {AlleleOriginBucket.GERMLINE, AlleleOriginBucket.UNKNOWN}
-
     if settings.CLASSIFICATION_STATS_USE_SHARED:
-        show_unclassified = False
         visibility = "shared & matched to an allele"
     else:
-        show_unclassified = True
         visibility = f"visible to {request.user.username}"
+    context = {
+        "visibility": visibility,
+        "show_unclassified": not settings.CLASSIFICATION_STATS_USE_SHARED,
+    }
+    return render(request, 'classification/classification_graphs.html', context)
+
+
+def _classification_graph_allele_counts(user: User, show_unclassified: bool) -> dict:
     classification_counts = get_classification_counts(
-        request.user,
+        user,
         show_unclassified=show_unclassified,
         unique_alleles=True,
-        allele_origin_buckets=germline_buckets)
+        allele_origin_buckets=CLASSIFICATION_GRAPHS_GERMLINE_BUCKETS)
+    return {
+        "labels": list(classification_counts.keys())[::-1],
+        "values": list(classification_counts.values())[::-1],
+    }
 
-    evidence_field = "published_evidence"
-    vc_gene_data = get_grouped_classification_counts(
-        user=request.user,
-        field=evidence_field,
+
+def _classification_graph_gene_counts(user: User, show_unclassified: bool) -> list[dict]:
+    return get_grouped_classification_counts(
+        user=user,
+        field="published_evidence",
         evidence_key="gene_symbol",
         max_groups=15,
         show_unclassified=show_unclassified,
         allele_level=True,
-        allele_origin_buckets=germline_buckets
-    )
+        allele_origin_buckets=CLASSIFICATION_GRAPHS_GERMLINE_BUCKETS)
 
-    acmg_by_significance = get_criteria_counts(request.user, evidence_field)
-    context = {
-        "visibility": visibility,
-        "show_unclassified": show_unclassified,
-        "classification_labels": list(classification_counts.keys())[::-1],
-        "classification_values": list(classification_counts.values())[::-1],
-        "vc_gene_data": vc_gene_data,
-        "acmg_by_significance": acmg_by_significance,
-    }
-    return render(request, 'classification/classification_graphs.html', context)
+
+def _classification_graph_criteria_counts(user: User, show_unclassified: bool) -> dict:
+    return get_criteria_counts(user, "published_evidence")
+
+
+CLASSIFICATION_GRAPHS = {
+    "allele_counts": _classification_graph_allele_counts,
+    "gene_counts": _classification_graph_gene_counts,
+    "criteria_counts": _classification_graph_criteria_counts,
+}
+
+
+def classification_graph_data(request, graph: str) -> JsonResponse:
+    """ One graph of the classification_graphs page. The counts depend on who is asking unless
+        CLASSIFICATION_STATS_USE_SHARED, so the cache is per user then (a bare cache_page would hand one user's
+        lab-level counts to everyone) """
+    if not (graph_data_func := CLASSIFICATION_GRAPHS.get(graph)):
+        raise Http404(f"Unknown classification graph '{graph}'")
+
+    shared = settings.CLASSIFICATION_STATS_USE_SHARED
+    scope = "shared" if shared else f"user_{request.user.pk}"
+    cache_key = f"classification_graphs:{scope}:{graph}"
+    data = cache.get(cache_key)
+    if data is None:
+        data = graph_data_func(request.user, show_unclassified=not shared)
+        cache.set(cache_key, data, CLASSIFICATION_GRAPHS_CACHE_SECONDS)
+    return JsonResponse(data, safe=False)
 
 
 def lab_gene_classification_counts(request):
