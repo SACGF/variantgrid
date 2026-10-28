@@ -24,11 +24,16 @@ from annotation.fake_data import (
     retire_seeded_annotation_version,
 )
 from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
+from annotation.models.models import VariantTranscriptAnnotation
 from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
 from annotation.vep_annotation import get_vep_skipped_variants_filename
 from annotation.vep_field_formatters import format_pick_highest_int
 from genes.enums import AnnotationConsortium
-from genes.fake_data import create_gene_level_variant
+from genes.fake_data import (
+    create_gata2_transcript_version,
+    create_gene_level_variant,
+    create_pten_transcript_version,
+)
 from library.django_utils.django_partition import temporary_db_table
 from snpdb.models import GenomeBuild
 from snpdb.models.models_variant import VariantCoordinate
@@ -69,11 +74,13 @@ class BackfillColumnResolutionTests(TestCase):
         self.assertEqual(target.source_field, COSMIC_V101_SAMPLE_COUNT)
         self.assertEqual(target.formatter, format_pick_highest_int)
 
-    def test_csq_override_targets_representative_table_only(self):
+    def test_csq_column_the_transcript_rows_hold_is_written_per_transcript(self):
         target, = resolve_backfill_columns(self.vav, ["impact"], csq_overrides={"impact": "IMPACT"})
         self.assertTrue(target.from_csq)
         self.assertEqual(target.base_table_names,
-                         (VariantAnnotationVersion.REPRESENTATIVE_TRANSCRIPT_ANNOTATION,))
+                         (VariantAnnotationVersion.REPRESENTATIVE_TRANSCRIPT_ANNOTATION,
+                          VariantAnnotationVersion.TRANSCRIPT_ANNOTATION))
+        self.assertTrue(target.per_transcript)
 
     def test_column_outside_columns_version_reported(self):
         # cadd_raw arrived in columns_version 4
@@ -238,12 +245,21 @@ class BackfillColumnRoundTripTests(TestCase):
                                             only_missing=True, not_null_columns=["cosmic_legacy_id"])
         self.assertEqual(count, 1)
 
-    def test_consequence_dumps_matching_representative_transcripts(self):
-        VariantAnnotation.objects.filter(version=self.vav, variant=self.variants[0]) \
-                                 .update(consequence="intron_variant&5_prime_UTR_variant")
-        # Not the SO term itself - consequence is matched term by term
-        VariantAnnotation.objects.filter(version=self.vav, variant=self.variants[1]) \
-                                 .update(consequence="5_prime_UTR_variant_lookalike")
+    def test_consequence_dumps_variants_with_the_term_on_any_transcript_row(self):
+        """ The representative row says intron, but another transcript's row has the 5' UTR term - once """
+        annotation_run = AnnotationRun.objects.get(annotation_range_lock__version=self.vav)
+        VariantAnnotation.objects.filter(version=self.vav, variant=self.variants[0]).update(consequence="intron_variant")
+        transcript_rows = {
+            self.variants[0]: ["intron_variant", "intron_variant&5_prime_UTR_variant", "5_prime_UTR_variant"],
+            # Not the SO term itself - consequence is matched term by term
+            self.variants[1]: ["5_prime_UTR_variant_lookalike"],
+        }
+        partition = self.vav.get_partition_table(base_table_name=VariantAnnotationVersion.TRANSCRIPT_ANNOTATION)
+        with temporary_db_table(VariantTranscriptAnnotation, partition):
+            for variant, consequences in transcript_rows.items():
+                for consequence in consequences:
+                    VariantTranscriptAnnotation.objects.create(version=self.vav, variant=variant,
+                                                               annotation_run=annotation_run, consequence=consequence)
         with tempfile.TemporaryDirectory() as tmp_dir:
             dump_filename = os.path.join(tmp_dir, "dump.vcf")
             count = dump_annotated_variants(self.vav, dump_filename, targets=self.targets,
@@ -332,3 +348,110 @@ class BackfillColumnRoundTripTests(TestCase):
                 f.write(f"[VEP skipped the following variants from {dump_filename}]\n"
                         f"Line 4    \t{lines[-1][:40]}\tInvalid allele\n")
             self.assertEqual(check_annotated_vcf_complete(dump_filename, annotated_filename), 4)
+
+
+@override_settings(**get_fake_annotation_settings_dict(columns_version=5))
+class BackfillTranscriptRowsTests(TestCase):
+    """ A --csq column the transcript rows hold: the PICK'd entry fills the representative row and every entry
+        the row of the transcript its Feature names. """
+    UTR_CONSEQUENCE_FIELD = "5UTR_consequence"
+    UAUG_GAINED = "5_prime_UTR_premature_start_codon_gain_variant"
+    UORF_FRAMESHIFT = "5_prime_UTR_uORF_frameshift_variant"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        retire_seeded_annotation_version(cls.genome_build)
+        kwargs = get_fake_vep_version(cls.genome_build, AnnotationConsortium.REFSEQ, 5)
+        kwargs["vep"] = 116
+        cls.vav = VariantAnnotationVersion.objects.create(**kwargs,
+                                                          status=VariantAnnotationVersion.Status.ACTIVE)
+        AnnotationVersion.latest(cls.genome_build, validate=False)
+        cls.variant = slowly_create_test_variant("3", 128207300, "G", "A", cls.genome_build)
+        cls.gata2 = create_gata2_transcript_version(cls.genome_build)
+        cls.pten = create_pten_transcript_version(cls.genome_build)
+        annotation_range_lock = AnnotationRangeLock.objects.create(version=cls.vav, min_variant=cls.variant,
+                                                                   max_variant=cls.variant, count=1)
+        annotation_run = AnnotationRun.objects.create(annotation_range_lock=annotation_range_lock)
+        representative_partition = cls.vav.get_partition_table(
+            base_table_name=VariantAnnotationVersion.REPRESENTATIVE_TRANSCRIPT_ANNOTATION)
+        with temporary_db_table(VariantAnnotation, representative_partition):
+            VariantAnnotation.objects.create(version=cls.vav, variant=cls.variant, annotation_run=annotation_run,
+                                             transcript=cls.gata2.transcript, transcript_version=cls.gata2)
+        transcript_partition = cls.vav.get_partition_table(
+            base_table_name=VariantAnnotationVersion.TRANSCRIPT_ANNOTATION)
+        with temporary_db_table(VariantTranscriptAnnotation, transcript_partition):
+            for transcript_version in (cls.gata2, cls.pten):
+                VariantTranscriptAnnotation.objects.create(version=cls.vav, variant=cls.variant,
+                                                           annotation_run=annotation_run,
+                                                           transcript=transcript_version.transcript,
+                                                           transcript_version=transcript_version)
+
+    def setUp(self):
+        self.targets = resolve_backfill_columns(self.vav, ["utr_annotator_consequence"],
+                                                csq_overrides={"utr_annotator_consequence": self.UTR_CONSEQUENCE_FIELD})
+
+    def _annotated_vcf(self, tmp_dir: str, csq_entries: list[str], csq_fields: str = "Feature|PICK|5UTR_consequence") -> str:
+        """ Stand in for the VEP run: the dumped record gains a CSQ entry per transcript """
+        dump_filename = os.path.join(tmp_dir, "dump.vcf")
+        self.assertEqual(dump_annotated_variants(self.vav, dump_filename, targets=self.targets), 1)
+        annotated_filename = os.path.join(tmp_dir, "annotated.vcf")
+        csq_header = (f'##INFO=<ID=CSQ,Number=.,Type=String,Description="Consequence annotations from Ensembl VEP. '
+                      f'Format: {csq_fields}">\n')
+        with open(dump_filename, encoding="utf-8") as f_in, open(annotated_filename, "w", encoding="utf-8") as f_out:
+            for line in f_in:
+                if line.startswith("#CHROM"):
+                    f_out.write(csq_header)
+                if line.startswith("#"):
+                    f_out.write(line)
+                    continue
+                columns = line.rstrip("\n").split("\t")
+                columns[7] += ";CSQ=" + ",".join(csq_entries)
+                f_out.write("\t".join(columns) + "\n")
+        return annotated_filename
+
+    def _transcript_row_values(self) -> dict[str, str]:
+        qs = VariantTranscriptAnnotation.objects.filter(version=self.vav, variant=self.variant)
+        return {tv.accession: value for tv, value in
+                ((row.transcript_version, row.utr_annotator_consequence) for row in qs)}
+
+    def test_each_entry_fills_its_transcript_row(self):
+        csq_entries = [
+            f"{self.gata2.accession}|1|{self.UAUG_GAINED}",
+            f"{self.pten.accession}||{self.UORF_FRAMESHIFT}",
+            # A transcript the database has no version for - the inserter left no row to match
+            "NM_999999.1||5_prime_UTR_uORF_stop_codon_loss_variant",
+        ]
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report = import_backfill_vcf(self.vav, self._annotated_vcf(tmp_dir, csq_entries), self.targets)
+
+        self.assertEqual(report["transcript_rows_copied"], 2)
+        self.assertEqual(report["rows_changed"], 3)
+        representative = VariantAnnotation.objects.get(version=self.vav, variant=self.variant)
+        self.assertEqual(representative.utr_annotator_consequence, self.UAUG_GAINED)
+        self.assertEqual(self._transcript_row_values(),
+                         {self.gata2.accession: self.UAUG_GAINED, self.pten.accession: self.UORF_FRAMESHIFT})
+
+    def test_dry_run_counts_transcript_rows_and_changes_nothing(self):
+        csq_entries = [f"{self.gata2.accession}|1|{self.UAUG_GAINED}", f"{self.pten.accession}||{self.UORF_FRAMESHIFT}"]
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report = import_backfill_vcf(self.vav, self._annotated_vcf(tmp_dir, csq_entries), self.targets,
+                                         dry_run=True)
+        self.assertEqual(report["rows_changed"], 3)
+        self.assertEqual(self._transcript_row_values(), {self.gata2.accession: None, self.pten.accession: None})
+
+    def test_entries_with_no_value_are_not_copied(self):
+        """ UTRAnnotator says nothing for most transcripts - only the ones it annotates reach the temp table """
+        csq_entries = [f"{self.gata2.accession}|1|-", f"{self.pten.accession}||{self.UORF_FRAMESHIFT}"]
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report = import_backfill_vcf(self.vav, self._annotated_vcf(tmp_dir, csq_entries), self.targets)
+        self.assertEqual(report["transcript_rows_copied"], 1)
+        self.assertEqual(self._transcript_row_values(), {self.gata2.accession: None,
+                                                         self.pten.accession: self.UORF_FRAMESHIFT})
+
+    def test_vcf_without_feature_refused(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            annotated_filename = self._annotated_vcf(tmp_dir, [f"1|{self.UAUG_GAINED}"], csq_fields="PICK|5UTR_consequence")
+            with self.assertRaisesRegex(BackfillColumnError, "Feature"):
+                import_backfill_vcf(self.vav, annotated_filename, self.targets)

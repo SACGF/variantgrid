@@ -57,6 +57,8 @@ _backfill_note = import_module(
     "annotation.migrations.0005_utr_annotator_avi_splicevault_manual_backfill")._backfill_note
 _flag_versions_annotated_by_old_plugin = import_module(
     "annotation.migrations.0009_utr_effects_backfill")._flag_versions_annotated_by_old_plugin
+_flag_versions_that_ran_transcript_plugins = import_module(
+    "annotation.migrations.0010_utr_splicevault_transcripts_backfill")._flag_versions_that_ran_transcript_plugins
 
 
 def _settings_with_plugins(vep_version: str = "116") -> dict:
@@ -329,6 +331,84 @@ class PluginPinStampTests(TestCase):
         self.assertTrue(unannotated.backfilled_utr_effects)
         self.assertTrue(historical.backfilled_utr_effects)
         self.assertTrue(no_utr.backfilled_utr_effects)
+
+    def test_transcripts_migration_flags_versions_that_ran_utr_annotator_or_splicevault(self):
+        """ #2426: the earlier backfills left those versions' transcript rows null """
+        utr = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)
+        splicevault = self._vav(self.grch38, VariantAnnotationVersion.Status.NEW)
+        unannotated = self._vav(self.grch37, VariantAnnotationVersion.Status.NEW, annotated=False)
+        historical = self._vav(self.grch37, VariantAnnotationVersion.Status.HISTORICAL)
+        avi_only = self._vav(self.grch38, VariantAnnotationVersion.Status.ACTIVE)
+        VariantAnnotationVersion.objects.filter(pk__in=[utr.pk, unannotated.pk, historical.pk]) \
+            .update(utr_annotator="uORF_5UTR_GRCh37_PUBLIC.txt")
+        VariantAnnotationVersion.objects.filter(pk=splicevault.pk).update(splicevault="SpliceVault_data_GRCh38.refseq_mane.tsv.gz")
+        VariantAnnotationVersion.objects.filter(pk=avi_only.pk).update(avi="alphagenome_variant_impact_score_snvs.tsv.gz")
+        _flag_versions_that_ran_transcript_plugins(apps, None)
+        for vav in (utr, splicevault, unannotated, historical, avi_only):
+            vav.refresh_from_db()
+        self.assertFalse(utr.backfilled_utr_splicevault_transcripts)
+        self.assertFalse(splicevault.backfilled_utr_splicevault_transcripts)
+        self.assertTrue(unannotated.backfilled_utr_splicevault_transcripts)
+        self.assertTrue(historical.backfilled_utr_splicevault_transcripts)
+        self.assertTrue(avi_only.backfilled_utr_splicevault_transcripts)
+
+    def test_transcript_rows_pass_alone_is_unbounded_over_utr_annotator_and_splicevault(self):
+        """ GRCh37 has both transcript-level plugins; GRCh38 (SpliceVault, AVI and AlphaGenome splicing in the test
+            settings) shows the variant-level sources dropped from the pass """
+        grch37 = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)
+        grch38 = self._vav(self.grch38, VariantAnnotationVersion.Status.ACTIVE)
+        self._enable()
+        VariantAnnotationVersion.objects.filter(pk__in=[grch37.pk, grch38.pk]) \
+            .update(backfilled_utr_avi_splicevault=True, backfilled_utr_splicevault_transcripts=False)
+        steps = self._steps(grch37)
+        self.assertNotIn("download_annotation_data", "\n".join(steps))
+        dump = self._step(steps, "python3 manage.py annotation_backfill_columns --dump")
+        vep = self._step(steps, "--fields Feature,PICK")
+        import_step = self._step(steps, "--mark-backfilled")
+        self.assertNotIn("--max-variant-id", dump)
+        self.assertNotIn("--not-null", dump)
+        self.assertIn("--plugin UTRAnnotator,", vep)
+        self.assertIn("--plugin SpliceVault,", vep)
+        self.assertIn("--csq splicevault_top_events=SpliceVault_top_events", import_step)
+        self.assertIn("--csq utr_annotator_existing_uorfs=Existing_uORFs", import_step)
+        self.assertTrue(import_step.endswith("--mark-backfilled backfilled_utr_splicevault_transcripts"))
+
+        steps = self._steps(grch38)
+        vep = self._step(steps, "--fields Feature,PICK")
+        import_step = self._step(steps, "--mark-backfilled")
+        self.assertIn("--plugin SpliceVault,", vep)
+        self.assertNotIn("AVI", vep)
+        self.assertNotIn("AlphaGenome", vep)
+        self.assertNotIn("avi_phred", import_step)
+        self.assertNotIn("alphagenome_splicing", import_step)
+
+    def test_every_pass_pending_is_one_unbounded_pass_marking_every_flag(self):
+        vav = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)
+        self._enable("--genome-build", "GRCh37")
+        VariantAnnotationVersion.objects.filter(pk=vav.pk).update(backfilled_utr_effects=False,
+                                                                    backfilled_utr_splicevault_transcripts=False)
+        steps = self._steps(vav)
+        self.assertTrue(steps[1].startswith("1. python3 manage.py download_annotation_data"))
+        self.assertNotIn("--max-variant-id", self._step(steps, "python3 manage.py annotation_backfill_columns --dump"))
+        self.assertTrue(self._step(steps, "--mark-backfilled").endswith(
+            "--mark-backfilled backfilled_utr_avi_splicevault,backfilled_utr_effects,backfilled_utr_splicevault_transcripts"))
+
+    def test_transcripts_flag_not_marked_by_an_import_writing_no_transcript_rows(self):
+        """ avi_phred is on VariantAnnotation only, so an AVI import can't have filled the transcript rows """
+        vav = self._vav(self.grch38, VariantAnnotationVersion.Status.ACTIVE)
+        VariantAnnotationVersion.objects.filter(pk=vav.pk).update(backfilled_utr_splicevault_transcripts=False)
+        with tempfile.NamedTemporaryFile(suffix=".vcf") as empty_vcf, override_settings(**_settings_with_plugins()):
+            empty_vcf.write(b"##fileformat=VCFv4.2\n"
+                            b'##INFO=<ID=CSQ,Number=.,Type=String,Description="Format: Feature|PICK|AVI_PHRED">\n'
+                            b"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n")
+            empty_vcf.flush()
+            with self.assertRaisesRegex(CommandError, "no transcript rows"):
+                call_command("annotation_backfill_columns", "--import", "--genome-build", "GRCh38",
+                             "--variant-annotation-version", str(vav.pk), "--columns", "avi_phred",
+                             "--csq", "avi_phred=AVI_PHRED", "--vcf", empty_vcf.name,
+                             "--mark-backfilled", "backfilled_utr_splicevault_transcripts", stdout=io.StringIO())
+        vav.refresh_from_db()
+        self.assertFalse(vav.backfilled_utr_splicevault_transcripts)
 
     @staticmethod
     def _step(steps: list[str], needle: str) -> str:

@@ -175,13 +175,13 @@ plugin was switched on), split by `--min/max-variant-id` to run VEP in parallel,
 order and flags as the pipeline so the PICK'd transcript matches, then `--import --csq <column>=<CSQ field>` with
 `--dry-run` first. Limits as it stands:
 
-- `--csq` reads the PICK'd CSQ entry into `VariantAnnotation` only; `VariantTranscriptAnnotation` keeps NULL
-  (`annotation/backfill_columns.py:_base_table_names_for_column`). A per-transcript column needs the import extended to
-  match each CSQ entry to its transcript row, or accepts representative-only history - and a page showing it reads
-  `VariantAnnotation`, since the transcript rows of backfilled variants are NULL.
+- `--csq` reads the PICK'd CSQ entry into `VariantAnnotation` and, for a column `VariantTranscriptAnnotation` holds,
+  every entry into the transcript row its `Feature` names (`annotation/backfill_columns.py:_base_table_names_for_column`,
+  `_TranscriptVersionResolver`), so the VEP run keeps `Feature` in `--fields`. An entry whose transcript the database
+  has no version for updates nothing, as the inserter left that row unlinked.
 - `--only-missing` dumps rows where every named column is NULL, which for a sparse source never shrinks, so a re-run
   re-dumps the whole version. Bound by variant id instead, and narrow it with `--not-null` (a sibling column the
-  source writes) or `--consequence` (an SO term on the representative transcript, all a `--csq` import can fill).
+  source writes) or `--consequence` (an SO term on any transcript row).
 - `--mark-backfilled <flag>` sets the VAV's `backfilled_*` flag once the import finishes. With a split dump, pass it
   on the last import only.
 
@@ -319,11 +319,15 @@ carries the steps; `annotation/migrations/0007_alphagenome_splicing.py` does the
       (`annotation/backfill_columns.py:check_annotated_vcf_complete`), as VEP can exit 0 on a short file (#1701).
    4. `rm -f` of the dumps, the annotated VCFs and VEP's warnings and skipped variants files.
 
-The `--csq` import fills `VariantAnnotation` from the PICK'd entry only, so backfilled variants have UTRAnnotator and
-SpliceVault values for the representative transcript and NULL transcript rows; SpliceVault values only land when the
-representative transcript is the MANE one (VEP's default pick order puts MANE Select first). The variant page reads
-them from `VariantAnnotation`. UTRAnnotator reports one `5UTR_consequence` per transcript even when it finds several
-effects (the last flagged, in Perl hash order); `5UTR_annotation` keeps every effect.
+The utr_annotator_* and splicevault_* columns are transcript-level, and both readers go to the transcript rows: the
+variant page's transcript switcher (`annotation/transcripts_annotation_selections.py:VariantTranscriptSelections`)
+and evidence key autopopulate
+(`classification/autopopulate_evidence_keys/evidence_from_variant.py:get_evidence_fields_from_preferred_transcript`,
+no fallback to `VariantAnnotation`). The first backfills imported the PICK'd entry into `VariantAnnotation` only, so
+`VariantAnnotationVersion.backfilled_utr_splicevault_transcripts` sends those versions through one more UTRAnnotator +
+SpliceVault pass over every variant, imported per transcript. SpliceVault values only land on the MANE transcript's
+row (the data file is keyed by it). UTRAnnotator reports one `5UTR_consequence` per transcript even when it finds
+several effects (the last flagged, in Perl hash order); `5UTR_annotation` keeps every effect.
 
 ### ClinVar
 

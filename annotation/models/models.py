@@ -185,6 +185,14 @@ class AbstractVariantAnnotation(models.Model):
             return self.transcript.identifier
         return None
 
+    @property
+    def utr_annotator_effects(self) -> list[dict[str, str]]:
+        return vep_plugin_display.utr_annotator_effects(self.utr_annotator_annotation)
+
+    @property
+    def splicevault_top_events_list(self) -> list[str]:
+        return [e for e in (self.splicevault_top_events or "").split("&") if e]
+
     @staticmethod
     def get_domains_components(domains):
         domain_dict = defaultdict(list)
@@ -655,14 +663,6 @@ class VariantAnnotation(AbstractVariantAnnotation):
     @property
     def protvar_pocket_parsed(self) -> Optional[dict]:
         return vep_plugin_display.protvar_pocket_parsed(self)
-
-    @property
-    def utr_annotator_effects(self) -> list[dict[str, str]]:
-        return vep_plugin_display.utr_annotator_effects(self.utr_annotator_annotation)
-
-    @property
-    def splicevault_top_events_list(self) -> list[str]:
-        return [e for e in (self.splicevault_top_events or "").split("&") if e]
 
     @property
     def gnomad4_or_later(self) -> bool:

@@ -1,3 +1,4 @@
+{% load static %}
 {% load js_tags %}
 {% load ui_help %}
 {% load tag_config_tags %}
@@ -11,6 +12,7 @@
 {% settings_value 'VARIANT_SHOW_CANONICAL_HGVS' as variant_show_canonical_hgvs %}
 
 {% render_tag_styles_and_formatter %}
+<script src="{% static 'js/variantopedia/variant_transcript_plugins.js' %}"></script>
 <script type="text/javascript">
 
 // Starts from the tag config, the checkbox above the tags grid flips it for this page only
@@ -211,6 +213,7 @@ function transcriptFunc(transcriptId, data) {
     const hasMaxEntScan = ["maxentscan_ref", "maxentscan_alt", "maxentscan_diff"].some(name => data?.[name] != null);
     $("#maxentscan_values", transcriptInfoTable).toggle(hasMaxEntScan);
     $("#maxentscan_none", transcriptInfoTable).toggle(!hasMaxEntScan);
+    applyTranscriptPluginRows(data);
 
     formatField($("#cosmic_id"), VariantGridFormat.cosmicLink);
     formatField($("#cosmic_legacy_id"), VariantGridFormat.cosmicLink);

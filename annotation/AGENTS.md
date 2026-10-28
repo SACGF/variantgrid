@@ -90,15 +90,17 @@ Gotchas:
   VEPVersionMismatchError and makes `create_new_variant_annotation_version` mint a full re-annotation until the
   ACTIVE VAV's new field is stamped to match. Gate the VEPColumnDef on the existing VAV's columns_version and VEP
   (min_columns_version / min_vep_version, never a columns_version bump), or `annotation_backfill_columns` refuses it.
-  Its `--csq` import reads the PICK'd entry into VariantAnnotation only; VariantTranscriptAnnotation stays null.
+  Its `--csq` import fills VariantAnnotation from the PICK'd entry and, for a column VariantTranscriptAnnotation
+  holds, each transcript row from the entry whose Feature it is (so the VEP run keeps Feature in `--fields`).
 - A backfilled_* flag on the VAV (annotation/models/models_version.py:VariantAnnotationVersion.backfilled_ptc) lets
   readers tell "not backfilled yet" from a real null: default True, the migration sets False only on VAVs that need
   the backfill, the command that fills the partition sets it True, and a ManualOperation tests for a False flag.
   The full recipe (pin stamping, gates, flag, backfill steps and limits) is claude/research/annotation.md
   "A new column on an existing VariantAnnotationVersion"; UTRAnnotator / AVI / SpliceVault (#2426) is the worked example.
-- The utr_annotator_* and splicevault_* columns of variants annotated before those plugins were switched on are
-  backfilled into VariantAnnotation only, so the variant page shows the representative transcript's values from there
-  (not the transcript rows). A variant not yet backfilled shows nothing, like any other missing value.
+- The utr_annotator_* and splicevault_* columns are transcript-level: the variant page's transcript switcher and
+  evidence key autopopulate read them off the transcript rows, never VariantAnnotation, so a backfill of them has to
+  fill those rows (VariantAnnotationVersion.backfilled_utr_splicevault_transcripts). A variant not yet backfilled
+  shows nothing, like any other missing value.
 - UTRAnnotator / AVI / SpliceVault and the AlphaGenome splicing custom VCF (#2433) are off in the package defaults. A deployment downloads (and for SpliceVault
   converts) the files, sets them in its env settings, runs `enable_vep_plugin_backfill` (stamps the pins on the
   NEW/ACTIVE versions, flags each build's newest, prints its backfill, or `--bash-script PATH` writes it as one script;
