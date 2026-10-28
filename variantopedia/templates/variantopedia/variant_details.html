@@ -208,7 +208,7 @@ function transcriptFunc(transcriptId, data) {
     $.each(data, (name, value) => {
         applyValue(name, value);
     });
-    const hasMaxEntScan = ["maxentscan_ref", "maxentscan_alt", "maxentscan_diff"].some(name => data[name] != null);
+    const hasMaxEntScan = ["maxentscan_ref", "maxentscan_alt", "maxentscan_diff"].some(name => data?.[name] != null);
     $("#maxentscan_values", transcriptInfoTable).toggle(hasMaxEntScan);
     $("#maxentscan_none", transcriptInfoTable).toggle(!hasMaxEntScan);
 
