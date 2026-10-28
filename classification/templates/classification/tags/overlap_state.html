@@ -5,7 +5,7 @@
 {% endif %}
 {% if overlap.overlap_status.is_attention %}
     <span>
-    {% if show_medical_significant_icon %} <i class="fa-solid fa-kit-medical text-danger" title="Medically Significant"></i> Discordance{% else %}{{ overlap.overlap_status_label }}{% endif %}
+    {% if show_medical_significant_icon %} <i class="fa-solid fa-kit-medical text-danger" title="Medically Significant"></i> {{ overlap.disagreement_label }}{% else %}{{ overlap.overlap_status_label }}{% endif %}
     </span>
 {% else %}<span>{{ overlap.overlap_status_label }}</span>{% endif %}
 {% if show_link %}</a>{% endif %}
