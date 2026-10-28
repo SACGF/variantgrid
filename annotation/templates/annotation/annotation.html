@@ -3,7 +3,7 @@
 {% load js_tags %}
 {% load ui_utils %}
 {% load humanize %}
-{% block title %}Annotation Info{% endblock title %}
+{% block title %}Annotation Status{% endblock title %}
 {% block head %}
     <style>
         code {
@@ -15,7 +15,7 @@
 {% block content %}
     <div class="container">
         {% load ui_help %}
-        {% page_help page_id='annotation/annotation_help' title='Annotations' %}
+        {% page_help page_id='annotation/annotation_help' title='Annotation Status' %}
 
         {% if user.is_superuser %}
         <div id="installation-instructions" class='card hidden'>

@@ -120,12 +120,12 @@ MENUS: tuple[Menu, ...] = (
         MenuItem('variant_types', title="Variant Types"),
     ), pages=('view_allele', 'view_allele_compact', 'view_variant', 'view_variant_genome_build',
               'view_variant_annotation_history', 'nearby_variants_annotation_version')),
-    Menu('annotation', 'Annotation', 'annotation', items=(
-        MenuItem('annotation'),
-        MenuItem('variant_annotation_runs', title="Pipeline Runs", admin_only=True, pages=('view_annotation_run',)),
+    Menu('annotation', 'Annotation', 'view_annotation_descriptions', items=(
         MenuItem('view_annotation_descriptions', title="Descriptions",
                  pages=('view_annotation_descriptions_genome_build',)),
+        MenuItem('variant_annotation_runs', title="Pipeline Runs", admin_only=True, pages=('view_annotation_run',)),
         MenuItem('pathogenicity_thresholds', title="Pathogenicity Thresholds"),
+        MenuItem('annotation', title="Status"),
         MenuItem('annotation_versions', title="Versions"),
     ), pages=('view_citation',)),
     # Reached from the username in the navbar rather than the top bar
