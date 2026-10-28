@@ -4,11 +4,13 @@ from django.db.models import Q
 from manual.operations.manual_operations import ManualOperation
 
 
-def _test_initiation_codon_p_hgvs(apps):
-    """ Start codon changes were stored as substitutions (ClinGen's p.Met1Val) or failed to compute (#1383) """
+def _test_p_hgvs_needs_recalc(apps):
+    """ Start codon changes were stored as substitutions (ClinGen's p.Met1Val) or failed to compute (#1383).
+        Also rows never backfilled - every calculation sets p_hgvs or p_hgvs_error """
     ResolvedVariantInfo = apps.get_model("classification", "ResolvedVariantInfo")
-    met1_change_q = Q(p_hgvs__regex=r"p\.\(Met1[A-Z_]")
-    return ResolvedVariantInfo.objects.filter(met1_change_q | Q(p_hgvs_error__contains="AARefAlt")).exists()
+    met1_change_q = Q(p_hgvs__regex=r"p\.\(Met1[A-Z_]") | Q(p_hgvs_error__contains="AARefAlt")
+    never_calculated_q = Q(transcript_version__isnull=False, p_hgvs__isnull=True, p_hgvs_error__isnull=True)
+    return ResolvedVariantInfo.objects.filter(met1_change_q | never_calculated_q).exists()
 
 
 class Migration(migrations.Migration):
@@ -19,5 +21,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation.operation_manage(["recalc_resolved_variant_info_p_hgvs"], test=_test_initiation_codon_p_hgvs),
+        ManualOperation.operation_manage(["recalc_resolved_variant_info_p_hgvs"], test=_test_p_hgvs_needs_recalc),
     ]
