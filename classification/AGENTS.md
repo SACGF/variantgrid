@@ -135,6 +135,9 @@ Gotchas:
   per distinct set of copied values, rendered side by side by templates/classification/tags/consensus_comparison.html
   with the fields the choices differ in first and the shared ones folded away (ConsensusComparison.of). Record
   identity (lab id, curator) is provenance, not the choice - the diff page (`?cids=...&copied_only=1`) is the full view.
+- Evidence is TOASTed jsonb (a few KB per record), and Postgres decompresses it again for every `->` in a query, so
+  SQL reading many keys per record costs one full read per key. Expand it once with `jsonb_each`, or extract into an
+  `OFFSET 0` subquery that the planner can't flatten (`classification/classification_stats.py:get_criteria_counts`).
 - Classification.clinical_significance, allele_origin_bucket and summary are denormalised caches written by patch_value / publish
   (models/evidence_mixin_summary_cache.py:ClassificationSummaryCalculator); filter and sort on them, never recompute from
   evidence in a grid.

@@ -1,4 +1,3 @@
-import operator
 from collections import Counter, defaultdict
 from collections.abc import Iterable
 from typing import Any, Optional
@@ -6,14 +5,20 @@ from typing import Any, Optional
 import numpy as np
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import QuerySet
+from django.db import connection
+from django.db.models import Count, F, QuerySet
+from django.db.models.fields.json import KT
 
-from classification.enums.classification_enums import CriteriaEvaluation
+from classification.enums.classification_enums import CriteriaEvaluation, ShareLevel
 from classification.models import EvidenceKeyMap
-from classification.models.classification import Classification, ClassificationModification
+from classification.models.classification import ClassificationModification
 from library.django_utils import get_field_counts
 from snpdb.enums import AlleleOriginBucket, ClinicalSignificance
 from snpdb.models import Lab
+
+ALLELE_PATH = "classification__allele_info__allele_id"
+# Which record represents an allele (or a gene + allele) when several labs have classified it
+LATEST_FIRST = ("-created", "-pk")
 
 
 def get_classification_counts(
@@ -45,38 +50,38 @@ def get_classification_counts(
 
 
 def get_classification_counts_allele(qs: QuerySet[ClassificationModification], field: str, possible_values: Iterable[Any]) -> dict[Any, int]:
-    counts: dict[Any, int] = {}
-
-    # django doesn't support query set annotations and distinct() at the same time, so have to do this as multiple requests
-    qs = qs.order_by('classification__allele_info__allele_id', '-created').distinct('classification__allele_info__allele_id')
-    for possible_value in possible_values:
-        count: int
-        if possible_value is None:
-            count = qs.filter(**{f'{field}__isnull': True}).count()
-        else:
-            count = qs.filter(**{field: possible_value}).count()
-        # use 0 for key for unclassified
-        counts[possible_value] = count
-    return counts
+    """ Counts of field over the latest record per allele, so an allele classified differently by 2 labs counts once """
+    latest_per_allele_qs = qs.filter(classification__allele_info__allele__isnull=False) \
+        .order_by(ALLELE_PATH, *LATEST_FIRST).distinct(ALLELE_PATH)
+    counts_qs = ClassificationModification.objects.filter(pk__in=latest_per_allele_qs.values("pk")) \
+        .values_list(field).annotate(count=Count("pk")).order_by()
+    field_counts = dict(counts_qs)
+    return {value: field_counts.get(value, 0) for value in possible_values}
 
 
 def get_visible_classifications_qs(user: User, allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> QuerySet[ClassificationModification]:
     # now excludes external labs (don't want to report on Shariant only data within SA Path for example)
 
-    shared = settings.CLASSIFICATION_STATS_USE_SHARED
-    kwargs = {"classification__lab__external": False}
-    if shared:
-        kwargs["clinical_significance__isnull"] = False
-    else:
-        kwargs["classification__variant__isnull"] = False
+    if settings.CLASSIFICATION_STATS_USE_SHARED:
+        # Records shared at a discordant level are readable by every user (ShareLevel.has_access), so skip the
+        # guardian lookup latest_for_user would do - it is most of the cost of these queries
+        qs = ClassificationModification.objects.filter(
+            is_last_published=True,
+            share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS,
+            classification__withdrawn=False,
+            classification__lab__external=False,
+            clinical_significance__isnull=False,
+        )
+        if allele_origin_buckets:
+            qs = qs.filter(classification__allele_origin_bucket__in=allele_origin_buckets)
+        return qs
 
     return ClassificationModification.latest_for_user(
         user,
         exclude_withdrawn=True,
-        published=shared,
-        shared_only=shared,
         allele_origin_buckets=allele_origin_buckets,
-        **kwargs,
+        classification__lab__external=False,
+        classification__variant__isnull=False,
     )
 
 
@@ -86,7 +91,7 @@ def get_grouped_classification_counts(user: User,
                                       field_labels: Optional[dict[str, str]] = None,
                                       max_groups=10,
                                       show_unclassified=True,
-                                      norm_factor: dict[str, float] = None,
+                                      norm_factor: Optional[dict[str, float]] = None,
                                       allele_level: bool = False,
                                       allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None) -> list[dict[str, dict]]:
     """ :param user: User used to check visibility of classifications
@@ -96,39 +101,41 @@ def get_grouped_classification_counts(user: User,
         mutually exclusive with evidence_key
         :param max_groups: the max size of the returns list
         :param show_unclassified: return counts for clinical_significance=None (as 'Unclassified')
-        :param allele_level: if True should only count one record per allele (currently cheats and assumes each lab
-        only submits primarily in one genome so uses variant)
+        :param allele_level: if True only the latest record per allele within each group is counted
         :return: data for graphing, a list of dicts with x,y,name and type
     """
     if evidence_key and field_labels:
         raise ValueError("Can't supply both 'evidence_key' and 'field_labels'")
 
-    vc_qs = get_visible_classifications_qs(user, allele_origin_buckets).order_by('-modified')
-    values_qs = vc_qs.values_list("clinical_significance", field, "classification__allele_info__allele")
+    group_value = KT(f"{field}__{evidence_key}__value") if evidence_key else F(field)
+    vc_qs = get_visible_classifications_qs(user, allele_origin_buckets).annotate(group_value=group_value)
+    if allele_level:
+        rows_sql, params = vc_qs.values_list("pk", "created", "clinical_significance", ALLELE_PATH, "group_value") \
+            .order_by().query.sql_with_params()
+        # OFFSET 0 keeps the rows subquery from being flattened, so an evidence value is extracted once per record
+        # rather than again for each of the DISTINCT ON and GROUP BY that use it
+        group_counts_sql = f"""
+            SELECT clinical_significance, group_value, COUNT(*) FROM (
+                SELECT DISTINCT ON (group_value, allele_id) * FROM ({rows_sql} OFFSET 0)
+                    visible (id, created, clinical_significance, allele_id, group_value)
+                WHERE allele_id IS NOT NULL ORDER BY group_value, allele_id, created DESC, id DESC
+            ) latest_per_allele GROUP BY 1, 2"""
+        with connection.cursor() as cursor:
+            cursor.execute(group_counts_sql, params)
+            group_counts_rows = cursor.fetchall()
+    else:
+        group_counts_rows = vc_qs.values_list("clinical_significance", "group_value") \
+            .annotate(count=Count("pk")).order_by()
 
     counts = Counter()
     classification_counts = defaultdict(Counter)
-    seen_alleles: dict[str, set[int]] = defaultdict(set)
-
-    for clinical_significance, field, allele in values_qs:
-
-        if evidence_key:
-            # field will either be evidence or published evidence
-            value = Classification.get_optional_value_from(field, evidence_key)
-        elif field_labels:
-            value = field_labels.get(field, field)
-        else:
-            value = field
-
-        if value is not None:
-            if allele_level:
-                seen_set = seen_alleles[value]
-                if allele is None or allele in seen_set:
-                    continue
-                seen_set.add(allele)
-
-            counts[value] += 1
-            classification_counts[clinical_significance][value] += 1
+    for clinical_significance, value, count in group_counts_rows:
+        if value is None:  # filtered here rather than in SQL, where it would extract the evidence value again
+            continue
+        if field_labels:
+            value = field_labels.get(value, value)
+        counts[value] += count
+        classification_counts[clinical_significance][value] += count
 
     if norm_factor:
         group_counts = {}
@@ -138,7 +145,7 @@ def get_grouped_classification_counts(user: User,
     else:
         group_counts = counts
 
-    top_groups = [gc[0] for gc in sorted(group_counts.items(), key=operator.itemgetter(1), reverse=True)][:max_groups]
+    top_groups = sorted(group_counts, key=lambda g: (-group_counts[g], g))[:max_groups]
 
     data = []
     for cs, clinical_significance_label in ClinicalSignificance.LABELS.items():
@@ -167,52 +174,60 @@ def get_criteria_counts(
         critera="acmg",
         allele_origin_buckets: Optional[set[AlleleOriginBucket]] = None
     ) -> dict[str, list[dict]]:
-    acmg_labels = dict((e.key, e.pretty_label) for e in EvidenceKeyMap.instance().criteria_for(critera))
-    n = len(acmg_labels)
-    acmg_met_not_met_by_significance = defaultdict(lambda: (np.zeros(n), np.zeros(n), np.zeros(n)))
-    total_clinical_significance = Counter()
+    """ Per clinical significance, the fraction of records where each criterion is met (CriteriaEvaluation.is_met),
+        not met (NM, NA or N), or not set """
+    acmg_labels = {e.key: e.pretty_label for e in EvidenceKeyMap.instance().criteria_for(critera)}
+    criteria_index = {key: i for i, key in enumerate(acmg_labels)}
 
     vc_qs = get_visible_classifications_qs(user, allele_origin_buckets=allele_origin_buckets)
-    vc_qs = vc_qs.filter(clinical_significance__isnull=False)
-    num_classifications = 0
-    for clinical_significance, evidence in vc_qs.values_list("clinical_significance", evidence_field):
-        num_classifications += 1
-        total_clinical_significance[clinical_significance] += 1
-        met, not_met, not_set = acmg_met_not_met_by_significance[clinical_significance]
-        for i, k in enumerate(acmg_labels):
-            value = Classification.get_optional_value_from(evidence, k)
-            if value:
-                if CriteriaEvaluation.is_met(value):
-                    met[i] += 1
-                else:
-                    not_met[i] += 1
+    vc_qs = vc_qs.filter(clinical_significance__isnull=False).order_by()
+    totals = dict(vc_qs.values_list("clinical_significance").annotate(count=Count("pk")))
 
-            else:
-                not_set[i] += 1
+    # jsonb_each expands each record's evidence once - a -> per criterion would read the whole blob again each time
+    rows_sql, params = vc_qs.values_list("clinical_significance", evidence_field).query.sql_with_params()
+    value_counts_sql = f"""
+        SELECT visible.clinical_significance, evidence.key,
+               CASE WHEN jsonb_typeof(evidence.value) = 'object' THEN evidence.value ->> 'value'
+                    ELSE evidence.value #>> '{{}}' END AS criteria_value,
+               COUNT(*)
+        FROM ({rows_sql}) visible (clinical_significance, evidence)
+        CROSS JOIN LATERAL jsonb_each(visible.evidence) evidence
+        WHERE evidence.key = ANY(%s)
+        GROUP BY 1, 2, 3"""
+    with connection.cursor() as cursor:
+        cursor.execute(value_counts_sql, [*params, list(acmg_labels)])
+        value_counts = cursor.fetchall()
+
+    n = len(acmg_labels)
+    met_not_met = defaultdict(lambda: (np.zeros(n), np.zeros(n)))
+    for clinical_significance, key, value, count in value_counts:
+        if value:
+            met, not_met = met_not_met[clinical_significance]
+            (met if CriteriaEvaluation.is_met(value) else not_met)[criteria_index[key]] += count
 
     acmg_data = {}
     labels = list(acmg_labels.values())
-    for clinical_significance, (met, not_met, not_set) in acmg_met_not_met_by_significance.items():
-        total = total_clinical_significance[clinical_significance]
-        acmg_met_not_met_by_significance[clinical_significance] = (met/total, not_met/total, not_set/total)
+    for clinical_significance, total in totals.items():
+        met, not_met = (counts / total for counts in met_not_met[clinical_significance])
+        not_set = 1 - met - not_met
 
         acmg_data[clinical_significance] = [
             {"x": labels,
-             "y": (met / total).tolist(),
+             "y": met.tolist(),
              "name": "Met",
              "type": 'bar',
              "marker": {
                  "color": "rgb(80,200,80)"
              }},
             {"x": labels,
-             "y": (not_met / total).tolist(),
+             "y": not_met.tolist(),
              "name": "Not met",
              "type": 'bar',
              "marker": {
                  "color": "rgb(140,140,140)"
              }},
             {"x": labels,
-             "y": (not_set / total).tolist(),
+             "y": not_set.tolist(),
              "name": "Not set",
              "type": 'bar',
              "marker": {
