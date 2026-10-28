@@ -109,23 +109,29 @@ def get_grouped_classification_counts(user: User,
 
     group_value = KT(f"{field}__{evidence_key}__value") if evidence_key else F(field)
     vc_qs = get_visible_classifications_qs(user, allele_origin_buckets).annotate(group_value=group_value)
-    rows_sql, params = vc_qs.values_list("pk", "created", "clinical_significance", ALLELE_PATH, "group_value") \
-        .order_by().query.sql_with_params()
-    # OFFSET 0 keeps the rows subquery from being flattened, so an evidence value is extracted once per record
-    # rather than again for each of the WHERE, DISTINCT ON and GROUP BY that use it
-    rows_sql = f"SELECT * FROM ({rows_sql} OFFSET 0) visible (id, created, clinical_significance, allele_id, group_value)"
     if allele_level:
-        rows_sql = f"""SELECT DISTINCT ON (group_value, allele_id) * FROM ({rows_sql}) all_rows
-                       WHERE allele_id IS NOT NULL ORDER BY group_value, allele_id, created DESC, id DESC"""
-    group_counts_sql = f"""SELECT clinical_significance, group_value, COUNT(*) FROM ({rows_sql}) counted_rows
-                           WHERE group_value IS NOT NULL GROUP BY 1, 2"""
-    with connection.cursor() as cursor:
-        cursor.execute(group_counts_sql, params)
-        group_counts_rows = cursor.fetchall()
+        rows_sql, params = vc_qs.values_list("pk", "created", "clinical_significance", ALLELE_PATH, "group_value") \
+            .order_by().query.sql_with_params()
+        # OFFSET 0 keeps the rows subquery from being flattened, so an evidence value is extracted once per record
+        # rather than again for each of the DISTINCT ON and GROUP BY that use it
+        group_counts_sql = f"""
+            SELECT clinical_significance, group_value, COUNT(*) FROM (
+                SELECT DISTINCT ON (group_value, allele_id) * FROM ({rows_sql} OFFSET 0)
+                    visible (id, created, clinical_significance, allele_id, group_value)
+                WHERE allele_id IS NOT NULL ORDER BY group_value, allele_id, created DESC, id DESC
+            ) latest_per_allele GROUP BY 1, 2"""
+        with connection.cursor() as cursor:
+            cursor.execute(group_counts_sql, params)
+            group_counts_rows = cursor.fetchall()
+    else:
+        group_counts_rows = vc_qs.values_list("clinical_significance", "group_value") \
+            .annotate(count=Count("pk")).order_by()
 
     counts = Counter()
     classification_counts = defaultdict(Counter)
     for clinical_significance, value, count in group_counts_rows:
+        if value is None:  # filtered here rather than in SQL, where it would extract the evidence value again
+            continue
         if field_labels:
             value = field_labels.get(value, value)
         counts[value] += count
