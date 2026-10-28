@@ -214,6 +214,23 @@ COMPOSITE_EXAMPLE_ROWS: dict[str, dict[str, Any]] = {
     ),
     "promoter_ai": _va(promoter_ai_score=0.42, promoter_ai_tss_pos=-85),
     "mavedb": _va(mavedb_score=-1.24, mavedb_urn="urn:mavedb:00000001-a-1"),
+    "utr_annotator": _va(utr_annotator_consequence="5_prime_UTR_premature_start_codon_gain_variant",
+                         utr_annotator_annotation=("type=uORF:KozakContext=GCCATGG:KozakStrength=Strong:"
+                                                   "DistanceToCDS=48:CapDistanceToStart=112:DistanceToStop=27:"
+                                                   "Evidence=False"),
+                         utr_annotator_existing_uorfs=1,
+                         utr_annotator_existing_out_of_frame_oorfs=0,
+                         utr_annotator_existing_inframe_oorfs=0),
+    # 2 of the 4 top events are frameshifts, so the donor loss isn't splice-rescued
+    "splicevault": _va(splicevault_out_of_frame_events="Frameshift:2/4",
+                       splicevault_site_type="Donor_loss",
+                       splicevault_spliceai_delta=0.87,
+                       splicevault_site_sample_count=312,
+                       splicevault_site_max_depth=1450,
+                       splicevault_site_pos="chr12:12345680",
+                       splicevault_top_events=("1:ES:exon5:76%:Frameshift&2:CD:-4:18%:Frameshift"
+                                               "&3:CD:+12:9%:Inframe&4:CA:-27:4%:Inframe")),
+    "avi": _va(avi_phred=24.6, avi_raw=1.92),
     "dbscsnv": _va(dbscsnv_ada_score=0.97, dbscsnv_rf_score=0.88),
     "nmd_ptc": _va(nmd_escape_status="Escapes NMD", nmd_escaping_variant=True,
                    ptc_distance_codons=12, ptc_last_junction_distance=-34),

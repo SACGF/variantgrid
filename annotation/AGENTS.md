@@ -42,6 +42,10 @@ Patterns here:
 - Add or gate a VEP column with a VEPColumnDef in annotation/vep_columns.py (min/max_columns_version,
   min/max_vep_version, genome_builds, pipeline_types) plus a VariantGridColumn — the mapping has no DB model.
   annotation/vep_columns.py:filter_for is the one selector the command builder, inserter and descriptions page share.
+- A source that lands several columns (a score plus its detail, a plugin's fields) ships as one composite
+  VariantGridColumn with snpdb/models/models_columns.py:CompositeColumnMember rows, headline first, and goes into the
+  public "All columns" collection as the composite, never its members, with an example row in
+  snpdb/grid_columns/composite_examples.py. Copy the shape of `promoter_ai` or `mavedb` in snpdb/migrations/0002_seed_data.py.
 - Branch on pipeline via annotation/pipelines/__init__.py:PIPELINES (STANDARD, STRUCTURAL_VARIANT, GENE_LEVEL,
   ANNOTSV) and annotation/pipelines/base.py:AnnotationPipelineRunner (dump / annotate / import_results), not on
   pipeline_type. Which variants a type covers is annotation/annotation_pipeline_routing.py:pipeline_type_variant_q
