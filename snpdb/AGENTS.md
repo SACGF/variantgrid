@@ -27,6 +27,9 @@ Patterns here:
 - Resolve which build a request is for with genome_build_manager.py:GenomeBuildManager.get_current_genome_build (GET param, URL path, user default, first annotated build, in that order).
 - `RequiresClassification` is seed data - the name a fresh install's classify queue tag gets. What behaves as one is `Tag.requires_classification`, set per tag on the tag settings page; ask `models/models.py:Tag.classify_queue_qs` (or `classify_queue_qs_for_bucket`), never a tag name.
 - Read user preferences through models/models_user_settings.py:UserSettings.get_for_user — Global, Organization, Lab then User overrides, later wins.
+- A multi-field source is one composite VariantGridColumn drawing its members (models/models_columns.py:CompositeColumnMember,
+  sort_order 0 the headline). A new migration seeds the composite and its member rows and swaps the members out of the
+  public "All columns" collection for the composite (migrations/0007_utr_annotator_splicevault_avi_composites.py).
 - Every receiver, search included, is connected in `snpdb/apps.py:SnpdbConfig.ready`, not at import. A search is declared with `snpdb/search.py:search_receiver` (see signals/variant_search.py) and registered there by name with `search_registry.register`; `snpdb/tests/test_search_registry.py` fails when one is declared and not registered.
 
 Gotchas:
