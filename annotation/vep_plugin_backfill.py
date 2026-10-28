@@ -4,9 +4,9 @@ VariantAnnotationVersions already in use, without a new version: stamp their bas
 VEP lane doesn't halt on VEPVersionMismatchError, flag the versions whose existing variants need a backfill, and write
 the backfill steps.
 
-Entry points: stamp_plugin_pins (the migration and `manage.py enable_vep_plugin_backfill`), backfill_steps /
-backfill_note (the ManualOperation note and the command's output, with the backfill's VEP command line built by
-backfill_vep_command), backfill_script (the same steps as a bash script, the command's `--bash-script`),
+Entry points: stamp_plugin_pins (the migration and `manage.py enable_vep_plugin_backfill`), backfill_steps
+(the command's output, with the backfill's VEP command line built by backfill_vep_command), backfill_script (the same
+steps as a bash script, the command's `--bash-script`), backfill_note (the ManualOperation note, pointing at the script),
 enable_plugins_fix / vep_mismatch_fix (what the mismatch warnings tell the admin to run). Functions take the model
 classes, so the migration passes its historical ones; nothing here imports annotation.models.
 """
@@ -250,7 +250,7 @@ def _backfill_heading(vav) -> str:
 
 
 def backfill_steps(vav, annotation_range_lock_model) -> list[str]:
-    """ backfill_commands as numbered text under a heading, for the note and the command's output """
+    """ backfill_commands as numbered text under a heading, for the command's output """
     steps = backfill_commands(vav, annotation_range_lock_model)
     if not steps:
         return []
@@ -301,15 +301,14 @@ def versions_pending_backfill(variant_annotation_version_model, genome_build_nam
     return qs.order_by("genome_build_id", "pk")
 
 
-def backfill_note(variant_annotation_version_model, annotation_range_lock_model,
-                  genome_build_name: Optional[str] = None) -> str:
-    """ Steps for every version still flagged for a backfill """
-    lines = ["Fill in UTRAnnotator, AVI, SpliceVault and AlphaGenome splicing annotation of variants annotated "
-             "before they were switched on (#2426, #2433), and re-annotate the 5' UTR effects Ensembl's UTRAnnotator "
-             "reported one of at random (#2499), with one VEP run per version. Admin steps: "
-             "https://github.com/SACGF/variantgrid/issues/2433#issuecomment-6393595562, or write them as one "
-             f"script with '{ENABLE_COMMAND} --bash-script backfill.sh'. For each version:"]
-    for vav in versions_pending_backfill(variant_annotation_version_model, genome_build_name):
-        lines.append("")
-        lines.extend(backfill_steps(vav, annotation_range_lock_model))
-    return "\n".join(lines)
+def backfill_note(variant_annotation_version_model, genome_build_name: Optional[str] = None) -> str:
+    """ What the backfill is and which versions need it - the steps themselves come from the command, whose
+        VEP command lines would bury the upgrader in output """
+    versions = ", ".join(_backfill_heading(vav)
+                         for vav in versions_pending_backfill(variant_annotation_version_model, genome_build_name))
+    return ("Fill in UTRAnnotator, AVI, SpliceVault and AlphaGenome splicing annotation of variants annotated "
+            "before they were switched on (#2426, #2433), and re-annotate the 5' UTR effects Ensembl's UTRAnnotator "
+            f"reported one of at random (#2499), with one VEP run per version: {versions}. "
+            f"Write the steps as one script with '{ENABLE_COMMAND} --bash-script backfill.sh' and run it under "
+            "screen or nohup (hours per version). Admin steps: "
+            "https://github.com/SACGF/variantgrid/issues/2433#issuecomment-6393595562")

@@ -30,8 +30,7 @@ def _has_versions_to_backfill(apps) -> bool:
 
 
 def _backfill_note(apps) -> str:
-    return backfill_note(apps.get_model("annotation", "VariantAnnotationVersion"),
-                         apps.get_model("annotation", "AnnotationRangeLock"))
+    return backfill_note(apps.get_model("annotation", "VariantAnnotationVersion"))
 
 
 def _outstanding_required(apps, task_id: str):

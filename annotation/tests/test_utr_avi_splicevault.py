@@ -276,17 +276,19 @@ class PluginPinStampTests(TestCase):
             self.assertIn(ENABLE_COMMAND, vep_mismatch_fix(vav, pins))
             self.assertIn("create_new_variant_annotation_version", vep_mismatch_fix(vav, {**pins, "vep": 117}))
 
-    def test_backfill_note_imports_only_the_plugins_each_build_covers(self):
+    def test_backfill_imports_only_the_plugins_each_build_covers(self):
         """ AVI is configured on GRCh37 too, but has no GRCh37 columns """
-        self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)
+        vav = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)
         self._enable("--genome-build", "GRCh37")
+        steps = "\n".join(self._steps(vav))
+        self.assertIn("--csq splicevault_spliceai_delta=SpliceVault_SpliceAI_delta", steps)
+        self.assertIn("--csq utr_annotator_consequence=5UTR_consequence", steps)
+        self.assertNotIn("AVI_PHRED", steps)
+        self.assertIn(f"--plugin UTRAnnotator,file={settings.ANNOTATION_VEP_BASE_DIR}/{UTR_ANNOTATOR_FILE}", steps)
         with override_settings(**_settings_with_plugins()):
             note = _backfill_note(apps)
-        self.assertIn("--csq splicevault_spliceai_delta=SpliceVault_SpliceAI_delta", note)
-        self.assertIn("--csq utr_annotator_consequence=5UTR_consequence", note)
-        self.assertNotIn("AVI_PHRED", note)
-        self.assertIn(f"--plugin UTRAnnotator,file={settings.ANNOTATION_VEP_BASE_DIR}/{UTR_ANNOTATOR_FILE}", note)
-        self.assertIn("enable_vep_plugin_backfill", note)
+        self.assertIn(f"GRCh37 (VariantAnnotationVersion {vav.pk})", note)
+        self.assertIn("enable_vep_plugin_backfill --bash-script", note)
 
     def test_backfill_vep_command_keeps_only_the_backfilled_sources(self):
         vav = self._vav(self.grch38, VariantAnnotationVersion.Status.ACTIVE)

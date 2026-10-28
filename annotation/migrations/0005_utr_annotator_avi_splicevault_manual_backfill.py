@@ -11,9 +11,8 @@ def _has_versions_to_backfill(apps) -> bool:
 
 def _backfill_note(apps) -> str:
     """ Only registered where the plugins were configured before migrating. Enabling them later is
-        `manage.py enable_vep_plugin_backfill`, which prints the same steps """
-    note = backfill_note(apps.get_model("annotation", "VariantAnnotationVersion"),
-                         apps.get_model("annotation", "AnnotationRangeLock"))
+        `manage.py enable_vep_plugin_backfill`, which prints the steps """
+    note = backfill_note(apps.get_model("annotation", "VariantAnnotationVersion"))
     return (note + "\n\nA plugin switched on after this migration: 'manage.py enable_vep_plugin_backfill' stamps "
             "its versions and prints the steps for them")
 

@@ -116,7 +116,6 @@ def _get_custom_params_list(cvf_list: list[VEPColumnDef], prefix, data_path) -> 
         params["format"] = fmt
 
     command = ",".join([f"{k}={v}" for k, v in params.items()])
-    logging.info(command)
     return ["--custom", command]
 
 
