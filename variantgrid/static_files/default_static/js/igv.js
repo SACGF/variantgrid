@@ -4,7 +4,7 @@
 
    A page shows the links by setting window.ANALYSIS_SETTINGS = {show_igv_links, igv_data} and defining
    getAlignmentFiles(), the BAM/CRAM paths to load alongside the locus. The settings are read off the analysis window,
-   so variant details loaded inside an analysis follow the analysis'. igvPortUrl takes everything it
+   so variant details loaded inside an analysis follow the analysis'. igvPortUrls takes everything it
    needs as arguments. */
 
 function getIgvSettings() {
@@ -23,37 +23,42 @@ function replaceFilePrefix(replaceDict, alignmentFiles) {
     });
 }
 
-// 'goto' the locus, or 'load' the alignment files at it when there are any
-function igvPortUrl(igvData, locus, alignmentFiles) {
-    const params = ["genome=" + igvData.genome];
-    if (locus) {
-        params.push("locus=" + locus);
-    }
-    let op = "goto";
+// Port requests, sent in order. IGV's /goto reads only the locus, so without alignment files the genome is
+// switched by a /load of its own first (a no-op when IGV already has it). A /load with files takes all three.
+function igvPortUrls(igvData, locus, alignmentFiles) {
+    const genomeParam = "genome=" + igvData.genome;
     const files = replaceFilePrefix(igvData.replace_dict, alignmentFiles || []).join();
     if (files) {
-        params.push("file=" + files);
-        op = "load";
+        const params = [genomeParam, "file=" + files];
+        if (locus) {
+            params.push("locus=" + locus);
+        }
+        return [`${igvData.base_url}/load?${params.join("&")}`];
     }
-    return `${igvData.base_url}/${op}?${params.join("&")}`;
+    const urls = [`${igvData.base_url}/load?${genomeParam}`];
+    if (locus) {
+        urls.push(`${igvData.base_url}/goto?locus=${locus}`);
+    }
+    return urls;
 }
 
 let seenIgvError = false;
 
 function openIgvLink(locus, alignmentFiles) {
     const igvData = getIgvSettings().igv_data;
-    $.ajax({
-        url: igvPortUrl(igvData, locus, alignmentFiles),
-        error: function(jqXHR, textStatus, errorThrown) {
-            if (!seenIgvError) {
-                console.log(jqXHR, textStatus, errorThrown);
-                let message = `<p>Could not connect to IGV - is it running and accepting connections on ${igvData.base_url}?`;
-                message += `<p>See also <a target='_blank' href='${Urls.igv_integration()}'>IGV Integration</a>`;
-                createModal("igv-error-dialog", "IGV", message);
-                seenIgvError = true;
-            }
-        },
-        suppressErrors: true,
+    const [firstUrl, ...laterUrls] = igvPortUrls(igvData, locus, alignmentFiles);
+    let request = $.ajax({url: firstUrl, suppressErrors: true});
+    for (const url of laterUrls) {
+        request = request.then(() => $.ajax({url: url, suppressErrors: true}));
+    }
+    request.fail(function(jqXHR, textStatus, errorThrown) {
+        if (!seenIgvError) {
+            console.log(jqXHR, textStatus, errorThrown);
+            let message = `<p>Could not connect to IGV - is it running and accepting connections on ${igvData.base_url}?`;
+            message += `<p>See also <a target='_blank' href='${Urls.igv_integration()}'>IGV Integration</a>`;
+            createModal("igv-error-dialog", "IGV", message);
+            seenIgvError = true;
+        }
     });
 }
 
