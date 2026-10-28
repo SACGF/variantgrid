@@ -39,6 +39,12 @@ boxes of any `--measure` selectors. Options worth knowing:
 - `--dump` records every element's box; `compare.py shots/results.json` then lists what collapsed, appeared,
   resized or changed font size between the two modes.
 
+`console.py URL` loads one page and prints, as JSON, its uncaught exceptions with stacks, console errors and
+warnings, failed requests and 4xx/5xx responses. `vg page <url> --js-writes-to-database` is the usual way in: it serves the working
+tree from its own process on a free port, logs in with a short-lived session (`VG_BROWSER_BASE` and
+`VG_BROWSER_SESSION` override `harness.py`'s defaults), runs `console.py` and maps inline-script frames back to
+template lines, so it needs neither the runserver nor `agent_session.py` below.
+
 `jsq.py URL 'JS'` evaluates one expression (an `async () =>` is fine) in each mode and prints both results.
 
 ## Gotchas

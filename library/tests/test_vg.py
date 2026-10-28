@@ -32,6 +32,7 @@ from library.vg.maps import signals as signals_map
 from library.vg.maps import tasks as tasks_map
 from library.vg.markdown import MapTable, render_markdown
 from library.vg.outline import module_doc, outline, render_outline
+from library.vg.page_js import FrameMapper, WritesRefused, build_report, check_box_allows_writes
 from library.vg.repo import REPO_ROOT
 from library.vg.settings_chain import (
     assignments,
@@ -457,3 +458,37 @@ class CssUnusedTest(SimpleTestCase):
         """, "html.parser")
         self.assertEqual(css_rendered._links(soup),  # pylint: disable=protected-access
                          ["/snpdb/view_sample/3", "/genes/view_gene/1", "/analysis/1/node_doc/2/"])
+
+
+class PageJsTest(SimpleTestCase):
+    DOCUMENT = "<html>\n<script>\n    const hasMaxEntScan = names.some(name => data[name] != null);\n});\n</script>"
+    URL = "http://localhost:4321/variantopedia/view_variant/1"
+
+    class _TemplateLines:
+        def find(self, line):
+            return "variantopedia/templates/variant_details.html:211" if "hasMaxEntScan" in line else None
+
+    def test_frames_map_to_template_page_line_or_static_source(self):
+        mapper = FrameMapper(self.URL, self.DOCUMENT, self._TemplateLines())
+        stack = (f"TypeError: x\n    at transcriptFunc ({self.URL}:3:100)\n    at {self.URL}:4:1\n"
+                 "    at e (http://localhost:4321/static/js/global.0123456789ab.js:12:5)")
+        self.assertEqual(mapper.stack(stack), [
+            "at transcriptFunc (variantopedia/templates/variant_details.html:211)",
+            "at page line 4: });",
+            "at e (/static/js/global.js:12)",
+        ])
+
+    def test_console_lines_are_zero_based_and_repeats_counted(self):
+        warning = {"type": "warning", "text": "slow", "url": self.URL, "lineNumber": 2, "columnNumber": 0}
+        data = {"url": self.URL, "status": 200, "document": self.DOCUMENT, "errors": [], "click_failures": [],
+                "console": [warning, warning], "requests": []}
+        report = build_report(data, [])
+        self.assertEqual(report.console, ["warning: slow  [page line 3: const hasMaxEntScan = names.some(name => data[name] != null);] (x2)"])
+
+    def test_writes_allowed_only_on_developer_and_test_boxes(self):
+        check_box_allows_writes("variantgrid.settings.env_developers.anybox")
+        check_box_allows_writes("variantgrid.settings.env.vgtest2")
+        for module in ["variantgrid.settings.env.vgaws", "variantgrid.settings.env.shariant",
+                       "variantgrid.settings.env.newhost (missing - settings would fail to load)"]:
+            with self.assertRaises(WritesRefused, msg=module):
+                check_box_allows_writes(module)

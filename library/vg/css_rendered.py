@@ -15,25 +15,19 @@ reports or shells out (annotation_build_detail runs VEP on a test VCF) leaves no
 Entry points: `crawl_rendered_classes` (returns a CrawlResult) and `render_rendered_report`.
 """
 import re
-import subprocess
 from collections import Counter, deque
-from contextlib import ExitStack
 from dataclasses import dataclass, field
-from unittest import mock
 from urllib.parse import urlsplit
 
-import requests
-import rollbar
 from bs4 import BeautifulSoup
-from celery.app.base import Celery
 from django.db import transaction
-from django.test import Client, override_settings
+from django.test import Client
 from django.urls import NoReverseMatch, Resolver404, get_resolver, resolve, reverse
 
 from library.django_utils.database_utils import pg_settings
 from library.vg.css import UnusedReport
 from library.vg.maps.urls import _is_api, _templates, _view_callable, _walk
-from library.vg.page import get_agent_user
+from library.vg.page import get_agent_user, quiet_side_effects
 from library.vg.repo import first_party_packages
 
 # URL names that do something rather than show something; a GET to one is never made
@@ -83,18 +77,6 @@ def _links(soup: BeautifulSoup) -> list[str]:
     return links
 
 
-def _quietly():
-    """ Everything a view could send off the box, stubbed for the crawl """
-    stack = ExitStack()
-    stack.enter_context(mock.patch.object(Celery, "send_task"))
-    stack.enter_context(mock.patch.object(rollbar, "report_exc_info"))
-    stack.enter_context(mock.patch.object(rollbar, "report_message"))
-    stack.enter_context(mock.patch.object(requests, "post"))  # Slack webhooks, ClinVar submission
-    stack.enter_context(mock.patch.object(subprocess, "Popen", side_effect=OSError("no subprocesses while crawling")))
-    stack.enter_context(override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"))
-    return stack
-
-
 def crawl_rendered_classes(username: str | None = None, max_pages: int = 500, per_name: int = 2,
                            progress=None) -> CrawlResult:
     result = CrawlResult()
@@ -102,7 +84,7 @@ def crawl_rendered_classes(username: str | None = None, max_pages: int = 500, pe
     client = Client(SERVER_NAME="localhost", raise_request_exception=False)
     queue = deque(_seeds(names))
     seen_paths = set(queue)
-    with _quietly():
+    with quiet_side_effects():
         with transaction.atomic():
             client.force_login(get_agent_user(username) if username else get_agent_user())
             transaction.set_rollback(True)  # the session lives in the cache; last_login need not be kept

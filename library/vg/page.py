@@ -9,15 +9,23 @@ tracked the way Django's test runner does it: Template._render is swapped for th
 for the duration of the request.
 """
 import re
+import subprocess
 from collections import Counter
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
+from importlib import import_module
+from unittest import mock
 
+import requests
+import rollbar
 from bs4 import BeautifulSoup
+from celery.app.base import Celery
+from django.conf import settings
+from django.contrib.auth import BACKEND_SESSION_KEY, HASH_SESSION_KEY, SESSION_KEY
 from django.contrib.auth.models import User
 from django.db import connection, transaction
 from django.template import Template
-from django.test import Client
+from django.test import Client, override_settings
 from django.test.signals import template_rendered
 from django.test.utils import CaptureQueriesContext, instrumented_test_render
 from django.urls import NoReverseMatch, reverse
@@ -77,6 +85,32 @@ def create_agent_user() -> tuple[User, bool]:
         user.save()
     user.groups.add(all_users_group())
     return user, created
+
+
+def agent_session_key(user: User, expiry_seconds: int) -> str:
+    """ A logged-in session for user in the configured SESSION_ENGINE (the cache backend here, where a db
+        SessionStore would never be found), for a browser to send as its sessionid cookie """
+    session = import_module(settings.SESSION_ENGINE).SessionStore()
+    session[SESSION_KEY] = str(user.pk)
+    session[BACKEND_SESSION_KEY] = "django.contrib.auth.backends.ModelBackend"
+    session[HASH_SESSION_KEY] = user.get_session_auth_hash()
+    session.set_expiry(expiry_seconds)
+    session.create()
+    return session.session_key
+
+
+def quiet_side_effects(block_subprocesses: bool = True) -> ExitStack:
+    """ Everything a view could send off the box, stubbed: celery's send_task, Rollbar, outgoing POSTs (Slack,
+        ClinVar submission), email and (optionally) subprocesses """
+    stack = ExitStack()
+    stack.enter_context(mock.patch.object(Celery, "send_task"))
+    stack.enter_context(mock.patch.object(rollbar, "report_exc_info"))
+    stack.enter_context(mock.patch.object(rollbar, "report_message"))
+    stack.enter_context(mock.patch.object(requests, "post"))
+    if block_subprocesses:
+        stack.enter_context(mock.patch.object(subprocess, "Popen", side_effect=OSError("no subprocesses while crawling")))
+    stack.enter_context(override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"))
+    return stack
 
 
 @contextmanager

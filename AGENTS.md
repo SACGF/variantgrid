@@ -38,7 +38,7 @@ Route by task. The app notes (`<app>/AGENTS.md`) load automatically when you wor
 | an analysis node | `analysis/AGENTS.md` | `manage.py profile_analysis_nodes --analysis <id> --rerun --explain` |
 | a classification, discordance, evidence keys | `classification/AGENTS.md` | `claude/maps/models.md#classification` |
 | VCF import | `upload/AGENTS.md` | `claude/maps/tasks.md` |
-| a page, grid, template tag, JS behaviour | `uicore/AGENTS.md` (grids in `#grids`) | `vg page <url> --queries` |
+| a page, grid, template tag, JS behaviour | `uicore/AGENTS.md` (grids in `#grids`) | `vg page <url> --queries`, `--js-writes-to-database` |
 | permissions, notifications, previews, `library/utils` | `library/AGENTS.md` | - |
 | the user-facing changelog (`system/changelog`) | `variantgrid/templates/default_templates/changelog.html` (rules in its header comment) | `git log` since its last update |
 | a management command that must run on deploy | `manual/__manual_readme.md` | `manage.py manual_outstanding` |
@@ -62,14 +62,14 @@ same name (`claude/guides/operations.md#deployments`). Identify the box before r
 
 | Host (settings stem) | What it is | Rules |
 |---|---|---|
-| `vg-test2` (`vgtest2`) | Shared lab, test.variantgrid.com: gunicorn and celery against a 175 GB database human testers are also using | Read-only work, `vg page`, `--keepdb` tests and creating fake/test data (left in place afterwards) without asking; ask before the list below, except that an upgrade the user asked for (pull, `scripts/upgrade.sh`, migrate) is the whole `scripts/upgrade.sh --quick` (never a bare `git pull`: it skips migrate and collectstatic, `claude/guides/operations.md#deploy-and-upgrade`), then `sudo -n systemctl restart <service>` for gunicorn and each celeryd_* unit (never skipped, even after a docs-only pull) (sudoers allows exactly those, named without `.service`) and `vg status`, without a separate ask |
+| `vg-test2` (`vgtest2`) | Shared lab, test.variantgrid.com: gunicorn and celery against a 175 GB database human testers are also using | Read-only work, `vg page` (without `--js-writes-to-database`), `--keepdb` tests and creating fake/test data (left in place afterwards) without asking; ask before the list below, except that an upgrade the user asked for (pull, `scripts/upgrade.sh`, migrate) is the whole `scripts/upgrade.sh --quick` (never a bare `git pull`: it skips migrate and collectstatic, `claude/guides/operations.md#deploy-and-upgrade`), then `sudo -n systemctl restart <service>` for gunicorn and each celeryd_* unit (never skipped, even after a docs-only pull) (sudoers allows exactly those, named without `.service`) and `vg status`, without a separate ask |
 | `sharianttest`, `shariantdemo`, `shariantsecurity` | Shared Shariant test / demo | As vg-test2, without the restart exception |
 | `vgaws`, `shariant`, `runx1db2`, SA Pathology hosts | Production, real users and clinical data | Read-only by default. Never run tests or edit code. When I ask for a production rollout of something that has already shipped and been run on a test deployment (switching on a feature, adding annotation data or a VEP plugin file, a documented backfill): its documented steps only - deployment settings, data/plugin downloads, its management commands, `celeryd_*`/gunicorn restarts. Dry run first where one exists, smallest slice first for a backfill; stop and report on anything unexpected. Ask before anything else |
 | `dlawrence-Precision-3680` (`dlawrenceprecision3680`, in `env_developers/`) | Developer box, disposable local database | Just work: `migrate` (forwards or back), tests, management commands, annotation/VEP, fake or test data, service restarts - no ask needed |
 | anything else | Developer box or unknown | Ask the user what the box is before the list below |
 
 Ask first on any shared box: restarting services, `manage.py migrate`, creating or deleting annotation versions or
-running VEP, liftover across the database, or any write to `snpdb_variant`, `snpdb_allele` or
+running VEP, liftover across the database, `vg page --js-writes-to-database`, or any write to `snpdb_variant`, `snpdb_allele` or
 `annotation_variantannotation` (`.claude/hooks/pre_bash.py` prompts for these). `python3 manage.py vg status` is the first
 thing to run in a session.
 
@@ -95,6 +95,8 @@ scripts/vg docs check [doc.md]                    # every path / path:Symbol cit
 scripts/vg css unused [--dynamic]                 # scss class/id selectors nothing in templates, JS or Python names
 scripts/vg imports cycles                         # import cycles among module-load imports; CI fails on any
 python3 manage.py vg page /variantopedia/dashboard --queries   # render a page as claude_agent: status, outline, N+1s
+python3 manage.py vg page <url> --js-writes-to-database [--click '#tab']  # WRITES: also loads it in headless chromium,
+                                                               #   not rolled back: JS errors at their template line, failed ajax
 scripts/vg map                                    # regenerate claude/maps/*.md (gitignored; the session hook does this)
 python3 manage.py test --keepdb [label]           # --keepdb always; whole suite: --parallel 4 (~2 min)
 ./scripts/linting/run_pylint.sh                   # pylint to lint.txt (~4 min); --errors-only to stdout is what CI
@@ -224,6 +226,14 @@ restates a field declaration, drop it.
 
 ### Verifying pages
 Run `vg page <url> --queries` before and after a template or view change; a rising query count is an N+1.
+`--js-writes-to-database` checks a change to a page's JavaScript (inline or static): it loads the page in headless chromium and
+reports uncaught errors and console warnings at the template or static file line they came from, plus failed
+requests; `--click '#tab'` runs a tab's JS too. **It writes to the database and nothing is rolled back** - plain
+`vg page` rolls back, this does not: the page and the ajax it fires run as `claude_agent` exactly as for a user. It
+counts as a write under "This box": fine on a developer box, ask first on a shared test one, and the command refuses
+to run anywhere else (production included).
+It needs `scripts/browser/setup.sh` once per box and serves static files from `STATIC_ROOT` (run `collectstatic`
+after a static JS edit).
 For layout - what a CSS or template change actually looks like - `scripts/browser/README.md` has a headless
 chromium harness (screenshots, element boxes, quirks-vs-standards diff, try-a-fix patches) that runs against a
 working-tree `runserver` as `claude_agent`; read the PNGs it writes rather than guessing at a render.

@@ -5,6 +5,7 @@ manage.py vg — introspection for driving VariantGrid from an agent or a termin
     vg map [models|urls|commands|tasks|signals|settings|all] [--json] [--app X] [--counts]
     vg tests [--changed] [--base REF] [--run] [--parallel N] [--explain]
     vg page <url-or-url-name> [--as USER] [--kwargs k=v ...] [--text|--html|--links|--forms|--json] [--queries]
+                                      [--js-writes-to-database [--click SELECTOR ...] [--wait MS]]
     vg page --create-user
     vg outline <file.py> [--min-lines N] | vg outline --coverage [package ...]
     vg settings [NAME] [--diff] [--json]
@@ -38,6 +39,13 @@ from library.vg.import_graph import build_import_graph, import_cycles, render_cy
 from library.vg.inspect import KINDS, inspect, render_inspection
 from library.vg.outline import outline, render_coverage, render_outline
 from library.vg.page import AgentUserMissing, create_agent_user, render_page
+from library.vg.page_js import (
+    HarnessFailed,
+    HarnessMissing,
+    WritesRefused,
+    render_js_report,
+    run_page_js,
+)
 from library.vg.repo import REPO_ROOT
 from library.vg.settings_chain import (
     names_assigned_in,
@@ -82,6 +90,13 @@ class Command(BaseCommand):
         page_parser.add_argument("--kwargs", nargs="*", default=[], metavar="k=v", help="URL name kwargs")
         page_parser.add_argument("--queries", action="store_true", help="Report production query count and repeats")
         page_parser.add_argument("--create-user", action="store_true", help="Create the claude_agent user and exit")
+        page_parser.add_argument("--js-writes-to-database", dest="js", action="store_true",
+                                 help="Also load it in headless chromium and report JS errors, console warnings and failed requests. "
+                                      "NOT ROLLED BACK: the page and its ajax write to the database as claude_agent, like a real "
+                                      "user. Refused on production; ask first on a shared test box. Needs scripts/browser/setup.sh")
+        page_parser.add_argument("--click", action="append", default=[], metavar="SELECTOR",
+                                 help="With --js-writes-to-database: click this (a tab) after load, so its JS runs too; repeatable")
+        page_parser.add_argument("--wait", type=int, default=1500, metavar="MS", help="With --js-writes-to-database: ms to wait after network idle")
         output = page_parser.add_mutually_exclusive_group()
         output.add_argument("--text", action="store_true", help="Page as plain text")
         output.add_argument("--html", action="store_true", help="Raw HTML")
@@ -185,7 +200,8 @@ class Command(BaseCommand):
 
     # --- page ---
 
-    def handle_page(self, url, username, kwargs, queries, create_user, text, html, links, forms, json: bool, **_):  # pylint: disable=redefined-outer-name
+    def handle_page(self, url, username, kwargs, queries, create_user, text, html, links, forms, json: bool,  # pylint: disable=redefined-outer-name
+                    js, click, wait, **_):
         if create_user:
             user, created = create_agent_user()
             self.stdout.write(f"User {user.username} {'created' if created else 'already existed'}; in all_users.")
@@ -197,9 +213,19 @@ class Command(BaseCommand):
             result = render_page(url, username=username, kwargs=url_kwargs, queries=queries)
         except (AgentUserMissing, ValueError) as e:
             raise CommandError(str(e)) from e
+        js_report = None
+        if js:
+            try:
+                js_report = run_page_js(result.url, username=username, template_names=result.templates,
+                                        wait_ms=wait, clicks=click)
+            except (HarnessMissing, HarnessFailed, WritesRefused) as e:
+                raise CommandError(str(e)) from e
 
         if json:
-            self.stdout.write(_json_dumps({k: v for k, v in asdict(result).items() if k != "html"}))
+            page = {k: v for k, v in asdict(result).items() if k != "html"}
+            if js_report:
+                page["js"] = asdict(js_report)
+            self.stdout.write(_json_dumps(page))
         elif html:
             self.stdout.write(result.html)
         elif text:
@@ -218,6 +244,9 @@ class Command(BaseCommand):
             self.stdout.write(f"queries: {result.production_queries} production ({result.total_queries} total)")
             for sql, n in result.repeated[:10]:
                 self.stdout.write(f"  x{n}: {sql[:200]}")
+        if js_report and not json:
+            self.stdout.write(render_js_report(js_report))
+            self.stdout.write("js: not rolled back - anything the page or its ajax wrote is still in the database")
 
     # --- outline ---
 

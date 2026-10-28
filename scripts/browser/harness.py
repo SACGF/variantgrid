@@ -12,6 +12,8 @@ VIEWPORT = {"width": 1280, "height": 900}
 
 
 def session_key() -> str:
+    if key := os.environ.get("VG_BROWSER_SESSION"):  # vg page --js-writes-to-database passes its own session
+        return key
     path = HOME / "sessionid"
     if not path.exists():
         raise SystemExit(f"{path} missing: run  python3 manage.py shell -c \"$(cat scripts/browser/agent_session.py)\"")
