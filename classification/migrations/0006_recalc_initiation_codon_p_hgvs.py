@@ -21,5 +21,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation.operation_manage(["recalc_resolved_variant_info_p_hgvs"], test=_test_p_hgvs_needs_recalc),
+        # Computing p.HGVS needs cdot's protein accessions and the cached transcript sequences
+        ManualOperation.operation_manage(["recalc_resolved_variant_info_p_hgvs"], test=_test_p_hgvs_needs_recalc,
+                                         requires=["cdot-current", "transcript-sequences-loaded"]),
     ]
