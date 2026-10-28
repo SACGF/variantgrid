@@ -302,13 +302,15 @@ and remove it when the plan lands or is deleted.
 ## Definition of done
 
 1. `scripts/vg tests --explain` names the tests at risk and they pass; the ones kept earn their keep (Testing, above).
-2. A new module has a docstring stating what it owns and its entry points. A gotcha learned the hard way is one line in
+2. A change to a page's JavaScript has been run: `vg page <url> --js-writes-to-database` on a page whose data reaches
+   the changed code shows no new errors (Verifying pages, above). On a shared test box, ask before running it.
+3. A new module has a docstring stating what it owns and its entry points. A gotcha learned the hard way is one line in
    the app's `AGENTS.md`, next to the code it is about - not a memory, not this file.
-3. `scripts/vg docs check` passes after any doc edit. A citation is a repo path or `snpdb/models/models_variant.py:Variant`-style path:Symbol in backticks; a plan is checked while
+4. `scripts/vg docs check` passes after any doc edit. A citation is a repo path or `snpdb/models/models_variant.py:Variant`-style path:Symbol in backticks; a plan is checked while
    its `Status:` is draft, approved or in progress. CI reports dead citations as a warning rather than failing, so the
    ones it lists are yours to fix when you are next in that app.
-4. The plan file's `Status:` line records the outcome; a landed plan whose knowledge has moved into docs is deleted.
-5. A fact a later session needs and could not work out from the code goes into the repo in the same change (a doc,
+5. The plan file's `Status:` line records the outcome; a landed plan whose knowledge has moved into docs is deleted.
+6. A fact a later session needs and could not work out from the code goes into the repo in the same change (a doc,
    or a comment next to the code), and the report-back says where. Most changes have no such fact: the code and the
    diff are the record. The chat is gone when the session ends, so a "for the next agent" note there is noise.
 

@@ -15,6 +15,10 @@ Patterns here:
   register in global.js; a feature's register from its own file (`[data-citation-id]` in citations.js,
   `[data-preview-db]` in vc_form.js), which must load before `globalSetup()` runs on ready - registration order
   is the order processors run.
+- A change to a page's JS (an inline `<script>` here, or a file it loads) is checked by running the page:
+  `python3 manage.py vg page <url> --js-writes-to-database`, with `--click '#tab'` for a tab's JS, and a URL whose
+  data reaches the changed code. Not rolled back: fine on a developer box, ask first on a shared test box, refused
+  anywhere else.
 - Put Python values into a `<script>` with `{{ value|jsonify }}` (uicore/templatetags/js_tags.py:jsonify_for_js) -
   it escapes `<`, `>` and `&` and marks safe (no quotes or backticks around it); `{{ value|js_symbol }}` for identifiers. Never build JS literals with `{{ }}`.
 - Label/value rows are `{% labelled label="..." %}...{% endlabelled %}` (uicore/templatetags/ui_utils.py:LabelledValueTag),

@@ -47,3 +47,9 @@ two) or callbacks that are nothing but page values (`classification/templates/cl
 `Urls.<name>(...)` (django_js_reverse). New files start with `// @ts-check` and must pass `npx eslint`. A new static
 file 500s every page that references it until `collectstatic` has added it to the manifest
 (`ManifestStaticFilesStorage`), so it ships via `scripts/upgrade.sh`, never a bare checkout on a served tree.
+
+Lint only sees the code; a bug that needs particular data (a variant with no transcript) only shows when the page
+runs. After a JS change, `collectstatic`, then load a page that runs it with
+`python3 manage.py vg page <url> --js-writes-to-database` - uncaught errors and console warnings come back at their
+source line. It writes to the database (not rolled back): fine on a developer box, ask first on a shared test box,
+and it refuses anywhere else. The edit hook reminds you and suggests URLs.
