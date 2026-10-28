@@ -306,10 +306,13 @@ def backfill_script(vavs, annotation_range_lock_model) -> str:
 
 
 def versions_pending_backfill(variant_annotation_version_model, genome_build_name: Optional[str] = None):
-    """ Every version still flagged for a backfill, in the order the steps run """
+    """ Every version still flagged for a backfill, in the order the steps run. Migrations pass their historical
+        model, which only has the flags added by then """
+    field_names = {f.name for f in variant_annotation_version_model._meta.get_fields()}
     pending = Q()
     for flag in (BACKFILL_FLAG, UTR_EFFECTS_FLAG, TRANSCRIPTS_FLAG):
-        pending |= Q(**{flag: False})
+        if flag in field_names:
+            pending |= Q(**{flag: False})
     qs = variant_annotation_version_model.objects.filter(pending)
     if genome_build_name:
         qs = qs.filter(genome_build_id=genome_build_name)
