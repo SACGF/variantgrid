@@ -164,6 +164,9 @@ class VariantTranscriptSelections:
             field_value = data[field]
             if field_value:
                 data[field] = field_value.replace("&", ", ")
+        # The '&'-joined plugin columns the page draws as records rather than text
+        data["utr_annotator_effects"] = obj.utr_annotator_effects
+        data["splicevault_top_events_list"] = obj.splicevault_top_events_list
 
         # These always need to be set for sorting
         data[self.REFSEQ_TRANSCRIPT] = self.NO_TRANSCRIPT

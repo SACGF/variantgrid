@@ -24,7 +24,7 @@ from annotation.backfill_columns import (
 from annotation.enums import VariantAnnotationPipelineType
 from annotation.models.models_version import VariantAnnotationVersion
 from annotation.vep_annotation import installed_vep_plugin_is_ours
-from annotation.vep_plugin_backfill import DOWNLOAD_COMMAND, UTR_EFFECTS_FLAG
+from annotation.vep_plugin_backfill import DOWNLOAD_COMMAND, TRANSCRIPTS_FLAG, UTR_EFFECTS_FLAG
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -110,9 +110,15 @@ class Command(BaseCommand):
         except BackfillColumnError as e:
             raise CommandError(str(e)) from e
 
+        if options["mark_backfilled"] and TRANSCRIPTS_FLAG in self._mark_backfilled_flags(options) \
+                and not any(t.per_transcript for t in targets):
+            raise CommandError(f"None of --columns is a --csq column VariantTranscriptAnnotation holds, so this "
+                               f"import writes no transcript rows - nothing to mark {TRANSCRIPTS_FLAG} for")
+
         for target in targets:
             tables = ", ".join(target.base_table_names)
-            self.stdout.write(f"{target.column} <- {target.source_description} ({tables})")
+            per_transcript = ", per transcript" if target.per_transcript else ""
+            self.stdout.write(f"{target.column} <- {target.source_description} ({tables}{per_transcript})")
 
         if options["dump"]:
             self._run_dump(variant_annotation_version, targets, options)

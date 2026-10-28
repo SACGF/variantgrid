@@ -239,6 +239,14 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # that ran the old plugin.
     backfilled_utr_effects = models.BooleanField(default=True)
 
+    # #2426 - the backfills above imported UTRAnnotator and SpliceVault into VariantAnnotation only, leaving the
+    # transcript rows of variants annotated before the switch-on null, while the variant page's transcript switcher
+    # and evidence key autopopulate read those transcript-level columns off the transcript rows. One UTRAnnotator +
+    # SpliceVault pass over every variant imports each CSQ entry to its transcript row
+    # (annotation/vep_plugin_backfill.py:backfill_commands). The migration sets it False on the NEW/ACTIVE versions
+    # that ran either plugin.
+    backfilled_utr_splicevault_transcripts = models.BooleanField(default=True)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
