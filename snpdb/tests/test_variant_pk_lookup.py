@@ -3,7 +3,10 @@ import tempfile
 from django.test import TestCase
 
 from snpdb.models import GenomeBuild, Variant, VariantCoordinate
-from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from snpdb.tests.utils.vcf_testing_utils import (
+    slowly_create_test_variant,
+    slowly_create_test_variant_from_coordinate,
+)
 from snpdb.variant_pk_lookup import VariantPKLookup
 
 LONG_ALTS = ["ACGTACGTACGTACGTAC", "TTTTTGGGGGCCCCCAAAAA", "GATTACAGATTACA"]
@@ -27,6 +30,16 @@ class VariantPKLookupTest(TestCase):
             variant_pk_lookup.batch_check()
         self.assertEqual({v.pk for v in self.long_variants}, set(variant_pk_lookup.variant_pk_by_hash.values()))
         self.assertEqual([novel], variant_pk_lookup.unknown_variant_coordinates)
+
+    def test_symbolic_alt_preloaded(self):
+        """ <DEL> etc are preloaded by name, so take no long-sequence query """
+        deletion = VariantCoordinate(chrom="1", position=5000, ref="A", alt="<DEL>", end=5100, svlen=-100)
+        variant = slowly_create_test_variant_from_coordinate(deletion, self.genome_build)
+        variant_pk_lookup = VariantPKLookup(self.genome_build)
+        variant_pk_lookup.add(deletion)
+        with self.assertNumQueries(1):  # Variants for the contig only
+            variant_pk_lookup.batch_check()
+        self.assertEqual([variant.pk], list(variant_pk_lookup.variant_pk_by_hash.values()))
 
     def test_unknown_short_sequence_has_no_hash(self):
         variant_pk_lookup = VariantPKLookup(self.genome_build)

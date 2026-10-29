@@ -1,22 +1,23 @@
 """
 Variant table is massive, so we need a way to quickly look up a variant PK for insertion
 
-Every possible short sequence (GATCN up to SHORT_SEQUENCE_MAX_LENGTH, and the reference alt) is looked up by hash
-up front, so a short REF/ALT missing from the map means the variant is new. That covers ~98% of variants in 1 indexed
-query, whatever the size of the Sequence table. Other sequences stay as strings in the hash, and are resolved to pks
-in 1 query per batch (#2538)
+An explicit set of sequences (every GATCN sequence up to SHORT_SEQUENCE_MAX_LENGTH, the reference alt and the
+supported symbolic alts) is looked up by hash up front, so a preloaded REF/ALT missing from the map means the variant
+is new. That covers ~98% of variants in 1 indexed query, whatever the size of the Sequence table. It is an enumeration
+rather than a length cutoff because the hash is the only index on Sequence - any other sequence stays as a string in
+the hash, and is resolved to a pk in 1 query per batch (#2538)
 
 The original implementation RedisVariantPKLookup used Redis to store a hash, was deleted 2021-08-05
 """
 import itertools
 import logging
 import os
-import re
 from collections import defaultdict
 from collections.abc import Callable, Collection, Iterable
 from functools import cache, cached_property
 from typing import Any, Optional, TypeAlias
 
+from django.conf import settings
 from django.db.models import QuerySet, TextField, Value
 from django.db.models.functions import Concat
 
@@ -24,7 +25,7 @@ from library.utils import sha256sum_str
 from snpdb.models import GenomeBuild, Locus, Sequence, Variant, VariantCoordinate
 from upload.vcf import sql_copy_files
 
-# ref/alt are a Sequence pk for short sequences, or the sequence itself for long ones
+# ref/alt are a Sequence pk for preloaded sequences, or the sequence itself for the rest
 SequenceKey: TypeAlias = int | str
 VariantHash: TypeAlias = tuple[int, int, SequenceKey, SequenceKey, int | str]
 LocusHash: TypeAlias = tuple[int, int, SequenceKey]
@@ -32,16 +33,20 @@ LociHash: TypeAlias = Any
 AnyHash: TypeAlias = VariantHash | LocusHash | LociHash
 
 SHORT_SEQUENCE_MAX_LENGTH = 5
-SHORT_SEQUENCE_PATTERN = re.compile(rf"[GATCN]{{1,{SHORT_SEQUENCE_MAX_LENGTH}}}|{re.escape(Variant.REFERENCE_ALT)}")
 
 
 @cache
-def _short_sequences_by_hash() -> dict[str, str]:
-    bases = "GATCN"
-    sequences = [Variant.REFERENCE_ALT]
+def _preloaded_sequences() -> frozenset[str]:
+    """ Gene-level alts (<FUSION:HGNC:76>) are unique to their event, so are left to the per-batch query """
+    sequences = {Variant.REFERENCE_ALT, *settings.VARIANT_SYMBOLIC_ALT_VALID_TYPES}
     for length in range(1, SHORT_SEQUENCE_MAX_LENGTH + 1):
-        sequences.extend("".join(p) for p in itertools.product(bases, repeat=length))
-    return {sha256sum_str(seq): seq for seq in sequences}
+        sequences.update("".join(p) for p in itertools.product("GATCN", repeat=length))
+    return frozenset(sequences)
+
+
+@cache
+def _preloaded_sequence_hashes() -> list[str]:
+    return [sha256sum_str(seq) for seq in _preloaded_sequences()]
 
 
 class VariantPKLookup:
@@ -60,8 +65,8 @@ class VariantPKLookup:
             self.chrom_contig_id_mappings = genome_build.get_chrom_contig_id_mappings()
         else:
             self.chrom_contig_id_mappings = None
-        short_qs = Sequence.objects.filter(seq_sha256_hash__in=_short_sequences_by_hash())
-        self.sequence_pk_by_seq: dict[str, int] = dict(short_qs.values_list("seq", "pk"))
+        preloaded_qs = Sequence.objects.filter(seq_sha256_hash__in=_preloaded_sequence_hashes())
+        self.sequence_pk_by_seq: dict[str, int] = dict(preloaded_qs.values_list("seq", "pk"))
         self.long_sequence_pk_by_seq: dict[str, Optional[int]] = {}  # None = not in DB
 
     @cached_property
@@ -74,12 +79,12 @@ class VariantPKLookup:
         return Sequence.objects.get_or_create(seq=Variant.REFERENCE_ALT, defaults=defaults)[0].pk
 
     @staticmethod
-    def _is_short(seq: str) -> bool:
-        return SHORT_SEQUENCE_PATTERN.fullmatch(seq) is not None
+    def _is_preloaded(seq: str) -> bool:
+        return seq in _preloaded_sequences()
 
     def _get_sequence_key(self, seq: str) -> Optional[SequenceKey]:
-        """ None = short sequence not in DB, so no variant can use it """
-        if self._is_short(seq):
+        """ None = preloaded sequence not in DB, so no variant can use it """
+        if self._is_preloaded(seq):
             return self.sequence_pk_by_seq.get(seq)
         return seq
 
@@ -197,7 +202,7 @@ class VariantPKLookup:
     def add(self, variant_coordinate: VariantCoordinate) -> Optional[VariantHash]:
         variant_coordinate = variant_coordinate.as_internal_canonical_form(self.genome_build)
 
-        # If a short sequence isn't known, variant is definitely unknown. Long ones are checked in batch_check
+        # If a preloaded sequence isn't known, variant is definitely unknown. Others are checked in batch_check
         if variant_hash := self.get_variant_coordinate_hash(variant_coordinate):
             # Maybe unknown, need to check
             self.variant_hashes.append(variant_hash)
@@ -236,11 +241,11 @@ class VariantPKLookup:
         sequences = set()
         for variant_coordinate in self.unknown_variant_coordinates:
             sequences.update((variant_coordinate.ref, variant_coordinate.alt))
-        self._load_long_sequences(seq for seq in sequences if not self._is_short(seq))
+        self._load_long_sequences(seq for seq in sequences if not self._is_preloaded(seq))
 
         unknown_sequence_by_hash = {}
         for seq in sequences:
-            if self._is_short(seq):
+            if self._is_preloaded(seq):
                 known = seq in self.sequence_pk_by_seq
             else:
                 known = self.long_sequence_pk_by_seq[seq] is not None
@@ -255,7 +260,7 @@ class VariantPKLookup:
             qs = Sequence.objects.filter(seq_sha256_hash__in=unknown_sequence_by_hash)
             for seq_sha256_hash, pk in qs.values_list("seq_sha256_hash", "pk"):
                 seq = unknown_sequence_by_hash[seq_sha256_hash]
-                if self._is_short(seq):
+                if self._is_preloaded(seq):
                     self.sequence_pk_by_seq[seq] = pk
                 else:
                     self.long_sequence_pk_by_seq[seq] = pk
