@@ -68,9 +68,12 @@ def handle_sample_pre_delete(sender, instance, **kwargs):
         | Q(moinode__sample=instance)
     )
     if instance.extraction_id:
-        q |= Q(samplenode__extraction=instance.extraction_id)
+        specimen = instance.extraction.specimen
+        q |= Q(samplenode__extraction=instance.extraction_id) | Q(samplenode__specimen=specimen)
+        # A patient level node reaches samples via the extraction's patient as well as Sample.patient
+        q |= Q(samplenode__patient=specimen.patient_id)
     if patient := get_patient_for_source(SampleSourceLevel.SAMPLE, instance):
-        q |= (
+        q |= Q(samplenode__patient=patient) | (
             Q(zygositynode__patient=patient)
             | Q(genelistnode__patient=patient)
             | Q(allelefrequencynode__patient=patient)
