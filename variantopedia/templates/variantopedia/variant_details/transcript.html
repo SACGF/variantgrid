@@ -13,18 +13,18 @@
         <div class='alert alert-warning'>
             {{ vts.no_transcript_message }}
             {% if vts.gene_overlaps %}
-                <div>
-                    <a class='toggle-link' data-toggle="collapse" href='#gene-overlaps'>Show {{ vts.gene_overlaps|length }} overlapping genes</a>
+                <div class="form-inline mt-2">
+                    <label for="gene-overlap-select" class="mr-2">Overlapping gene</label>
+                    <select id="gene-overlap-select" class="form-control form-control-sm">
+                        {% for gene_version in vts.gene_overlaps %}
+                            <option value="{{ gene_version.gene_symbol_id|default:'' }}" data-gene-id="{{ gene_version.gene_id }}">{{ gene_version.gene_symbol_id|default:gene_version.gene_id }}</option>
+                        {% endfor %}
+                    </select>
+                    <a id="gene-overlap-link" class="hover-link ml-2" target="_blank" href="#">Gene page</a>
                 </div>
-                <div id="gene-overlaps" class="collapse">
-                    {% for gene_version in vts.gene_overlaps %}
-                        {% if gene_version.gene_symbol_id %}
-                            <a href="{% url 'view_gene_symbol' gene_version.gene_symbol_id %}">{{ gene_version.gene_symbol_id }}</a>
-                        {% else %}
-                            <a href="{% url 'view_gene' gene_version.gene_id %}">{{ gene_version.gene_id }}</a>
-                        {% endif %}
-                    {% endfor %}
-                </div>
+                <script>
+                    $(document).ready(function() { initGeneOverlapSelect(geneFunc); });
+                </script>
             {% endif %}
         </div>
     {% endif %}
