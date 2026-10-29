@@ -84,7 +84,9 @@ def get_canonical_transcript_collection_filename_part(ctc: CanonicalTranscriptCo
 
 def get_node_export_basename(node: AnalysisNode) -> str:
     """ Short enough to survive Windows path limits once it lands in a downloads folder - the analysis pk,
-        node pk and version keep it unique; the node name (or class when unnamed) says what it is """
+        node pk and version keep it unique; the node name (or class when unnamed) says what it is.
+        A live-data node's rows depend on data that changes under it, so each source's version is appended
+        (eg 'vzcc1.42' for zygosity count collection 1 at data version 42) to say which state the file reflects """
     if node.name:
         label = _filename_part(node.name)
     else:
@@ -94,6 +96,9 @@ def get_node_export_basename(node: AnalysisNode) -> str:
         if len(samples) == 1:
             name_parts.append(samples[0].name)
     name_parts += [f"a{node.analysis.pk}", f"n{node.pk}", f"v{node.version}"]
+    for source_key, data_version in sorted(node.live_data_sources.items()):
+        source_label = re.sub(r"\W", "", source_key)
+        name_parts.append(f"{source_label}.{data_version}")
     return "_".join(name_parts)
 
 
