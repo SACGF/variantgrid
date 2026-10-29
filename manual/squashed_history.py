@@ -6,8 +6,9 @@ pre-squash migration and refuses to apply while manual tasks are outstanding, so
 means the database holds the whole old history and every one-off step it registered.
 
 A database is in one of three states, judged on the django_migrations rows of our own apps (not site-packages)
-that name no migration on disk. Once NEW_HISTORY_MIGRATION is recorded (a fresh build, or the reset) only rows applied
-before it are old history: one applied after it is a post-squash migration renamed since, which Django ignores.
+that name no migration on disk. NEW_HISTORY_MIGRATION is recorded only by a fresh build or the reset (pre_migrate
+refuses to apply it over the old history), so once it is there any such row is a post-squash migration renamed since,
+which Django ignores.
 - current: no old-history rows - a fresh database, or one already reset
 - needs_checkpoint: rows from the old history and no checkpoint row - upgrade through the checkpoint branch first
 - needs_reset: rows from the old history and the checkpoint row - delete them and record the new initial
@@ -68,12 +69,11 @@ def _migration_loader(using: str) -> MigrationLoader:
 
 
 def _stale_migrations(loader: MigrationLoader) -> set[tuple[str, str]]:
+    if NEW_HISTORY_MIGRATION in loader.applied_migrations:
+        return set()
     local_apps = _local_app_labels()
-    stale = {key: row for key, row in loader.applied_migrations.items()
-             if key[0] in local_apps and key not in loader.disk_migrations and key != CHECKPOINT_MIGRATION}
-    if new_history_row := loader.applied_migrations.get(NEW_HISTORY_MIGRATION):
-        return {key for key, row in stale.items() if row.applied < new_history_row.applied}
-    return set(stale)
+    return {key for key in loader.applied_migrations
+            if key[0] in local_apps and key not in loader.disk_migrations and key != CHECKPOINT_MIGRATION}
 
 
 def history_state(using: str = "default") -> HistoryState:

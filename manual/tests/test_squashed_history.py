@@ -1,3 +1,4 @@
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.core.management import CommandError, call_command
@@ -32,9 +33,10 @@ class SquashedHistoryTest(TestCase):
         self.assertEqual(history_state(), HistoryState.CURRENT)
 
     def test_renamed_post_squash_migration_is_current(self):
-        """ A reset database that applied a migration since renamed keeps its row, which is not old history """
-        self.recorder.record_applied(*CHECKPOINT_MIGRATION)
-        self.recorder.record_applied("annotation", "0004_utr_annotator")
+        """ A fresh build can apply a migration before NEW_HISTORY_MIGRATION; renamed since, its row is not old history """
+        new_history_row = self.recorder.migration_qs.get(app=NEW_HISTORY_MIGRATION[0], name=NEW_HISTORY_MIGRATION[1])
+        self.recorder.migration_qs.create(app="eventlog", name="0002_renamed_since",
+                                          applied=new_history_row.applied - timedelta(seconds=1))
         self.assertEqual(history_state(), HistoryState.CURRENT)
 
     def test_old_history_without_checkpoint_refuses_reset(self):
