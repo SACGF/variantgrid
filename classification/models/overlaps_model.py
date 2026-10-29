@@ -476,13 +476,14 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
     def value_type_label(self):
         value_type = self.value_type
         if value_type == ClassificationResultValue.ONC_PATH:
-            if self.testing_contexts_objs == [TestingContextBucket.GERMLINE]:
+            if not set(self.testing_contexts_objs).difference([TestingContextBucket.GERMLINE, TestingContextBucket.NON_CANCER]):
                 return "Pathogenicity"
             elif TestingContextBucket.GERMLINE not in self.testing_contexts_objs:
                 return "Oncogenicity"
+            else:
+                return value_type.label  # ONCO-PATH
         else:
             return "Clinical Significance"
-        return value_type.label
 
     @property
     def is_single_context(self):
