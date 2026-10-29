@@ -3,7 +3,7 @@ from collections import defaultdict
 
 import pandas as pd
 from dateutil import parser
-from django.utils.timezone import make_aware
+from django.utils.timezone import is_naive, make_aware
 
 from analysis.enums import TagLocation
 from analysis.models import ImportedVariantTag, VariantTag, VariantTagsImport
@@ -40,6 +40,7 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
     COL_ANALYSIS_NAME = "analysis__name"
     COL_USERNAME = "user__username"
 
+    # Labels written by the Tags grid CSV download (variantopedia.grids.VariantTagsColumns)
     NEW_COLUMNS = {
         COL_VARIANT_STRING: "Variant",
         COL_NODE: "NodeID",
@@ -47,10 +48,15 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
         COL_GENOME_BUILD: "Genome Build",
         COL_TAG: "Tag",
         COL_GENE: "Gene",
-        COL_VARIANT_ID: "VariantID",
-        COL_ANALYSIS_ID: "AnalysisID",
+        COL_VARIANT_ID: "Variant ID",
+        COL_ANALYSIS_ID: "Analysis ID",
         COL_ANALYSIS_NAME: "Analysis",
         COL_USERNAME: "Username",
+    }
+    # Older downloads wrote these without the space
+    OLD_COLUMN_LABELS = {
+        "VariantID": COL_VARIANT_ID,
+        "AnalysisID": COL_ANALYSIS_ID,
     }
 
     def process_items(self, upload_step):
@@ -63,7 +69,7 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
         REMOVE_LENGTH = len(NEW_CLASSIFICATION)
 
         if self.COL_GENOME_BUILD not in df.columns:
-            df = df.rename(columns=invert_dict(self.NEW_COLUMNS))
+            df = df.rename(columns=invert_dict(self.NEW_COLUMNS) | self.OLD_COLUMN_LABELS)
 
         # view_genome_build should all be the same
         view_genome_builds = set(df["view_genome_build"])
@@ -93,7 +99,7 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
                 variant_string = variant_string[:-REMOVE_LENGTH].strip()
 
             try:
-                variant_coordinate = VariantCoordinate.from_string(variant_string)
+                variant_coordinate = VariantCoordinate.from_string(variant_string, genome_build)
             except ValueError:
                 num_skipped_records += 1
                 if "*" in variant_string:
@@ -107,7 +113,8 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
 
             gene_symbol = row["variant__variantannotation__transcript_version__gene_version__gene_symbol__symbol"]
             created = parser.parse(row["created"])
-            created = make_aware(created)
+            if is_naive(created):  # The Tags grid download writes an aware datetime
+                created = make_aware(created)
             ivt = ImportedVariantTag(variant_tags_import=variant_tags_import,
                                      variant_string=variant_string,
                                      genome_build_string=row["view_genome_build"],
@@ -154,8 +161,8 @@ class VariantTagsInsertTask(ImportVCFStepTask):
         created_date = []
         ivt_variant_hashes = {}
         vts_qs = variant_tags_import.importedvarianttag_set.all()
-        for i, ivt in enumerate(vts_qs.order_by("variant_string")):
-            variant_coordinate = VariantCoordinate.from_string(ivt.variant_string)
+        for ivt in vts_qs.order_by("variant_string"):
+            variant_coordinate = VariantCoordinate.from_string(ivt.variant_string, genome_build)
             ivt_variant_hashes[ivt] = variant_pk_lookup.get_variant_coordinate_hash(variant_coordinate)
 
         # Retrieve them all. Some may be None as they were modified/normalized
@@ -167,7 +174,7 @@ class VariantTagsInsertTask(ImportVCFStepTask):
         for ivt, variant_hash in ivt_variant_hashes.items():
             variant_id = variant_ids_by_hash.get(variant_hash)
             if variant_id is None:
-                variant_coordinate = VariantCoordinate.from_string(ivt.variant_string)
+                variant_coordinate = VariantCoordinate.from_string(ivt.variant_string, genome_build)
                 try:
                     variant = ModifiedImportedVariant.get_variant_for_unnormalized_variant(upload_step.upload_pipeline,
                                                                                            variant_coordinate)
@@ -227,7 +234,8 @@ class VariantTagsInsertTask(ImportVCFStepTask):
                 tags_by_user[vt.user].append(vt)
 
             for user, user_tags in tags_by_user.items():
-                assign_permission_to_user_and_groups(user, user_tags)
+                for vt in user_tags:
+                    assign_permission_to_user_and_groups(user, vt)
 
             # Update date to be from imported date
             for vt, created in zip(variant_tags, created_date):
