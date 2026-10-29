@@ -172,17 +172,25 @@ def get_tag_node_counts_dict(node, tagged_variant_ids_by_label: dict[str, list[i
         return dict.fromkeys(tagged_variant_ids_by_label, 0)
 
     qs = node.get_queryset().filter(pk__in=all_tagged_variant_ids)
-    aggregate_kwargs = {label: Count("pk", filter=Q(pk__in=variant_ids))
-                        for label, variant_ids in tagged_variant_ids_by_label.items()}
-    return qs.aggregate(**aggregate_kwargs)
+    return _count_by_label(qs, {label: Q(pk__in=variant_ids)
+                                for label, variant_ids in tagged_variant_ids_by_label.items()})
 
 
 def _aggregate_node_counts(qs, analysis, counts_to_get) -> dict[str, int]:
-    aggregate_kwargs = {}
+    q_by_label = {}
     for count_type in counts_to_get:
         if count_type == BuiltInFilters.TOTAL:
             q = None
         else:
             q = get_extra_filters_q(analysis, count_type)
-        aggregate_kwargs[count_type] = Count("pk", filter=q)
-    return qs.aggregate(**aggregate_kwargs)
+        q_by_label[count_type] = q
+    return _count_by_label(qs, q_by_label)
+
+
+def _count_by_label(qs, q_by_label: dict[str, Optional[Q]]) -> dict[str, int]:
+    """ Labels carry tag ids, which can hold characters Django refuses in a column alias (whitespace,
+        quotes, ';') - so aggregate under generated aliases and map the counts back """
+    labels_by_alias = {f"count_{i}": label for i, label in enumerate(q_by_label)}
+    counts = qs.aggregate(**{alias: Count("pk", filter=q_by_label[label])
+                             for alias, label in labels_by_alias.items()})
+    return {label: counts[alias] for alias, label in labels_by_alias.items()}

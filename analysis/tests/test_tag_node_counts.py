@@ -135,6 +135,19 @@ class TestTagNodeCountValues(TagNodeCountTestCase):
 
         self.assertNotIn(self.tag_label, self._node_version(child).counts)
 
+    def test_tag_id_django_refuses_as_an_alias_is_counted(self):
+        """ Tag ids from before the alphanumeric rule can hold spaces and quotes (#2527) """
+        node = self._sample_node()
+        odd_tag = Tag.objects.create(pk="needs 'review'; now")
+        odd_label = TagFilter.label(odd_tag.pk)
+        self._tag_variant(self.variants[0], tag=odd_tag)
+
+        update_analysis_tag_node_counts(self.analysis)
+        self.assertEqual(1, self._node_version(node).counts[odd_label])
+
+        node.load()
+        self.assertEqual(1, self._node_version(node).counts[odd_label])
+
     def test_recount_bumps_modified_so_the_client_sees_it(self):
         """ nodes_status hands the client counts_modified - it's how it knows a recount landed """
         node = self._sample_node()
