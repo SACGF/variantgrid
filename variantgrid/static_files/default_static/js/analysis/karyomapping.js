@@ -53,7 +53,7 @@ function showKaryotypeScatter(scatterData, binLabels, options) {
         }],
         annotations: [{
             xref: 'x', yref: 'paper', x: (options.geneStart + options.geneEnd) / 2, y: 1,
-            yanchor: 'bottom', showarrow: false, text: escapeHtml(options.geneSymbol),
+            yanchor: 'top', showarrow: false, text: escapeHtml(options.geneSymbol),
         }],
     };
 

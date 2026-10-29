@@ -1,12 +1,14 @@
 """
 Karyomapping: phasing a trio proband's variants against its parents. KaryotypeBins sorts each (proband, father, mother)
 genotype into in-phase / out-of-phase paternal and maternal bins; GenomeKaryomappingCounts / ContigKaryomappingCounts
-hold those counts per trio (create_genome_karyomapping_for_trio, queued when a Trio is created) for the trio page QC,
+hold those counts per trio (create_genome_karyomapping_for_trio, queued when a Trio is created, and requeued by the trio
+page when missing, failed or stuck - get_or_queue_genome_karyomapping_counts) for the trio page QC,
 and TrioKaryomappingGeneRegion bins a gene's flanking region live for the per-gene graph and CSV (#1754).
 """
 import operator
 from collections import Counter
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from functools import cached_property, reduce
 from typing import Optional
 
@@ -234,12 +236,25 @@ class GenomeKaryomappingCounts(KaryotypeCounts, models.Model):
     """ Full sample (eg panel/exome not necessarily WGS) """
     trio = models.OneToOneField(Trio, on_delete=CASCADE)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
+    modified = models.DateTimeField(auto_now=True)
+
+    ERROR_RETRY_AFTER = timedelta(minutes=10)
+    PENDING_RETRY_AFTER = timedelta(days=1)  # far longer than a recount takes (minutes for an exome) - the task was lost
 
     def __str__(self):
         description = f"Whole sample karyomapping counts for {self.trio} ({self.trio.genome_build})"
         if self.import_status != ImportStatus.SUCCESS:
             description += f" ({self.get_import_status_display()})"
         return description
+
+    @property
+    def retry_after(self) -> Optional[datetime]:
+        """ When viewing the trio may requeue a count that failed or never finished """
+        if self.import_status == ImportStatus.SUCCESS:
+            return None
+        if self.import_status == ImportStatus.ERROR:
+            return self.modified + self.ERROR_RETRY_AFTER
+        return self.modified + self.PENDING_RETRY_AFTER
 
     @property
     def relatedness_summary(self):
