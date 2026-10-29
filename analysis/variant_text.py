@@ -2,7 +2,7 @@
 
     Identifier formats come from the search framework's receivers (dbSNP, HGVS, variant
     coordinates, loci, ClinGen allele IDs, COSMIC), so anything the search box understands
-    can be pasted in. Regions are the one shape search doesn't cover, so they're parsed here.
+    can be pasted in, as can VEP's "&"-joined dbSNP ids. Regions are the one shape search doesn't cover, so they're parsed here.
 """
 import re
 from dataclasses import dataclass, field
@@ -25,6 +25,8 @@ from snpdb.variant_pk_lookup import VariantPKLookup
 
 REGION_PATTERN = re.compile(r"^(?P<chrom>[^:\s]+)\s*:\s*(?P<start>[0-9,]+)\s*-\s*(?P<end>[0-9,]+)$")
 REGION_SEPARATOR = "-"
+# VEP joins a variant's dbSNP ids with "&", which is how they appear in grids and exports
+DBSNP_IDS_PATTERN = re.compile(r"^rs\d+(&rs\d+)+$", re.IGNORECASE)
 # The search box's coordinate formats - chrom and position are groups 1 and 2 of each
 COORDINATE_PATTERNS = [
     (VARIANT_PATTERN, VariantCoordinate.from_variant_match),
@@ -84,6 +86,16 @@ def _search_variant_ids(user: User, genome_build: GenomeBuild, line: str) -> lis
     return list(qs.values_list("pk", flat=True))
 
 
+def _search_line_variant_ids(user: User, genome_build: GenomeBuild, line: str) -> list[int]:
+    """ A line of dbSNP ids (rs1&rs2) is searched one id at a time, until one finds variants """
+    if DBSNP_IDS_PATTERN.match(line):
+        for dbsnp_rs_id in line.split("&"):
+            if variant_ids := _search_variant_ids(user, genome_build, dbsnp_rs_id):
+                return variant_ids
+        return []
+    return _search_variant_ids(user, genome_build, line)
+
+
 def _variant_coordinate(line: str, genome_build: GenomeBuild) -> Optional[VariantCoordinate]:
     for pattern, get_variant_coordinate in COORDINATE_PATTERNS:
         if m := pattern.fullmatch(line):
@@ -128,7 +140,7 @@ def resolve_variant_text(user: User, genome_build: GenomeBuild, text: str) -> Va
         if variant_id := variant_id_by_line.get(line):
             variant_ids = [variant_id]
         else:
-            variant_ids = _search_variant_ids(user, genome_build, line)
+            variant_ids = _search_line_variant_ids(user, genome_build, line)
         if variant_ids:
             for variant_id in variant_ids:
                 if variant_id not in seen_variant_ids:

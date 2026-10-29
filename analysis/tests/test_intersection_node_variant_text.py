@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.test import TestCase, override_settings
 
@@ -51,6 +51,14 @@ class ResolveVariantTextTest(AnalysisSetupMixin, TestCase):
         resolution = self._resolve("rs99999999")
         self.assertEqual(resolution.variant_ids, [])
         self.assertEqual(resolution.unresolved, ["rs99999999"])
+
+    def test_dbsnp_ids_searched_one_at_a_time_until_found(self):
+        with patch("analysis.variant_text.search_data") as search_data:
+            search_data.side_effect = lambda _user, search_string: Mock(
+                results=[_search_result(self.variant)] if search_string == "rs2150111024" else [])
+            resolution = resolve_variant_text(self.analysis.user, self.grch37, "rs11958868&rs2150111024&rs3")
+        self.assertEqual(resolution.variant_ids, [self.variant.pk])
+        self.assertEqual([c.args[1] for c in search_data.call_args_list], ["rs11958868", "rs2150111024"])
 
     def test_variants_deduplicated_across_lines(self):
         resolution = self._resolve("rs6025\nrs6025", search_results=[_search_result(self.variant)])
