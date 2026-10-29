@@ -368,6 +368,7 @@ class TestProcessRecordPatientCodeOnly(TestCase):
         self.assertTrue(record.valid)
         self.assertEqual(record.patient.patient_code, "CODEONLY2")
         self.assertEqual(str(record.patient), "CODEONLY2")
+        self.assertIsNone(record.patient_last_name)
 
 
 class TestProcessRecordReadOnlyPatient(TestCase):

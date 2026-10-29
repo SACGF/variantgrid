@@ -52,6 +52,15 @@ class TestPatientUploadCSV(TestCase):
                          list(imported_df[PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE]))
         self.assertTrue(imported_df[PatientColumns.EXTRACTION_REFERENCE_ID].isna().all())
 
+    def test_whitespace_cell_is_blank(self):
+        """ A cell of only spaces reads as None, the same as an empty one """
+        df = get_patient_record_imports_dataframe(PATIENT_UPLOAD_CSV)
+        df[PatientColumns.PATIENT_LAST_NAME] = "  "
+        with tempfile.NamedTemporaryFile(suffix=".csv") as spaces_csv:
+            df.to_csv(spaces_csv.name, index=False)
+            imported_df = get_patient_record_imports_dataframe(spaces_csv.name)
+        self.assertTrue(all(v is None for v in imported_df[PatientColumns.PATIENT_LAST_NAME]))
+
 
 class TestPatientUploadImport(TestCase):
     maxDiff = None
