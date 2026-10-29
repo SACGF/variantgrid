@@ -7,7 +7,7 @@ from django.test import TestCase
 
 from annotation.effect_filters import (
     SPLICEVAULT_ALL_OUT_OF_FRAME_REGEX,
-    SPLICEVAULT_ANY_OUT_OF_FRAME_REGEX,
+    SPLICEVAULT_TOP_EVENT_OUT_OF_FRAME_REGEX,
     utr_high_impact_rules,
 )
 
@@ -107,6 +107,12 @@ class SpliceVaultOutOfFrameTest(TestCase):
         self.assertFalse(_regex_matches("Frameshift:1/10", SPLICEVAULT_ALL_OUT_OF_FRAME_REGEX))
         self.assertFalse(_regex_matches("Frameshift:0/0", SPLICEVAULT_ALL_OUT_OF_FRAME_REGEX))
 
-    def test_any_top_event_out_of_frame(self):
-        self.assertTrue(_regex_matches("Frameshift:1/4", SPLICEVAULT_ANY_OUT_OF_FRAME_REGEX))
-        self.assertFalse(_regex_matches("Frameshift:0/4", SPLICEVAULT_ANY_OUT_OF_FRAME_REGEX))
+    def test_top_event_out_of_frame(self):
+        """ The most frequent event decides, whatever the rarer ones are """
+        top1_frameshift = ("Top1:CD:-32:12%:Frameshift&Top2:ES:2:7%:inFrame&Top3:CD:-96:0.4%:inFrame&"
+                           "Top4:ES:2-3:0.3%:inFrame")
+        self.assertTrue(_regex_matches(top1_frameshift, SPLICEVAULT_TOP_EVENT_OUT_OF_FRAME_REGEX))
+        self.assertTrue(_regex_matches("Top1:ES:3-4:35%:Frameshift", SPLICEVAULT_TOP_EVENT_OUT_OF_FRAME_REGEX))
+        top1_in_frame = ("Top1:ES:3:36%:inFrame&Top2:ES:3-4:34%:Frameshift&Top3:ES:2-3:0.3%:inFrame&"
+                         "Top4:CA:+17:0.05%:Frameshift")
+        self.assertFalse(_regex_matches(top1_in_frame, SPLICEVAULT_TOP_EVENT_OUT_OF_FRAME_REGEX))

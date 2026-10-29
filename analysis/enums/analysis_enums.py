@@ -263,10 +263,10 @@ class StructuralFilter(models.TextChoices):
 
 
 class SpliceVaultOutOfFrame(models.TextChoices):
-    """ Which SpliceVault top events must be out of frame (splicevault_out_of_frame_events 'Frameshift:N/M').
-        ALL is the authors' "consistent with null outcomes" case (Dawes 2023), ANY a looser screen """
+    """ Which SpliceVault top events must be out of frame: ALL is Dawes 2023's "consistent with null outcomes" case,
+        TOP the most frequent event (annotation/effect_filters.py says why there's no "any event") """
     ALL = 'A', "All top events out of frame"
-    ANY = 'Y', "Any top event out of frame"
+    TOP = 'T', "Top event out of frame"
 
 
 class UTRHighImpact(models.TextChoices):

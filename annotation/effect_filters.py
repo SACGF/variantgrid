@@ -11,14 +11,21 @@ from functools import reduce
 
 from django.db.models import Q
 
-# 'Frameshift:N/M' - N of SpliceVault's M top events are out of frame. ALL needs N = M (and N > 0)
+# splicevault_out_of_frame_events is 'Frameshift:N/M' - N of SpliceVault's M top events are out of frame. All of
+# them needs N = M (and N > 0), Dawes 2023's "consistent with null outcomes" case
 SPLICEVAULT_ALL_OUT_OF_FRAME_REGEX = r"^Frameshift:([1-9][0-9]*)/\1$"
-SPLICEVAULT_ANY_OUT_OF_FRAME_REGEX = r"^Frameshift:[1-9]"
+# splicevault_top_events is '&'-joined 'TopN:<event>:<position>:<% of samples>:<frame>', most frequent first. The
+# Top1 event being out of frame weights by frequency, which the N/M count can't: a 12% frameshift ahead of three
+# rare in-frame events is only 1/4, but the variant's usual outcome is still a frameshift. "Any event out of frame"
+# isn't offered - with 4 top events at a site SpliceAI already predicts lost, nearly every variant has one
+SPLICEVAULT_TOP_EVENT_OUT_OF_FRAME_REGEX = r"^Top1:[^&]*:Frameshift(&|$)"
 
 
-def splicevault_out_of_frame_q(all_events: bool, prefix: str = "variantannotation__") -> Q:
-    regex = SPLICEVAULT_ALL_OUT_OF_FRAME_REGEX if all_events else SPLICEVAULT_ANY_OUT_OF_FRAME_REGEX
-    return Q(**{f"{prefix}splicevault_out_of_frame_events__regex": regex})
+def splicevault_out_of_frame_q(top_event_only: bool, prefix: str = "variantannotation__") -> Q:
+    """ top_event_only: SpliceVault's most frequent event is out of frame, else all of its top events are """
+    if top_event_only:
+        return Q(**{f"{prefix}splicevault_top_events__regex": SPLICEVAULT_TOP_EVENT_OUT_OF_FRAME_REGEX})
+    return Q(**{f"{prefix}splicevault_out_of_frame_events__regex": SPLICEVAULT_ALL_OUT_OF_FRAME_REGEX})
 
 
 # utr_annotator_annotation holds one record per uORF effect, each 'key=value' pairs joined by ':'

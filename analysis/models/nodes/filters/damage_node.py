@@ -554,8 +554,8 @@ class DamageNode(AnalysisNode):
                     or_filters.append(q_aloft)
 
             if self.splicevault_out_of_frame and self._plugin_column_backfilled("splicevault_out_of_frame_events"):
-                all_events = self.splicevault_out_of_frame == SpliceVaultOutOfFrame.ALL
-                q_splicevault = splicevault_out_of_frame_q(all_events)
+                top_event_only = self.splicevault_out_of_frame == SpliceVaultOutOfFrame.TOP
+                q_splicevault = splicevault_out_of_frame_q(top_event_only)
                 if self.splicevault_out_of_frame_required:
                     if self.splicevault_out_of_frame_allow_null:
                         q_splicevault |= Q(variantannotation__splicevault_out_of_frame_events__isnull=True)

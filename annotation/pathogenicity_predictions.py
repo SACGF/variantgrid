@@ -570,9 +570,11 @@ EFFECT_NODE_FILTERS: tuple[EffectNodeFilter, ...] = (
     ),
     EffectNodeFilter(
         name="SpliceVault out of frame",
-        fields=("splicevault_out_of_frame_events",),
+        fields=("splicevault_out_of_frame_events", "splicevault_top_events"),
         rule="All top events out of frame: Frameshift:N/N (N > 0) - the authors' \"consistent with null "
-             "outcomes\" case for PVS1 at Very Strong. Any top event out of frame: Frameshift > 0.",
+             "outcomes\" case for PVS1 at Very Strong. Top event out of frame: the most frequent event (Top1) "
+             "is Frameshift, weighting by how often each event is seen, which the N/M count doesn't. A looser "
+             "\"any event out of frame\" isn't offered: nearly every SpliceVault-annotated variant has one.",
         source="Dawes 2023",
         source_detail=_DAWES_2023[0],
         source_url=_DAWES_2023[1],

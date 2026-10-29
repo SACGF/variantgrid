@@ -33,7 +33,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='damagenode',
             name='splicevault_out_of_frame',
-            field=models.CharField(blank=True, choices=[('A', 'All top events out of frame'), ('Y', 'Any top event out of frame')], max_length=1, null=True),
+            field=models.CharField(blank=True, choices=[('A', 'All top events out of frame'), ('T', 'Top event out of frame')], max_length=1, null=True),
         ),
         migrations.AddField(
             model_name='damagenode',

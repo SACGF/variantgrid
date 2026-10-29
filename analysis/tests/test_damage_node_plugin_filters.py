@@ -79,16 +79,16 @@ class DamageNodePluginFiltersTest(TestCase):
     def test_required_allow_null(self):
         self._set_backfilled(True)
         node = DamageNode(analysis=self.analysis,
-                          splicevault_out_of_frame=SpliceVaultOutOfFrame.ANY, splicevault_out_of_frame_required=True,
+                          splicevault_out_of_frame=SpliceVaultOutOfFrame.TOP, splicevault_out_of_frame_required=True,
                           splicevault_out_of_frame_allow_null=False,
                           utr_high_impact=UTRHighImpact.OUT_OF_FRAME, utr_high_impact_required=True, utr_high_impact_allow_null=False)
         q_no_nulls = node._get_node_q()
-        self.assertEqual(splicevault_out_of_frame_q(all_events=False) & utr_high_impact_q(out_of_frame_only=True), q_no_nulls)
+        self.assertEqual(splicevault_out_of_frame_q(top_event_only=True) & utr_high_impact_q(out_of_frame_only=True), q_no_nulls)
 
         node.splicevault_out_of_frame_allow_null = True
         node.utr_high_impact_allow_null = True
         q = node._get_node_q()
-        expected = ((splicevault_out_of_frame_q(all_events=False)
+        expected = ((splicevault_out_of_frame_q(top_event_only=True)
                      | Q(variantannotation__splicevault_out_of_frame_events__isnull=True))
                     & (utr_high_impact_q(out_of_frame_only=True) | Q(variantannotation__utr_annotator_consequence__isnull=True)))
         self.assertEqual(expected, q)

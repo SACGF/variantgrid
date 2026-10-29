@@ -476,7 +476,7 @@
                 {% endif %}
                 {% if node.has_splicevault %}
                     <tr>
-                        <th title="SpliceVault's top mis-splicing events at a splice site SpliceAI predicts lost. 'All out of frame' is the authors' consistent-with-null case (Dawes 2023)">SpliceVault</th>
+                        <th title="SpliceVault's top mis-splicing events at a splice site SpliceAI predicts lost. 'All top events' keeps a variant whose top events are all out of frame (Dawes 2023's consistent-with-null case), 'Top event' one whose most frequent event is. A looser 'any event' screen isn't offered because nearly every SpliceVault-annotated variant has one">SpliceVault</th>
                         <td>{{ form.splicevault_out_of_frame.errors }} {{ form.splicevault_out_of_frame }}</td>
                         <td class="collapse filter-required">{{ form.splicevault_out_of_frame_required }}</td>
                         <td class="collapse filter-required">{{ form.splicevault_out_of_frame_allow_null }}</td>
