@@ -31,6 +31,7 @@ VariantHash: TypeAlias = tuple[int, int, SequenceKey, SequenceKey, int | str]
 LocusHash: TypeAlias = tuple[int, int, SequenceKey]
 LociHash: TypeAlias = Any
 AnyHash: TypeAlias = VariantHash | LocusHash | LociHash
+REF_ALT_SLICE = slice(2, 4)  # After contig_id, position in every hash
 
 SHORT_SEQUENCE_MAX_LENGTH = 5
 
@@ -101,16 +102,18 @@ class VariantPKLookup:
     def _resolve_hashes(self, hashes: Iterable[Optional[AnyHash]]) -> list[Optional[tuple]]:
         """ Swaps long sequences for their pks. None where a hash is None or uses a sequence not in the DB """
         hashes = list(hashes)
-        long_sequences = {part for h in hashes if h is not None for part in h[2:4] if isinstance(part, str)}
+        long_sequences = {seq for h in hashes if h is not None for seq in h[REF_ALT_SLICE] if isinstance(seq, str)}
         self._load_long_sequences(long_sequences)
 
         resolved_hashes = []
         for h in hashes:
             if h is not None:
-                h = tuple(self.long_sequence_pk_by_seq[part] if i in (2, 3) and isinstance(part, str) else part
-                          for i, part in enumerate(h))
-                if None in h[2:4]:
+                ref_and_alt = h[REF_ALT_SLICE]  # Just ref for a locus hash
+                ref_and_alt_ids = tuple(self.long_sequence_pk_by_seq[s] if isinstance(s, str) else s for s in ref_and_alt)
+                if None in ref_and_alt_ids:
                     h = None
+                else:
+                    h = (*h[:REF_ALT_SLICE.start], *ref_and_alt_ids, *h[REF_ALT_SLICE.stop:])
             resolved_hashes.append(h)
         return resolved_hashes
 
