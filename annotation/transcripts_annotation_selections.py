@@ -16,7 +16,7 @@ from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.models.models_version import InvalidAnnotationVersionError
 from genes.enums import AnnotationConsortium
 from genes.hgvs import HGVSException, HGVSMatcher
-from genes.models import GnomADGeneConstraint, Transcript, TranscriptVersion
+from genes.models import GeneVersion, GnomADGeneConstraint, Transcript, TranscriptVersion
 from library.genomics import format_bp
 from snpdb.models import Variant
 from snpdb.models.models_genome import GenomeBuild
@@ -54,6 +54,7 @@ class VariantTranscriptSelections:
         self.hide_other_annotation_consortium_transcripts = hide_other_annotation_consortium_transcripts
         self.variant_annotation: Optional[VariantAnnotation] = None
         self.gene_annotations = {}
+        self.gene_overlaps: list[GeneVersion] = []  # VariantGeneOverlap genes, for a variant VEP gave no gene
         self.transcript_data = []  # See docstring in _populate for details
         self.warning_messages = []
         self.error_messages = []
@@ -99,10 +100,13 @@ class VariantTranscriptSelections:
         vav = annotation_version.variant_annotation_version
         try:
             self.variant_annotation = variant.variantannotation_set.get(version=vav)
+            if self.variant_annotation.gene_id is None:
+                self.gene_overlaps = self._get_gene_overlaps(variant, vav)
             if self.variant_annotation.vep_skipped_reason == VEPSkippedReason.TOO_LONG:
                 # Deliberate - gene overlaps were still resolved locally (#1271)
                 sv_max_size = vav.sv_max_size or settings.ANNOTATION_VEP_SV_MAX_SIZE
-                self.warning_messages.append(self._too_long_warning(sv_max_size))
+                self.warning_messages.append(self._too_long_warning(sv_max_size, len(self.gene_overlaps),
+                                                                    self.variant_annotation.has_annotsv))
             elif self.variant_annotation.vep_skipped_reason:
                 annotation_error = "Unable to annotate variant"
                 if self.variant_annotation.vep_skipped_reason != VEPSkippedReason.UNKNOWN:
@@ -138,11 +142,50 @@ class VariantTranscriptSelections:
             self.error_messages.append(str(e))
 
     @staticmethod
-    def _too_long_warning(sv_max_size: int) -> str:
-        msg = f"Not annotated by VEP: SV longer than {format_bp(sv_max_size)}"
+    def _get_gene_overlaps(variant: Variant, vav) -> list[GeneVersion]:
+        """ Latest GeneVersion of each gene the variant overlaps, sorted by symbol. For a TOO_LONG SV these are
+            the only genes it has - resolved locally rather than by VEP (#1271) """
+        gv_qs = GeneVersion.objects.filter(genome_build=vav.genome_build,
+                                           gene__variantgeneoverlap__version=vav,
+                                           gene__variantgeneoverlap__variant=variant)
+        gv_qs = gv_qs.order_by("gene_id", "-version").distinct("gene_id").only("gene_id", "gene_symbol_id")
+        return sorted(gv_qs, key=lambda gv: (gv.gene_symbol_id is None, gv.gene_symbol_id or gv.gene_id))
+
+    @staticmethod
+    def _gene_overlaps_summary(num_gene_overlaps: int) -> str:
+        if num_gene_overlaps:
+            return f"Genes were still assigned by simple overlap with the gene annotation release ({num_gene_overlaps} genes)"
+        return "No genes in the gene annotation release overlap it"
+
+    @classmethod
+    def _too_long_warning(cls, sv_max_size: int, num_gene_overlaps: int, has_annotsv: bool) -> str:
+        parts = [f"Not annotated by VEP: SV longer than {format_bp(sv_max_size)}",
+                 cls._gene_overlaps_summary(num_gene_overlaps)]
+        if has_annotsv:
+            parts.append("Annotated by AnnotSV")
+        msg = ". ".join(parts)
         if get_visible_url_names()["variant_types"]:
             msg = format_html('{} - see <a href="{}">Variant Types</a>', msg, reverse("variant_types"))
         return msg
+
+    @property
+    def no_transcript_message(self) -> Optional[str]:
+        """ Why the variant annotation has no transcript - only "intergenic" when VEP ran and found no gene """
+        va = self.variant_annotation
+        if va is None or va.transcript_id:
+            return None
+        many_unavailable = "Many annotations will not be available."
+        if va.vep_skipped_reason == VEPSkippedReason.TOO_LONG:
+            return (f"Not annotated by VEP, so has no transcript. {self._gene_overlaps_summary(len(self.gene_overlaps))}. "
+                    f"{many_unavailable}")
+        if va.vep_skipped_reason:
+            reason = ""
+            if va.vep_skipped_reason != VEPSkippedReason.UNKNOWN:
+                reason = f" ({va.get_vep_skipped_reason_display()})"
+            return f"Not annotated by VEP{reason}, so has no assigned gene / transcript. {many_unavailable}"
+        if va.gene_id:
+            return f"Variant has no assigned transcript. {many_unavailable}"
+        return f"Variant is intergenic and has no assigned gene / transcript. {many_unavailable}"
 
     def _get_transcript_data(self, obj: VariantTranscriptAnnotation, representative_transcript: Transcript) -> dict:
         data = model_to_dict(obj)

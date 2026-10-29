@@ -10,13 +10,19 @@ from django.utils import timezone
 
 from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType, VEPSkippedReason
 from annotation.fake_data import get_fake_vep_version, retire_seeded_annotation_version
-from annotation.models import AnnotationVersion, VariantAnnotation, VariantAnnotationVersion
+from annotation.models import (
+    AnnotationVersion,
+    VariantAnnotation,
+    VariantAnnotationVersion,
+    VariantGeneOverlap,
+)
 from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
 from annotation.tasks.annotation_scheduler_task import COUNT_LEASE_PREFIX, count_annotation_runs
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
 from annotation.vcf_files.import_vcf_annotations import handle_vep_skipped
 from genes.enums import AnnotationConsortium
+from genes.fake_data import create_fake_gene_version
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.models import GenomeBuild, VariantCoordinate
 from snpdb.tests.utils.vcf_testing_utils import (
@@ -87,10 +93,54 @@ class VEPTooLongTestCase(VEPTooLongTestBase):
         # it must not be written off as UNKNOWN
         self.assertEqual(self._skipped_reasons(sv_run), {self.long_sv.pk: VEPSkippedReason.TOO_LONG})
 
-    def test_variant_page_too_long_is_a_warning(self):
-        sv_run = self._sv_run(self.long_sv)
-        VariantAnnotation.objects.create(version=self.vav, variant=self.long_sv, annotation_run=sv_run,
-                                         vep_skipped_reason=VEPSkippedReason.TOO_LONG)
-        vts = VariantTranscriptSelections(self.long_sv, self.grch37, annotation_version=self.av)
+
+
+class VariantPageNoTranscriptMessageTestCase(VEPTooLongTestBase):
+    """ #2511: the variant page says why there is no transcript, and only calls VEP's no-gene result intergenic """
+
+    def setUp(self):
+        super().setUp()
+        self.annotation_run = self._sv_run(self.short_sv)
+
+    def _vts(self, variant, **va_kwargs) -> VariantTranscriptSelections:
+        VariantAnnotation.objects.create(version=self.vav, variant=variant, annotation_run=self.annotation_run,
+                                         **va_kwargs)
+        return VariantTranscriptSelections(variant, self.grch37, annotation_version=self.av)
+
+    def test_too_long_with_gene_overlaps(self):
+        for gene_id, symbol in [("ENSG00000000002", "ZZZ1"), ("ENSG00000000001", "AAA1")]:
+            gene_version = create_fake_gene_version(self.grch37, gene_id, symbol, AnnotationConsortium.ENSEMBL)
+            VariantGeneOverlap.objects.create(version=self.vav, annotation_run=self.annotation_run,
+                                              variant=self.long_sv, gene=gene_version.gene)
+        vts = self._vts(self.long_sv, vep_skipped_reason=VEPSkippedReason.TOO_LONG, annotsv_acmg_score=1.0)
+
         self.assertEqual(vts.error_messages, [])
-        self.assertIn("SV longer than 1 kb", " ".join(vts.warning_messages))
+        warning = " ".join(vts.warning_messages)
+        self.assertIn("SV longer than 1 kb", warning)
+        self.assertIn("simple overlap with the gene annotation release (2 genes)", warning)
+        self.assertIn("Annotated by AnnotSV", warning)
+        self.assertEqual(["AAA1", "ZZZ1"], [gv.gene_symbol_id for gv in vts.gene_overlaps])
+        self.assertIn("(2 genes)", vts.no_transcript_message)
+        self.assertNotIn("intergenic", vts.no_transcript_message)
+
+    def test_too_long_without_gene_overlaps(self):
+        vts = self._vts(self.long_sv, vep_skipped_reason=VEPSkippedReason.TOO_LONG)
+        warning = " ".join(vts.warning_messages)
+        self.assertIn("No genes in the gene annotation release overlap it", warning)
+        self.assertNotIn("AnnotSV", warning)
+        self.assertIn("No genes in the gene annotation release overlap it", vts.no_transcript_message)
+
+    def test_other_skipped_reasons(self):
+        vts = self._vts(self.snv, vep_skipped_reason=VEPSkippedReason.UNKNOWN_CONTIG)
+        self.assertTrue(vts.no_transcript_message.startswith("Not annotated by VEP (Unknown Contig),"))
+
+        vts = self._vts(self.short_sv, vep_skipped_reason=VEPSkippedReason.UNKNOWN)
+        self.assertTrue(vts.no_transcript_message.startswith("Not annotated by VEP, so has no assigned gene"))
+
+    def test_vep_annotated(self):
+        vts = self._vts(self.snv)
+        self.assertTrue(vts.no_transcript_message.startswith("Variant is intergenic"))
+
+        gene_version = create_fake_gene_version(self.grch37, "ENSG00000000003", "GENE3", AnnotationConsortium.ENSEMBL)
+        vts = self._vts(self.short_sv, gene=gene_version.gene)
+        self.assertTrue(vts.no_transcript_message.startswith("Variant has no assigned transcript"))

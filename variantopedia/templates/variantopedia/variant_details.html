@@ -498,7 +498,7 @@ function applyVariantValues() {
 
     {% include "variantopedia/variant_details/transcript.html" %}
 
-    {% if variant_annotation.annotation_run.pipeline_type == 'C' %}
+    {% if variant_annotation.annotation_run.pipeline_type == 'C' and not variant_annotation.vep_skipped_reason %}
     <div id="sv-annotation-help-info" class="container">
         {% page_help page_id="variantdetails/sv_annotation_help" title="Structural Variant Annotation Differences" %}
     </div>

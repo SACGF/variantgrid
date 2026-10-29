@@ -64,15 +64,17 @@
                     {% labelled id='gnomad_sas_af' visible_fields=visible_fields label='South Asian' help=annotation_description.gnomad_sas_af hint="tiny" value_css="text-monospace" %}{{ variant_annotation.gnomad_sas_af|format_unit_as_percent }}{% endlabelled %}
                 </div>
             {% else %}
-                {% labelled id='gnomad_none' label='gnomAD' hint="tiny" help=annotation_description.gnomad %}No gnomAD entry{% endlabelled %}
+                {% labelled id='gnomad_none' label='gnomAD' hint="tiny" help=annotation_description.gnomad %}{% if variant_annotation.vep_skipped_reason %}Not annotated by VEP{% else %}No gnomAD entry{% endif %}{% endlabelled %}
             {% endif %}
 
             {% if variant_annotation.is_structural_variant_annotation %}
+            {% with gnomad_sv_overlap=variant_annotation.gnomad_sv_overlap %}
+            {% if gnomad_sv_overlap %}
                 {% labelled label="Structural Variants" hint="tiny" %}
                     <a class='toggle-link' data-toggle="collapse" href='#gnomad-sv-list'>Show Structural Variant Overlaps</a>
                 {% endlabelled %}
                 <div id="gnomad-sv-list" class="collapse">
-                    {% for sv_overlap in variant_annotation.gnomad_sv_overlap %}
+                    {% for sv_overlap in gnomad_sv_overlap %}
                         {% labelled id='gnomad_sv_overlap_name' label='SV Overlap Name' help=annotation_description.gnomad_sv_overlap_name hint="tiny" value_css="text-monospace" %}
                             <a target='_blank' class="hover-link" href='{{ sv_overlap.gnomad_sv_overlap_url }}'>{{ sv_overlap.gnomad_sv_overlap_name }}</a>
                         {% endlabelled %}
@@ -84,6 +86,8 @@
                         {% labelled id='gnomad_sv_overlap_percent' label='SV Overlap %' help=annotation_description.gnomad_sv_overlap_percent hint="tiny" value_css="text-monospace" %}{{ sv_overlap.gnomad_sv_overlap_percent }}{% endlabelled %}
                     {% endfor %}
                 </div>
+            {% endif %}
+            {% endwith %}
             {% endif %}
         </div>
     </div>
