@@ -9,6 +9,7 @@ duplicates.
 from typing import Optional
 
 from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Model, Q
 from drf_spectacular.utils import extend_schema_field
@@ -131,6 +132,16 @@ class ExternallyManagedModelSerializer(serializers.ModelSerializer):
     def _post_create(self, instance, user):
         """ Anything a brand new row needs beyond being saved """
 
+    @staticmethod
+    def _save(instance):
+        """ A model constraint the request breaks (eg a patient with no code or last name) is a 400,
+            checked here rather than in validate() as an upsert only knows its row once it has found it """
+        try:
+            instance.validate_constraints()
+        except DjangoValidationError as e:
+            raise serializers.ValidationError(e.messages) from e
+        instance.save()
+
     def _get_existing(self, validated_data, external_pk_data, user) -> Optional[Model]:
         qs = self.Meta.model.filter_for_user(user)
         if external_pk_data:
@@ -171,7 +182,7 @@ class ExternallyManagedModelSerializer(serializers.ModelSerializer):
                     setattr(instance, field, value)
             if external_pk_data:
                 instance.external_pk = self._external_pk_for(instance, external_pk_data)
-            instance.save()
+            self._save(instance)
             if created:
                 self._post_create(instance, user)
         return instance
@@ -180,9 +191,13 @@ class ExternallyManagedModelSerializer(serializers.ModelSerializer):
         external_pk_data = validated_data.pop("external_pk", None)
         user = self.context["request"].user
         instance.check_can_write(user)
-        if external_pk_data:
-            instance.external_pk = self._external_pk_for(instance, external_pk_data)
-        return super().update(instance, validated_data)
+        with transaction.atomic():
+            if external_pk_data:
+                instance.external_pk = self._external_pk_for(instance, external_pk_data)
+            for field, value in validated_data.items():
+                setattr(instance, field, value)
+            self._save(instance)
+        return instance
 
 
 class PatientSerializer(ExternallyManagedModelSerializer):

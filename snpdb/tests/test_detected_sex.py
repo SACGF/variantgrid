@@ -60,7 +60,7 @@ class TestSampleDetectedSex(TestCase):
         self.sample = type(self.sample).objects.get(pk=self.sample.pk)  # clear cached_property
 
     def _set_patient_sex(self, sex):
-        patient = Patient.objects.create(family_code="fam", sex=sex)
+        patient = Patient.objects.create(patient_code="PROBAND", family_code="fam", sex=sex)
         self.sample.patient = patient
         self.sample.save()
 

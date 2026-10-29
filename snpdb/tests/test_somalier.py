@@ -357,7 +357,7 @@ class SomalierAllSamplesPairsTest(TestCase):
         for sample in [self.proband, self.mother]:
             SomalierSampleExtract.objects.create(vcf_extract=vcf_extract, sample=sample,
                                                  het_count=5000, hom_count=5000)
-        patient_relate = SomalierPatientRelate.objects.create(patient=Patient.objects.create(),
+        patient_relate = SomalierPatientRelate.objects.create(patient=Patient.objects.create(patient_code="RELATE"),
                                                               status=ProcessingStatus.SUCCESS)
         _create_somalier_pairs(SomalierPatientRelatePair, patient_relate,
                                _read_somalier_pairs(_pairs("pairs_different_individual.tsv")))

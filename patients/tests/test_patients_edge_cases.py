@@ -9,6 +9,7 @@ from datetime import UTC, date, datetime
 from unittest import mock
 
 from django.contrib.auth.models import User
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.test import TestCase
 from django.utils import timezone
@@ -633,6 +634,23 @@ class TestPatientFormDeceased(TestCase):
         self.assertIn("deceased", form.errors)
 
 
+class TestPatientIdentityConstraint(TestCase):
+    """ #2518 - a patient needs a patient code or last name, and blank or whitespace doesn't count """
+
+    def test_patient_without_code_or_last_name_is_not_saved(self):
+        for kwargs in [{}, {"first_name": "JANE", "date_of_birth": date(1980, 1, 1)},
+                       {"patient_code": " ", "last_name": "\t"}]:
+            with self.subTest(**kwargs), self.assertRaises(IntegrityError), transaction.atomic():
+                Patient.objects.create(**kwargs)
+
+    def test_form_reports_missing_identifier(self):
+        user = User.objects.create_user("form_identity_user", password="x")
+        form = PatientForm(data={"first_name": "JANE", "patient_code": "  ", "sex": Sex.UNKNOWN, "population": []},
+                           user=user)
+        self.assertFalse(form.is_valid())
+        self.assertEqual(["A patient needs a patient code or last name"], form.non_field_errors())
+
+
 # ---------------------------------------------------------------------------
 # Patient.code — issue #230 de-identified display label fallthrough
 # ---------------------------------------------------------------------------
@@ -686,7 +704,7 @@ class TestDeIdentifiedPatientName(TestCase):
         self.assertEqual(str(patient), "SMITH, Jane")
 
     def test_name_with_first_name_only(self):
-        patient = Patient.objects.create(first_name="BOB")
+        patient = Patient(first_name="BOB")
         self.assertEqual(patient.name, "BOB")
         self.assertEqual(patient.name_last_name_first, "BOB")
 
@@ -716,9 +734,6 @@ class TestPatientDisplayIdentityExpression(TestCase):
 
     def test_name_only(self):
         self._assert_agrees_with_property(Patient.objects.create(first_name="Jane", last_name="SMITH"))
-
-    def test_no_code_and_no_name(self):
-        self._assert_agrees_with_property(Patient.objects.create())
 
     def test_blank_is_not_a_value(self):
         """ A cleared form field saves as "", which Python reads as absent and a NOT NULL test does not """
