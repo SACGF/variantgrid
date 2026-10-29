@@ -104,6 +104,13 @@ class ResolvedVariantInfoPHGVSTest(TestCase):
         resolution = self.rvi.recalc_p_hgvs()
         self.assertEqual((resolution.p_hgvs, resolution.source), (COMPUTED_P_HGVS, PHGVSSource.COMPUTED))
 
+    def test_computed_initiation_codon_wins_over_clingen(self):
+        """ c_to_p gives a start loss as a bare edit with no position; ClinGen writes it as a substitution """
+        self._clingen("NP_001139133.1:p.Met1Val")
+        self.rvi.resolved_hgvs = "NM_001145661.2(GATA2):c.1A>G"
+        resolution = self.rvi.recalc_p_hgvs()
+        self.assertEqual((resolution.p_hgvs, resolution.source), ("NP_001139133.1:p.(Met1?)", PHGVSSource.COMPUTED))
+
     def test_clingen_used_when_computed_fails(self):
         self._clingen("NP_001139133.1:p.Glu2Lys")
         with self._computed_fails():
