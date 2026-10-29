@@ -97,10 +97,9 @@ class ClassificationImportProcessVariantsTask(ImportVCFStepTask):
             allele_info_variant_and_message[allele_info] = (variant, None)
 
         for variant_coordinate in variant_pk_lookup.unknown_variant_coordinates:
-            # Keyed by coordinate rather than by hash: a coordinate that was never inserted has no
-            # Sequence row for its alt, so get_variant_coordinate_hash raises KeyError on it. Every
-            # unresolved gene-level event is that case (its alt is unique to the event), and the raise
-            # took the whole import's linking down with it, leaving the rest stuck in Processing.
+            # Keyed by coordinate rather than by hash: a coordinate that was never inserted may have no
+            # Sequence row for its alt, so no hash. Every unresolved gene-level event is that case (its alt
+            # is unique to the event).
             if not (allele_info := allele_info_by_coordinate.get(variant_coordinate)):
                 continue
             try:

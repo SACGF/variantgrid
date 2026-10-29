@@ -15,13 +15,19 @@ SNP-specific.
 
 Every VCF line becomes one `Locus` (contig, position, ref) and one `Variant` per alt. Because `snpdb_variant` is
 tens of millions of rows, insertion goes through `snpdb/variant_pk_lookup.py:VariantPKLookup`, which hashes each
-coordinate to a tuple `(contig_id, position, ref_id, alt_id, svlen)` in `VariantPKLookup._get_variant_hash` and
+coordinate to a `snpdb/variant_pk_lookup.py:VariantHash` `(contig_id, position, ref, alt, svlen)` in `VariantPKLookup._get_variant_hash` and
 resolves hashes to pks per contig in SQL (`VariantPKLookup._get_variant_ids`, a `Concat` annotation looked up with
 `locus__position__in`). `null` svlen is encoded as `''` because 0 is a real value gene-level variants rely on.
+Only an explicit set of sequences (`GATCN` up to 5 bp, `=` and the symbolic alts in
+`VARIANT_SYMBOLIC_ALT_VALID_TYPES` - about 98% of variants' REF and ALT) is preloaded into `sequence_pk_by_seq` and
+appears in the hash as pks; any other sequence (a long indel, a gene-level alt) stays in the hash as its string and
+`VariantPKLookup._resolve_hashes` swaps it for its pk in one `seq_sha256_hash__in` query per batch. It is an
+enumeration, not a `Length(seq)` cutoff, because `seq_sha256_hash` is the only index on `Sequence`; loading the whole
+table instead costs ~1M rows on a large deployment.
 `VariantPKLookup.add` canonicalises first (`VariantCoordinate.as_internal_canonical_form`) and short-circuits a
-coordinate whose ref or alt sequence is not yet in `sequence_pk_by_seq` straight to the unknown list without a query;
+coordinate whose preloaded ref or alt is not in `sequence_pk_by_seq` straight to the unknown list without a query;
 `VariantPKLookup.batch_check` resolves the rest and, with `insert_unknown=True`, calls `VariantPKLookup._insert_unknown`,
-which inserts sequences (`bulk_create(ignore_conflicts=True)` then a re-read, since bulk_create returns no pks), then
+which inserts sequences (`bulk_create(ignore_conflicts=True)` then a re-read by hash, since bulk_create returns no pks), then
 loci and variants by Postgres `COPY` (`upload/vcf/sql_copy_files.py:loci_sql_copy_csv`, `variants_sql_copy_csv`).
 `batch_check` must stay on the calling thread: the final `insert_all=True` pass depends on its side effects.
 
