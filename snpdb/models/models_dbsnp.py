@@ -45,20 +45,22 @@ class DbSNP(TimeStampedModel):
         return dbsnp
 
     @staticmethod
+    def get_first_valid(dbsnp_rs_ids: str) -> 'DbSNP':
+        """ VEP packs multiple ids into one field, e.g. "rs1&rs2" """
+        for dbsnp_rs_id in dbsnp_rs_ids.split("&"):
+            try:
+                return DbSNP.get(dbsnp_rs_id)
+            except ValueError:
+                pass
+        raise ValueError(f"No valid dbSNP record in '{dbsnp_rs_ids}'")
+
+    @staticmethod
     def get_for_variant(variant: 'Variant', variant_annotation_version) -> 'DbSNP':
         dbsnp = None
         try:
             variant_annotation = variant.variantannotation_set.get(version=variant_annotation_version)
             if variant_annotation.dbsnp_rs_id:
-                # VEP packs multiple ids into one field, e.g. "rs1&rs2" - use the first valid record
-                dbsnp_rs_ids = variant_annotation.dbsnp_rs_id.split("&")
-                for i, dbsnp_rs_id in enumerate(dbsnp_rs_ids):
-                    try:
-                        dbsnp = DbSNP.get(dbsnp_rs_id)
-                        break
-                    except ValueError:
-                        if i == len(dbsnp_rs_ids) - 1:
-                            raise
+                dbsnp = DbSNP.get_first_valid(variant_annotation.dbsnp_rs_id)
         except ObjectDoesNotExist:
             pass
         return dbsnp
