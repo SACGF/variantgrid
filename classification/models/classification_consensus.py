@@ -83,10 +83,12 @@ class ConsensusGroup:
     @cached_property
     def conditions(self) -> list[ConditionResolved]:
         """ The distinct conditions this content has been used for, most used first - the tumour type
-            spread is usually what decides whether a row applies to the case in hand """
+            spread is usually what decides whether a row applies to the case in hand. A record with no condition
+            adds nothing (its fallback is a reference with neither term nor name) """
         counts: Counter[ConditionResolved] = Counter()
         for modification in self.records:
-            if condition := modification.condition_resolution_obj_fallback:
+            condition = modification.condition_resolution_obj_fallback
+            if condition.plain_text or any(reference.term or reference.name for reference in condition.references):
                 counts[condition] += 1
         return [condition for condition, _ in counts.most_common()]
 
@@ -152,7 +154,7 @@ class ClassificationConsensus:
     def copy_keys(copy_scopes: frozenset[CopyScope], allele_origin_bucket: Optional[AlleleOriginBucket]) -> list[str]:
         """ The keys that travel when copying content of these scopes into a record of this bucket """
         return [ekey.key for ekey in EvidenceKeyMap.cached().all_keys
-                if ekey.copy_scope_enum in copy_scopes
+                if ekey.effective_copy_scope in copy_scopes
                 and ekey.copy_allele_origin_enum.can_copy_to(allele_origin_bucket)]
 
     @staticmethod

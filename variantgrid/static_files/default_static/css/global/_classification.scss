@@ -702,7 +702,6 @@ table.overlap-summary {
 			min-width: 220px;
 		}
 		td {
-			white-space: pre-wrap;
 			vertical-align: top;
 		}
 		tr.differences td {
@@ -713,6 +712,10 @@ table.overlap-summary {
 			color: #666;
 			background-color: #f7f7f7;
 		}
+	}
+	// pre-wrap on the value alone, so the template's indentation around it doesn't become blank lines
+	.gene-content-text {
+		white-space: pre-wrap;
 	}
 	.gene-content-text.clamp {
 		max-height: 4.5em;

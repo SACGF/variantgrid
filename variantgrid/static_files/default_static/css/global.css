@@ -3686,7 +3686,6 @@ table.overlap-summary .overlap-criteria {
   min-width: 220px;
 }
 .consensus-comparison table.consensus-compare td {
-  white-space: pre-wrap;
   vertical-align: top;
 }
 .consensus-comparison table.consensus-compare tr.differences td {
@@ -3696,6 +3695,9 @@ table.overlap-summary .overlap-criteria {
   font-weight: normal;
   color: #666;
   background-color: #f7f7f7;
+}
+.consensus-comparison .gene-content-text {
+  white-space: pre-wrap;
 }
 .consensus-comparison .gene-content-text.clamp {
   max-height: 4.5em;
