@@ -47,6 +47,7 @@
         {% ui_register_tab_embedded label="Patient" tab_set="patients" %}
             <form id="patient-form" method="post">
                 {% csrf_token %}
+                    {{ form.non_field_errors | field_errors }}
                     {{ form.patient_code | as_crispy_field }}
                     {{ form.first_name | as_crispy_field }}
                     {{ form.last_name | as_crispy_field }}
