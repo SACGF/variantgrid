@@ -30,6 +30,7 @@ from annotation.vep_plugin_display import (
     get_gnomad_sv_overlap,
     get_mmid3_mastermind_urls,
     mavedb_urn_to_urls,
+    utr_annotator_effects,
 )
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
@@ -179,6 +180,25 @@ def mavedb_formatter(value):
     return ", ".join(mavedb_urn_to_urls(value).values())
 
 
+def vep_multi_to_comma_separated(value):
+    if value:
+        value = ", ".join(vep_multi_to_list(value))
+    return value
+
+
+def utr_annotator_annotation_formatter(value):
+    """ Each uORF effect's type and Kozak strength - what decides how damaging it is (Whiffin 2020). The rest of
+        UTRAnnotator's detail is on the variant page """
+    effect_summaries = []
+    for effect in utr_annotator_effects(value):
+        summary = effect.get("type", "")
+        if kozak_strength := effect.get("KozakStrength"):
+            summary += f" ({kozak_strength} Kozak)"
+        if summary := summary.strip():
+            effect_summaries.append(summary)
+    return ", ".join(effect_summaries) or None
+
+
 def ekey_from_vg_column_formatters():
     # Ekey options automatically split "," into lists - so need to use pipes
     clinvar_review_status_to_vcf_dict = {v: k.replace(",", "|") for k, v in ClinVarReviewStatus.VCF_MAPPINGS.items()}
@@ -199,6 +219,9 @@ def ekey_from_vg_column_formatters():
         'pfam_protein_domain': domain_to_pfam,
         "literature": pubmed_formatter,
         "sift": get_choices_formatter(SIFTPrediction.CHOICES),
+        "splicevault_top_events": vep_multi_to_comma_separated,
+        "utr_annotator_annotation": utr_annotator_annotation_formatter,
+        "utr_annotator_consequence": vep_multi_to_comma_separated,
         "variant_class": get_choices_formatter(VariantClass.choices),
     }
 
@@ -246,8 +269,14 @@ def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
 
     evidence_transcript_columns = {}  # These need to be copied off TranscriptVersion object
     evidence_variant_columns = {}  # Copied from query
+    if settings.ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED:
+        disallowed_columns = frozenset()
+    else:  # A version annotated before the deployment turned it off still holds the data
+        disallowed_columns = vep_columns.non_commercial_variant_grid_column_ids()
     for evidence_key in evidence_keys_list:
         if variantgrid_column := evidence_key.variantgrid_column:
+            if variantgrid_column.pk in disallowed_columns:
+                continue
             if variantgrid_column.annotation_level == ColumnAnnotationLevel.TRANSCRIPT_LEVEL:
                 evidence = evidence_transcript_columns
             else:

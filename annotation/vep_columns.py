@@ -17,7 +17,7 @@ from annotation.enums import (
     VEPCustom,
     VEPPlugin,
 )
-from annotation.vep_config import VEPConfig
+from annotation.vep_config import NON_COMMERCIAL_VEP_CONFIG_KEYS, VEPConfig
 from library.genomics.vcf_enums import VariantClass
 
 
@@ -1440,6 +1440,16 @@ def for_variant_grid_column(vgc_id: str, *, vep_config: Optional[VEPConfig] = No
 
 def all_variant_grid_column_ids() -> frozenset[str]:
     return frozenset(vgc for c in VEP_COLUMNS for vgc in c.variant_grid_columns)
+
+
+def non_commercial_variant_grid_column_ids() -> frozenset[str]:
+    """ Columns filled from data licensed for non-commercial use only (NON_COMMERCIAL_VEP_CONFIG_KEYS) """
+    return frozenset(
+        vgc
+        for c in VEP_COLUMNS
+        if set(required_data_keys(c)) & set(NON_COMMERCIAL_VEP_CONFIG_KEYS)
+        for vgc in c.variant_grid_columns
+    )
 
 
 def separators_by_variant_grid_column() -> dict[str, str]:
