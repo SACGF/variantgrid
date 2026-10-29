@@ -295,6 +295,16 @@ def normalise_evidence_cell(classification: Classification, cell: VCDataCell, so
     e_key = cell.e_key
     note = cell.note
 
+    # if we got an array of values, unwrap it first so the string cleanup below applies to a single value
+    if isinstance(value, list):
+        if not value:
+            # if the array is empty, treat that as a null value
+            value = None
+        elif e_key.value_type != EvidenceKeyValueType.MULTISELECT and len(value) == 1:
+            # if we're not a multi-select key, and we have an array with 1 value in it.
+            # use that 1 value
+            value = value[0]
+
     if isinstance(value, str):
         if '\u00a0' in value:
             value = value.replace('\u00a0', ' ')
@@ -326,16 +336,6 @@ def normalise_evidence_cell(classification: Classification, cell: VCDataCell, so
             # only provide mandatory validation for internal labs
             # don't want to dirty up imported read only classifications with errors
             cell.add_validation(code=ValidationCode.MANDATORY, severity='error', message='Missing mandatory value')
-
-    # if we got an array of values
-    if isinstance(value, list):
-        if not value:
-            # if the array is empty, treat that as a null value
-            value = None
-        elif e_key.value_type != EvidenceKeyValueType.MULTISELECT and len(value) == 1:
-            # if we're not a multi-select key, and we have an array with 1 value in it.
-            # use that 1 value
-            value = value[0]
 
     # types below without a normaliser (age, date, an unmatched user) keep the cleanup above
     if value != cell.value:
