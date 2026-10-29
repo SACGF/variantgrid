@@ -231,7 +231,7 @@ class TaggedVariantGridTest(TestCase):
 
         lines = b"".join(response.streaming_content).decode().strip().splitlines()
         self.assertEqual(lines[0], "Variant,Genome Build,Gene,Tag,Analysis ID,Analysis,Sample,Patient,"
-                                   "Username,Created,Variant ID,Tag ID")
+                                   "Username,Created,g.HGVS,Variant ID,Tag ID")
         rows = list(csv.DictReader(lines))
         self.assertEqual(len(rows), 1, lines)
         tag = VariantTag.objects.get(pk=rows[0]["Tag ID"])
