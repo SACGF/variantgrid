@@ -21,14 +21,16 @@ def splicevault_out_of_frame_q(all_events: bool, prefix: str = "variantannotatio
     return Q(**{f"{prefix}splicevault_out_of_frame_events__regex": regex})
 
 
-# utr_annotator_annotation holds one record per 5' UTR effect, '&' separated, each 'key=value' pairs joined by ':'
-# in no fixed order (annotation/vep_plugin_display.py:utr_annotator_effects). A record doesn't say which consequence
-# it is for, but each consequence writes its own keys: a uAUG gain has 'type' and no 'Evidence', a uAUG loss 'type'
-# and 'Evidence', a uSTOP loss 'AltStop', a uFrameshift 'alt_type'. Each lookahead stays inside one record ([^&]*),
-# so every condition has to hold for the same effect. Matched case-insensitively: 'inFrame_oORF' and 'InFrame_oORF'
-# both occur.
+# utr_annotator_annotation holds one record per uORF effect, each 'key=value' pairs joined by ':'
+# (annotation/vep_plugin_display.py:utr_annotator_effects). The plugin writes the effects in a fixed order (uAUG gain,
+# uSTOP loss, uAUG loss, uSTOP gain, uFrameshift - the order of utr_annotator_consequence), records of one effect
+# joined by ',' and effects by '&', but VEP's VCF output turns ',' into '&' as well, so the stored string no longer
+# says where one effect's records end. Each effect writes its own set of keys, so a record says which effect it is:
+# a uAUG gain has 'type' and never 'Evidence', a uAUG loss 'type' and always 'Evidence' ('NA' without an evidence
+# file), a uSTOP loss 'AltStop', a uFrameshift 'alt_type', a uSTOP gain 'newSTOPDistanceToCDS'. Each lookahead stays
+# inside one record ([^&]*), so every condition has to hold for the same effect. Matched case-insensitively:
+# 'inFrame_oORF' and 'InFrame_oORF' both occur.
 _RECORD_START = "(^|&)"
-_OORF = "[a-z]*_oorf"  # an overlapping ORF in either frame - Martin-Geary 2025 doesn't restrict the frame
 _STRONG_OR_MODERATE = "strong|moderate"
 
 
@@ -40,28 +42,34 @@ def _lacks_key(key: str) -> str:
     return f"(?!([^&]*:)?{key}=)"
 
 
-# (consequence, record regex) - Martin-Geary 2025's high-impact 5' UTR variants
-UTR_HIGH_IMPACT_RULES: tuple[tuple[str, str], ...] = (
-    # uAUG gain creating an oORF, strong or moderate Kozak
-    ("5_prime_UTR_premature_start_codon_gain_variant",
-     _RECORD_START + _has_pair("type", _OORF) + _has_pair("KozakStrength", _STRONG_OR_MODERATE)
-     + _lacks_key("Evidence")),
-    # uSTOP loss with no alternative stop before the CDS - so the uORF now overlaps it - strong or moderate Kozak
-    ("5_prime_UTR_uORF_stop_codon_loss_variant",
-     _RECORD_START + _has_pair("AltStop", "false") + _has_pair("KozakStrength", _STRONG_OR_MODERATE)),
-    # uAUG loss, strong Kozak
-    ("5_prime_UTR_premature_start_codon_loss_variant",
-     _RECORD_START + _has_pair("type", "[^:&]*") + _has_pair("Evidence", "[^:&]*")
-     + _has_pair("KozakStrength", "strong")),
-    # uFrameshift creating an oORF, strong or moderate Kozak
-    ("5_prime_UTR_uORF_frameshift_variant",
-     _RECORD_START + _has_pair("alt_type", _OORF) + _has_pair("KozakStrength", _STRONG_OR_MODERATE)),
-)
+def utr_high_impact_rules(out_of_frame_only: bool) -> tuple[tuple[str, str], ...]:
+    """ (consequence, record regex) for Martin-Geary 2025's high-impact 5' UTR variants. Martin-Geary doesn't
+        restrict the oORF's frame; out_of_frame_only drops an oORF in frame with the CDS (an N-terminal extension,
+        not necessarily loss of function - Ellingford 2022) from the three effects that create one """
+    oorf = "outofframe_oorf" if out_of_frame_only else "[a-z]*_oorf"
+    ustop_lost_frame = _has_pair("FrameWithCDS", "outofframe") if out_of_frame_only else ""
+    return (
+        # uAUG gain creating an oORF, strong or moderate Kozak
+        ("5_prime_UTR_premature_start_codon_gain_variant",
+         _RECORD_START + _has_pair("type", oorf) + _has_pair("KozakStrength", _STRONG_OR_MODERATE)
+         + _lacks_key("Evidence")),
+        # uSTOP loss with no alternative stop before the CDS - so the uORF now overlaps it - strong or moderate Kozak
+        ("5_prime_UTR_uORF_stop_codon_loss_variant",
+         _RECORD_START + _has_pair("AltStop", "false") + ustop_lost_frame
+         + _has_pair("KozakStrength", _STRONG_OR_MODERATE)),
+        # uAUG loss, strong Kozak - whatever the frame
+        ("5_prime_UTR_premature_start_codon_loss_variant",
+         _RECORD_START + _has_pair("type", "[^:&]*") + _has_pair("Evidence", "[^:&]*")
+         + _has_pair("KozakStrength", "strong")),
+        # uFrameshift creating an oORF, strong or moderate Kozak
+        ("5_prime_UTR_uORF_frameshift_variant",
+         _RECORD_START + _has_pair("alt_type", oorf) + _has_pair("KozakStrength", _STRONG_OR_MODERATE)),
+    )
 
 
-def utr_high_impact_q(prefix: str = "variantannotation__") -> Q:
+def utr_high_impact_q(out_of_frame_only: bool, prefix: str = "variantannotation__") -> Q:
     return reduce(operator.or_, (
         Q(**{f"{prefix}utr_annotator_consequence__contains": consequence,
              f"{prefix}utr_annotator_annotation__iregex": record_regex})
-        for consequence, record_regex in UTR_HIGH_IMPACT_RULES
+        for consequence, record_regex in utr_high_impact_rules(out_of_frame_only)
     ))

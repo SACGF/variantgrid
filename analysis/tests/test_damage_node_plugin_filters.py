@@ -8,7 +8,7 @@ from django.contrib.auth.models import User
 from django.db.models import Q
 from django.test import TestCase, override_settings
 
-from analysis.enums import SpliceVaultOutOfFrame
+from analysis.enums import SpliceVaultOutOfFrame, UTRHighImpact
 from analysis.models import Analysis
 from analysis.models.nodes.filters.damage_node import DamageNode
 from annotation.effect_filters import splicevault_out_of_frame_q, utr_high_impact_q
@@ -19,7 +19,7 @@ from snpdb.models.models_genome import GenomeBuild
 PLUGIN_COLUMNS = frozenset({"avi_phred", "alphagenome_splicing", "splicevault_out_of_frame_events",
                             "utr_annotator_consequence", "utr_annotator_annotation"})
 PLUGIN_FILTERS = {"avi_phred_min": 20, "alphagenome_splicing_min": 0.5,
-                  "splicevault_out_of_frame": SpliceVaultOutOfFrame.ALL, "utr_high_impact": True}
+                  "splicevault_out_of_frame": SpliceVaultOutOfFrame.ALL, "utr_high_impact": UTRHighImpact.ANY_FRAME}
 
 
 @override_settings(**get_fake_annotation_settings_dict(columns_version=2))
@@ -81,14 +81,14 @@ class DamageNodePluginFiltersTest(TestCase):
         node = DamageNode(analysis=self.analysis,
                           splicevault_out_of_frame=SpliceVaultOutOfFrame.ANY, splicevault_out_of_frame_required=True,
                           splicevault_out_of_frame_allow_null=False,
-                          utr_high_impact=True, utr_high_impact_required=True, utr_high_impact_allow_null=False)
+                          utr_high_impact=UTRHighImpact.OUT_OF_FRAME, utr_high_impact_required=True, utr_high_impact_allow_null=False)
         q_no_nulls = node._get_node_q()
-        self.assertEqual(splicevault_out_of_frame_q(all_events=False) & utr_high_impact_q(), q_no_nulls)
+        self.assertEqual(splicevault_out_of_frame_q(all_events=False) & utr_high_impact_q(out_of_frame_only=True), q_no_nulls)
 
         node.splicevault_out_of_frame_allow_null = True
         node.utr_high_impact_allow_null = True
         q = node._get_node_q()
         expected = ((splicevault_out_of_frame_q(all_events=False)
                      | Q(variantannotation__splicevault_out_of_frame_events__isnull=True))
-                    & (utr_high_impact_q() | Q(variantannotation__utr_annotator_consequence__isnull=True)))
+                    & (utr_high_impact_q(out_of_frame_only=True) | Q(variantannotation__utr_annotator_consequence__isnull=True)))
         self.assertEqual(expected, q)

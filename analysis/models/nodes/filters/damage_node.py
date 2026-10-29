@@ -9,7 +9,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models.query_utils import Q
 
-from analysis.enums import ALoFTPredictionOptions, SpliceVaultOutOfFrame, StructuralFilter
+from analysis.enums import ALoFTPredictionOptions, SpliceVaultOutOfFrame, StructuralFilter, UTRHighImpact
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeChip, NodeIcon, grouped_chips
 from annotation.effect_filters import splicevault_out_of_frame_q, utr_high_impact_q
@@ -246,7 +246,7 @@ class DamageNode(AnalysisNode):
     splicevault_out_of_frame_required = models.BooleanField(default=False)
     splicevault_out_of_frame_allow_null = models.BooleanField(default=True)
 
-    utr_high_impact = models.BooleanField(default=False)
+    utr_high_impact = models.CharField(max_length=1, choices=UTRHighImpact.choices, null=True, blank=True)
     utr_high_impact_required = models.BooleanField(default=False)
     utr_high_impact_allow_null = models.BooleanField(default=True)
 
@@ -564,7 +564,7 @@ class DamageNode(AnalysisNode):
                     or_filters.append(q_splicevault)
 
             if self.utr_high_impact and self._plugin_column_backfilled("utr_annotator_annotation"):
-                q_utr = utr_high_impact_q()
+                q_utr = utr_high_impact_q(out_of_frame_only=self.utr_high_impact == UTRHighImpact.OUT_OF_FRAME)
                 if self.utr_high_impact_required:
                     if self.utr_high_impact_allow_null:
                         q_utr |= Q(variantannotation__utr_annotator_consequence__isnull=True)
@@ -676,7 +676,7 @@ class DamageNode(AnalysisNode):
             chips.append(NodeChip(text="SpliceVault", icon="fa-solid fa-scissors",
                                   title=f"SpliceVault: {SpliceVaultOutOfFrame(self.splicevault_out_of_frame).label}"))
         if self.utr_high_impact:
-            chips.append(NodeChip(text="5' UTR", title="High-impact 5' UTR variant (UTRAnnotator, Martin-Geary 2025)"))
+            chips.append(NodeChip(text="5' UTR", title=f"{UTRHighImpact(self.utr_high_impact).label} (UTRAnnotator)"))
         return chips
 
     @staticmethod

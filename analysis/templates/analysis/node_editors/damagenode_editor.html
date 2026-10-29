@@ -484,7 +484,7 @@
                 {% endif %}
                 {% if node.has_utr_annotator %}
                     <tr>
-                        <th title="UTRAnnotator: uAUG gain or uFrameshift creating an oORF, or uSTOP loss with no alternative stop, each with strong/moderate Kozak; or uAUG loss with strong Kozak (Martin-Geary 2025)">High-impact 5' UTR</th>
+                        <th title="UTRAnnotator: uAUG gain or uFrameshift creating an oORF, or uSTOP loss with no alternative stop, each with strong/moderate Kozak; or uAUG loss with strong Kozak (Martin-Geary 2025). Out-of-frame only drops an oORF in frame with the CDS - an N-terminal extension, not necessarily loss of function (Ellingford 2022)">5' UTR (UTRAnnotator)</th>
                         <td>{{ form.utr_high_impact.errors }} {{ form.utr_high_impact }}</td>
                         <td class="collapse filter-required">{{ form.utr_high_impact_required }}</td>
                         <td class="collapse filter-required">{{ form.utr_high_impact_allow_null }}</td>

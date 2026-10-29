@@ -34,7 +34,6 @@ class PathogenicityTool:
     pred_pathogenic_values: tuple[str, ...] = ()       # categorical pred values counted as pathogenic
     raw_direction: RawScoreDirection = RawScoreDirection.HIGHER
     node_label: str = ""                               # DamageNode slider label, where the auto field label would mislead
-    node_default: Optional[float] = None               # where the DamageNode slider starts when ticked on (else raw_min)
     source: str = ""                                   # short citation tag (table cell / colour-band tooltip)
     source_detail: str = ""                            # full citation, shown on the Pathogenicity Thresholds page
     source_url: str = ""                               # DOI / URL for the citation
@@ -318,9 +317,9 @@ TOOLS: tuple[PathogenicityTool, ...] = (
              "ddG > 2 likely destabilising. No ClinGen-calibrated PP3/BP4 cutoff.",
     ),
     # AVI (AlphaGenome Variant Impact) - Cheng 2026, medRxiv. GRCh38 SNVs, VEP >= 116. The PHRED scale is a
-    # genome-wide rank (20 = top 1% of all SNVs), not a pathogenicity call, and the authors set no cutoff - the
-    # slider starts at the top 1% their rare-disease triage used. Like CADD it isn't calibrated for non-coding
-    # variants, so it has no colour band and stays out of predictions_num_pathogenic (#2561).
+    # genome-wide rank (20 = top 1% of all SNVs, what their rare-disease triage used), not a pathogenicity call, and
+    # the authors set no cutoff. Like CADD it isn't calibrated for non-coding variants, so it has no colour band and
+    # stays out of predictions_num_pathogenic (#2561).
     PathogenicityTool(
         name="AVI (AlphaGenome Variant Impact)",
         rankscore_field=None,
@@ -330,7 +329,6 @@ TOOLS: tuple[PathogenicityTool, ...] = (
         raw_max_benign_threshold=None,
         raw_pathogenic_threshold=None,
         node_label="AVI (phred)",
-        node_default=20.0,
         source="Cheng 2026 (no calibration)",
         source_detail="Cheng J, et al. AlphaGenome Atlas: in silico mutagenesis of the entire human genome "
                       "improves prioritization and interpretation of non-coding variants. medRxiv 2026 "
@@ -523,12 +521,10 @@ class EffectNodeFilter:
 
 
 # AlphaGenome merged splicing score: splice site + splice site usage (each 0-1) + splice junction / 5, so 0 to ~3.
-# The paper proposes no pathogenicity cutoff, so the slider start is a VariantGrid choice: in a sample of scored
-# GRCh38 variants ~95% are below 0.5
+# The paper proposes no pathogenicity cutoff, so the slider covers the whole scale with no colour band
 ALPHAGENOME_SPLICING_MIN = 0.0
 ALPHAGENOME_SPLICING_MAX = 3.0
 ALPHAGENOME_SPLICING_STEP = 0.1
-ALPHAGENOME_SPLICING_NODE_DEFAULT = 0.5
 
 _DAWES_2023 = (
     "Dawes R, Bournazos AM, Bryen SJ, et al. SpliceVault predicts the precise nature of variant-associated "
@@ -560,18 +556,16 @@ EFFECT_NODE_FILTERS: tuple[EffectNodeFilter, ...] = (
     EffectNodeFilter(
         name="AlphaGenome splicing",
         fields=("alphagenome_splicing",),
-        rule=f"Score ≥ slider ({ALPHAGENOME_SPLICING_MIN:g} to {ALPHAGENOME_SPLICING_MAX:g}, starts at "
-             f"{ALPHAGENOME_SPLICING_NODE_DEFAULT:g}), an OR term in the Splicing filter beside SpliceAI and "
-             "dbscSNV, sharing its Required / Allow Null.",
+        rule=f"Score ≥ slider ({ALPHAGENOME_SPLICING_MIN:g} to {ALPHAGENOME_SPLICING_MAX:g}), an OR term in the "
+             "Splicing filter beside SpliceAI and dbscSNV, sharing its Required / Allow Null.",
         source="Avsec 2025 (no calibration)",
         source_detail="Avsec Ž, Latysheva N, Cheng J, et al. AlphaGenome: advancing regulatory variant effect "
                       "prediction with a unified DNA sequence model. bioRxiv 2025.06.25.661532, "
                       "published in Nature (doi 10.1038/s41586-025-10014-0). Merged score = splice site + "
                       "splice site usage + splice junction / 5.",
         source_url="https://doi.org/10.1038/s41586-025-10014-0",
-        note=f"No published pathogenicity cutoff - the paper's thresholds are quantiles against common SNPs. "
-             f"The {ALPHAGENOME_SPLICING_NODE_DEFAULT:g} start is a VariantGrid choice, not a calibrated "
-             "threshold. GRCh38 SNVs only, and licensed for non-commercial use only, so it is offered only "
+        note="No published pathogenicity cutoff - the paper's thresholds are quantiles against common SNPs. "
+             "GRCh38 SNVs only, and licensed for non-commercial use only, so it is offered only "
              "where the deployment allows non-commercial data.",
     ),
     EffectNodeFilter(
@@ -592,13 +586,16 @@ EFFECT_NODE_FILTERS: tuple[EffectNodeFilter, ...] = (
         fields=("utr_annotator_consequence", "utr_annotator_annotation"),
         rule="Any one of: uAUG gain creating an oORF with strong or moderate Kozak; uSTOP loss with no "
              "alternative stop before the CDS (an oORF) with strong or moderate Kozak; uAUG loss with strong "
-             "Kozak; uFrameshift creating an oORF with strong or moderate Kozak.",
+             "Kozak; uFrameshift creating an oORF with strong or moderate Kozak. Two options: \"any frame\" is "
+             "the Martin-Geary 2025 rule as published; \"out-of-frame oORF only\" also requires the oORF of a "
+             "uAUG gain, uSTOP loss or uFrameshift to be out of frame with the CDS (uAUG loss is unchanged).",
         source="Martin-Geary 2025",
         source_detail=_MARTIN_GEARY_2025[0],
         source_url=_MARTIN_GEARY_2025[1],
         note="The filter Martin-Geary 2025 used to find new diagnoses in undiagnosed rare-disease cases. uAUG "
              "gains forming an oORF are under selection similar to missense variants (Whiffin 2020). An "
-             "in-frame oORF (an N-terminal extension) is not necessarily loss of function (Ellingford 2022).",
+             "oORF in frame with the CDS makes an N-terminal extension rather than disrupting translation, so is "
+             "not necessarily loss of function (Ellingford 2022) - the reason for the out-of-frame option.",
         references=(_WHIFFIN_2020, _ZHANG_2021, _ELLINGFORD_2022),
     ),
 )

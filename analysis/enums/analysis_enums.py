@@ -267,3 +267,10 @@ class SpliceVaultOutOfFrame(models.TextChoices):
         ALL is the authors' "consistent with null outcomes" case (Dawes 2023), ANY a looser screen """
     ALL = 'A', "All top events out of frame"
     ANY = 'Y', "Any top event out of frame"
+
+
+class UTRHighImpact(models.TextChoices):
+    """ The Martin-Geary 2025 high-impact 5' UTR rule, as published (oORF in any frame) or keeping only an oORF out
+        of frame with the CDS - an in-frame one is an N-terminal extension (Ellingford 2022) """
+    OUT_OF_FRAME = 'O', "High-impact 5' UTR, out-of-frame oORF only"
+    ANY_FRAME = 'A', "High-impact 5' UTR, any frame (Martin-Geary 2025)"

@@ -44,7 +44,6 @@ from annotation.models import VariantAnnotation
 from annotation.pathogenicity_predictions import (
     ALPHAGENOME_SPLICING_MAX,
     ALPHAGENOME_SPLICING_MIN,
-    ALPHAGENOME_SPLICING_NODE_DEFAULT,
     ALPHAGENOME_SPLICING_STEP,
     TOOLS,
 )
@@ -600,8 +599,7 @@ class DamageNodeForm(BaseNodeForm):
             "splice_min": HiddenInput(attrs={"min": 0, "max": 1, "step": 0.1}),
             "alphagenome_splicing_min": HiddenInput(attrs={"min": ALPHAGENOME_SPLICING_MIN,
                                                            "max": ALPHAGENOME_SPLICING_MAX,
-                                                           "step": ALPHAGENOME_SPLICING_STEP,
-                                                           "data-default": ALPHAGENOME_SPLICING_NODE_DEFAULT}),
+                                                           "step": ALPHAGENOME_SPLICING_STEP}),
             "cosmic_count_min": HiddenInput(attrs={"min": 0, "max": 50, "step": 1}),
             "damage_predictions_min": HiddenInput(attrs={"min": 0}),
             # Columns v1
@@ -630,8 +628,6 @@ class DamageNodeForm(BaseNodeForm):
                     attrs["data-pathogenic-min"] = tool.raw_pathogenic_threshold
                 if tool.raw_max_benign_threshold is not None:
                     attrs["data-benign-max"] = tool.raw_max_benign_threshold
-                if tool.node_default is not None:
-                    attrs["data-default"] = tool.node_default
                 field = self.fields[tool.node_threshold_field]
                 field.widget = HiddenInput(attrs=attrs)
                 if tool.node_label:
