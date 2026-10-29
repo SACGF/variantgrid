@@ -58,9 +58,11 @@ class ClassifyReportTestCase(TestCase):
 
         variants = list(Variant.objects.filter(Variant.get_no_reference_q()).order_by("pk"))
         cls.variant, cls.shared_variant, cls.no_genotype_variant = variants[0], variants[1], variants[2]
+        cls.no_vaf_variant = variants[3]
         make_cohort_genotype(cls.cgc, cls.variant, "E..")
         make_cohort_genotype(cls.cgc, cls.shared_variant, ".EE")
-        make_cohort_genotype(cls.cgc, cls.no_genotype_variant, "U..")
+        make_cohort_genotype(cls.cgc, cls.no_genotype_variant, "U..", allele_frequency=[-1, -1, -1])
+        make_cohort_genotype(cls.cgc, cls.no_vaf_variant, "O..", allele_frequency=[-1, -1, -1])
 
         cls.tag = create_classify_queue_tag()
 
@@ -334,6 +336,17 @@ class ClassifyDialogSampleTest(ClassifyReportTestCase):
 
     def test_several_carriers_leave_the_choice_to_the_scientist(self):
         self.assertEqual(self._selected(self.shared_variant), [])
+
+    def _proband_label(self, variant) -> str:
+        case = ClassifyReportCase(self.user, self.cohort, [self.proband], SampleSourceLevel.SAMPLE)
+        row = case.queue_row(self._create_variant_tag(analysis=self._create_cohort_analysis(), variant=variant))
+        return case.sample_options(row)[0].label
+
+    def test_a_no_call_is_labelled_not_called(self):
+        self.assertEqual(self._proband_label(self.no_genotype_variant), f"{self.proband.name} - not called")
+
+    def test_a_missing_vaf_is_left_off_the_label(self):
+        self.assertEqual(self._proband_label(self.no_vaf_variant), f"{self.proband.name} - HOM_ALT")
 
 
 class ResolveClassifyQueueTagsForSamplesTest(ClassifyReportTestCase):
