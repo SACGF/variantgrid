@@ -74,6 +74,13 @@ class ImportCdotDataTest(TestCase):
         self.assertEqual(gata2_build_data["exons"], gata2_tv.genome_build_data["exons"])
         self.assertEqual("0.2.36", CdotDataVersion.get_version(self.genome_build, AnnotationConsortium.REFSEQ))
 
+    def test_transcript_stats_counted(self):
+        self._import(self._cdot_file("0.2.34"))
+        cdot_data_version = CdotDataVersion.objects.get(genome_build=self.genome_build,
+                                                        annotation_consortium=AnnotationConsortium.REFSEQ)
+        self.assertEqual({"genes": 2, "transcripts": 2, "import_sources": {self.URL: 2}},
+                         cdot_data_version.transcript_stats)
+
     def test_mitochondrial_fake_transcript_imported(self):
         """ cdot's versionless 'fake-rna-ND4' is stored as version 1 so MT annotation can link to it, and
             matched on re-import (#2139) """

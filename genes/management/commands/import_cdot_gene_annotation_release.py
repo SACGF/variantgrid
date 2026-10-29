@@ -20,6 +20,7 @@ from genes.management.commands.import_cdot_latest import (
 from genes.management.commands.import_gene_annotation import Command as GeneAnnotationCommand
 from genes.management.commands.import_gene_annotation import GeneAnnotationImportManager
 from genes.models import (
+    CdotDataVersion,
     GeneAnnotationRelease,
     GeneVersion,
     ReleaseGeneVersion,
@@ -86,6 +87,8 @@ def create_gene_annotation_release(genome_build: GenomeBuild, annotation_consort
                                                        gene__annotation_consortium=annotation_consortium,
                                                        pk__gt=max_gene_version)
         gene_version_ids_by_accession.update({gv.accession: gv.pk for gv in new_gene_versions})
+        CdotDataVersion.objects.filter(genome_build=genome_build,
+                                       annotation_consortium=annotation_consortium).update(transcript_stats=None)
 
     release_gene_version_list = []
     for gene_accession in cdot_data["genes"]:

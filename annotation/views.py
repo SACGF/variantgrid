@@ -32,8 +32,6 @@ from genes.models import (
     GeneAnnotationImport,
     GeneListCategory,
     GeneSymbolAlias,
-    GeneVersion,
-    TranscriptVersion,
 )
 from library.django_utils import get_field_counts, require_superuser
 from ontology.enums import OntologyService
@@ -63,23 +61,27 @@ def get_build_contigs():
 
 
 def _get_gene_and_transcript_stats(genome_build: GenomeBuild, annotation_consortium):
-    genes_and_transcripts = {}
-    gene_counts = GeneVersion.objects.filter(gene__annotation_consortium=annotation_consortium,
-                                             genome_build=genome_build).count()
-    transcripts_qs = TranscriptVersion.objects.filter(transcript__annotation_consortium=annotation_consortium,
-                                                      genome_build=genome_build)
-    transcript_counts = transcripts_qs.count()
-    if gene_counts and transcript_counts:
-        genes_and_transcripts = {"genes": gene_counts, "transcripts": transcript_counts}
-        field_counts = get_field_counts(transcripts_qs, "import_source__url")
-        import_sources = {}
-        for import_source in GeneAnnotationImport.objects.filter(url__in=field_counts).order_by("created"):
-            field = import_source.url
-            num_transcripts = field_counts[field]
-            import_sources[field] = {"transcripts": num_transcripts, "created": import_source.created}
-        genes_and_transcripts["import_sources"] = import_sources
-        genes_and_transcripts["latest_cdot"] = CdotDataVersion.get_version(genome_build, annotation_consortium)
+    """ Counted at cdot import - or here, the first time, on a deployment last imported before that """
+    cdot_data_version = CdotDataVersion.objects.filter(genome_build=genome_build,
+                                                       annotation_consortium=annotation_consortium).first()
+    if cdot_data_version is None:
+        transcript_stats = CdotDataVersion.count_transcript_stats(genome_build, annotation_consortium)
+    else:
+        if cdot_data_version.transcript_stats is None:
+            cdot_data_version.update_transcript_stats()
+        transcript_stats = cdot_data_version.transcript_stats
 
+    genes_and_transcripts = {}
+    if transcript_stats:
+        transcripts_by_url = transcript_stats["import_sources"]
+        import_sources = {}
+        for import_source in GeneAnnotationImport.objects.filter(url__in=transcripts_by_url).order_by("created"):
+            import_sources[import_source.url] = {"transcripts": transcripts_by_url[import_source.url],
+                                                 "created": import_source.created}
+        genes_and_transcripts = {"genes": transcript_stats["genes"],
+                                 "transcripts": transcript_stats["transcripts"],
+                                 "import_sources": import_sources,
+                                 "latest_cdot": cdot_data_version and cdot_data_version.cdot_version}
     return genes_and_transcripts
 
 
