@@ -130,6 +130,48 @@
             </div>
         </div>
 
+        <h4 class="mt-4">Effect node rules without a calibrated score</h4>
+        <p>
+            Effect node filters over a categorical annotation (SpliceVault, UTRAnnotator) or a score with no
+            published pathogenicity cutoff (AlphaGenome splicing). None has a ClinGen-calibrated PP3/BP4 band:
+            the rules below come from the tool's authors or the same group, so they take no part in the colour
+            bands or the damage count. Each is offered only where the analysis's annotation version populates the
+            column, and skipped (with a node warning) on a version not yet backfilled for the plugin.
+        </p>
+
+        <div class="card mt-3">
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Filter</th>
+                            <th>Rule</th>
+                            <th>Source</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for f in effect_node_filters %}
+                            <tr>
+                                <th>
+                                    {{ f.name }}
+                                    <div class="text-muted small font-weight-normal mt-1">
+                                        {% for field in f.fields %}<span class="text-monospace">{{ field }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}
+                                    </div>
+                                </th>
+                                <td>
+                                    {{ f.rule }}
+                                    {% if f.note %}<div class="text-muted small mt-1">{{ f.note }}</div>{% endif %}
+                                </td>
+                                <td>
+                                    <a class="hover-link" href="{{ f.source_url }}" target="_blank" title="{{ f.source_detail }}">{{ f.source }}</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <h5 class="mt-4">References</h5>
         <ul>
             {% for detail, url in references.items %}

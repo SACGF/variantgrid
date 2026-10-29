@@ -260,3 +260,10 @@ class StructuralFilter(models.TextChoices):
     ANY = 'A', "Any"
     ONLY = 'O', "Structural only"
     EXCLUDE = 'E', "Exclude structural"
+
+
+class SpliceVaultOutOfFrame(models.TextChoices):
+    """ Which SpliceVault top events must be out of frame (splicevault_out_of_frame_events 'Frameshift:N/M').
+        ALL is the authors' "consistent with null outcomes" case (Dawes 2023), ANY a looser screen """
+    ALL = 'A', "All top events out of frame"
+    ANY = 'Y', "Any top event out of frame"

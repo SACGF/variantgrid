@@ -19,7 +19,7 @@ from annotation.models.models_gene_annotation import (
     HumanProteinAtlasAnnotation,
     HumanProteinAtlasAnnotationVersion,
 )
-from annotation.pathogenicity_predictions import COLOUR_BANDS, TOOLS
+from annotation.pathogenicity_predictions import COLOUR_BANDS, EFFECT_NODE_FILTERS, TOOLS
 from annotation.pipelines import vep_pipeline_types
 from annotation.vep_annotation import (
     get_cached_vep_variant_annotation_version_kwargs,
@@ -335,17 +335,22 @@ def annotation_versions(request):
 def view_pathogenicity_thresholds(request):
     """ Reference page for every cutoff that colours a number on the variant details page: the
     ClinGen-calibrated PP3/BP4 raw-score cutoffs DamageNode also filters on (TOOLS), the rankscore
-    bands, and the conservation / splicing / amino acid bands (COLOUR_BANDS). """
+    bands, the conservation / splicing / amino acid bands (COLOUR_BANDS), and the Effect node's rules over
+    categorical or uncalibrated annotations (EFFECT_NODE_FILTERS). """
     tools = [t for t in TOOLS if t.raw_field]
     rankscore_tools = [t for t in TOOLS if t.rankscore_field]
     references = {}  # source_detail -> source_url, first-seen order, for the citations section
-    for t in itertools.chain(tools, rankscore_tools, COLOUR_BANDS):
-        if t.source_detail and t.source_detail not in references:
-            references[t.source_detail] = t.source_url
+    citations = [(t.source_detail, t.source_url) for t in itertools.chain(tools, rankscore_tools, COLOUR_BANDS,
+                                                                          EFFECT_NODE_FILTERS)]
+    citations.extend(ref for f in EFFECT_NODE_FILTERS for ref in f.references)
+    for source_detail, source_url in citations:
+        if source_detail and source_detail not in references:
+            references[source_detail] = source_url
     context = {
         "tools": tools,
         "rankscore_tools": rankscore_tools,
         "colour_bands": COLOUR_BANDS,
+        "effect_node_filters": EFFECT_NODE_FILTERS,
         "max_benign_rankscore": settings.ANNOTATION_MAX_BENIGN_RANKSCORE,
         "min_pathogenic_rankscore": settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE,
         "references": references,

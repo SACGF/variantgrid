@@ -30,7 +30,9 @@ from snpdb.models.models_genome import GenomeBuild
 
 PROTVAR = {"protvar_stability"}  # columns_version 5, every build
 GRCH38_VEP116 = {"eve_score", "popeve_score", "promoter_ai_score"}
-DBNSFP_RAW_FIELDS = {t.raw_field for t in TOOLS if t.raw_field} - PROTVAR - GRCH38_VEP116
+# Needs its plugin data file in vep_config, which the fake annotation settings leave unset
+AVI = {"avi_phred"}
+DBNSFP_RAW_FIELDS = {t.raw_field for t in TOOLS if t.raw_field} - PROTVAR - GRCH38_VEP116 - AVI
 
 
 class _RawScoreSliderMixin:

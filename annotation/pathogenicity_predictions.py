@@ -34,6 +34,7 @@ class PathogenicityTool:
     pred_pathogenic_values: tuple[str, ...] = ()       # categorical pred values counted as pathogenic
     raw_direction: RawScoreDirection = RawScoreDirection.HIGHER
     node_label: str = ""                               # DamageNode slider label, where the auto field label would mislead
+    node_default: Optional[float] = None               # where the DamageNode slider starts when ticked on (else raw_min)
     source: str = ""                                   # short citation tag (table cell / colour-band tooltip)
     source_detail: str = ""                            # full citation, shown on the Pathogenicity Thresholds page
     source_url: str = ""                               # DOI / URL for the citation
@@ -316,6 +317,30 @@ TOOLS: tuple[PathogenicityTool, ...] = (
         note="Protein stability change (ddG, kcal/mol), not a pathogenicity prediction. The plugin calls "
              "ddG > 2 likely destabilising. No ClinGen-calibrated PP3/BP4 cutoff.",
     ),
+    # AVI (AlphaGenome Variant Impact) - Cheng 2026, medRxiv. GRCh38 SNVs, VEP >= 116. The PHRED scale is a
+    # genome-wide rank (20 = top 1% of all SNVs), not a pathogenicity call, and the authors set no cutoff - the
+    # slider starts at the top 1% their rare-disease triage used. Like CADD it isn't calibrated for non-coding
+    # variants, so it has no colour band and stays out of predictions_num_pathogenic (#2561).
+    PathogenicityTool(
+        name="AVI (AlphaGenome Variant Impact)",
+        rankscore_field=None,
+        raw_field="avi_phred",
+        pred_field=None,
+        raw_min=0.0, raw_max=80.0, raw_step=1.0,
+        raw_max_benign_threshold=None,
+        raw_pathogenic_threshold=None,
+        node_label="AVI (phred)",
+        node_default=20.0,
+        source="Cheng 2026 (no calibration)",
+        source_detail="Cheng J, et al. AlphaGenome Atlas: in silico mutagenesis of the entire human genome "
+                      "improves prioritization and interpretation of non-coding variants. medRxiv 2026 "
+                      "(preprint, not peer reviewed). PHRED is a genome-wide rank: 10 = top 10%, 20 = top 1%.",
+        source_url="https://doi.org/10.64898/2026.09.16.26363192",
+        note="Coding and non-coding SNVs (GRCh38). PHRED 20 is the genome-wide top 1%, which the authors used "
+             "to triage de novo variants in rare-disease cases - a ranking choice, not a calibrated "
+             "pathogenicity threshold. The authors recommend region- or application-aware thresholds. "
+             "No ClinGen-calibrated PP3/BP4 cutoff.",
+    ),
     # PromoterAI - Illumina. Promoter variants' effect on expression, so unlike every other tool here it
     # is not missense. The score is signed (predicted expression up/down) and it is the magnitude that
     # says how strong the effect is - matching how the importer picks the strongest TSS entry.
@@ -477,6 +502,104 @@ COLOUR_BANDS: tuple[ColourBand, ...] = (
                       "2010;6(12):e1001025. Rejected-substitutions score, range -12 to 6.8; the cutoff is a "
                       "VariantGrid display choice.",
         source_url="https://doi.org/10.1371/journal.pcbi.1001025",
+    ),
+)
+
+
+@dataclass(frozen=True)
+class EffectNodeFilter:
+    """ An Effect (Damage) node filter over an annotation that has no per-tool PP3/BP4 score: a categorical
+        call (SpliceVault, UTRAnnotator) or a score with no published cutoff (AlphaGenome splicing). Listed on
+        the Pathogenicity Thresholds page with the rule the node applies and where it comes from (#2561). """
+    name: str
+    fields: tuple[str, ...]
+    rule: str
+    source: str
+    source_detail: str
+    source_url: str
+    note: str = ""
+    # further (detail, url) citations behind the rule, for the page's references
+    references: tuple[tuple[str, str], ...] = ()
+
+
+# AlphaGenome merged splicing score: splice site + splice site usage (each 0-1) + splice junction / 5, so 0 to ~3.
+# The paper proposes no pathogenicity cutoff, so the slider start is a VariantGrid choice: in a sample of scored
+# GRCh38 variants ~95% are below 0.5
+ALPHAGENOME_SPLICING_MIN = 0.0
+ALPHAGENOME_SPLICING_MAX = 3.0
+ALPHAGENOME_SPLICING_STEP = 0.1
+ALPHAGENOME_SPLICING_NODE_DEFAULT = 0.5
+
+_DAWES_2023 = (
+    "Dawes R, Bournazos AM, Bryen SJ, et al. SpliceVault predicts the precise nature of variant-associated "
+    "mis-splicing. Nat Genet. 2023;55(2):324-332.",
+    "https://doi.org/10.1038/s41588-022-01293-8",
+)
+_MARTIN_GEARY_2025 = (
+    "Martin-Geary AC, Blakes AJM, Dawes R, et al. Systematic identification of disease-causing promoter and "
+    "untranslated region variants in 8040 undiagnosed individuals with rare disease. Genome Med. 2025;17:40.",
+    "https://doi.org/10.1186/s13073-025-01464-2",
+)
+_WHIFFIN_2020 = (
+    "Whiffin N, Karczewski KJ, Zhang X, et al. Characterising the loss-of-function impact of 5' untranslated "
+    "region variants in 15,708 individuals. Nat Commun. 2020;11(1):2523.",
+    "https://pmc.ncbi.nlm.nih.gov/articles/PMC7253449/",
+)
+_ZHANG_2021 = (
+    "Zhang X, Wakeling M, Ware J, Whiffin N. Annotating high-impact 5'untranslated region variants with the "
+    "UTRannotator. Bioinformatics. 2021;37(8):1171-1173.",
+    "https://doi.org/10.1093/bioinformatics/btaa783",
+)
+_ELLINGFORD_2022 = (
+    "Ellingford JM, Ahn JW, Bagnall RD, et al. Recommendations for clinical interpretation of variants found in "
+    "non-coding regions of the genome. Genome Med. 2022;14(1):73.",
+    "https://pmc.ncbi.nlm.nih.gov/articles/PMC9295495/",
+)
+
+EFFECT_NODE_FILTERS: tuple[EffectNodeFilter, ...] = (
+    EffectNodeFilter(
+        name="AlphaGenome splicing",
+        fields=("alphagenome_splicing",),
+        rule=f"Score ≥ slider ({ALPHAGENOME_SPLICING_MIN:g} to {ALPHAGENOME_SPLICING_MAX:g}, starts at "
+             f"{ALPHAGENOME_SPLICING_NODE_DEFAULT:g}), an OR term in the Splicing filter beside SpliceAI and "
+             "dbscSNV, sharing its Required / Allow Null.",
+        source="Avsec 2025 (no calibration)",
+        source_detail="Avsec Ž, Latysheva N, Cheng J, et al. AlphaGenome: advancing regulatory variant effect "
+                      "prediction with a unified DNA sequence model. bioRxiv 2025.06.25.661532, "
+                      "published in Nature (doi 10.1038/s41586-025-10014-0). Merged score = splice site + "
+                      "splice site usage + splice junction / 5.",
+        source_url="https://doi.org/10.1038/s41586-025-10014-0",
+        note=f"No published pathogenicity cutoff - the paper's thresholds are quantiles against common SNPs. "
+             f"The {ALPHAGENOME_SPLICING_NODE_DEFAULT:g} start is a VariantGrid choice, not a calibrated "
+             "threshold. GRCh38 SNVs only, and licensed for non-commercial use only, so it is offered only "
+             "where the deployment allows non-commercial data.",
+    ),
+    EffectNodeFilter(
+        name="SpliceVault out of frame",
+        fields=("splicevault_out_of_frame_events",),
+        rule="All top events out of frame: Frameshift:N/N (N > 0) - the authors' \"consistent with null "
+             "outcomes\" case for PVS1 at Very Strong. Any top event out of frame: Frameshift > 0.",
+        source="Dawes 2023",
+        source_detail=_DAWES_2023[0],
+        source_url=_DAWES_2023[1],
+        note="Predicts what kind of mis-splicing follows from a variant already predicted to disrupt a splice "
+             "site (the plugin only reports sites where SpliceAI predicts a loss), not whether splicing is "
+             "disrupted. No sample count minimum: the paper counts an event from a single read. Low PPV, and "
+             "less reliable for genes with tissue-specific or developmental alternative splicing.",
+    ),
+    EffectNodeFilter(
+        name="High-impact 5' UTR (UTRAnnotator)",
+        fields=("utr_annotator_consequence", "utr_annotator_annotation"),
+        rule="Any one of: uAUG gain creating an oORF with strong or moderate Kozak; uSTOP loss with no "
+             "alternative stop before the CDS (an oORF) with strong or moderate Kozak; uAUG loss with strong "
+             "Kozak; uFrameshift creating an oORF with strong or moderate Kozak.",
+        source="Martin-Geary 2025",
+        source_detail=_MARTIN_GEARY_2025[0],
+        source_url=_MARTIN_GEARY_2025[1],
+        note="The filter Martin-Geary 2025 used to find new diagnoses in undiagnosed rare-disease cases. uAUG "
+             "gains forming an oORF are under selection similar to missense variants (Whiffin 2020). An "
+             "in-frame oORF (an N-terminal extension) is not necessarily loss of function (Ellingford 2022).",
+        references=(_WHIFFIN_2020, _ZHANG_2021, _ELLINGFORD_2022),
     ),
 )
 
