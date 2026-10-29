@@ -15,6 +15,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        ManualOperation.operation_manage(["one_off_relink_variant_tags_without_allele"],
+        ManualOperation.operation_manage(["variant_tags", "link-alleles"],
                                          test=_test_has_variant_tags_without_allele),
     ]

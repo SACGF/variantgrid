@@ -1,17 +1,19 @@
+from unittest.mock import patch
+
 from django.contrib.auth.models import User
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from analysis.forms.forms_nodes import TagNodeForm
 from analysis.models import Analysis, VariantTag
 from analysis.models.nodes.filters.tag_node import TagNode, TagNodeTag
-from annotation.fake_data import create_fake_variants
+from annotation.fake_data import create_fake_variants, get_fake_annotation_version
 from library.django_utils.unittest_utils import prevent_request_warnings
 from snpdb.enums import AlleleOriginBucket
 from snpdb.forms import CreateTagForm
-from snpdb.models import GenomeBuild, Tag, TagConfig, TagConfigCollection, Variant
+from snpdb.models import GenomeBuild, Tag, TagConfig, TagConfigCollection, Variant, VariantAllele
 from snpdb.tag_operations import (
     TagOperation,
     get_case_collision_groups,
@@ -23,6 +25,7 @@ from snpdb.tag_operations import (
     retire_tag,
     set_tag_allele_origin,
 )
+from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 
 _UNSET = object()  # analysis=None is a global (variant page) tagging, so it can't be the default
 
@@ -277,6 +280,55 @@ class DeleteDuplicateVariantTagsTest(VariantTagTestCase):
         call_command("variant_tags", "delete-duplicates", "--dry-run")
 
         self.assertEqual(VariantTag.objects.filter(tag=self.surviving_tag).count(), 2)
+
+
+@patch("snpdb.management.commands.variant_tags.create_liftover_pipelines")
+class LinkAllelesCommandTest(TestCase):
+    """ Tags whose variant_tag_created_task never finished have no allele (#2354) """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        user = User.objects.get_or_create(username='link_alleles_test_user')[0]
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(cls.grch37)  # HGVSMatcher for the ClinGen request
+        variant = slowly_create_test_variant("3", 128198980, 'A', 'T', cls.grch37)  # Mock ClinGen: CA10617208
+        cls.variant_tag = VariantTag.objects.create(genome_build=cls.grch37, variant=variant,
+                                                    tag=Tag.objects.create(pk="artefact"), user=user)
+
+    def _link_alleles(self) -> VariantAllele:
+        call_command("variant_tags", "link-alleles")
+        self.variant_tag.refresh_from_db()
+        return VariantAllele.objects.get(variant=self.variant_tag.variant, genome_build=self.grch37)
+
+    def test_dry_run_changes_nothing(self, mock_create_liftover_pipelines):
+        call_command("variant_tags", "link-alleles", "--dry-run")
+        self.variant_tag.refresh_from_db()
+        self.assertIsNone(self.variant_tag.allele)
+        self.assertFalse(VariantAllele.objects.filter(variant=self.variant_tag.variant).exists())
+        mock_create_liftover_pipelines.assert_not_called()
+
+    @override_settings(CLINGEN_ALLELE_REGISTRY_LOGIN=None)
+    def test_links_existing_allele_and_lifts_over(self, mock_create_liftover_pipelines):
+        allele = create_mock_allele(self.variant_tag.variant, self.grch37)
+        self._link_alleles()
+        self.assertEqual(self.variant_tag.allele, allele)
+        allele_qs = mock_create_liftover_pipelines.call_args.args[1]
+        self.assertEqual(list(allele_qs), [allele])
+
+    @override_settings(CLINGEN_ALLELE_REGISTRY_LOGIN="test_login")
+    def test_creates_allele_from_clingen(self, _mock_create_liftover_pipelines):
+        variant_allele = self._link_alleles()
+        self.assertEqual(str(variant_allele.allele.clingen_allele), "CA10617208")
+        self.assertEqual(self.variant_tag.allele, variant_allele.allele)
+
+    @override_settings(CLINGEN_ALLELE_REGISTRY_LOGIN="test_login",
+                       CLINGEN_ALLELE_REGISTRY_API_CLASS="snpdb.tests.utils.mock_clingen_api."
+                                                         "MockServerErrorClinGenAlleleRegistryAPI")
+    def test_clingen_failure_still_links_and_retries_later(self, _mock_create_liftover_pipelines):
+        variant_allele = self._link_alleles()
+        self.assertEqual(self.variant_tag.allele, variant_allele.allele)
+        self.assertTrue(variant_allele.needs_clingen_call())
 
 
 class CreateTagFormTest(TestCase):
