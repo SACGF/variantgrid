@@ -2,7 +2,7 @@
 """
 scripts/vg — thin dispatcher for `manage.py vg` (see snpdb/management/commands/vg.py).
 
-Subcommands that need no Django (`tests`, `outline`, `docs`, `imports`, `health`, `deprecations`, `css` without `--rendered`, and the static maps: signals, settings, tasks)
+Subcommands that need no Django (`tests`, `outline`, `issue`, `docs`, `imports`, `health`, `deprecations`, `css` without `--rendered`, and the static maps: signals, settings, tasks)
 run here in well under a second. Everything else delegates to `manage.py vg` with the repo's virtualenv, and
 `map` is run under the canonical CI settings module so the committed maps are deterministic.
 """
@@ -22,6 +22,13 @@ from library.vg.deprecations import find_deprecations, render_deprecations  # no
 from library.vg.docs import check_docs, render_report  # noqa: E402
 from library.vg.health import gather_health, render_health  # noqa: E402
 from library.vg.import_graph import build_import_graph, import_cycles, render_cycles  # noqa: E402
+from library.vg.issue import (  # noqa: E402
+    gather_issue,
+    issue_work_json,
+    origin_repo,
+    parse_issue_ref,
+    render_issue,
+)
 from library.vg.outline import outline, render_coverage, render_outline  # noqa: E402
 from library.vg.test_selection import select_tests  # noqa: E402
 
@@ -119,6 +126,20 @@ def _static_deprecations(argv: list[str]) -> int:
     return 0 if report.ok else 1
 
 
+def _static_issue(argv: list[str]) -> int:
+    refs = [a for a in argv if not a.startswith("--")]
+    if len(refs) != 1:
+        print("usage: vg issue <number|owner/repo#number|url> [--no-body] [--no-comments] [--json]")
+        return 2
+    ref = parse_issue_ref(refs[0], default_repo=origin_repo())
+    work = gather_issue(ref, comments="--no-comments" not in argv)
+    if "--json" in argv:
+        print(issue_work_json(work))
+    else:
+        print(render_issue(work, body="--no-body" not in argv, comments="--no-comments" not in argv), end="")
+    return 0
+
+
 def _static_outline(argv: list[str]) -> int:
     files = [a for a in argv if not a.startswith("--")]
     min_lines = int(argv[argv.index("--min-lines") + 1]) if "--min-lines" in argv else 0
@@ -144,6 +165,8 @@ def main(argv: list[str]) -> int:
         return _static_tests(argv[1:])
     if subcommand == "outline":
         return _static_outline(argv[1:])
+    if subcommand == "issue":
+        return _static_issue(argv[1:])
     if subcommand == "docs":
         return _static_docs(argv[1:])
     if subcommand == "imports":

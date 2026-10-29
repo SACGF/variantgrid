@@ -15,6 +15,7 @@ manage.py vg — introspection for driving VariantGrid from an agent or a termin
     vg health [--no-ci] [--no-deprecations] [--json]
     vg deprecations [--no-runtime] [--json]
     vg inspect <kind> <id> [--depth N] [--json]
+    vg issue <number|owner/repo#number|url> [--no-body] [--no-comments] [--json]
 
 All logic lives in library/vg/; this file only parses arguments.
 """
@@ -37,6 +38,13 @@ from library.vg.docs import check_docs, render_report
 from library.vg.health import gather_health, render_health
 from library.vg.import_graph import build_import_graph, import_cycles, render_cycles
 from library.vg.inspect import KINDS, inspect, render_inspection
+from library.vg.issue import (
+    gather_issue,
+    issue_work_json,
+    origin_repo,
+    parse_issue_ref,
+    render_issue,
+)
 from library.vg.outline import outline, render_coverage, render_outline
 from library.vg.page import AgentUserMissing, create_agent_user, render_page
 from library.vg.page_js import (
@@ -141,6 +149,12 @@ class Command(BaseCommand):
         inspect_parser.add_argument("key", help="pk, or a natural key (CA id, gene symbol, transcript accession, username, lab group name)")
         inspect_parser.add_argument("--depth", type=int, default=2, help="How far to follow relations (default 2)")
         inspect_parser.add_argument("--json", action="store_true")
+
+        issue_parser = subparsers.add_parser("issue", help="A GitHub issue with its comments and every PR, branch, plan and commit that references it")
+        issue_parser.add_argument("ref", help="Issue number, owner/repo#number, or an issue / PR / comment URL")
+        issue_parser.add_argument("--no-body", action="store_true")
+        issue_parser.add_argument("--no-comments", action="store_true")
+        issue_parser.add_argument("--json", action="store_true")
 
         settings_parser = subparsers.add_parser("settings", help="Resolved value of a setting and every file that assigned it")
         settings_parser.add_argument("name", nargs="?", help="Setting name; omit to list the settings chain for this box")
@@ -314,6 +328,13 @@ class Command(BaseCommand):
         self.stdout.write(_json_dumps(inspection) if json else render_inspection(inspection))
 
     # --- settings ---
+
+    def handle_issue(self, ref, no_body, no_comments, json: bool, **_):  # pylint: disable=redefined-outer-name
+        work = gather_issue(parse_issue_ref(ref, default_repo=origin_repo()), comments=not no_comments)
+        if json:
+            self.stdout.write(issue_work_json(work))
+        else:
+            self.stdout.write(render_issue(work, body=not no_body, comments=not no_comments))
 
     def handle_settings(self, name, diff, json: bool, **_):  # pylint: disable=redefined-outer-name
         module = resolved_settings_module()

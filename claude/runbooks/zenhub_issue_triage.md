@@ -2,7 +2,7 @@
 
 Issues for VariantGrid are spread over several GitHub repos (`SACGF/variantgrid`, `SACGF/variantgrid_private`,
 `SACGF/variantgrid_shariant`, `SACGF/variantgrid_sapath`) but tracked on one ZenHub board. GitHub has the issue text and
-comments (`gh issue view`); ZenHub has the pipeline (board column) each issue is in, which GitHub cannot see.
+comments (`scripts/vg issue N`, which also lists the PRs, branches and commits on it); ZenHub has the pipeline (board column) each issue is in, which GitHub cannot see.
 
 Only `SACGF/variantgrid` is public. The others can carry private details of labs, patients or variants, so the rule in
 root `AGENTS.md` (GitHub comments) applies here too: read the title, body or comments of a private-repo issue - through

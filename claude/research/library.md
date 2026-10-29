@@ -157,7 +157,11 @@ transitively imports it; templates, JS and `urls.py` select the app's `tests.tes
 `tests` package). `library/vg/page.py:render_page` logs the `claude_agent` user in through the test client inside an
 `atomic()` that is always rolled back, tracks templates the way Django's test runner does, and reuses
 `production_query_count` for `--queries`; `library/vg/inspect/__init__.py:inspect` does the same rollback around one
-object's graph by domain kind. `library/vg/docs.py:check_docs` is what keeps this file honest: every backticked path
+object's graph by domain kind. `library/vg/issue.py:gather_issue` is the one GitHub-facing piece: an issue with its comments and the work already
+linked to it (cross-referenced PRs from the timeline API with their branch, `<issue>_<slug>` remote branches, a plan,
+master commits citing it), through `gh api` and `git` only; `library/vg/issue.py:existing_work_summary` is the
+one-line form the PostToolUse Bash hook (`.claude/hooks/post_bash.py`) appends to any `gh issue view`, so an open PR
+is in front of the agent before it proposes work. `library/vg/docs.py:check_docs` is what keeps this file honest: every backticked path
 and `path:Symbol` is resolved by AST against the working tree, live plans included, generated maps excluded. `library/vg/deprecations.py:find_deprecations` runs basedpyright's `reportDeprecated` as
 `LOOKAHEAD_PYTHON`, so a call typeshed marks deprecated in a Python we haven't deployed shows before the upgrade, and
 splits the hits from our own `@deprecated` markers by name; `manage.py check` under `-W always::DeprecationWarning`

@@ -27,6 +27,16 @@ from library.vg.import_graph import (
     relative_base,
     resolve_from_import,
 )
+from library.vg.issue import (
+    _ISSUE_CITATION_RE,
+    DEFAULT_REPO,
+    IssueRef,
+    IssueWork,
+    LinkedWork,
+    parse_issue_ref,
+    render_existing_work,
+    render_issue,
+)
 from library.vg.maps import settings as settings_map
 from library.vg.maps import signals as signals_map
 from library.vg.maps import tasks as tasks_map
@@ -492,3 +502,56 @@ class PageJsTest(SimpleTestCase):
                        "variantgrid.settings.env.newhost (missing - settings would fail to load)"]:
             with self.assertRaises(WritesRefused, msg=module):
                 check_box_allows_writes(module)
+
+
+class IssueTest(SimpleTestCase):
+    """ vg issue without gh: reference parsing and what the private-repo rule withholds """
+
+    def test_parse_issue_ref_forms(self):
+        for text in ("2317", "#2317", "https://github.com/SACGF/variantgrid/issues/2317#issuecomment-6455689234",
+                     "https://github.com/SACGF/variantgrid/pull/2317", "repos/SACGF/variantgrid/issues/2317/comments"):
+            self.assertEqual(parse_issue_ref(text), IssueRef(DEFAULT_REPO, 2317), text)
+        self.assertEqual(parse_issue_ref("SACGF/variantgrid_private#12"), IssueRef("SACGF/variantgrid_private", 12))
+        self.assertEqual(parse_issue_ref("12", default_repo="SACGF/other"), IssueRef("SACGF/other", 12))
+        with self.assertRaises(ValueError):
+            parse_issue_ref("2317_preferred_hgvs_none")
+
+    def test_existing_work_lists_prs_branches_plans_and_commits(self):
+        work = IssueWork(ref=IssueRef(DEFAULT_REPO, 2317), title="t", state="open", author="a", created="2026-10-17",
+                         labels=[], body="", is_pull_request=False,
+                         linked=[LinkedWork(kind="pr", repo=DEFAULT_REPO, number=2373, state="open",
+                                            title="never return None", branch="2317_preferred_hgvs_none"),
+                                 LinkedWork(kind="issue", repo="SACGF/variantgrid_private", number=9, state="closed")],
+                         branches=["origin/2317_preferred_hgvs_none"], plans=["claude/plans/2317_x_plan.md"],
+                         commits=["abc1234 Something #2317"])
+        self.assertEqual(render_existing_work(work), [
+            "PR #2373 open (2317_preferred_hgvs_none) never return None",
+            "issue SACGF/variantgrid_private#9 closed",
+            "branch origin/2317_preferred_hgvs_none",
+            "plan claude/plans/2317_x_plan.md",
+            "commits on master citing it:",
+            "  abc1234 Something #2317",
+        ])
+
+    def test_no_existing_work_says_so_and_lists_unreferenced_prs(self):
+        work = IssueWork(ref=IssueRef(DEFAULT_REPO, 1), title="t", state="open", author="a", created="",
+                         labels=[], body="", is_pull_request=False,
+                         unreferenced_prs=[LinkedWork(kind="pr", repo=DEFAULT_REPO, number=2470, state="open",
+                                                      title="OIDC login", branch="oidc_user_lookup_by_sub")])
+        self.assertFalse(work.has_existing_work)
+        self.assertEqual(len(render_existing_work(work)), 1)
+        self.assertIn("check by hand:\n  PR #2470 open (oidc_user_lookup_by_sub) OIDC login", render_issue(work))
+
+    def test_issue_citation_forms_a_pr_body_can_use(self):
+        for text in ("Fixes #12", "For SACGF/variantgrid_private#3932.", "https://github.com/SACGF/variantgrid/issues/5"):
+            self.assertTrue(_ISSUE_CITATION_RE.search(text), text)
+        for text in ("branch 2317_preferred_hgvs_none", "a/b path", "/usr/bin#1"):
+            self.assertFalse(_ISSUE_CITATION_RE.search(text), text)
+
+    def test_private_repo_render_warns_titles_are_withheld(self):
+        work = IssueWork(ref=IssueRef("SACGF/variantgrid_private", 12), title="t", state="open", author="a",
+                         created="", labels=[], body="b", is_pull_request=False)
+        self.assertIn("Private repo", render_issue(work))
+        self.assertNotIn("Private repo", render_issue(IssueWork(ref=IssueRef(DEFAULT_REPO, 1), title="t",
+                                                                state="open", author="a", created="", labels=[],
+                                                                body="b", is_pull_request=False)))

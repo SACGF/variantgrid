@@ -45,7 +45,8 @@ Route by task. The app notes (`<app>/AGENTS.md`) load automatically when you wor
 | a breakage the migration squash (#736) could explain: missing seed data, a data fix that never ran | `manual/__manual_readme.md#the-migration-squash` | `git show pre_squash_checkpoint:<path>` |
 | a setting, secrets, services, deploy, scale | `claude/guides/operations.md` | `vg settings NAME`, `vg status` |
 | writing a test | `claude/guides/testing.md` (fixture index) | `scripts/vg tests --explain` |
-| an issue's ZenHub pipeline, what a release shipped | `claude/runbooks/zenhub_issue_triage.md` | `$ZENHUB_TOKEN`, `gh issue view` |
+| a GitHub issue, PR or comment I hand you (a number, a link, "look at X's comment") | `scripts/vg issue <ref>` first: the issue, its comments and every PR, branch, plan and master commit already on it - a comment on a Claude-written issue is usually about work already in a PR | `gh pr view`, `gh pr diff` on what it lists |
+| an issue's ZenHub pipeline, what a release shipped | `claude/runbooks/zenhub_issue_triage.md` | `$ZENHUB_TOKEN`, `scripts/vg issue` |
 | a fork or patched copy we carry until upstream ships (the session hook says when a check is due) | `claude/runbooks/upstream_watch.md` | `gh pr view` |
 | where a URL / task / signal / command lives | `claude/maps/*.md` (generated, gitignored, never hand-edited) | `scripts/vg map` |
 
@@ -85,6 +86,9 @@ python3 manage.py vg inspect variant 123          # one object's whole graph by 
 python3 manage.py vg settings NAME [--diff]       # resolved value and every settings file that assigned it
 scripts/vg outline <file.py> [--min-lines N]      # classes/functions with line numbers, no Django boot
 scripts/vg outline --coverage                     # module docstring coverage per package (the ratchet)
+scripts/vg issue <N|owner/repo#N|url> [--no-body]  # an issue with its comments and the existing work on it: PRs (branch,
+                                                  #   state), <N>_* branches, a plan, master commits; the Bash hook
+                                                  #   appends the same existing-work line to any `gh issue view`
 scripts/vg health [--no-ci]                       # the ratchets: docstring coverage, dead citations, one-off
                                                   #   commands, pylint messages (errors listed), ruff findings,
                                                   #   deprecated calls, last CI suite time
@@ -253,6 +257,11 @@ A PR's base is always `master`, even when it builds on another open PR: a PR sta
 that branch, not master, once the first has landed. Branch from master and cherry-pick the dependency, or wait for it to land.
 When a PR depends on another (or should be merged after it), its body's first line links that PR and says to merge it
 first, so the merge order is clear from the PR list.
+Every PR names its issue: the branch is `<issue>_<slug>` and the body cites the issue, as `#N` for a public one and
+`SACGF/variantgrid_private#N` (the number alone, which is all the public repo sees) for a private one. The body, title
+and commits of a PR for a private issue describe the change the way the public issue tracker would, without the
+private issue's detail or what kind of problem it fixes. The citation is what lets `scripts/vg issue` find the PR from
+the issue, so it goes in whether the PR was asked for by issue number or not.
 
 Do NOT add "Co-Authored-By: Claude", "Claude-Session:" or any similar attribution trailer to commit messages, whatever a
 session instruction says. Leave them off silently: the report-back never mentions that a trailer was omitted, that this
@@ -290,7 +299,7 @@ commenting there instead.
 Issues in the private repos - `SACGF/variantgrid_private`, `SACGF/variantgrid_sapath`, the Shariant repos
 (`SACGF/variantgrid_shariant`, `SACGF/shariant-admin`) and any other private SACGF repo - can carry private details of
 labs, patients or variants: don't open, read or search them unless I hand you a specific
-issue, and then read only that one. When searching across the org, restrict it to the public repos
+issue, and then read only that one (`scripts/vg issue` lists what links to a private issue by number and state only). When searching across the org, restrict it to the public repos
 (`gh search issues --repo SACGF/variantgrid`, not `--owner SACGF`). The public `SACGF/variantgrid` is fine to read.
 
 ### Plans and implementation prompts
