@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
@@ -6,8 +8,10 @@ from annotation.fake_data import get_fake_annotation_version
 from genes.hgvs import HGVSMatcher
 from library.preview_request import PreviewData
 from snpdb.models import GenomeBuild, Sample, Sequence, Variant, VariantCoordinate
+from snpdb.models.models_variant import VARIANT_PATTERN
 from snpdb.search import (
     SearchInput,
+    SearchMessageOverall,
     SearchResponse,
     SearchResponsesCombined,
     SearchResult,
@@ -19,6 +23,7 @@ from variantopedia.signals.variant_search import (
     _alt_mismatch_message,
     search_allele_id,
     search_variant_id,
+    yield_search_variant_match,
 )
 
 
@@ -134,3 +139,14 @@ class SearchIdRequiresClassificationTestCase(TestCase):
     def test_unclassified_allele_hidden_from_non_admin(self):
         self.assertEqual(self._result_count(self.user, search_allele_id, f"a{self.allele.pk}"), 0)
         self.assertEqual(self._result_count(self.admin, search_allele_id, f"a{self.allele.pk}"), 1)
+
+
+class VariantSearchUnknownContigTestCase(TestCase):
+    """ A coordinate on a contig the build doesn't have (#2529) - T2T has no MT """
+
+    def test_contig_not_in_build_is_reported_not_raised(self):
+        t2t = GenomeBuild.get_name_or_alias("T2T-CHM13v2.0")
+        search_input = SimpleNamespace(genome_builds=[t2t], match=VARIANT_PATTERN.match("MT:16519 T>C"))
+        [response] = list(yield_search_variant_match(search_input, VariantCoordinate.from_variant_match))
+        self.assertIsInstance(response, SearchMessageOverall)
+        self.assertIn("'MT'", response.message)

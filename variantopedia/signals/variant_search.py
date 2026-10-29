@@ -307,12 +307,15 @@ def yield_no_results_for_variant_coordinate(user, genome_build: GenomeBuild, var
 
 
 def yield_search_variant_match(search_input: SearchInputInstance, get_variant_coordinate: Callable):
+    """ get_variant_coordinate is passed a match with chrom and position as its first 2 groups """
     for genome_build in search_input.genome_builds:
-        variant_coordinate = get_variant_coordinate(search_input.match, genome_build)
-        # Coordinate is explicit/symbolic according to length
-        if errors := Variant.validate(genome_build, variant_coordinate.chrom, variant_coordinate.position):
+        # Before converting, which looks the contig up and raises on one the build doesn't have (MT on T2T)
+        chrom = format_chrom(search_input.match.group(1), genome_build.reference_fasta_has_chr)
+        if errors := Variant.validate(genome_build, chrom, search_input.match.group(2)):
             yield SearchMessageOverall(", ".join(errors), genome_builds=[genome_build])
             continue
+        # Coordinate is explicit/symbolic according to length
+        variant_coordinate = get_variant_coordinate(search_input.match, genome_build)
         if message := variant_coordinate.unsupported_symbolic_alt_message:
             yield SearchMessageOverall(message, genome_builds=[genome_build])
             continue
