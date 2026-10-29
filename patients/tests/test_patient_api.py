@@ -55,6 +55,20 @@ class PatientAPITest(APITestCase):
         self._create_specimen()
         return self._create_extraction()
 
+    def test_patient_without_code_or_last_name_is_rejected(self):
+        response = self._create_patient(patient_code="", last_name=None)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertFalse(Patient.objects.exists())
+
+    def test_update_clearing_identifiers_is_rejected(self):
+        self._create_patient(last_name=None)
+        patient = Patient.objects.get()
+        response = self.client.patch(reverse("api_patient-detail", args=[patient.pk]), {"patient_code": ""},
+                                     format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        patient.refresh_from_db()
+        self.assertEqual("2600000001P", patient.patient_code)
+
     def test_creates_patient_specimen_extraction(self):
         response = self._create_run()
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)

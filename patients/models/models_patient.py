@@ -194,6 +194,18 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
     fake_data = models.ForeignKey(FakeData, null=True, on_delete=CASCADE)
     _deceased = models.BooleanField(null=True, blank=True)
 
+    class Meta:
+        # The least that identifies a patient (#2518) - Patient.match holds the import's stricter rule.
+        # A blank or whitespace-only value counts as missing; isnull is needed as a NULL check passes
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(patient_code__isnull=False, patient_code__regex=r"\S")
+                | Q(last_name__isnull=False, last_name__regex=r"\S"),
+                name="patient_has_code_or_last_name",
+                violation_error_message="A patient needs a patient code or last name",
+            ),
+        ]
+
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-user-injured"

@@ -34,11 +34,11 @@ class PatientPhenotypesPageTest(TestCase):
         cls.cohort = create_fake_cohort(cls.user, cls.grch37)
         cls.vcf = cls.cohort.vcf
 
-        cls.patient = Patient(phenotype="Raised TSH")
+        cls.patient = Patient(patient_code="PHENOTYPE", phenotype="Raised TSH")
         cls.patient.save(phenotype_matcher=phenotype_matcher)
         assign_permission_to_user_and_groups(cls.user, cls.patient)
 
-        cls.other_lab_patient = Patient(phenotype="Raised TSH")
+        cls.other_lab_patient = Patient(patient_code="PHENOTYPE", phenotype="Raised TSH")
         cls.other_lab_patient.save(phenotype_matcher=phenotype_matcher)
 
         proband, mother = cls.cohort.get_samples()[:2]

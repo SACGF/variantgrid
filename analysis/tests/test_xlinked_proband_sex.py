@@ -44,7 +44,7 @@ class TestXLinkedRecessiveProbandSex(TestCase):
 
     def setUp(self):
         self.proband_sample = self.trio.proband.sample
-        patient = Patient.objects.create(family_code="fam", sex=Sex.FEMALE)
+        patient = Patient.objects.create(patient_code="PROBAND", family_code="fam", sex=Sex.FEMALE)
         self.proband_sample.patient = patient
         self.proband_sample.save()
         self.trio.proband_sex = None
@@ -108,7 +108,7 @@ class TestTrioWizardProbandSex(TestCase):
         self.assertEqual(Sex.MALE, trio.effective_proband_sex)
 
     def test_no_choice_leaves_patient_record_in_charge(self):
-        self.samples[0].patient = Patient.objects.create(family_code="fam", sex=Sex.FEMALE)
+        self.samples[0].patient = Patient.objects.create(patient_code="PROBAND", family_code="fam", sex=Sex.FEMALE)
         self.samples[0].save()
         self._post("")
         trio = Trio.objects.get(cohort=self.cohort)
@@ -137,7 +137,7 @@ class TestQuadProbandSex(TestCase):
 
     def setUp(self):
         proband_sample = self.quad.proband.sample
-        proband_sample.patient = Patient.objects.create(family_code="fam", sex=Sex.FEMALE)
+        proband_sample.patient = Patient.objects.create(patient_code="PROBAND", family_code="fam", sex=Sex.FEMALE)
         proband_sample.save()
         self.quad.proband_sex = None
         self.quad.save()

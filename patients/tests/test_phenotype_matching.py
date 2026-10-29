@@ -75,7 +75,7 @@ class TestPhenotypeMatching(TestCase):
                 "aliases": aliases, "from_import": ontology_import})
 
     def create_patient_match_phenotypes(self, phenotype):
-        patient = Patient(phenotype=phenotype)
+        patient = Patient(patient_code="PHENOTYPE", phenotype=phenotype)
         patient.save(phenotype_matcher=self.phenotype_matcher)
 
         patient.process_phenotype_if_changed(phenotype_matcher=self.phenotype_matcher)
@@ -168,7 +168,7 @@ class TestPhenotypeMatching(TestCase):
     @override_settings(PATIENT_PHENOTYPE_EXCLUDE_STRING="----needs human review")
     def test_exclude_string_skips_persistence(self):
         phenotype = "Raised TSH\n----needs human review"
-        patient = Patient(phenotype=phenotype)
+        patient = Patient(patient_code="PHENOTYPE", phenotype=phenotype)
         patient.save(phenotype_matcher=self.phenotype_matcher)
         self.assertFalse(PhenotypeDescription.objects.filter(patient=patient).exists(),
                          "Exclude marker should prevent persisting matches")
@@ -177,11 +177,12 @@ class TestPhenotypeMatching(TestCase):
         """ PhenotypeMatcher loads the whole ontology so takes seconds to build - saving a patient
             shouldn't pay for that unless there are sentences we haven't already matched """
         already_matched_text = "Failure to thrive"
-        Patient(phenotype=already_matched_text).save(phenotype_matcher=self.phenotype_matcher)
+        matched = Patient(patient_code="PHENOTYPE", phenotype=already_matched_text)
+        matched.save(phenotype_matcher=self.phenotype_matcher)
 
         with mock.patch("patients.phenotype_matching.PhenotypeMatcher") as mock_matcher:
             Patient(patient_code="no phenotype").save()
-            Patient(phenotype=already_matched_text).save()
+            Patient(patient_code="PHENOTYPE", phenotype=already_matched_text).save()
             mock_matcher.assert_not_called()
 
     def test_commas(self):
@@ -211,7 +212,7 @@ class TestPhenotypeMatching(TestCase):
             # picks up the patched denylist (the class-level matcher was built
             # in setUpTestData against the real ontology test data).
             matcher = PhenotypeMatcher()
-            patient = Patient(phenotype="Failure to thrive")
+            patient = Patient(patient_code="PHENOTYPE", phenotype="Failure to thrive")
             patient.save(phenotype_matcher=matcher)
             patient.process_phenotype_if_changed(phenotype_matcher=matcher)
 
@@ -247,7 +248,7 @@ class TestPhenotypeMatching(TestCase):
             )
 
     def _create_matched_patient(self, phenotype: str) -> Patient:
-        patient = Patient(phenotype=phenotype)
+        patient = Patient(patient_code="PHENOTYPE", phenotype=phenotype)
         patient.save(phenotype_matcher=self.phenotype_matcher)
         patient.process_phenotype_if_changed(phenotype_matcher=self.phenotype_matcher)
         return patient
@@ -379,7 +380,7 @@ class TestPhenotypeMatcherVersion(TestCase):
     def test_requeue_keeps_links_and_approvals(self):
         text = "Raised TSH"
         user = User.objects.get_or_create(username="phenotype_approver")[0]
-        patient = Patient(phenotype=text)
+        patient = Patient(patient_code="PHENOTYPE", phenotype=text)
         patient.save(phenotype_matcher=self.phenotype_matcher, phenotype_approval_user=user)
         cohort = Cohort(name="phenotype cohort", user=user, genome_build=GenomeBuild.get_name_or_alias("GRCh37"),
                         phenotype=text)
@@ -416,7 +417,7 @@ class TestPhenotypeDescriptionOwner(TestCase):
 
     def test_deleting_patient_deletes_description_but_not_shared_sentence(self):
         text = "Raised TSH"
-        patient = Patient(phenotype=text)
+        patient = Patient(patient_code="PHENOTYPE", phenotype=text)
         patient.save(phenotype_matcher=self.phenotype_matcher)
         description_pk = patient.phenotype_description.pk
 
