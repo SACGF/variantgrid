@@ -1,4 +1,6 @@
-from django.test import TestCase
+from unittest.mock import patch
+
+from django.test import SimpleTestCase, TestCase, override_settings
 
 from annotation.fake_data import get_fake_annotation_version
 from annotation.gene_level_annotation import annotate_gene_level_run
@@ -9,10 +11,12 @@ from annotation.models import (
     VariantAnnotationPipelineType,
     VariantAnnotationVersion,
 )
+from annotation.models.models import VariantAnnotation
 from classification.autopopulate_evidence_keys.evidence_from_variant import (
     _get_gnomad_sv_overlap_note,
     _gnomad_sv_sourced_columns,
     get_evidence_fields_for_variant,
+    utr_annotator_annotation_formatter,
 )
 from classification.enums import SpecialEKeys
 from classification.models import EvidenceKey
@@ -23,7 +27,10 @@ from genes.tests.gene_level_test_utils import (
     create_gene_copy_number_event,
     create_splice_event_variant,
 )
+from library.django_utils.django_partition import temporary_db_table
+from snpdb.clingen_allele import ClinGenAlleleAPIException
 from snpdb.models import GenomeBuild
+from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 
 class GnomADSVOverlapNoteTest(TestCase):
@@ -136,3 +143,46 @@ class GeneLevelGeneSymbolTest(TestCase):
         self.assertEqual("AR GRCh37 X:1-2 splice",
                          self._autopopulated(self.unnamed_splice_variant, SpecialEKeys.SPLICE_LABEL))
         self.assertTrue(SpliceEvent.objects.exists(), "the seeded junctions are still there")
+
+
+class AlphaGenomeAutopopulateTest(TestCase):
+    """ AlphaGenome splicing is licensed for non-commercial use only (#2433) """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh38")
+        cls.annotation_version = get_fake_annotation_version(cls.genome_build)
+        vav = cls.annotation_version.variant_annotation_version
+        cls.variant = slowly_create_test_variant("1", 1000, "A", "T", cls.genome_build)
+        partition_table = vav.get_partition_table(
+            base_table_name=VariantAnnotationVersion.REPRESENTATIVE_TRANSCRIPT_ANNOTATION)
+        with temporary_db_table(VariantAnnotation, partition_table):
+            VariantAnnotation.objects.create(version=vav, variant=cls.variant,
+                                             annotation_run=AnnotationRun.objects.create(),
+                                             avi_phred=23.1, alphagenome_splicing=1.4)
+
+    @patch("classification.autopopulate_evidence_keys.evidence_from_variant.get_clingen_allele_for_variant",
+           side_effect=ClinGenAlleleAPIException("offline"))
+    def _autopopulated(self, _get_clingen_allele) -> dict:
+        evidence_keys_list = list(EvidenceKey.objects.all().select_related("variantgrid_column"))
+        data = get_evidence_fields_for_variant(self.genome_build, self.variant, None, None,
+                                               evidence_keys_list, self.annotation_version)
+        return {key: EvidenceKey.get_value(data.data.get(key)) for key in ["avi", "alphagenome_splicing"]}
+
+    @override_settings(ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED=True)
+    def test_populated_where_allowed(self):
+        self.assertEqual({"avi": 23.1, "alphagenome_splicing": 1.4}, self._autopopulated())
+
+    @override_settings(ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED=False)
+    def test_not_populated_where_disallowed(self):
+        """ A version annotated before the deployment turned the setting off still holds the scores """
+        self.assertEqual({"avi": 23.1, "alphagenome_splicing": None}, self._autopopulated())
+
+
+class UTRAnnotatorFormatterTest(SimpleTestCase):
+
+    def test_summarises_each_effect(self):
+        annotation = ("KozakStrength=Weak:type=uORF:Evidence=NA"
+                      "&Evidence=True:Unlisted=1:type=OutOfFrame_oORF:KozakStrength=Strong")
+        self.assertEqual("uORF (Weak Kozak), OutOfFrame_oORF (Strong Kozak)",
+                         utr_annotator_annotation_formatter(annotation))
