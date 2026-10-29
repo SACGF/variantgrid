@@ -592,7 +592,7 @@ function setNodeCounts(node, data) {
 	const counts = data.counts;
 	const deterministic = data.deterministic !== false;
 	for (const c in counts) {
-		const vc = $(".node-count-" + c, node_counts);
+		const vc = getNodeCountDiv(node_counts, c);
 		const count = counts[c];
 		if (count === null || count === undefined) {
 			setVariantCount(vc, '?');  // Node hasn't finished counting - @see updateDirtyNode
@@ -724,9 +724,9 @@ function updateTagNodeCounts(nodeCountTypes) {
 function createNodeCountDiv(nodeCountType) {
 	const name = nodeCountType[0];
 	const data = nodeCountType[1];
-	const label = data["label"];
-	const nodeCountContent = "<div class='user-tag-colored count-value'>?</div>";
-	const nodeCountDiv = $("<div count_type=" + name + " title='" + label + "' class='node-count node-count-" + name + "'>" + nodeCountContent + "</div>");
+	// A tag count's name and label carry the tag id, so they go in as attributes and text, never as markup
+	const nodeCountDiv = $("<div>", {count_type: name, title: data["label"], class: "node-count node-count-" + name});
+	$("<div>", {class: "user-tag-colored count-value", text: "?"}).appendTo(nodeCountDiv);
 	if (data["link"]) {
 		nodeCountDiv.addClass("clickable-count");
 		nodeCountDiv.click(clickCounter);
@@ -739,6 +739,13 @@ function createNodeCountDiv(nodeCountType) {
 
 
 const TAG_NODE_COUNT_PREFIX = "tag_";  // @see TagFilter.PREFIX
+
+// By attribute rather than a ".node-count-<name>" selector, which a tag id can break
+function getNodeCountDiv(nodeCounts, countType) {
+	return $(".node-count", nodeCounts).filter(function() {
+		return $(this).attr("count_type") === countType;
+	});
+}
 
 function isTagNodeCount(nodeCountType) {
 	return Boolean(nodeCountType[1].tag);
@@ -1073,7 +1080,10 @@ function drawCountLegend(nodeCountTypes) {
 			const node_count_type = nodeCountTypes[i];
 			const name = node_count_type[0];
 			const data = node_count_type[1];
-			const row = $("<div class='legend-row node-count-legend-" + name + "'><div class='user-tag-colored legend-color-box'></div><div class='legend-label'>" + data.label + "</div><div class='clear'></div></div>");
+			const row = $("<div>", {class: "legend-row node-count-legend-" + name});
+			row.append($("<div>", {class: "user-tag-colored legend-color-box"}),
+					   $("<div>", {class: "legend-label", text: data.label}),
+					   $("<div>", {class: "clear"}));
 			legend.append(row);
         }
     }
