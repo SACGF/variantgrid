@@ -522,7 +522,7 @@ def create_failed_patient_record(patient_records, record_id, row, exception):
                                  patient_family_code=row[PatientColumns.PATIENT_FAMILY_CODE],
                                  patient_code=row[PatientColumns.PATIENT_CODE],
                                  patient_first_name=row[PatientColumns.PATIENT_FIRST_NAME],
-                                 patient_last_name=row[PatientColumns.PATIENT_LAST_NAME] or "",
+                                 patient_last_name=row[PatientColumns.PATIENT_LAST_NAME],
                                  patient_phenotype=row[PatientColumns.PATIENT_PHENOTYPE],
                                  specimen_reference_id=row[PatientColumns.SPECIMEN_REFERENCE_ID],
                                  specimen_description=row[PatientColumns.SPECIMEN_DESCRIPTION],
@@ -552,7 +552,7 @@ def get_patient_record_imports_dataframe(f):
     """ A file written before #1870 (one extraction per specimen) has the nucleic acid column under its old
         Specimen name and no extraction reference / date - blank ones match the sample's extraction as before """
     df = pandas_read_encoded_csv(f, index_col=None, dtype=str)
-    df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
+    df = df.map(lambda x: (x.strip() or None) if isinstance(x, str) else x)
     df = df.rename(columns=LEGACY_COLUMNS)
     for column in OPTIONAL_COLUMNS:
         if column not in df.columns:

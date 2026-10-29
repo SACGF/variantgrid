@@ -1105,7 +1105,7 @@ class PatientRecord(TimeStampedModel):
     patient_family_code = models.TextField(null=True)
     patient_code = models.TextField(null=True)
     patient_first_name = models.TextField(null=True)
-    patient_last_name = models.TextField()
+    patient_last_name = models.TextField(null=True)
     date_of_birth = models.DateField(null=True)
     date_of_death = models.DateField(null=True)
     sex = models.CharField(max_length=1, choices=Sex.choices, null=True)
