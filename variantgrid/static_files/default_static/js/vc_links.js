@@ -369,10 +369,11 @@ const VCLinks = (function() {
             if (this.data.igv_locus) {
                 locus = this.data.igv_locus;
             } else if (this.variant_coordinate_parts) {
-                locus = this.variant_coordinate_parts[1] + ':' + this.variant_coordinate_parts[2];
+                const [, chrom, position, alt] = this.variant_coordinate_parts;
+                locus = igvVariantLocus(chrom, Number(position), alt, null);
             } else if (this.variant_coordinate_symbolic_parts) {
-                // Can do a range
-                locus = this.variant_coordinate_symbolic_parts[1] + ':' + this.variant_coordinate_symbolic_parts[2] + "-" + this.variant_coordinate_symbolic_parts[3];
+                const [, chrom, start, end, kind] = this.variant_coordinate_symbolic_parts;
+                locus = igvVariantLocus(chrom, Number(start), `<${kind}>`, end - start);
             } else {
                 return null;
             }
