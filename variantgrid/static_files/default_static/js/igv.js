@@ -66,6 +66,14 @@ function openIgvLink(locus, alignmentFiles) {
 // or gene symbols, space separated for a fusion's partners (@see GeneFusion.igv_locus), can go in
 const IGV_LOCUS_REGEX = /^[\w.-]+(:\d+(-\d+)?)?( [\w.-]+(:\d+(-\d+)?)?)*$/;
 
+// A symbolic SV opens across its span, as its coordinate is written (chrom:start-end <DEL>), a small variant at its position
+function igvVariantLocus(chrom, position, alt, svlen) {
+    if (svlen && String(alt).startsWith("<")) {
+        return `${chrom}:${position}-${position + Math.abs(svlen)}`;
+    }
+    return `${chrom}:${position}`;
+}
+
 // getAlignmentFilesFuncString names a page function returning the BAMs/CRAMs, called on click so it sees the page as it is then
 function createIgvUrl(locus, getAlignmentFilesFuncString) {
     if (getIgvSettings().show_igv_links && IGV_LOCUS_REGEX.test(locus)) {

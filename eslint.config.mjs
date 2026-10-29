@@ -69,6 +69,7 @@ export default [
                 variantTaggingPillOptions: "readonly", // grid.js
                 createIgvUrl: "readonly", // igv.js (typeof-guarded use in vc_links.js)
                 createIgvLink: "readonly", // igv.js
+                igvVariantLocus: "readonly", // igv.js
                 renderIgvLocusLinks: "readonly", // igv.js
                 deleteNodesFromDOM: "readonly", // analysis_nodes.js
                 unselectActive: "readonly", // analysis_nodes.js
