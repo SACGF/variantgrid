@@ -968,24 +968,28 @@ class ImportedAlleleInfo(TimeStampedModel):
         else:
             return None
 
-    def preferred_hgvs_obj(self, genome_build: Optional[GenomeBuild] = None) -> HGVSDisplay:
+    def preferred_hgvs_obj(self, genome_build: Optional[GenomeBuild] = None) -> Optional[HGVSDisplay]:
+        """ The HGVS resolved on genome_build, else one resolved on another build, else the imported HGVS
+            (as Classification.hgvs_best) - None when there is no HGVS of any kind to show """
         if genome_build is None:
             genome_build = GenomeBuildManager.get_current_genome_build()
 
-        if preferred := self[genome_build]:
-            return HGVSDisplay(dna_hgvs=preferred.resolved_hgvs_obj, genome_build=genome_build, p_hgvs=preferred.p_hgvs)
-        else:
-            for annotated_build in GenomeBuild.builds_with_annotation_cached():
-                if alternative := self[annotated_build]:
-                    if hgvs_obj := alternative.resolved_hgvs_obj:
-                        return HGVSDisplay(
-                            dna_hgvs=hgvs_obj,
-                            is_desired_build=False,
-                            genome_build=annotated_build,
-                            p_hgvs=alternative.p_hgvs
-                        )
+        if (preferred := self[genome_build]) and (hgvs_obj := preferred.resolved_hgvs_obj):
+            return HGVSDisplay(dna_hgvs=hgvs_obj, genome_build=genome_build, p_hgvs=preferred.p_hgvs)
+        for annotated_build in GenomeBuild.builds_with_annotation_cached():
+            if alternative := self[annotated_build]:
+                if hgvs_obj := alternative.resolved_hgvs_obj:
+                    return HGVSDisplay(
+                        dna_hgvs=hgvs_obj,
+                        is_desired_build=False,
+                        genome_build=annotated_build,
+                        p_hgvs=alternative.p_hgvs
+                    )
 
-        imported_hgvs = self.imported_hgvs_obj()
+        if not (imported_hgvs := self.imported_hgvs_obj()):
+            return None
+        if matched := self.matched_without_resolved_hgvs_display(genome_build):
+            return matched
         if imported_hgvs.genome_build and imported_hgvs.genome_build != genome_build:
             imported_hgvs = HGVSDisplay(
                 dna_hgvs=imported_hgvs.dna_hgvs,
