@@ -2,10 +2,10 @@
 Splits phenotype text into sentences and matches each new sentence to ontology terms with PhenotypeMatcher,
 stamping it with the PhenotypeMatchVersion it was matched with.
 
-Entry points: create_phenotype_description (one owner's text, or an unowned live preview),
-bulk_patient_phenotype_matching (register many patients' sentences, then match the awaiting ones once each,
-optionally in parallel), requeue_sentences (mark sentences for rematching), register_unsplit_descriptions (split
-descriptions that have no sentences, for `match_patient_phenotypes --rebuild`).
+Entry points: create_phenotype_description (one owner's text), phenotype_preview_results (unsaved text, writing
+nothing, with one PhenotypeMatcher per process), bulk_patient_phenotype_matching (register many patients' sentences,
+then match the awaiting ones once each, optionally in parallel), requeue_sentences (mark sentences for rematching),
+register_unsplit_descriptions (split descriptions that have no sentences, for `match_patient_phenotypes --rebuild`).
 """
 import logging
 import multiprocessing as mp
@@ -15,8 +15,9 @@ from typing import Optional
 
 import nltk
 from django.db import connections, transaction
-from django.db.models import QuerySet
+from django.db.models import Prefetch, QuerySet
 
+from ontology.models import OntologyTerm, OntologyVersion
 from patients.models.models_phenotype import (
     AmbiguousAcronymDenylist,
     PhenotypeDescription,
@@ -24,6 +25,8 @@ from patients.models.models_phenotype import (
     TextPhenotype,
     TextPhenotypeMatch,
     TextPhenotypeSentence,
+    ambiguous_acronym_pattern,
+    sentence_results,
     without_ambiguous_acronyms,
 )
 from patients.phenotype_matcher import (
@@ -131,10 +134,9 @@ def _transform_words(words, tags, spans):
     return list(zip(words, spans))
 
 
-def _process_text_phenotype(text_phenotype, phenotype_tokenizer, phenotype_matcher,
-                            match_version: PhenotypeMatchVersion, denylist: AmbiguousAcronymDenylist):
-    """ Replaces the sentence's matches and stamps it, so a rematch is idempotent.
-        match_version is PhenotypeMatchVersion.get_or_create_current() taken when phenotype_matcher was built """
+def _match_text_phenotype(text_phenotype: TextPhenotype, phenotype_tokenizer, phenotype_matcher,
+                          denylist: AmbiguousAcronymDenylist) -> list[TextPhenotypeMatch]:
+    """ The sentence's matches, unsaved - text_phenotype may be unsaved too """
     tokenized_text_and_spans = phenotype_tokenizer.word_tokenise_and_spans(text_phenotype.text)
 
     tokenized_text = []
@@ -165,11 +167,17 @@ def _process_text_phenotype(text_phenotype, phenotype_tokenizer, phenotype_match
 
     try:
         matches = parse_words(text_phenotype, words_and_spans, phenotype_matcher)
-        matches = without_ambiguous_acronyms(matches, denylist)
+        return without_ambiguous_acronyms(matches, denylist)
     except SkipAllPhenotypeMatchException:
         logging.info("Completely skipping: %s", text_phenotype.text)
-        matches = []
+        return []
 
+
+def _process_text_phenotype(text_phenotype, phenotype_tokenizer, phenotype_matcher,
+                            match_version: PhenotypeMatchVersion, denylist: AmbiguousAcronymDenylist):
+    """ Replaces the sentence's matches and stamps it, so a rematch is idempotent.
+        match_version is PhenotypeMatchVersion.get_or_create_current() taken when phenotype_matcher was built """
+    matches = _match_text_phenotype(text_phenotype, phenotype_tokenizer, phenotype_matcher, denylist)
     with transaction.atomic():
         TextPhenotypeMatch.objects.filter(text_phenotype=text_phenotype).delete()
         if matches:
@@ -219,7 +227,7 @@ def _replace_comments_with_spaces(text):
 
 def create_phenotype_description(text, owner=None, approved_by=None, phenotype_matcher=None,
                                  defer_processing=False) -> PhenotypeDescription:
-    """ owner is the Patient or Cohort the text belongs to - None only for a live preview, which deletes it.
+    """ owner is the Patient or Cohort the text belongs to - None only for an SA Path request.
         PhenotypeMatcher takes a while to initialize, so is only built if there are sentences we haven't
         already matched - pass one in to re-use it for bulk processing.
         If defer_processing is True the PhenotypeDescription/TextPhenotype rows are created but NLP matching is
@@ -251,22 +259,82 @@ def _create_sentences(phenotype_description: PhenotypeDescription, phenotype_tok
     """ Splits the description's text into TextPhenotypeSentences - returns those whose sentence is new and
         needs matching """
     unknown_sentences = []
-    # Strip carriage returns - some browsers send \r\n in forms, Ajax usually sends \n
-    # These need to be the same so save/ajax preview look the same
-    text = phenotype_description.original_text.replace('\r', '')
-    text = _replace_comments_with_spaces(text)  # Need to keep length the same for offsets
-    for sentence, sentence_offset in phenotype_tokenizer.sentences_and_offsets(text):
+    for sentence, sentence_offset in _sentences_and_offsets(phenotype_description.original_text, phenotype_tokenizer):
         text_phenotype, tp_created = TextPhenotype.objects.get_or_create(text=sentence)
         tps = TextPhenotypeSentence.objects.create(phenotype_description=phenotype_description,
                                                    text_phenotype=text_phenotype,
                                                    sentence_offset=sentence_offset)
         if tp_created:
-            has_alpha_numeric = any(x.isalnum() for x in sentence)
-            if not has_alpha_numeric:  # Impossible to match anything so skip
+            if not _can_match(sentence):
                 text_phenotype.mark_matched(match_version)
             else:
                 unknown_sentences.append(tps)
     return unknown_sentences
+
+
+def _sentences_and_offsets(text: str, phenotype_tokenizer: PhenotypeTokenizer) -> list[tuple[str, int]]:
+    # Strip carriage returns - some browsers send \r\n in forms, Ajax usually sends \n
+    # These need to be the same so save/ajax preview look the same
+    text = text.replace('\r', '')
+    text = _replace_comments_with_spaces(text)  # Need to keep length the same for offsets
+    return list(phenotype_tokenizer.sentences_and_offsets(text))
+
+
+def _can_match(sentence: str) -> bool:
+    """ A sentence with no letters or digits can't match anything """
+    return any(x.isalnum() for x in sentence)
+
+
+_PROCESS_PHENOTYPE_MATCHER: Optional[tuple[Optional[int], PhenotypeMatcher]] = None
+
+
+def _get_process_phenotype_matcher() -> PhenotypeMatcher:
+    """ The live preview's PhenotypeMatcher, built once per process (it takes seconds) and rebuilt when the
+        latest OntologyVersion changes """
+    global _PROCESS_PHENOTYPE_MATCHER
+    ontology_version = OntologyVersion.latest(validate=False)
+    ontology_version_id = ontology_version.pk if ontology_version else None
+    if _PROCESS_PHENOTYPE_MATCHER is None or _PROCESS_PHENOTYPE_MATCHER[0] != ontology_version_id:
+        _PROCESS_PHENOTYPE_MATCHER = (ontology_version_id, PhenotypeMatcher())
+    return _PROCESS_PHENOTYPE_MATCHER[1]
+
+
+def phenotype_preview_results(text: str) -> list[dict]:
+    """ PhenotypeDescription.get_results() for unsaved text (the live preview), writing nothing. A sentence already
+        matched shows its saved matches, as it will once saved; a new one is matched in memory """
+    phenotype_tokenizer = PhenotypeTokenizer()
+    sentences_and_offsets = _sentences_and_offsets(text, phenotype_tokenizer)
+    match_qs = TextPhenotypeMatch.objects.select_related("ontology_term")
+    matched_qs = (TextPhenotype.objects.filter(text__in={sentence for sentence, _ in sentences_and_offsets},
+                                               match_version__isnull=False)
+                  .prefetch_related(Prefetch("textphenotypematch_set", queryset=match_qs)))
+    matches_by_sentence = {tp.text: list(tp.textphenotypematch_set.all()) for tp in matched_qs}
+
+    denylist = get_ambiguous_acronym_denylist()
+    unsaved_matches = []
+    for sentence, _ in sentences_and_offsets:
+        if sentence not in matches_by_sentence:
+            matches = []
+            if _can_match(sentence):
+                matches = _match_text_phenotype(TextPhenotype(text=sentence), phenotype_tokenizer,
+                                                _get_process_phenotype_matcher(), denylist)
+                unsaved_matches.extend(matches)
+            matches_by_sentence[sentence] = matches
+
+    terms_by_id = OntologyTerm.objects.in_bulk({tpm.ontology_term_id for tpm in unsaved_matches})
+    for tpm in unsaved_matches:
+        tpm.ontology_term = terms_by_id[tpm.ontology_term_id]
+
+    ontology_version = None
+    if any(matches_by_sentence.values()):
+        ontology_version = OntologyVersion.latest()
+    acronym_pattern = ambiguous_acronym_pattern(denylist)
+
+    results = []
+    for sentence, sentence_offset in sentences_and_offsets:
+        results.extend(sentence_results(sentence, matches_by_sentence[sentence], sentence_offset, ontology_version,
+                                        denylist, acronym_pattern))
+    return results
 
 
 def register_unsplit_descriptions() -> int:

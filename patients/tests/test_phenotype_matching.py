@@ -31,9 +31,11 @@ from patients.phenotype_matcher import (
     get_ambiguous_acronym_denylist,
 )
 from patients.phenotype_matching import (
+    _get_process_phenotype_matcher,
     _process_text_phenotype,
     bulk_patient_phenotype_matching,
     create_phenotype_description,
+    phenotype_preview_results,
     requeue_sentences,
 )
 from patients.phenotype_tokenizer import PhenotypeTokenizer
@@ -184,6 +186,41 @@ class TestPhenotypeMatching(TestCase):
             Patient(patient_code="no phenotype").save()
             Patient(patient_code="PHENOTYPE", phenotype=already_matched_text).save()
             mock_matcher.assert_not_called()
+
+    def test_preview_writes_nothing_and_matches_as_saved(self):
+        """ The live preview runs on every pause in typing (#2551): new sentences are matched in memory with the
+            process matcher, matched ones read back, and both give what the saved description shows """
+        phenotype = "Raised TSH. Failure to thrive\n...\nMEN type 1"
+        model_classes = [PhenotypeDescription, TextPhenotypeSentence, TextPhenotype, TextPhenotypeMatch,
+                         PhenotypeMatchVersion]
+        counts_before = {model: model.objects.count() for model in model_classes}
+        ontology_version = OntologyVersion.latest(validate=False)
+        with mock.patch("patients.phenotype_matching._PROCESS_PHENOTYPE_MATCHER",
+                        (ontology_version.pk, self.phenotype_matcher)):
+            new_text_results = phenotype_preview_results(phenotype)
+        self.assertEqual(counts_before, {model: model.objects.count() for model in model_classes})
+        self.assertTrue(new_text_results)
+
+        saved_results = self.create_patient_match_phenotypes(phenotype)
+        self.assertEqual(new_text_results, saved_results)
+
+        with mock.patch("patients.phenotype_matching.PhenotypeMatcher") as mock_matcher:
+            self.assertEqual(phenotype_preview_results(phenotype), saved_results)
+            mock_matcher.assert_not_called()
+
+    def test_process_matcher_rebuilt_only_for_new_ontology_version(self):
+        ontology_version = OntologyVersion.latest(validate=False)
+        with (mock.patch("patients.phenotype_matching._PROCESS_PHENOTYPE_MATCHER", None),
+              mock.patch("patients.phenotype_matching.PhenotypeMatcher") as mock_matcher,
+              mock.patch("patients.phenotype_matching.OntologyVersion.latest") as mock_latest):
+            mock_latest.return_value = ontology_version
+            first = _get_process_phenotype_matcher()
+            self.assertIs(_get_process_phenotype_matcher(), first)
+            self.assertEqual(mock_matcher.call_count, 1)
+
+            mock_latest.return_value = OntologyVersion(pk=ontology_version.pk + 1)
+            _get_process_phenotype_matcher()
+            self.assertEqual(mock_matcher.call_count, 2)
 
     def test_commas(self):
         COMMA_OMIM = {
