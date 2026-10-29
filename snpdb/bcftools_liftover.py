@@ -28,7 +28,18 @@ def bcftools_liftover_variant_coordinate(variant_coordinate: VariantCoordinate, 
 
 
 def check_bcftools_coordinate_limits(variant_coordinate: VariantCoordinate) -> Optional[str]:
-    """ Returns why the coordinate is outside the settings' symbolic/length limits, or None if bcftools can take it """
+    """ Returns why the coordinate is outside the settings' symbolic/length limits, or None if bcftools can take it
+
+        bcftools +liftover treats the two forms differently, so their limits differ:
+        - Explicit: the REF/ALT sequence is lifted and realigned against the destination fasta, so assembly
+          differences inside the variant show up in the result. Cost grows with length (an 11Mb deletion is an
+          11Mb REF string), hence LIFTOVER_BCFTOOLS_MAX_LENGTH.
+        - Symbolic: lifted like a SNP - only POS is lifted, SVLEN is kept and END is rewritten as POS + the old
+          length (freeseek/score#27). The new END is only right when the whole span sits in one gap-free chain
+          block, so the error grows with span: a 223Mb <DUP> on chr2 GRCh38->GRCh37 lands END ~870kb away from
+          where END itself lifts to. No length check applies here - LIFTOVER_BCFTOOLS_SYMBOLIC is all or nothing.
+          Upstream added --lift-end (2025-07, freeseek/score#35) to lift END independently, setting it missing
+          when it lands on another contig/strand, but SVLEN is still not updated (#2543) """
     if variant_coordinate.is_symbolic:
         if not settings.LIFTOVER_BCFTOOLS_SYMBOLIC:
             return f"Liftover of symbolic variants disabled via {settings.LIFTOVER_BCFTOOLS_SYMBOLIC=}"

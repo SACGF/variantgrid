@@ -496,7 +496,8 @@ LIFTOVER_DBSNP_ENABLED = False  # Default=False - doesn't work so well due to db
 LIFTOVER_BATCH_SIZE = 10_000
 
 LIFTOVER_BCFTOOLS_ENABLED = True
-# 2025-02-13 - bcftools liftover currently gives a warning about symbolic variants
+# bcftools lifts a symbolic variant's POS only and keeps its length (freeseek/score#27), so a long one's END
+# can be off - see snpdb/bcftools_liftover.py:check_bcftools_coordinate_limits
 LIFTOVER_BCFTOOLS_SYMBOLIC = False
 # Also lets a symbolic del/dup/inv shorter than this through, lifted over as its explicit sequence (#1358)
 LIFTOVER_BCFTOOLS_MAX_LENGTH = 1000
