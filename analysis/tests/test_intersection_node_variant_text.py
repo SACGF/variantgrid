@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from analysis.models.nodes.filters.intersection_node import IntersectionNode
 from analysis.tests.utils import AnalysisSetupMixin
@@ -24,6 +24,7 @@ class ResolveVariantTextTest(AnalysisSetupMixin, TestCase):
     def _resolve(self, text, search_results=None):
         with patch("analysis.variant_text.search_data") as search_data:
             search_data.return_value.results = search_results or []
+            self.search_data = search_data
             return resolve_variant_text(self.analysis.user, self.grch37, text)
 
     def test_blank_lines_ignored(self):
@@ -64,6 +65,23 @@ class ResolveVariantTextTest(AnalysisSetupMixin, TestCase):
     def test_parse_region_round_trip(self):
         resolution = self._resolve("1:100-200")
         self.assertEqual(parse_region(resolution.regions[0]), ("1", 100, 200))
+
+    def test_coordinates_in_the_database_resolved_without_search(self):
+        """ IGV, VCF and gnomAD formats are looked up together rather than searched line by line (#2531) """
+        resolution = self._resolve("1:169519049 T>C\n1 169519050 . G A\n1-169519049-T-C")
+        self.assertEqual(resolution.variant_ids, [self.variant.pk, self.other_variant.pk])
+        self.search_data.assert_not_called()
+
+    def test_coordinate_not_in_the_database_goes_to_search(self):
+        resolution = self._resolve("1:169519049 T>G")
+        self.assertEqual(resolution.unresolved, ["1:169519049 T>G"])
+        self.search_data.assert_called_once()
+
+    @override_settings(SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN=True)
+    def test_classified_only_search_is_left_to_search(self):
+        """ On Shariant a non-admin's search only finds classified variants """
+        self._resolve("1:169519049 T>C", search_results=[_search_result(self.variant)])
+        self.search_data.assert_called_once()
 
 
 class IntersectionNodeVariantsQTest(AnalysisSetupMixin, TestCase):
