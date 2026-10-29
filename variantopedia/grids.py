@@ -368,6 +368,8 @@ class VariantTagsColumns(VariantTagCaseColumnsMixin, DatatableConfig[VariantTag]
             self.user_column(name="user", label="User"),
             RichColumn("created", label="Created", orderable=True, default_sort=SortOrder.DESC,
                        client_renderer="TableFormat.timestamp"),
+            # The variant tags import resolves this first, falling back to the Variant column
+            RichColumn("rv_hgvs_g", label="g.HGVS", visible=False),
             RichColumn("variant__id", label="Variant ID", visible=False),
             RichColumn("id", label="Tag ID", visible=False),
             RichColumn("id", name="delete", label="", extra_columns=["analysis__id"],

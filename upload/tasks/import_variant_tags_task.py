@@ -1,5 +1,6 @@
 import logging
 from collections import defaultdict
+from typing import Optional
 
 import pandas as pd
 from dateutil import parser
@@ -7,6 +8,8 @@ from django.utils.timezone import is_naive, make_aware
 
 from analysis.enums import TagLocation
 from analysis.models import ImportedVariantTag, VariantTag, VariantTagsImport
+from genes.hgvs.hgvs_converter import HGVSException
+from genes.hgvs.hgvs_matcher import HGVSMatcher
 from library.django_utils import UserMatcher
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.pandas_utils import df_nan_to_none
@@ -30,6 +33,7 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
     """ Write a VCF with variants in VariantTags so they can go through normal insert pipeline """
     # These are the original names (grid CSV export with raw IDs)
     COL_VARIANT_STRING = "variant_string"
+    COL_HGVS_G = "hgvs_g"
     COL_NODE = "node__id"
     COL_CREATED = "created"
     COL_GENOME_BUILD = "view_genome_build"
@@ -43,6 +47,7 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
     # Labels written by the Tags grid CSV download (variantopedia.grids.VariantTagsColumns)
     NEW_COLUMNS = {
         COL_VARIANT_STRING: "Variant",
+        COL_HGVS_G: "g.HGVS",
         COL_NODE: "NodeID",
         COL_CREATED: "Created",
         COL_GENOME_BUILD: "Genome Build",
@@ -89,6 +94,7 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
         variant_tags_import = VariantTagsImport.objects.create(user=file_upload.user, genome_build=genome_build)
         UploadedVariantTags.objects.create(file_upload=file_upload, variant_tags_import=variant_tags_import)
 
+        hgvs_matcher = HGVSMatcher(genome_build)
         variant_coordinates = set()
         imported_tags = []
         unreadable_variant_strings = []
@@ -99,7 +105,8 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
                 variant_string = variant_string[:-REMOVE_LENGTH].strip()
 
             try:
-                variant_coordinate = VariantCoordinate.from_string(variant_string, genome_build)
+                variant_coordinate = self._get_variant_coordinate(hgvs_matcher, row.get(self.COL_HGVS_G),
+                                                                  variant_string)
             except ValueError:
                 unreadable_variant_strings.append(variant_string)
                 if "*" in variant_string:
@@ -115,8 +122,9 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
             created = parser.parse(row["created"])
             if is_naive(created):  # The Tags grid download writes an aware datetime
                 created = make_aware(created)
+            # What was resolved (maybe from g.HGVS) - VariantTagsInsertTask reads it back with from_string
             ivt = ImportedVariantTag(variant_tags_import=variant_tags_import,
-                                     variant_string=variant_string,
+                                     variant_string=variant_coordinate.format(),
                                      genome_build_string=row["view_genome_build"],
                                      gene_symbol_string=gene_symbol,
                                      tag_string=row["tag__id"],
@@ -141,6 +149,18 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
 
         write_vcf_from_variant_coordinates(upload_step.output_filename, variant_coordinates)
         return items_processed
+
+    @staticmethod
+    def _get_variant_coordinate(hgvs_matcher: HGVSMatcher, hgvs_g: Optional[str],
+                                variant_string: str) -> VariantCoordinate:
+        """ From g.HGVS where the download has it. An unannotated variant, a <CNV>/<INS> (no HGVS) or a download
+            from before the column existed falls back to the variant string. Raises ValueError if neither reads """
+        if hgvs_g:
+            try:
+                return hgvs_matcher.get_variant_coordinate(hgvs_g)
+            except (HGVSException, ValueError):
+                logging.warning("Could not resolve g.HGVS '%s', using '%s'", hgvs_g, variant_string)
+        return VariantCoordinate.from_string(variant_string, hgvs_matcher.genome_build)
 
 
 class VariantTagsInsertTask(ImportVCFStepTask):
