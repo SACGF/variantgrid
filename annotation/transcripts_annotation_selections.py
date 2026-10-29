@@ -60,6 +60,7 @@ class VariantTranscriptSelections:
         self.error_messages = []
         self.initial_transcript_id = self.NO_TRANSCRIPT
         self.num_hidden_overflow_transcripts = 0  # set in _apply_transcript_limit
+        self.num_hidden_other_annotation_consortium_transcripts = 0  # set in _add_other_annotation_consortium_transcripts
         self._populate(variant, annotation_version)
         self.other_annotation_consortium_transcripts_warning = None  # set in _add_other_annotation_consortium_transcripts
         self._add_other_annotation_consortium_transcripts(variant)
@@ -366,6 +367,7 @@ class VariantTranscriptSelections:
                 }
                 if self.hide_other_annotation_consortium_transcripts:
                     t_data["collapse_class"] = self.OTHER_CONSORTIUM_COLLAPSE_CLASS
+                    self.num_hidden_other_annotation_consortium_transcripts += 1
                 try:
                     # Transcript data may not be well formed
                     t_data["protein_length"] = transcript_version.protein_length

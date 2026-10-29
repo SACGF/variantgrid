@@ -80,7 +80,7 @@
         {% if vts.num_hidden_overflow_transcripts %}
             <a id='show-overflow-transcripts-link' class="toggle-link" data-toggle="collapse" href=".overflow-transcripts">Toggle {{ vts.num_hidden_overflow_transcripts }} additional transcript{{ vts.num_hidden_overflow_transcripts|pluralize }}</a>
         {% endif %}
-        {% if vts.hide_other_annotation_consortium_transcripts %}
+        {% if vts.num_hidden_other_annotation_consortium_transcripts %}
             <a id='show-other-annotation-consortium-transcripts-link' class="toggle-link" data-toggle="collapse" href=".other-annotation-consortium-transcripts">Toggle {{ vts.get_other_annotation_consortium_display }} transcripts (not annotated)</a>
         {% endif %}
     {% endif %}
