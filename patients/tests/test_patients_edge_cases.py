@@ -74,10 +74,10 @@ def _make_patient_records(user, path=_FAKE_CSV):
 
 class TestParseDateFunction(TestCase):
     def test_day_first_as_the_column_header_says(self):
-        self.assertEqual(date(2015, 7, 5), parse_date({"col": "05/07/2015"}, "col", []).date())
+        self.assertEqual(date(2015, 7, 5), parse_date({"col": "05/07/2015"}, "col", []))
 
     def test_iso_dates_are_not_read_day_first(self):
-        self.assertEqual(date(2015, 7, 5), parse_date({"col": "2015-07-05"}, "col", []).date())
+        self.assertEqual(date(2015, 7, 5), parse_date({"col": "2015-07-05"}, "col", []))
 
     def test_unparseable_date_is_a_validation_message(self):
         msgs = []
@@ -212,6 +212,14 @@ class TestProcessRecordDeceasedStateMachine(TestCase):
         final_count = PatientModification.objects.filter(patient=self.patient).count()
         self.assertEqual(initial_count, final_count,
                          "Spurious PatientModification created with no deceased info")
+
+    def test_unchanged_date_of_death_reimports_without_modification(self):
+        row = _make_row(**{PatientColumns.DATE_OF_DEATH: "2020-01-01"})
+        process_record(self.pr, record_id=1, row=row)
+        process_record(_make_patient_records(self.user), record_id=1, row=row)
+        modifications = PatientModification.objects.filter(patient=self.patient,
+                                                            description="Updated patient date of death")
+        self.assertEqual(1, modifications.count())
 
     def test_blank_deceased_columns_keep_date_of_death(self):
         Patient.objects.filter(pk=self.patient.pk).update(date_of_death=date(2020, 1, 1))

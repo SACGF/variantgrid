@@ -413,9 +413,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
                                                 ("last name", last_name, patient.last_name)]:
             if row_value and patient_value and row_value.upper() != patient_value.upper():
                 differs.append(label)
-        if isinstance(date_of_birth, datetime.datetime):
-            date_of_birth = date_of_birth.date()
-        elif isinstance(date_of_birth, str):
+        if isinstance(date_of_birth, str):
             date_of_birth = datetime.date.fromisoformat(date_of_birth)
         if date_of_birth and patient.date_of_birth and date_of_birth != patient.date_of_birth:
             differs.append("date of birth")

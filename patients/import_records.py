@@ -103,7 +103,8 @@ def assign_extraction_to_sample(patient_import, user, sample, extraction, origin
                                        patient_import=patient_import)
 
 
-def parse_date(row, column, validation_messages):
+def parse_datetime(row, column, validation_messages):
+    """ For the columns stored in a DateTimeField (specimen and extraction dates) """
     date_string = row[column]
     d = None
     if date_string and not pd.isnull(date_string):
@@ -118,6 +119,14 @@ def parse_date(row, column, validation_messages):
                     validation_messages.append(message)
 
     return d
+
+
+def parse_date(row, column, validation_messages):
+    """ For the columns stored in a DateField (date of birth and death) - a datetime never equals the
+        stored date, so comparing one with the patient would always read as a change """
+    if d := parse_datetime(row, column, validation_messages):
+        return d.date()
+    return None
 
 
 def parse_int(row, column, validation_messages):
@@ -308,13 +317,13 @@ def process_record(patient_records, record_id, row):
     specimen_reference_id = Specimen.normalize_reference_id(row[PatientColumns.SPECIMEN_REFERENCE_ID])
     specimen_description = row[PatientColumns.SPECIMEN_DESCRIPTION]
     specimen_collected_by = row[PatientColumns.SPECIMEN_COLLECTED_BY]
-    specimen_collection_date = parse_date(row, PatientColumns.SPECIMEN_COLLECTION_DATE, validation_messages)
-    specimen_received_date = parse_date(row, PatientColumns.SPECIMEN_RECEIVED_DATE, validation_messages)
+    specimen_collection_date = parse_datetime(row, PatientColumns.SPECIMEN_COLLECTION_DATE, validation_messages)
+    specimen_received_date = parse_datetime(row, PatientColumns.SPECIMEN_RECEIVED_DATE, validation_messages)
     specimen_tissue_status = parse_choice(TissueStatus.choices, row, PatientColumns.SPECIMEN_TISSUE_STATUS, validation_messages)
     specimen_age_at_collection = parse_int(row, PatientColumns.SPECIMEN_AGE_AT_COLLECTION_DATE, validation_messages)
     extraction_reference_id = Extraction.normalize_reference_id(row[PatientColumns.EXTRACTION_REFERENCE_ID])
     extraction_nucleic_acid_source = parse_choice(NucleicAcid.choices, row, PatientColumns.EXTRACTION_NUCLEIC_ACID_SOURCE, validation_messages)
-    extraction_date = parse_date(row, PatientColumns.EXTRACTION_DATE, validation_messages)
+    extraction_date = parse_datetime(row, PatientColumns.EXTRACTION_DATE, validation_messages)
 
     sample_id = parse_int(row, PatientColumns.SAMPLE_ID, validation_messages)
     sample_name = row[PatientColumns.SAMPLE_NAME]
