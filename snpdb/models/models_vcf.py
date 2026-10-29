@@ -642,6 +642,16 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
         return queryset.filter(ored_q_filters).exclude(import_status__in=ImportStatus.DELETION_STATES)
 
     @staticmethod
+    def visible_to_user(user, samples) -> list['Sample']:
+        """ samples: a list or queryset. A queryset is filtered in the one query that evaluates it; a list
+            keeps its instances, so whatever they have cached (VCF, gene list) isn't fetched again """
+        if isinstance(samples, models.QuerySet):
+            return list(Sample.filter_for_user(user, queryset=samples))
+        sample_qs = Sample.objects.filter(pk__in=[s.pk for s in samples])
+        visible_ids = set(Sample.filter_for_user(user, queryset=sample_qs).values_list("pk", flat=True))
+        return [s for s in samples if s.pk in visible_ids]
+
+    @staticmethod
     def get_for_user(user, sample_id):
         sample = get_object_or_404(Sample.objects.select_related("vcf"), pk=sample_id)
         sample.check_can_view(user)

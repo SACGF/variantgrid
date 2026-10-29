@@ -428,13 +428,17 @@ class Cohort(GuardianPermissionsAutoInitialSaveMixin, PreviewModelMixin, SortByP
 
     @classmethod
     def filter_for_user(cls, user, queryset=None, group_data=True, success_status_only=True, **kwargs):
-        if queryset is None:
-            cohort_qs = get_objects_for_user(user, 'snpdb.view_cohort', accept_global_perms=False)
+        """ queryset: only check these cohorts """
+        cohort_qs = get_objects_for_user(user, 'snpdb.view_cohort', accept_global_perms=False)
 
-            # Also ones we have access to vcfs
-            vcfs_qs = VCF.filter_for_user(user, group_data=group_data)
-            vcf_cohorts = Cohort.objects.filter(pk__in=vcfs_qs.values_list("cohort__pk", flat=True))
-            queryset = cohort_qs | vcf_cohorts
+        # Also ones we have access to vcfs
+        vcfs_qs = VCF.filter_for_user(user, group_data=group_data)
+        vcf_cohorts = Cohort.objects.filter(pk__in=vcfs_qs.values_list("cohort__pk", flat=True))
+        permitted_qs = cohort_qs | vcf_cohorts
+        if queryset is None:
+            queryset = permitted_qs
+        else:
+            queryset = queryset.filter(pk__in=permitted_qs.values("pk"))
 
         if success_status_only:
             queryset = queryset.filter(import_status=ImportStatus.SUCCESS)
