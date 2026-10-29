@@ -82,9 +82,9 @@ class ClassificationTestValidation(TestCase):
             lab=lab,
             lab_record_id=None,
             data={
-                'age': '&gt;80',
+                'age': ['&gt;80'],
                 'curation_date': ['2020-01-01'],
-                'owner': 'not\u00a0a user',
+                'owner': ['not\u00a0a user'],
             },
             save=True,
             source=SubmissionSource.API,
