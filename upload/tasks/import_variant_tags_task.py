@@ -91,7 +91,7 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
 
         variant_coordinates = set()
         imported_tags = []
-        num_skipped_records = 0
+        unreadable_variant_strings = []
         num_skipped_with_star = 0
         for _, row in df.iterrows():
             variant_string = row["variant_string"]
@@ -101,7 +101,7 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
             try:
                 variant_coordinate = VariantCoordinate.from_string(variant_string, genome_build)
             except ValueError:
-                num_skipped_records += 1
+                unreadable_variant_strings.append(variant_string)
                 if "*" in variant_string:
                     num_skipped_with_star += 1
                 logging.warning("Could not convert '%s'", variant_string)
@@ -132,8 +132,9 @@ class VariantTagsCreateVCFTask(ImportVCFStepTask):
         if imported_tags:
             ImportedVariantTag.objects.bulk_create(imported_tags, batch_size=2000)
 
-        if num_skipped_records:
-            message_string = f"Skipped {num_skipped_records} records."
+        if unreadable_variant_strings:
+            message_string = (f"Skipped {len(unreadable_variant_strings)} records with a variant string that "
+                              f"could not be read, eg '{unreadable_variant_strings[0]}'.")
             if num_skipped_with_star:
                 message_string += f" ({num_skipped_with_star} containing '*') "
             SimpleVCFImportInfo.objects.create(upload_step=upload_step, message_string=message_string)

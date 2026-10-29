@@ -5,12 +5,17 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase
+from django.urls import reverse
 
 from analysis.enums import TagLocation
 from analysis.models import VariantTag
+from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.enums import ImportSource
-from snpdb.models import GenomeBuild, Tag
-from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from snpdb.models import GenomeBuild, Tag, VariantCoordinate
+from snpdb.tests.utils.vcf_testing_utils import (
+    slowly_create_test_variant,
+    slowly_create_test_variant_from_coordinate,
+)
 from upload.enums import UploadedFileTypes
 from upload.models import FileUpload, UploadPipeline, UploadStep
 from upload.tasks.import_variant_tags_task import VariantTagsCreateVCFTask, VariantTagsInsertTask
@@ -32,13 +37,15 @@ class ImportVariantTagsTest(TestCase):
         Tag.objects.create(pk="existing tag")
 
     def _import(self, tag_id: str):
+        self._import_csv([TAGS_GRID_CSV_HEADER,
+                          ["3:128198980 G>A", "GRCh37", "GATA2", tag_id, "", "", "", "",
+                           self.user.username, "2026-10-29 02:46:19.957469+00:00", self.variant.pk, 1]])
+
+    def _import_csv(self, rows: list[list]):
         tmp_dir = tempfile.mkdtemp()
         csv_filename = os.path.join(tmp_dir, "tags.csv")
         with open(csv_filename, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(TAGS_GRID_CSV_HEADER)
-            writer.writerow(["3:128198980 G>A", "GRCh37", "GATA2", tag_id, "", "", "", "",
-                             self.user.username, "2026-10-29 02:46:19.957469+00:00", self.variant.pk, 1])
+            csv.writer(f).writerows(rows)
 
         file_upload = FileUpload.objects.create(user=self.user, name="tags.csv", path=csv_filename,
                                                 file_type=UploadedFileTypes.VARIANT_TAGS,
@@ -62,3 +69,23 @@ class ImportVariantTagsTest(TestCase):
         with self.assertRaisesRegex(ValueError, "must be alphanumeric"):
             self._import("new tag")
         self.assertFalse(Tag.objects.filter(pk="new tag").exists())
+
+    def test_tags_grid_download_round_trips_a_symbolic_variant(self, _mock_liftover):
+        """ The grid writes a symbolic variant with its end, the form VariantCoordinate.from_string reads """
+        deletion = slowly_create_test_variant_from_coordinate(
+            VariantCoordinate(chrom="21", position=47532744, ref="T", alt="<DEL>", svlen=-1224), self.grch37)
+        exported_tag = Tag.objects.create(pk="exported")
+        for variant in (self.variant, deletion):
+            variant_tag = VariantTag.objects.create(variant=variant, tag=exported_tag, genome_build=self.grch37,
+                                                    user=self.user)
+            assign_permission_to_user_and_groups(self.user, variant_tag)
+
+        self.client.force_login(self.user)
+        url = reverse("variant_tags_datatable", kwargs={"genome_build_name": self.grch37.name})
+        response = self.client.get(url, {"tag": exported_tag.pk, "dataTableCsv": 1})
+        rows = list(csv.reader(b"".join(response.streaming_content).decode().splitlines()))
+        self.assertIn(["21:47532744-47533968 <DEL>"], [row[:1] for row in rows])
+
+        self._import_csv(rows)
+        imported = VariantTag.objects.filter(tag=exported_tag, location=TagLocation.EXTERNAL)
+        self.assertEqual(set(imported.values_list("variant", flat=True)), {self.variant.pk, deletion.pk})

@@ -17,7 +17,8 @@ from django.db.models import (
     Value,
     When,
 )
-from django.db.models.functions import Coalesce, Concat
+from django.db.models.functions import Abs, Coalesce, Concat
+from django.db.models.lookups import IsNull
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 
@@ -442,14 +443,21 @@ class VariantTagsColumns(VariantTagCaseColumnsMixin, DatatableConfig[VariantTag]
 
     @classmethod
     def _annotate_variant_string(cls, qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:
-        """ A "1:123321 G>C" string.
+        """ VariantCoordinate.format in SQL - "1:123321 G>C", or "3:58100830-58107262 <DEL>" for a variant
+            with an svlen - so the CSV download re-imports through VariantCoordinate.from_string.
 
             The fallback is per field because Concat renders a NULL argument as empty rather than
             returning NULL, so coalescing the finished strings would never reach the second one. """
         field = cls._build_variant_field
-        return qs.annotate(variant_string=Concat(
-            field("locus__contig__name"), Value(":"), field("locus__position"), Value(" "),
-            field("locus__ref__seq"), Value(">"), field("alt__seq"), output_field=TextField()))
+        contig = field("locus__contig__name")
+        position = field("locus__position")
+        svlen = field("svlen")
+        return qs.annotate(variant_string=Case(
+            When(IsNull(svlen, False),
+                 then=Concat(contig, Value(":"), position, Value("-"), position + Abs(svlen), Value(" "),
+                             field("alt__seq"), output_field=TextField())),
+            default=Concat(contig, Value(":"), position, Value(" "),
+                           field("locus__ref__seq"), Value(">"), field("alt__seq"), output_field=TextField())))
 
     @classmethod
     def _annotate_gene_symbol(cls, qs: QuerySet[VariantTag]) -> QuerySet[VariantTag]:
