@@ -15,7 +15,7 @@ import os
 from collections import defaultdict
 from collections.abc import Callable, Collection, Iterable
 from functools import cache, cached_property
-from typing import Any, Optional, TypeAlias
+from typing import NamedTuple, Optional, TypeAlias
 
 from django.conf import settings
 from django.db.models import QuerySet, TextField, Value
@@ -27,11 +27,60 @@ from upload.vcf import sql_copy_files
 
 # ref/alt are a Sequence pk for preloaded sequences, or the sequence itself for the rest
 SequenceKey: TypeAlias = int | str
-VariantHash: TypeAlias = tuple[int, int, SequenceKey, SequenceKey, int | str]
-LocusHash: TypeAlias = tuple[int, int, SequenceKey]
-LociHash: TypeAlias = Any
-AnyHash: TypeAlias = VariantHash | LocusHash | LociHash
-REF_ALT_SLICE = slice(2, 4)  # After contig_id, position in every hash
+
+
+def _resolve_sequence_key(key: SequenceKey, sequence_pk_by_seq: dict[str, Optional[int]]) -> Optional[int]:
+    return sequence_pk_by_seq[key] if isinstance(key, str) else key
+
+
+class LocusHash(NamedTuple):
+    contig_id: int
+    position: int
+    ref: SequenceKey
+
+    @property
+    def sql_key(self) -> str:
+        """ Matches the Concat annotation in _get_loci_ids """
+        return f"{self.position}_{self.ref}"
+
+    @property
+    def long_sequences(self) -> set[str]:
+        return {s for s in (self.ref,) if isinstance(s, str)}
+
+    def resolve(self, sequence_pk_by_seq: dict[str, Optional[int]]) -> Optional["LocusHash"]:
+        """ Long sequence swapped for its pk. None = not in the DB, so no Locus can use it """
+        ref = _resolve_sequence_key(self.ref, sequence_pk_by_seq)
+        return None if ref is None else self._replace(ref=ref)
+
+
+class VariantHash(NamedTuple):
+    contig_id: int
+    position: int
+    ref: SequenceKey
+    alt: SequenceKey
+    svlen: int | str  # '' for null - 0 is a real value gene-level variants rely on, @see snpdb.gene_level_variants
+
+    @property
+    def locus_hash(self) -> LocusHash:
+        return LocusHash(self.contig_id, self.position, self.ref)
+
+    @property
+    def sql_key(self) -> str:
+        """ Matches the Concat annotation in _get_variant_ids """
+        return f"{self.position}_{self.ref}_{self.alt}_{self.svlen}"
+
+    @property
+    def long_sequences(self) -> set[str]:
+        return {s for s in (self.ref, self.alt) if isinstance(s, str)}
+
+    def resolve(self, sequence_pk_by_seq: dict[str, Optional[int]]) -> Optional["VariantHash"]:
+        """ Long sequences swapped for their pks. None = one isn't in the DB, so no Variant can use it """
+        ref = _resolve_sequence_key(self.ref, sequence_pk_by_seq)
+        alt = _resolve_sequence_key(self.alt, sequence_pk_by_seq)
+        return None if ref is None or alt is None else self._replace(ref=ref, alt=alt)
+
+
+AnyHash: TypeAlias = VariantHash | LocusHash
 
 SHORT_SEQUENCE_MAX_LENGTH = 5
 
@@ -99,46 +148,30 @@ class VariantPKLookup:
             for seq_sha256_hash, pk in qs.values_list("seq_sha256_hash", "pk"):
                 self.long_sequence_pk_by_seq[new_sequence_by_hash[seq_sha256_hash]] = pk
 
-    def _resolve_hashes(self, hashes: Iterable[Optional[AnyHash]]) -> list[Optional[tuple]]:
+    def _resolve_hashes(self, hashes: Iterable[Optional[AnyHash]]) -> list[Optional[AnyHash]]:
         """ Swaps long sequences for their pks. None where a hash is None or uses a sequence not in the DB """
         hashes = list(hashes)
-        long_sequences = {seq for h in hashes if h is not None for seq in h[REF_ALT_SLICE] if isinstance(seq, str)}
-        self._load_long_sequences(long_sequences)
+        self._load_long_sequences(set().union(*(h.long_sequences for h in hashes if h is not None)))
+        return [None if h is None else h.resolve(self.long_sequence_pk_by_seq) for h in hashes]
 
-        resolved_hashes = []
-        for h in hashes:
-            if h is not None:
-                ref_and_alt = h[REF_ALT_SLICE]  # Just ref for a locus hash
-                ref_and_alt_ids = tuple(self.long_sequence_pk_by_seq[s] if isinstance(s, str) else s for s in ref_and_alt)
-                if None in ref_and_alt_ids:
-                    h = None
-                else:
-                    h = (*h[:REF_ALT_SLICE.start], *ref_and_alt_ids, *h[REF_ALT_SLICE.stop:])
-            resolved_hashes.append(h)
-        return resolved_hashes
-
-    def _get_variant_hash(self, contig_id: int, position: int, ref_id: int, alt_id: int,
+    def _get_variant_hash(self, contig_id: int, position: int, ref_key: SequenceKey, alt_key: SequenceKey,
                           svlen: Optional[int]) -> VariantHash:
-        # Only null means "no svlen" - 0 is a real value gene-level variants rely on
-        # @see snpdb.gene_level_variants
-        return contig_id, position, ref_id, alt_id, '' if svlen is None else svlen
+        return VariantHash(contig_id, position, ref_key, alt_key, '' if svlen is None else svlen)
 
     def _get_ids_for_hashes(self, hashes: Iterable[Optional[AnyHash]],
                             get_queryset: Callable[[int, Collection[int]], QuerySet]) -> list[Optional[int]]:
-        """ hashes tuples 1st 2 elements should be contig_id, position """
         resolved_hashes = self._resolve_hashes(hashes)
         contig_positions = defaultdict(set)
         for h in resolved_hashes:
             if h is not None:
-                contig_id, position, *_ = h
-                contig_positions[contig_id].add(position)
+                contig_positions[h.contig_id].add(h.position)
 
         contig_hashes: dict[int, dict] = defaultdict(dict)
         for contig_id, positions in contig_positions.items():
             qs = get_queryset(contig_id, positions)
             contig_hashes[contig_id] = dict(qs.values_list("hash", "id"))
 
-        return [h and contig_hashes[h[0]].get("_".join([str(s) for s in h[1:]])) for h in resolved_hashes]
+        return [None if h is None else contig_hashes[h.contig_id].get(h.sql_key) for h in resolved_hashes]
 
     def _get_variant_ids(self, variant_hashes: Iterable[VariantHash]) -> list[int]:
         annotate_kwargs = {
@@ -163,7 +196,7 @@ class VariantPKLookup:
                         raise ValueError(f"Variant hash {variant_hash} had no PK in DB!")
         return variant_ids
 
-    def _get_loci_ids(self, loci_hashes: Iterable) -> list[int]:
+    def _get_loci_ids(self, loci_hashes: Iterable[LocusHash]) -> list[int]:
         annotate_kwargs = {
             "hash": Concat("position", Value("_"), "ref_id",
                            output_field=TextField())
@@ -175,7 +208,7 @@ class VariantPKLookup:
 
         return self._get_ids_for_hashes(loci_hashes, get_queryset)
 
-    def get_loci_ids(self, loci_hashes: Iterable, validate_not_null=True) -> list[int]:
+    def get_loci_ids(self, loci_hashes: Iterable[LocusHash], validate_not_null=True) -> list[int]:
         loci_ids = self._get_loci_ids(loci_hashes)
         if validate_not_null:
             if not all(loci_ids):  # Quick test if ok
@@ -186,7 +219,8 @@ class VariantPKLookup:
         return loci_ids
 
     def filter_non_reference(self, variant_hashes: Iterable[VariantHash], variant_ids: Iterable[int]) -> list[int]:
-        return [vh_vi[1] for vh_vi in zip(variant_hashes, variant_ids) if vh_vi[0][3] != self.reference_seq_id]
+        return [variant_id for variant_hash, variant_id in zip(variant_hashes, variant_ids)
+                if variant_hash.alt != self.reference_seq_id]
 
     def get_variant_coordinate_hash(self, variant_coordinate: VariantCoordinate) -> Optional[VariantHash]:
         """ For VCF records (needs GenomeBuild supplied). None = uses a sequence not in the DB, so the variant
@@ -295,10 +329,7 @@ class VariantPKLookup:
         for variant_coordinate in self.unknown_variant_coordinates:
             variant_hash = self.get_variant_coordinate_hash(variant_coordinate)
             variant_coordinates_by_hash[variant_hash] = variant_coordinate
-
-            (contig_id, start, ref_id, _alt_id, _svlen) = variant_hash
-            locus_hash = (contig_id, start, ref_id)
-            loci_hashes[locus_hash] = None
+            loci_hashes[variant_hash.locus_hash] = None
 
         self.unknown_variant_coordinates.clear()
         loci_ids = self.get_loci_ids(loci_hashes, validate_not_null=False)  # Could have some unknowns as None
@@ -318,11 +349,9 @@ class VariantPKLookup:
         for variant_hash, resolved_variant_hash, variant_pk in zip(variant_coordinates_by_hash, resolved_variant_hashes,
                                                                    variant_ids):
             if variant_pk is None:
-                (contig_id, start, ref_key, _alt_key, _svlen) = variant_hash
-                (_contig_id, _start, _ref_id, alt_id, svlen) = resolved_variant_hash
-                locus_pk = locus_pk_by_hash[(contig_id, start, ref_key)]
+                locus_pk = locus_pk_by_hash[variant_hash.locus_hash]
                 vc = variant_coordinates_by_hash[variant_hash]
-                unknown_variants.append((locus_pk, alt_id, vc.end, svlen))
+                unknown_variants.append((locus_pk, resolved_variant_hash.alt, vc.end, resolved_variant_hash.svlen))
         logging.debug("loci_hashes = %d, unknown_variants = %d", len(loci_hashes), len(unknown_variants))
 
         if unknown_variants:

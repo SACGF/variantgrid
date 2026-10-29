@@ -15,7 +15,7 @@ SNP-specific.
 
 Every VCF line becomes one `Locus` (contig, position, ref) and one `Variant` per alt. Because `snpdb_variant` is
 tens of millions of rows, insertion goes through `snpdb/variant_pk_lookup.py:VariantPKLookup`, which hashes each
-coordinate to a tuple `(contig_id, position, ref, alt, svlen)` in `VariantPKLookup._get_variant_hash` and
+coordinate to a `snpdb/variant_pk_lookup.py:VariantHash` `(contig_id, position, ref, alt, svlen)` in `VariantPKLookup._get_variant_hash` and
 resolves hashes to pks per contig in SQL (`VariantPKLookup._get_variant_ids`, a `Concat` annotation looked up with
 `locus__position__in`). `null` svlen is encoded as `''` because 0 is a real value gene-level variants rely on.
 Only an explicit set of sequences (`GATCN` up to 5 bp, `=` and the symbolic alts in
