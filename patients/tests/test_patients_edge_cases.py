@@ -74,10 +74,10 @@ def _make_patient_records(user, path=_FAKE_CSV):
 
 class TestParseDateFunction(TestCase):
     def test_day_first_as_the_column_header_says(self):
-        self.assertEqual(date(2015, 7, 5), parse_date({"col": "05/07/2015"}, "col", []).date())
+        self.assertEqual(date(2015, 7, 5), parse_date({"col": "05/07/2015"}, "col", []))
 
     def test_iso_dates_are_not_read_day_first(self):
-        self.assertEqual(date(2015, 7, 5), parse_date({"col": "2015-07-05"}, "col", []).date())
+        self.assertEqual(date(2015, 7, 5), parse_date({"col": "2015-07-05"}, "col", []))
 
     def test_unparseable_date_is_a_validation_message(self):
         msgs = []
@@ -213,6 +213,14 @@ class TestProcessRecordDeceasedStateMachine(TestCase):
         self.assertEqual(initial_count, final_count,
                          "Spurious PatientModification created with no deceased info")
 
+    def test_unchanged_date_of_death_reimports_without_modification(self):
+        row = _make_row(**{PatientColumns.DATE_OF_DEATH: "2020-01-01"})
+        process_record(self.pr, record_id=1, row=row)
+        process_record(_make_patient_records(self.user), record_id=1, row=row)
+        modifications = PatientModification.objects.filter(patient=self.patient,
+                                                            description="Updated patient date of death")
+        self.assertEqual(1, modifications.count())
+
     def test_blank_deceased_columns_keep_date_of_death(self):
         Patient.objects.filter(pk=self.patient.pk).update(date_of_death=date(2020, 1, 1))
         process_record(self.pr, record_id=1, row=_make_row())
@@ -326,6 +334,41 @@ class TestProcessRecordMultiplePatientMatches(TestCase):
         self.assertIn("Matched multiple patients", message)
         for patient in Patient.objects.filter(last_name="IMPORTTESTLAST"):
             self.assertIn(f"Patient:{patient.pk}", message)
+
+
+class TestProcessRecordPatientCodeOnly(TestCase):
+    """ A row with only a patient code (no name or DOB) matches that patient, or creates one with that code """
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("code_only_import_user", password="x")
+        cls.patient = Patient.objects.create(patient_code="CODEONLY1", first_name="IMPORTTESTFIRST",
+                                             last_name="IMPORTTESTLAST", _deceased=True)
+        assign_permission_to_user_and_groups(cls.user, cls.patient)
+
+    def _code_only_row(self, patient_code, **overrides):
+        return _make_row(**{PatientColumns.PATIENT_CODE: patient_code,
+                            PatientColumns.PATIENT_FIRST_NAME: None,
+                            PatientColumns.PATIENT_LAST_NAME: None,
+                            **overrides})
+
+    def test_existing_code_matches_and_updates(self):
+        pr = _make_patient_records(self.user)
+        process_record(pr, record_id=1, row=self._code_only_row("CODEONLY1", **{PatientColumns.DECEASED: "N"}))
+        record = PatientRecord.objects.get(patient_records=pr)
+        self.assertTrue(record.valid)
+        self.assertEqual(record.patient, self.patient)
+        self.patient.refresh_from_db()
+        self.assertFalse(self.patient._deceased)
+
+    def test_new_code_creates_patient(self):
+        pr = _make_patient_records(self.user)
+        process_record(pr, record_id=1, row=self._code_only_row("CODEONLY2"))
+        record = PatientRecord.objects.get(patient_records=pr)
+        self.assertTrue(record.valid)
+        self.assertEqual(record.patient.patient_code, "CODEONLY2")
+        self.assertEqual(str(record.patient), "CODEONLY2")
+        self.assertIsNone(record.patient_last_name)
 
 
 class TestProcessRecordReadOnlyPatient(TestCase):

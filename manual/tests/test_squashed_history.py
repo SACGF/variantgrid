@@ -1,3 +1,4 @@
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.core.management import CommandError, call_command
@@ -8,6 +9,7 @@ from django.test import TestCase
 
 from manual.squashed_history import (
     CHECKPOINT_MIGRATION,
+    NEW_HISTORY_MIGRATION,
     CheckoutBeforeSquashError,
     HistoryState,
     history_state,
@@ -23,19 +25,29 @@ class SquashedHistoryTest(TestCase):
     def setUp(self):
         self.recorder = MigrationRecorder(connection)
 
+    def _record_old_history(self):
+        self.recorder.migration_qs.filter(app="snpdb", name__in=["0001_initial", "0002_seed_data"]).delete()
+        self.recorder.record_applied(*OLD_MIGRATION)
+
     def test_fresh_database_is_current(self):
         self.assertEqual(history_state(), HistoryState.CURRENT)
 
+    def test_renamed_post_squash_migration_is_current(self):
+        """ A fresh build can apply a migration before NEW_HISTORY_MIGRATION; renamed since, its row is not old history """
+        new_history_row = self.recorder.migration_qs.get(app=NEW_HISTORY_MIGRATION[0], name=NEW_HISTORY_MIGRATION[1])
+        self.recorder.migration_qs.create(app="eventlog", name="0002_renamed_since",
+                                          applied=new_history_row.applied - timedelta(seconds=1))
+        self.assertEqual(history_state(), HistoryState.CURRENT)
+
     def test_old_history_without_checkpoint_refuses_reset(self):
-        self.recorder.record_applied(*OLD_MIGRATION)
+        self._record_old_history()
         self.assertEqual(history_state(), HistoryState.NEEDS_CHECKPOINT)
         with self.assertRaises(CommandError):
             call_command("reset_squashed_migration_history")
 
     def test_reset_swaps_old_rows_for_initials(self):
-        self.recorder.record_applied(*OLD_MIGRATION)
+        self._record_old_history()
         self.recorder.record_applied(*CHECKPOINT_MIGRATION)
-        self.recorder.migration_qs.filter(app="snpdb", name="0001_initial").delete()
         self.assertEqual(history_state(), HistoryState.NEEDS_RESET)
 
         reset_squashed_history()
@@ -44,6 +56,7 @@ class SquashedHistoryTest(TestCase):
         applied = self.recorder.applied_migrations()
         self.assertNotIn(OLD_MIGRATION, applied)
         self.assertIn(("snpdb", "0001_initial"), applied)
+        self.assertIn(NEW_HISTORY_MIGRATION, applied)
         self.assertIn(CHECKPOINT_MIGRATION, applied)
 
     def test_celery_worker_exits_on_old_history(self):

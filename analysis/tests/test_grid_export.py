@@ -434,6 +434,14 @@ class TestNodeExportLaunch(GridExportTestCase):
         node.name = ""
         self.assertTrue(get_node_export_basename(node).startswith(node.get_node_class_label() + "_"))
 
+    def test_export_basename_has_live_data_versions(self):
+        """ A live-data node's file says which data version it reflects; a deterministic node's needs no suffix """
+        node = self.node
+        deterministic_basename = get_node_export_basename(node)
+        self.assertTrue(deterministic_basename.endswith(f"_v{node.version}"))
+        node.node_version.live_data_sources = {"vzcc:1": 42, "abc:7": 3}
+        self.assertEqual(get_node_export_basename(node), f"{deterministic_basename}_abc7.3_vzcc1.42")
+
     def test_canonical_export_filename_part(self):
         ctc = CanonicalTranscriptCollection(description="", filename="/data/canonical/MedEx v2.GeneTable.tsv")
         self.assertEqual(get_canonical_transcript_collection_filename_part(ctc), "canonical_MedEx_v2")

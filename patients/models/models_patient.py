@@ -413,9 +413,7 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
                                                 ("last name", last_name, patient.last_name)]:
             if row_value and patient_value and row_value.upper() != patient_value.upper():
                 differs.append(label)
-        if isinstance(date_of_birth, datetime.datetime):
-            date_of_birth = date_of_birth.date()
-        elif isinstance(date_of_birth, str):
+        if isinstance(date_of_birth, str):
             date_of_birth = datetime.date.fromisoformat(date_of_birth)
         if date_of_birth and patient.date_of_birth and date_of_birth != patient.date_of_birth:
             differs.append("date of birth")
@@ -1107,7 +1105,7 @@ class PatientRecord(TimeStampedModel):
     patient_family_code = models.TextField(null=True)
     patient_code = models.TextField(null=True)
     patient_first_name = models.TextField(null=True)
-    patient_last_name = models.TextField()
+    patient_last_name = models.TextField(null=True)
     date_of_birth = models.DateField(null=True)
     date_of_death = models.DateField(null=True)
     sex = models.CharField(max_length=1, choices=Sex.choices, null=True)

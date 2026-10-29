@@ -5,8 +5,11 @@ Migration history from before the squash (#736): every app's migrations were rep
 pre-squash migration and refuses to apply while manual tasks are outstanding, so its row in django_migrations
 means the database holds the whole old history and every one-off step it registered.
 
-A database is in one of three states, judged on the django_migrations rows of our own apps (not site-packages):
-- current: every applied row names a migration on disk - a fresh database, or one already reset
+A database is in one of three states, judged on the django_migrations rows of our own apps (not site-packages)
+that name no migration on disk. NEW_HISTORY_MIGRATION is recorded only by a fresh build or the reset (pre_migrate
+refuses to apply it over the old history), so once it is there any such row is a post-squash migration renamed since,
+which Django ignores.
+- current: no old-history rows - a fresh database, or one already reset
 - needs_checkpoint: rows from the old history and no checkpoint row - upgrade through the checkpoint branch first
 - needs_reset: rows from the old history and the checkpoint row - delete them and record the new initial
   migrations as applied (every one with `initial = True`, which the squash's seed migrations also set)
@@ -32,6 +35,7 @@ from django.db.migrations.recorder import MigrationRecorder
 
 CHECKPOINT_BRANCH = "migration_checkpoint"
 CHECKPOINT_MIGRATION = ("manual", "0009_migration_checkpoint")
+NEW_HISTORY_MIGRATION = ("snpdb", "0002_seed_data")  # The old history had no migration of this name
 
 
 class HistoryState(Enum):
@@ -65,6 +69,8 @@ def _migration_loader(using: str) -> MigrationLoader:
 
 
 def _stale_migrations(loader: MigrationLoader) -> set[tuple[str, str]]:
+    if NEW_HISTORY_MIGRATION in loader.applied_migrations:
+        return set()
     local_apps = _local_app_labels()
     return {key for key in loader.applied_migrations
             if key[0] in local_apps and key not in loader.disk_migrations and key != CHECKPOINT_MIGRATION}
