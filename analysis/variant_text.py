@@ -5,7 +5,6 @@
     can be pasted in. Regions are the one shape search doesn't cover, so they're parsed here.
 """
 import re
-from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -22,6 +21,7 @@ from snpdb.models.models_variant import (
     VariantCoordinate,
 )
 from snpdb.search import search_data
+from snpdb.variant_pk_lookup import VariantPKLookup
 
 REGION_PATTERN = re.compile(r"^(?P<chrom>[^:\s]+)\s*:\s*(?P<start>[0-9,]+)\s*-\s*(?P<end>[0-9,]+)$")
 REGION_SEPARATOR = "-"
@@ -98,7 +98,7 @@ def _variant_coordinate(line: str, genome_build: GenomeBuild) -> Optional[Varian
 
 
 def _exact_coordinate_variant_ids(user: User, genome_build: GenomeBuild, lines: list[str]) -> dict[str, int]:
-    """ Line -> variant for coordinates already in the database, in 1 query per contig - a search per line
+    """ Line -> variant for coordinates already in the database, in batched queries - a search per line
         takes ~0.5s (#2531). Lines left out (a REF the search corrects, an rsID, HGVS etc) go to the search """
     if settings.SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN and not user.is_superuser:
         return {}  # Search only shows classified variants - leave that to it
@@ -108,22 +108,11 @@ def _exact_coordinate_variant_ids(user: User, genome_build: GenomeBuild, lines: 
         if variant_coordinate := _variant_coordinate(line, genome_build):
             coordinate_by_line[line] = variant_coordinate
 
-    contig_mappings = genome_build.chrom_contig_mappings
-    positions_by_contig_id = defaultdict(set)
-    for variant_coordinate in coordinate_by_line.values():
-        positions_by_contig_id[contig_mappings[variant_coordinate.chrom].pk].add(variant_coordinate.position)
-
-    variant_id_by_key = {}
-    for contig_id, positions in positions_by_contig_id.items():
-        qs = Variant.objects.filter(locus__contig_id=contig_id, locus__position__in=positions)
-        for variant_id, *key in qs.values_list("pk", "locus__position", "locus__ref__seq", "alt__seq", "svlen"):
-            variant_id_by_key[(contig_id, *key)] = variant_id
-
-    variant_id_by_line = {}
-    for line, vc in coordinate_by_line.items():
-        key = (contig_mappings[vc.chrom].pk, vc.position, vc.ref, vc.alt, vc.svlen)
-        if variant_id := variant_id_by_key.get(key):
-            variant_id_by_line[line] = variant_id
+    variant_pk_lookup = VariantPKLookup(genome_build)
+    variant_hash_by_line = {line: variant_pk_lookup.get_variant_coordinate_hash(variant_coordinate)
+                            for line, variant_coordinate in coordinate_by_line.items()}
+    variant_ids = variant_pk_lookup.get_variant_ids(variant_hash_by_line.values(), validate_not_null=False)
+    variant_id_by_line = {line: variant_id for line, variant_id in zip(variant_hash_by_line, variant_ids) if variant_id}
     return variant_id_by_line
 
 
