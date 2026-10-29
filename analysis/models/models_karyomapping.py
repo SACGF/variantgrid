@@ -17,6 +17,7 @@ from django.core.cache import cache
 from django.db import models
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
+from django.utils import timezone
 from model_utils.models import TimeStampedModel
 
 from annotation.annotation_version_querysets import (
@@ -232,14 +233,16 @@ class KaryotypeCounts(models.Model):
         return tuple(percents)
 
 
-class GenomeKaryomappingCounts(KaryotypeCounts, models.Model):
-    """ Full sample (eg panel/exome not necessarily WGS) """
+class GenomeKaryomappingCounts(KaryotypeCounts, TimeStampedModel):
+    """ Full sample (eg panel/exome not necessarily WGS). Deleting the row requeues a fresh count on the next trio view,
+        which is how to recover one that has used up its retries """
     trio = models.OneToOneField(Trio, on_delete=CASCADE)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
-    modified = models.DateTimeField(auto_now=True)
+    retries = models.PositiveSmallIntegerField(default=0)
 
     ERROR_RETRY_AFTER = timedelta(minutes=10)
     PENDING_RETRY_AFTER = timedelta(days=1)  # far longer than a recount takes (minutes for an exome) - the task was lost
+    MAX_RETRIES = 3
 
     def __str__(self):
         description = f"Whole sample karyomapping counts for {self.trio} ({self.trio.genome_build})"
@@ -249,11 +252,21 @@ class GenomeKaryomappingCounts(KaryotypeCounts, models.Model):
 
     @property
     def retry_after(self) -> Optional[datetime]:
-        """ When viewing the trio may requeue a count that failed or never finished """
-        if self.import_status == ImportStatus.SUCCESS:
+        """ When viewing the trio may requeue a count that failed or never finished, None once out of retries """
+        if self.import_status == ImportStatus.SUCCESS or self.retries >= self.MAX_RETRIES:
             return None
+        return self._due_after()
+
+    @property
+    def gave_up(self) -> bool:
+        """ Its last retry failed or was lost, so only deleting the row counts it again """
+        if self.import_status == ImportStatus.SUCCESS or self.retries < self.MAX_RETRIES:
+            return False
+        return self._due_after() <= timezone.now()
+
+    def _due_after(self) -> datetime:
         if self.import_status == ImportStatus.ERROR:
-            return self.modified + self.ERROR_RETRY_AFTER
+            return self.modified + self.ERROR_RETRY_AFTER * 2 ** self.retries
         return self.modified + self.PENDING_RETRY_AFTER
 
     @property

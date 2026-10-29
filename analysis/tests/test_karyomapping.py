@@ -1,5 +1,6 @@
 import csv
 import io
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
@@ -111,6 +112,19 @@ class TrioKaryomappingViewTest(TestCase):
         _, callbacks = self._view_trio_callbacks()
         self.assertEqual(callbacks, [])  # requeued once
 
+    def test_retries_back_off_then_give_up(self):
+        counts_qs = GenomeKaryomappingCounts.objects.filter(trio=self.trio)
+        GenomeKaryomappingCounts.objects.create(trio=self.trio, import_status=ImportStatus.ERROR, retries=1)
+        counts_qs.update(modified=timezone.now() - GenomeKaryomappingCounts.ERROR_RETRY_AFTER)
+        _, callbacks = self._view_trio_callbacks()
+        self.assertEqual(callbacks, [])  # second retry waits twice as long
+
+        counts_qs.update(retries=GenomeKaryomappingCounts.MAX_RETRIES,
+                         modified=timezone.now() - timedelta(days=1))
+        response, callbacks = self._view_trio_callbacks()
+        self.assertContains(response, "no longer retried automatically")
+        self.assertEqual(callbacks, [])
+
     def test_stuck_count_retried(self):
         create_genome_karyomapping_for_trio(self.trio.pk)
         counts_qs = GenomeKaryomappingCounts.objects.filter(trio=self.trio)
@@ -121,3 +135,4 @@ class TrioKaryomappingViewTest(TestCase):
         counts_qs.update(modified=timezone.now() - GenomeKaryomappingCounts.PENDING_RETRY_AFTER)
         _, callbacks = self._view_trio_callbacks()
         self.assertEqual(len(callbacks), 1)
+        self.assertEqual(counts_qs.get().retries, 1)

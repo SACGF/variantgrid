@@ -6,7 +6,10 @@
         <a class="float-right" href="{% url 'trio_karyomapping' trio.pk %}">Per-gene karyomapping</a>
     </div>
     <div class="card-body">
-    {% if genome_karyomapping_counts.import_status == 'E' %}
+    {% if genome_karyomapping_counts.gave_up %}
+        <span class="text-danger">Karyomapping counts could not be calculated after
+            {{ genome_karyomapping_counts.retries }} retries, and are no longer retried automatically.</span>
+    {% elif genome_karyomapping_counts.import_status == 'E' %}
         <span class="text-danger">Karyomapping counts could not be calculated - they are retried when this page is
             viewed after {% timestamp genome_karyomapping_counts.retry_after %}.</span>
     {% elif not calculated %}

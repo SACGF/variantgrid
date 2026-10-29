@@ -2,6 +2,7 @@ from collections import Counter, defaultdict
 
 import celery
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 
 from analysis.models.models_karyomapping import (
@@ -21,7 +22,7 @@ def get_or_queue_genome_karyomapping_counts(trio: Trio) -> GenomeKaryomappingCou
         # Conditional on modified, so concurrent views requeue it once
         queue = GenomeKaryomappingCounts.objects.filter(
             pk=genome_karyomapping_counts.pk, modified=genome_karyomapping_counts.modified,
-        ).update(import_status=ImportStatus.CREATED, modified=timezone.now())
+        ).update(import_status=ImportStatus.CREATED, retries=F("retries") + 1, modified=timezone.now())
         genome_karyomapping_counts.refresh_from_db()
     if queue:
         transaction.on_commit(create_genome_karyomapping_for_trio.si(trio.pk).apply_async)
@@ -70,4 +71,5 @@ def _count_genome_karyomapping(genome_karyomapping_counts: GenomeKaryomappingCou
     for code in KaryotypeBins.COLLAPSED_BINS:
         setattr(genome_karyomapping_counts, code.lower(), genome_counts.get(code))
     genome_karyomapping_counts.import_status = ImportStatus.SUCCESS
+    genome_karyomapping_counts.retries = 0
     genome_karyomapping_counts.save()
