@@ -134,13 +134,17 @@ class SampleOption:
 
     @property
     def label(self) -> str:
+        not_called = f"{self.sample.name} - not called"
         if not self.sample_genotype:
-            return f"{self.sample.name} - not called"
+            return not_called
         if not self.sample.has_genotype:
             call = "called"  # a caller with no GT (eg TSO 500 fusions) only writes rows for what it called
+        elif self.sample_genotype.zygosity == Zygosity.UNKNOWN_ZYGOSITY:
+            return not_called  # ./.
         else:
             call = Zygosity.display(self.sample_genotype.zygosity)
-        if vaf := self.sample_genotype.allele_frequency:
+        vaf = self.sample_genotype.allele_frequency
+        if vaf and vaf > 0:  # CohortGenotype.MISSING_NUMBER_VALUE (-1) when the caller didn't report one
             call += f", VAF {vaf:.3f}"
         return f"{self.sample.name} - {call}"
 
