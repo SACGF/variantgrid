@@ -39,8 +39,6 @@ from classification.models import (
 )
 from flags.models import Flag, FlagComment, FlagsMixin
 from genes.models import GeneSymbol
-from genes.models.models_gene import AmbiguousGeneSymbolAlias
-from genes.signals.gene_symbol_search import GENE_SYMBOL_PATTERN
 from library.utils import (
     batch_iterator,
     http_header_date_now,
@@ -262,10 +260,14 @@ class DiscordanceReportStatus(str, Enum):
     PENDING_CONCORDANCE = 'pending'
 
 
+# Unlike GENE_SYMBOL_PATTERN, a gene name may start with a digit (the alias 9G8)
+GENE_NAME_PATTERN = re.compile(r"^[\da-zA-Z][\da-zA-Z\-.]+$")
+
+
 def classification_export_user_strings_to_q(filter_str_list: list[str], genome_build: GenomeBuild) -> Q:
     """
     Bulk converts strings into gene symbol, clingen allele or variant coordinate filters.
-    Note it does take a shortcut on gene symbol matching as the traditional way takes way too long.
+    Gene names go through GeneSymbol.resolve_names, so an old name or alias filters on its current symbol.
     Throws a ValueError if any of the filter_str_list doesn't appear to be a valid gene symbol, clingen allele or variant coordinate
     :param filter_str_list: User input
     :param genome_build: The genome build for Variant Coordiantes
@@ -273,31 +275,18 @@ def classification_export_user_strings_to_q(filter_str_list: list[str], genome_b
     """
     filter_set: set[str] = set(filter_str_list)
     error_set: set[str] = set()
-    ambiguous_aliases: list[AmbiguousGeneSymbolAlias] = []
+    ambiguous_alias_errors: list[str] = []
 
     gene_symbol_ids: set[str] = set()
-    if possible_gene_symbols := [filter_str for filter_str in filter_set if GENE_SYMBOL_PATTERN.match(filter_str)]:
-        possible_gene_symbols_set = set(possible_gene_symbols)
-        if gene_symbols_matched := list(GeneSymbol.objects.filter(symbol__in=possible_gene_symbols)):
-            # we will have found the case insensitive values, need to get them back out of the set
-            gene_symbols_upper = {gene_symbol.symbol.upper(): gene_symbol for gene_symbol in gene_symbols_matched}
-            for filter_str in possible_gene_symbols:
-                if gene_symbol := gene_symbols_upper.get(filter_str.upper()):
-                    filter_set.remove(filter_str)
-                    possible_gene_symbols_set.remove(filter_str)
-                    gene_symbol_ids.add(gene_symbol.pk)
-
-        # the few names that aren't a symbol as written are old names or aliases
-        for filter_str in possible_gene_symbols_set:
-            try:
-                gene_symbol_id, _hgnc = GeneSymbol.resolve_name(filter_str)
-            except AmbiguousGeneSymbolAlias as ambiguous:
+    if possible_gene_names := [filter_str for filter_str in filter_set if GENE_NAME_PATTERN.match(filter_str)]:
+        # a GeneSymbol row can be an old name (SEPT14) left by an earlier gene annotation import, so resolve every name
+        for filter_str, (resolution, ambiguous) in GeneSymbol.resolve_names(possible_gene_names).items():
+            if ambiguous:
                 filter_set.remove(filter_str)
-                ambiguous_aliases.append(ambiguous)
-                continue
-            if gene_symbol_id:
+                ambiguous_alias_errors.append(str(ambiguous))
+            elif resolution.gene_symbol_id:
                 filter_set.remove(filter_str)
-                gene_symbol_ids.add(gene_symbol_id)
+                gene_symbol_ids.add(resolution.gene_symbol_id)
 
     clingen_alleles: set[ClinGenAllele] = set()
     if filter_set:
@@ -319,7 +308,7 @@ def classification_export_user_strings_to_q(filter_str_list: list[str], genome_b
                     filter_set.remove(filter_str)
 
     error_set.update(filter_set)
-    errors = [str(ambiguous) for ambiguous in ambiguous_aliases]
+    errors = sorted(ambiguous_alias_errors)
     if error_set:
         unmatched_str = ", ".join(f'"{filter_str}"' for filter_str in sorted(error_set))
         errors.insert(0, f"Can't match {unmatched_str} to ClinGen Allele, Gene Symbol or Variant Coordinate")
