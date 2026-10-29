@@ -11,7 +11,21 @@
         {% endif %}
 
         <div class='alert alert-warning'>
-            Variant is intergenic and has no assigned gene / transcript. Many annotations will not be available.
+            {{ vts.no_transcript_message }}
+            {% if vts.gene_overlaps %}
+                <div>
+                    <a class='toggle-link' data-toggle="collapse" href='#gene-overlaps'>Show {{ vts.gene_overlaps|length }} overlapping genes</a>
+                </div>
+                <div id="gene-overlaps" class="collapse">
+                    {% for gene_version in vts.gene_overlaps %}
+                        {% if gene_version.gene_symbol_id %}
+                            <a href="{% url 'view_gene_symbol' gene_version.gene_symbol_id %}">{{ gene_version.gene_symbol_id }}</a>
+                        {% else %}
+                            <a href="{% url 'view_gene' gene_version.gene_id %}">{{ gene_version.gene_id }}</a>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            {% endif %}
         </div>
     {% endif %}
         <div class='select-transcript-container'></div>
