@@ -91,10 +91,10 @@ class SetTagColorTest(TestCase):
         cls.tcc = TagConfigCollection.objects.create(name="tag_color_test", user=cls.owner)
         assign_perm(DjangoPermission.perm(cls.tcc, DjangoPermission.READ), cls.reader, cls.tcc)
 
-    def _set_color(self, user, rgb):
+    def _set_color(self, user, rgb, tag="ResultTagColor"):
         self.client.force_login(user)
         url = reverse("set_tag_color", kwargs={"tag_config_collection_id": self.tcc.pk})
-        return self.client.post(url, {"tag": "ResultTagColor", "rgb": rgb})
+        return self.client.post(url, {"tag": tag, "rgb": rgb})
 
     def test_needs_write(self):
         self.assertEqual(self._set_color(self.reader, "#ff0000").status_code, 403)
@@ -102,4 +102,8 @@ class SetTagColorTest(TestCase):
 
     def test_rgb_must_be_hex_colour(self):
         self.assertEqual(self._set_color(self.owner, "red;}").status_code, 400)
+        self.assertFalse(self.tcc.tagconfig_set.exists())
+
+    def test_unknown_tag_not_found(self):
+        self.assertEqual(self._set_color(self.owner, "#ff0000", tag="no_such_tag_2512").status_code, 404)
         self.assertFalse(self.tcc.tagconfig_set.exists())

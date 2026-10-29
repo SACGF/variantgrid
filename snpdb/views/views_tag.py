@@ -236,11 +236,11 @@ def view_tag_config_collection(request, tag_config_collection_id):
 @require_POST
 def set_tag_color(request, tag_config_collection_id):
     tcc = TagConfigCollection.get_for_user(request.user, pk=tag_config_collection_id, write=True)
-    tag = request.POST['tag']
     rgb = request.POST['rgb']
     if not RGB_PATTERN.fullmatch(rgb):
         return HttpResponseBadRequest("rgb must be '#rrggbb'")
-    tc = tcc.tagconfig_set.get_or_create(tag_id=tag)[0]
+    tag = get_object_or_404(Tag, pk=request.POST['tag'])
+    tc = tcc.tagconfig_set.get_or_create(tag=tag)[0]
     tc.rgb = rgb
     tc.save()
     logging.info("set_tag_color: saved %s", tc)
