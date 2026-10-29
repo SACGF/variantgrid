@@ -481,7 +481,7 @@ def process_record(patient_records, record_id, row):
                                  patient_family_code=family_code,
                                  patient_code=patient_code,
                                  patient_first_name=first_name,
-                                 patient_last_name=last_name,
+                                 patient_last_name=last_name or "",
                                  date_of_birth=date_of_birth,
                                  date_of_death=date_of_death,
                                  sex=sex,

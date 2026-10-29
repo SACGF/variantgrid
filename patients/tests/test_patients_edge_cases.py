@@ -328,6 +328,40 @@ class TestProcessRecordMultiplePatientMatches(TestCase):
             self.assertIn(f"Patient:{patient.pk}", message)
 
 
+class TestProcessRecordPatientCodeOnly(TestCase):
+    """ A row with only a patient code (no name or DOB) matches that patient, or creates one with that code """
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("code_only_import_user", password="x")
+        cls.patient = Patient.objects.create(patient_code="CODEONLY1", first_name="IMPORTTESTFIRST",
+                                             last_name="IMPORTTESTLAST", _deceased=True)
+        assign_permission_to_user_and_groups(cls.user, cls.patient)
+
+    def _code_only_row(self, patient_code, **overrides):
+        return _make_row(**{PatientColumns.PATIENT_CODE: patient_code,
+                            PatientColumns.PATIENT_FIRST_NAME: None,
+                            PatientColumns.PATIENT_LAST_NAME: None,
+                            **overrides})
+
+    def test_existing_code_matches_and_updates(self):
+        pr = _make_patient_records(self.user)
+        process_record(pr, record_id=1, row=self._code_only_row("CODEONLY1", **{PatientColumns.DECEASED: "N"}))
+        record = PatientRecord.objects.get(patient_records=pr)
+        self.assertTrue(record.valid)
+        self.assertEqual(record.patient, self.patient)
+        self.patient.refresh_from_db()
+        self.assertFalse(self.patient._deceased)
+
+    def test_new_code_creates_patient(self):
+        pr = _make_patient_records(self.user)
+        process_record(pr, record_id=1, row=self._code_only_row("CODEONLY2"))
+        record = PatientRecord.objects.get(patient_records=pr)
+        self.assertTrue(record.valid)
+        self.assertEqual(record.patient.patient_code, "CODEONLY2")
+        self.assertEqual(str(record.patient), "CODEONLY2")
+
+
 class TestProcessRecordReadOnlyPatient(TestCase):
     @classmethod
     def setUpTestData(cls):
