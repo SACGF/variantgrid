@@ -14,8 +14,9 @@ Patterns here:
   patient form and API report as a validation error.
 - A PhenotypeDescription is owned through the one-to-one on the description, named after the owner's model
   (`patient`, `cohort`), so deleting the owner deletes it and its sentences. New text deletes the description and makes
-  another, and the approval (`approved_by`) goes with it. An unowned description is a live preview
-  (views_json.py:phenotypes_matches) or an SA Path request's, held by sapath's own link rows.
+  another, and the approval (`approved_by`) goes with it. An unowned description is an SA Path request's, held by
+  sapath's own link rows. The live preview (views_json.py:phenotypes_matches) runs on every pause in typing, so
+  patients/phenotype_matching.py:phenotype_preview_results writes no rows and keeps one PhenotypeMatcher per process.
 - TextPhenotype is one row per distinct sentence, shared by every description containing it and matched once.
   `match_version` null is awaiting matching; patients/phenotype_matching.py:requeue_sentences sets it back to null, and
   the old matches show until patients/phenotype_matching.py:bulk_patient_phenotype_matching replaces them.

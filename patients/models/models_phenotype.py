@@ -3,7 +3,8 @@ Phenotype text matched to ontology terms. A PhenotypeDescription is one owner's 
 through its owner field), split into TextPhenotypeSentences; each points at the TextPhenotype for that sentence,
 shared by every description containing it and matched once per PhenotypeMatchVersion into TextPhenotypeMatches.
 
-Entry points: PhenotypeDescription.get_results (the JSON pages highlight from), get_ontology_term_ids,
+Entry points: PhenotypeDescription.get_results (the JSON pages highlight from, built per sentence by
+sentence_results), get_ontology_term_ids,
 patient_phenotype_terms / patient_phenotypes_for_samples (many patients in one query). Matching is
 patients/phenotype_matching.py.
 """
@@ -127,7 +128,7 @@ class TextPhenotype(models.Model):
 
 class PhenotypeDescription(models.Model):
     """ A patient's or cohort's phenotype text, split into sentences. Owned by its patient or its cohort, so it
-        goes when they do; owned by neither only for the moment a live preview needs one.
+        goes when they do; owned by neither only for an SA Path request, held by sapath's own link rows.
         The owner field is named after the owner's model - @see HasPhenotypeDescriptionMixin """
     original_text = models.TextField()
     patient = models.OneToOneField("patients.Patient", null=True, blank=True, related_name=PHENOTYPE_DESCRIPTION,
@@ -182,36 +183,45 @@ class TextPhenotypeSentence(models.Model):
 
     def get_results(self, ontology_version: Optional[OntologyVersion], denylist: AmbiguousAcronymDenylist,
                     acronym_pattern: Optional[re.Pattern]) -> list[dict]:
-        """ ontology_version may be None only when the sentence has no matches.
-            Ambiguous acronyms come back as warning-only entries rather than terms """
-        all_matches = self.text_phenotype.textphenotypematch_set.all()
-        matches = without_ambiguous_acronyms(all_matches, denylist)
-        # Where an Ontology Service has multiple matches to the exact same text
-        span_counts = Counter(tpm.service_span for tpm in matches)
+        """ ontology_version may be None only when the sentence has no matches """
+        return sentence_results(self.text_phenotype.text, self.text_phenotype.textphenotypematch_set.all(),
+                                self.sentence_offset, ontology_version, denylist, acronym_pattern)
 
-        results = []
-        for tpm in matches:
-            data = tpm.to_dict(ontology_version)
-            data["offset_start"] += self.sentence_offset
-            data["offset_end"] += self.sentence_offset
-            if span_counts[tpm.service_span] >= 2:
-                data["ambiguous"] = tpm.match_text
-            results.append(data)
 
-        # Ambiguous acronyms aren't saved as matches, so find them by rescanning the sentence text
-        warned_spans = set()
-        if acronym_pattern:
-            for m in acronym_pattern.finditer(self.text_phenotype.text):
-                warned_spans.add((m.start(), m.end()))
-                results.append(_ambiguous_alias_result(m.group(0), m.start() + self.sentence_offset,
-                                                       m.end() + self.sentence_offset, denylist))
-        # A row matched before its text joined the denylist
-        for tpm in all_matches:
-            if (tpm.offset_start, tpm.offset_end) not in warned_spans and tpm.is_ambiguous_acronym(denylist):
-                warned_spans.add((tpm.offset_start, tpm.offset_end))
-                results.append(_ambiguous_alias_result(tpm.match_text, tpm.offset_start + self.sentence_offset,
-                                                       tpm.offset_end + self.sentence_offset, denylist))
-        return results
+def sentence_results(text: str, all_matches: Iterable['TextPhenotypeMatch'], sentence_offset: int,
+                     ontology_version: Optional[OntologyVersion], denylist: AmbiguousAcronymDenylist,
+                     acronym_pattern: Optional[re.Pattern]) -> list[dict]:
+    """ One sentence's matches (saved or not, with ontology_term loaded) offset into the whole text.
+        ontology_version may be None only when there are no matches.
+        Ambiguous acronyms come back as warning-only entries rather than terms """
+    all_matches = list(all_matches)
+    matches = without_ambiguous_acronyms(all_matches, denylist)
+    # Where an Ontology Service has multiple matches to the exact same text
+    span_counts = Counter(tpm.service_span for tpm in matches)
+
+    results = []
+    for tpm in matches:
+        data = tpm.to_dict(ontology_version)
+        data["offset_start"] += sentence_offset
+        data["offset_end"] += sentence_offset
+        if span_counts[tpm.service_span] >= 2:
+            data["ambiguous"] = tpm.match_text
+        results.append(data)
+
+    # Ambiguous acronyms aren't saved as matches, so find them by rescanning the sentence text
+    warned_spans = set()
+    if acronym_pattern:
+        for m in acronym_pattern.finditer(text):
+            warned_spans.add((m.start(), m.end()))
+            results.append(_ambiguous_alias_result(m.group(0), m.start() + sentence_offset,
+                                                   m.end() + sentence_offset, denylist))
+    # A row matched before its text joined the denylist
+    for tpm in all_matches:
+        if (tpm.offset_start, tpm.offset_end) not in warned_spans and tpm.is_ambiguous_acronym(denylist):
+            warned_spans.add((tpm.offset_start, tpm.offset_end))
+            results.append(_ambiguous_alias_result(tpm.match_text, tpm.offset_start + sentence_offset,
+                                                   tpm.offset_end + sentence_offset, denylist))
+    return results
 
 
 class TextPhenotypeMatch(models.Model):

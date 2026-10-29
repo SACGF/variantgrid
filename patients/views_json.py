@@ -13,7 +13,7 @@ from patients.models import (
 )
 from patients.models.models_phenotype import PatientPhenotypeTerms
 from patients.models.models_phenotype import patient_phenotype_terms as bulk_patient_phenotype_terms
-from patients.phenotype_matching import create_phenotype_description
+from patients.phenotype_matching import phenotype_preview_results
 from patients.sample_grouping import SOURCE_LEVELS, get_patient_sample_tree
 from snpdb.models import GenomeBuild, Sample
 
@@ -117,11 +117,8 @@ def patient_phenotype_terms(request, patient_id):
 
 @require_POST
 def phenotypes_matches(request):
-    """ Live phenotype edits (unsaved changes) are sent here. """
-    phenotype_text = request.POST['phenotype_text']
-    phenotype_description = create_phenotype_description(phenotype_text)
-    results = phenotype_description.get_results()
-    phenotype_description.delete()
+    """ Live phenotype edits (unsaved changes) are sent here on every pause in typing, so it writes nothing """
+    results = phenotype_preview_results(request.POST['phenotype_text'])
     return JsonResponse(results, safe=False)
 
 
