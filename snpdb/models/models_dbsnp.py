@@ -66,6 +66,8 @@ class DbSNP(TimeStampedModel):
         return dbsnp
 
     def get_alleles_for_genome_build(self, genome_build: GenomeBuild) -> list:
+        """ Alleles on the build's chromosome. dbSNP also places a variant on fix-patch contigs (NW_) under the same
+            seq_type and assembly name, in no fixed order """
         placements_with_allele = self.api_response["primary_snapshot_data"]["placements_with_allele"]
         build_with_patch = genome_build.get_build_with_patch()
 
@@ -73,7 +75,7 @@ class DbSNP(TimeStampedModel):
             pa = pwa["placement_annot"]
             if pa["seq_type"] == "refseq_chromosome":
                 for sit in pa["seq_id_traits_by_assembly"]:
-                    if sit.get("assembly_name") == build_with_patch:
+                    if sit.get("assembly_name") == build_with_patch and sit.get("is_chromosome"):
                         return pwa["alleles"]
         return []
 

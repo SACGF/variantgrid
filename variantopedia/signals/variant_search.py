@@ -417,8 +417,12 @@ def search_variant_db_snp(search_input: SearchInputInstance):
             if hgvs_string := data.get("hgvs"):
                 search_message = SearchMessage(f'dbSNP "{search_input.search_string}" resolved to "{hgvs_string}"',
                                                severity=LogLevel.INFO)
-                for r in _yield_results_from_hgvs(search_input, genome_build, matcher, hgvs_string):
-                    yield r, search_message
+                try:
+                    for r in _yield_results_from_hgvs(search_input, genome_build, matcher, hgvs_string):
+                        yield r, search_message
+                except (ValueError, HGVSException) as e:
+                    yield SearchMessageOverall(f'dbSNP "{search_input.search_string}" resolved to "{hgvs_string}": {e}',
+                                               severity=LogLevel.ERROR, genome_builds=[genome_build])
 
 
 def _yield_results_from_hgvs(search_input, genome_build, matcher, hgvs_string) -> Iterable[SearchResult]:
