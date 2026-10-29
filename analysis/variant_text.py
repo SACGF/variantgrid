@@ -5,16 +5,33 @@
     can be pasted in. Regions are the one shape search doesn't cover, so they're parsed here.
 """
 import re
+from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Optional
 
+from django.conf import settings
 from django.contrib.auth.models import User
 
+from library.genomics import format_chrom
 from snpdb.models import GenomeBuild, Variant
+from snpdb.models.models_variant import (
+    VARIANT_GNOMAD_PATTERN,
+    VARIANT_PATTERN,
+    VARIANT_SYMBOLIC_PATTERN,
+    VARIANT_VCF_PATTERN,
+    VariantCoordinate,
+)
 from snpdb.search import search_data
 
 REGION_PATTERN = re.compile(r"^(?P<chrom>[^:\s]+)\s*:\s*(?P<start>[0-9,]+)\s*-\s*(?P<end>[0-9,]+)$")
 REGION_SEPARATOR = "-"
+# The search box's coordinate formats - chrom and position are groups 1 and 2 of each
+COORDINATE_PATTERNS = [
+    (VARIANT_PATTERN, VariantCoordinate.from_variant_match),
+    (VARIANT_VCF_PATTERN, VariantCoordinate.from_variant_match),
+    (VARIANT_GNOMAD_PATTERN, VariantCoordinate.from_variant_match),
+    (VARIANT_SYMBOLIC_PATTERN, VariantCoordinate.from_symbolic_match),
+]
 
 
 @dataclass
@@ -67,16 +84,63 @@ def _search_variant_ids(user: User, genome_build: GenomeBuild, line: str) -> lis
     return list(qs.values_list("pk", flat=True))
 
 
+def _variant_coordinate(line: str, genome_build: GenomeBuild) -> Optional[VariantCoordinate]:
+    for pattern, get_variant_coordinate in COORDINATE_PATTERNS:
+        if m := pattern.fullmatch(line):
+            chrom = format_chrom(m.group(1), genome_build.reference_fasta_has_chr)
+            if Variant.validate(genome_build, chrom, m.group(2)):
+                return None
+            try:
+                return get_variant_coordinate(m, genome_build)
+            except ValueError:
+                return None
+    return None
+
+
+def _exact_coordinate_variant_ids(user: User, genome_build: GenomeBuild, lines: list[str]) -> dict[str, int]:
+    """ Line -> variant for coordinates already in the database, in 1 query per contig - a search per line
+        takes ~0.5s (#2531). Lines left out (a REF the search corrects, an rsID, HGVS etc) go to the search """
+    if settings.SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN and not user.is_superuser:
+        return {}  # Search only shows classified variants - leave that to it
+
+    coordinate_by_line = {}
+    for line in lines:
+        if variant_coordinate := _variant_coordinate(line, genome_build):
+            coordinate_by_line[line] = variant_coordinate
+
+    contig_mappings = genome_build.chrom_contig_mappings
+    positions_by_contig_id = defaultdict(set)
+    for variant_coordinate in coordinate_by_line.values():
+        positions_by_contig_id[contig_mappings[variant_coordinate.chrom].pk].add(variant_coordinate.position)
+
+    variant_id_by_key = {}
+    for contig_id, positions in positions_by_contig_id.items():
+        qs = Variant.objects.filter(locus__contig_id=contig_id, locus__position__in=positions)
+        for variant_id, *key in qs.values_list("pk", "locus__position", "locus__ref__seq", "alt__seq", "svlen"):
+            variant_id_by_key[(contig_id, *key)] = variant_id
+
+    variant_id_by_line = {}
+    for line, vc in coordinate_by_line.items():
+        key = (contig_mappings[vc.chrom].pk, vc.position, vc.ref, vc.alt, vc.svlen)
+        if variant_id := variant_id_by_key.get(key):
+            variant_id_by_line[line] = variant_id
+    return variant_id_by_line
+
+
 def resolve_variant_text(user: User, genome_build: GenomeBuild, text: str) -> VariantTextResolution:
     """ One entry per line. A line that resolves to nothing is reported rather than dropped """
     resolution = VariantTextResolution()
+    lines = [stripped for line in (text or "").splitlines() if (stripped := line.strip())]
+    variant_id_by_line = _exact_coordinate_variant_ids(user, genome_build, lines)
     seen_variant_ids = set()
-    for line in (text or "").splitlines():
-        if not (line := line.strip()):
-            continue
+    for line in lines:
         if _resolve_region(line, genome_build, resolution):
             continue
-        if variant_ids := _search_variant_ids(user, genome_build, line):
+        if variant_id := variant_id_by_line.get(line):
+            variant_ids = [variant_id]
+        else:
+            variant_ids = _search_variant_ids(user, genome_build, line)
+        if variant_ids:
             for variant_id in variant_ids:
                 if variant_id not in seen_variant_ids:
                     seen_variant_ids.add(variant_id)

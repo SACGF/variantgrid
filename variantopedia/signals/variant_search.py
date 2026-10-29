@@ -32,8 +32,10 @@ from snpdb.models import (
     DBSNP_PATTERN,
     LOCUS_NO_REF_PATTERN,
     LOCUS_PATTERN,
+    VARIANT_GNOMAD_PATTERN,
     VARIANT_PATTERN,
     VARIANT_SYMBOLIC_PATTERN,
+    VARIANT_VCF_PATTERN,
     Allele,
     ClinGenAllele,
     DbSNP,
@@ -342,9 +344,6 @@ def yield_search_variant_match(search_input: SearchInputInstance, get_variant_co
                                                                variant_coordinate, search_messages)
 
 
-VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([GATC]+)", re.IGNORECASE)
-
-
 @search_receiver(
     search_type=Variant,
     pattern=VARIANT_VCF_PATTERN,
@@ -356,9 +355,6 @@ VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([G
 )
 def variant_search_vcf(search_input: SearchInputInstance):
     return yield_search_variant_match(search_input, VariantCoordinate.from_variant_match)
-
-
-VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)\s*-\s*(\d+)\s*-\s*([GATC]+)\s*-\s*([GATC]+)", re.IGNORECASE)
 
 
 @search_receiver(
