@@ -98,6 +98,7 @@ from flags.models.models import (
     FlagTypeContext,
 )
 from genes.hgvs import HGVSComponents, HGVSDisplay, HGVSMatcher
+from genes.hgvs.hgvs_converter import HGVSNoRepresentationException
 from genes.models import Gene, GeneSymbol, NoTranscript
 from genes.models.models_gene import AmbiguousGeneSymbolAlias
 from library.cache import clear_cached_property
@@ -1537,6 +1538,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
                 # Transcript missing/invalid in our DB — data issue, not a bug. See #1478.
                 logging.warning("Could not generate c.HGVS for variant %s (%s, transcript %s): %s",
                                 variant, genome_build.name, transcript_id, nt)
+            except HGVSNoRepresentationException:
+                # gene-level variants have no HGVS - display falls back to the submitted HGVS (#2553)
+                pass
             except Exception:
                 # can't map between builds
                 report_exc_info(extra_data={
