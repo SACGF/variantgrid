@@ -2,14 +2,14 @@ from collections import defaultdict
 from functools import reduce
 from operator import itemgetter, or_
 
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from django.template import Library
 
 from classification.models import Classification
 from classification.views.classification_datatables import ClassificationColumns
 from pedigree.models import CohortSamplePedFileRecord, Pedigree
 from snpdb.enums import ImportStatus
-from snpdb.models import CohortSample, Duo, Quad, Trio
+from snpdb.models import Cohort, CohortSample, Duo, Quad, Sample, Trio
 
 register = Library()
 
@@ -17,9 +17,16 @@ TRIO_SAMPLES_SELECT_RELATED = ("mother__sample", "father__sample", "proband__sam
 
 
 def related_data_context(context, samples):
+    """ samples: a list or queryset - the tables name them, so only those the user can view are kept.
+        A queryset stays lazy: the cohort and family pages never list it """
+    user = context["user"]
+    if isinstance(samples, QuerySet):
+        samples = Sample.filter_for_user(user, queryset=samples)
+    else:
+        samples = Sample.visible_to_user(user, samples)
     tag_context = {
         "samples": samples,
-        "user": context["user"]
+        "user": user,
     }
     classifications = Classification.objects.filter(sample__in=samples)
     if classifications.exists():
@@ -48,13 +55,20 @@ def summarise_samples(x_and_samples_list, show_sample_info):
 
 @register.inclusion_tag("snpdb/tags/related_data_for_samples.html", takes_context=True)
 def related_data_for_samples(context, samples, show_sample_info=True):
+    """ Cohorts and pedigrees are only those the user can view that hold a sample they can view. Trios, quads
+        and duos take their cohort's permissions, so come from those cohorts' samples """
+    context = related_data_context(context, samples)
+    user = context["user"]
+    samples = context["samples"]
     cohorts_and_samples_list = defaultdict(list)
     trios_and_samples_list = defaultdict(list)
     quads_and_samples_list = defaultdict(list)
     duos_and_samples_list = defaultdict(list)
     pedigrees_and_samples_list = defaultdict(list)
 
-    cohort_samples = list(CohortSample.objects.filter(sample__in=samples).select_related("cohort", "sample"))
+    visible_cohorts = Cohort.filter_for_user(user, success_status_only=False)
+    cohort_samples = CohortSample.objects.filter(sample__in=samples, cohort__in=visible_cohorts.values("pk"))
+    cohort_samples = list(cohort_samples.select_related("cohort", "sample"))
     successful_cohort_samples = [cs for cs in cohort_samples
                                  if cs.cohort.import_status == ImportStatus.SUCCESS]
     for cs in successful_cohort_samples:
@@ -74,7 +88,8 @@ def related_data_for_samples(context, samples, show_sample_info=True):
 
     if cohort_samples:
         seen_pedigree_cohort_samples = set()
-        record_qs = CohortSamplePedFileRecord.objects.filter(cohort_sample__in=cohort_samples)
+        record_qs = CohortSamplePedFileRecord.objects.filter(cohort_sample__in=cohort_samples,
+                                                             pedigree__in=Pedigree.filter_for_user(user).values("pk"))
         for record in record_qs.select_related("pedigree", "cohort_sample__sample"):
             pair = (record.pedigree_id, record.cohort_sample_id)
             if pair not in seen_pedigree_cohort_samples:
@@ -87,7 +102,6 @@ def related_data_for_samples(context, samples, show_sample_info=True):
     duos_and_samples = summarise_samples(duos_and_samples_list, show_sample_info)
     pedigrees_and_samples = summarise_samples(pedigrees_and_samples_list, show_sample_info)
 
-    context = related_data_context(context, samples)
     context.update({"show_sample_info": show_sample_info,
                     "cohorts_and_samples": cohorts_and_samples,
                     "trios_and_samples": trios_and_samples,
@@ -99,16 +113,19 @@ def related_data_for_samples(context, samples, show_sample_info=True):
 
 @register.inclusion_tag("snpdb/tags/related_data_for_cohort.html", takes_context=True)
 def related_data_for_cohort(context, cohort):
+    """ Only the sub cohorts and pedigrees the user can view. Trios, quads and duos take their cohort's
+        permissions, so come from the cohort and those sub cohorts """
     context = related_data_context(context, cohort.get_samples())
+    user = context["user"]
     # Trios/pedigrees are often built off a sub cohort (@see VCF page) - show them on the parent too
-    sub_cohorts = list(cohort.sub_cohort_set.all())
-    cohorts = [cohort] + sub_cohorts
+    sub_cohorts = list(Cohort.filter_for_user(user, queryset=cohort.sub_cohort_set.all(), success_status_only=False))
+    cohorts = [cohort, *sub_cohorts]
     context["cohort"] = cohort
     context["sub_cohorts"] = sub_cohorts
     context["trios"] = list(Trio.objects.filter(cohort__in=cohorts).select_related(*TRIO_SAMPLES_SELECT_RELATED))
     context["quads"] = list(Quad.objects.filter(cohort__in=cohorts))
     context["duos"] = list(Duo.objects.filter(cohort__in=cohorts))
-    context["pedigrees"] = list(Pedigree.objects.filter(cohort__in=cohorts))
+    context["pedigrees"] = list(Pedigree.filter_for_user(user, queryset=Pedigree.objects.filter(cohort__in=cohorts)))
     return context
 
 

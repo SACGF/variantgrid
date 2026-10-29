@@ -36,10 +36,13 @@ class RelatedDataQueryCountTest(TestCase):
         cls.samples = list(cls.trio.get_samples())
 
     def test_related_data_for_samples_query_count(self):
-        # 6 queries: cohort samples, trios, quads, duos, ped file records, classifications exists.
+        # 9 queries: the user's global permissions (2, cached on the user for the rest of the request),
+        # visible samples, classifications exists, cohort samples, trios, quads, duos, ped file records.
         # Constant regardless of how many samples/cohorts/trios are passed in.
+        warm_up_user = User.objects.get(pk=self.user.pk)  # its own permission cache, so self.user's is still empty
+        related_data_for_samples({"user": warm_up_user}, self.samples)  # per-process content type caches
         context = {"user": self.user}
-        with self.assertNumQueries(6):
+        with self.assertNumQueries(9):
             result = related_data_for_samples(context, self.samples)
         self.assertEqual(len(result["trios_and_samples"]), 1)
         self.assertEqual(len(result["cohorts_and_samples"]), 1)

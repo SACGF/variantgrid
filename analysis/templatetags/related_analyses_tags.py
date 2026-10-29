@@ -4,7 +4,7 @@ from collections import defaultdict
 from functools import reduce
 
 from django.conf import settings
-from django.db.models import Model, Q, QuerySet
+from django.db.models import Model, Q
 from django.template import Library
 from django.template.loader import render_to_string
 from django.utils.safestring import mark_safe
@@ -86,22 +86,12 @@ def _family_groups_for_samples(family_class, cohorts, samples):
     return family_class.objects.filter(cohort__in=cohorts).filter(reduce(operator.or_, member_q_list)).distinct()
 
 
-def _visible_samples(user, samples) -> list[Sample]:
-    """ A queryset is filtered in the one query that evaluates it; a list keeps its instances, so whatever
-        they have cached (VCF, gene list) isn't fetched again """
-    if isinstance(samples, QuerySet):
-        return list(Sample.filter_for_user(user, queryset=samples))
-    sample_qs = Sample.objects.filter(pk__in=[s.pk for s in samples])
-    visible_ids = set(Sample.filter_for_user(user, queryset=sample_qs).values_list("pk", flat=True))
-    return [s for s in samples if s.pk in visible_ids]
-
-
 @register.inclusion_tag("analysis/tags/related_analyses_for_samples.html", takes_context=True)
 def related_analyses_for_samples(context, samples, show_sample_info, show_create_analyses=True):
     """ samples: a list or queryset. The table names samples, cohorts and pedigrees, so only the samples the
         user can view are listed, and the cohorts / pedigrees they reach only if the user can view those too """
     user = context["user"]
-    samples = _visible_samples(user, samples)
+    samples = Sample.visible_to_user(user, samples)
 
     visible_cohorts = Cohort.filter_for_user(user, success_status_only=False)
     cohorts = Cohort.objects.filter(cohortsample__sample__in=samples, pk__in=visible_cohorts.values("pk")).distinct()
