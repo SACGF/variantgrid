@@ -82,7 +82,7 @@ class Command(BaseCommand):
             if cdot_version is None:
                 raise ValueError("JSON does not contain 'cdot_version' key")
             print(f"JSON uses cdot version {cdot_version}")
-            self.import_cdot_data_file(genome_build, annotation_consortium, f, cdot_version)
+            cdot_data_version = self.import_cdot_data_file(genome_build, annotation_consortium, f, cdot_version)
 
         if options["clear_obsolete"]:
             # These were really old json format (before cdot schema change)
@@ -91,6 +91,7 @@ class Command(BaseCommand):
                                                      genome_build=genome_build)
             ret = tv_qs.filter(data__genome_builds__isnull=True).delete()
             print(f"Deleted: {ret}")
+            cdot_data_version.update_transcript_stats()
 
     # How many transcript versions to hold in memory before flushing to the DB. Bounds peak RAM
     # when importing large streamed files (see import_cdot_data_file).
@@ -115,7 +116,8 @@ class Command(BaseCommand):
                               transcripts_iter=lambda: iter(cdot_data["transcripts"].items()))
 
     @classmethod
-    def import_cdot_data_file(cls, genome_build: GenomeBuild, annotation_consortium, file_obj, cdot_version):
+    def import_cdot_data_file(cls, genome_build: GenomeBuild, annotation_consortium, file_obj,
+                              cdot_version) -> CdotDataVersion:
         """ Stream genes/transcripts out of a seekable cdot JSON(.gz) file handle (binary mode) via
             ijson so we never hold the whole file in RAM. Genes are read first (transcripts link to
             them), then we seek back to the start and stream the transcripts. """
@@ -128,8 +130,11 @@ class Command(BaseCommand):
             return ijson.kvitems(file_obj, "transcripts", use_float=True)
 
         cls._import_cdot_data(genome_build, annotation_consortium, cdot_version, genes_iter, transcripts_iter)
-        CdotDataVersion.objects.update_or_create(genome_build=genome_build, annotation_consortium=annotation_consortium,
-                                                 defaults={"cdot_version": cdot_version})
+        cdot_data_version, _ = CdotDataVersion.objects.update_or_create(genome_build=genome_build,
+                                                                        annotation_consortium=annotation_consortium,
+                                                                        defaults={"cdot_version": cdot_version})
+        cdot_data_version.update_transcript_stats()
+        return cdot_data_version
 
     @classmethod
     def _import_cdot_data(cls, genome_build: GenomeBuild, annotation_consortium, cdot_version,

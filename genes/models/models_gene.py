@@ -34,7 +34,7 @@ from genes.transcript_sequence_retrieval import FetchedTranscriptSequence, Trans
 from genes.transcripts_utils import get_lrg_and_t
 from library.cache import timed_cache
 from library.constants import DAY_SECS, HOUR_SECS, WEEK_SECS
-from library.django_utils import SortByPKMixin
+from library.django_utils import SortByPKMixin, get_field_counts
 from library.django_utils.django_object_managers import ObjectManagerCachingRequest
 from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils.collection_utils import batch_iterator
@@ -505,6 +505,8 @@ class CdotDataVersion(TimeStampedModel):
     genome_build = models.ForeignKey(GenomeBuild, on_delete=CASCADE)
     annotation_consortium = models.CharField(max_length=1, choices=AnnotationConsortium.choices)
     cdot_version = models.TextField()
+    # Counting every transcript of a consortium takes seconds, so the annotation page reads this (#2530)
+    transcript_stats = models.JSONField(null=True, blank=True)
 
     class Meta:
         unique_together = ("genome_build", "annotation_consortium")
@@ -516,6 +518,24 @@ class CdotDataVersion(TimeStampedModel):
     def get_version(genome_build: GenomeBuild, annotation_consortium) -> Optional[str]:
         qs = CdotDataVersion.objects.filter(genome_build=genome_build, annotation_consortium=annotation_consortium)
         return qs.values_list("cdot_version", flat=True).first()
+
+    @staticmethod
+    def count_transcript_stats(genome_build: GenomeBuild, annotation_consortium) -> dict:
+        """ Genes, transcripts and transcripts per GeneAnnotationImport url - empty if there are none """
+        gene_versions_qs = GeneVersion.objects.filter(gene__annotation_consortium=annotation_consortium,
+                                                      genome_build=genome_build)
+        transcript_versions_qs = TranscriptVersion.objects.filter(transcript__annotation_consortium=annotation_consortium,
+                                                                  genome_build=genome_build)
+        transcript_stats = {}
+        if (num_genes := gene_versions_qs.count()) and (num_transcripts := transcript_versions_qs.count()):
+            transcript_stats = {"genes": num_genes, "transcripts": num_transcripts,
+                                "import_sources": get_field_counts(transcript_versions_qs, "import_source__url")}
+        return transcript_stats
+
+    def update_transcript_stats(self):
+        self.transcript_stats = self.count_transcript_stats(self.genome_build, self.annotation_consortium)
+        # Leaves 'modified' alone: it's when this cdot version was imported
+        CdotDataVersion.objects.filter(pk=self.pk).update(transcript_stats=self.transcript_stats)
 
     @staticmethod
     def get_installed_versions(genome_builds: Iterable[GenomeBuild], annotation_consortia: Iterable) -> set[Optional[str]]:
