@@ -20,6 +20,7 @@
         }
         td {
             overflow-wrap: break-word;
+            max-width: 300px;
         }
         ul {
             margin: 0;
@@ -31,6 +32,14 @@
         }
         td.key {
             max-width: 220px;
+        }
+        .container-table {
+            max-width: none;
+        }
+        /* evidence key descriptions can carry images with an inline width: 100% */
+        td.description img {
+            width: auto !important;
+            max-width: 300px;
         }
         td.values .value-type {
             font-style: italic;
