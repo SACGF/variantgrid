@@ -197,6 +197,15 @@ class PluginPinStampTests(TestCase):
         vav.refresh_from_db()
         self.assertIsNotNone(vav.avi)
 
+    def test_command_with_nothing_to_stamp_ignores_runs_not_imported(self):
+        """ A re-run for a later backfill pass changes no pin, so a busy annotation lane is no reason to refuse """
+        vav = self._vav(self.grch38, VariantAnnotationVersion.Status.ACTIVE)
+        self._enable("--genome-build", "GRCh38")
+        AnnotationRun.objects.create(annotation_range_lock=vav.annotationrangelock_set.get(),
+                                     annotation_start=timezone.now(), annotation_end=timezone.now())
+        output = self._enable("--genome-build", "GRCh38")
+        self.assertIn("already matches settings", output)
+
     def test_command_stamps_new_and_active_and_flags_only_the_newest(self):
         older = self._vav(self.grch38, VariantAnnotationVersion.Status.NEW)
         historical = self._vav(self.grch38, VariantAnnotationVersion.Status.HISTORICAL)

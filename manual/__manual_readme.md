@@ -14,7 +14,9 @@ Migrations register manual steps with `ManualOperation` (see `operations/manual_
 Each registers a `ManualMigrationTask` (PK = the command string) plus a `ManualMigrationRequired`
 row. `manual/upgrader.py:outstanding_tasks_json` lists everything still outstanding (`manage.py manual_outstanding`
 prints it), which the upgrader (`scripts/upgrade.sh` -> `manage.py upgrade`) surfaces. Completion is recorded as a
-`ManualMigrationAttempt`.
+`ManualMigrationAttempt`: the upgrader records a `manage` step it ran; an `other` step is recorded by selecting it in
+the upgrader menu (it prints the note, `y` records it done) or with `manage.py manual_complete --id '<task id>'`,
+the id as `manual_outstanding` prints it.
 
 ## Dependency gates (auto-running manage steps)
 

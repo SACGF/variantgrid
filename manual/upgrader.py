@@ -575,6 +575,9 @@ class Upgrader:
             print_purple("List gate status with:      python3 manage.py manual_gate")
         if obsolete:
             print_purple("Mark an obsolete step complete by selecting it in the ./scripts/upgrade.sh menu")
+        if others:
+            print_purple("Select a manual step in the ./scripts/upgrade.sh menu to read its note, and again to record it "
+                         "done (y) once you have; python3 manage.py manual_outstanding prints the notes")
 
     def prompt(self) -> int:
         while True:

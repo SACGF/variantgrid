@@ -44,6 +44,14 @@ class Command(BaseCommand):
                             help="Also write the backfill steps as a bash script to PATH, to run under screen "
                                  "or nohup (with --dry-run, the script for what would be flagged)")
 
+    @staticmethod
+    def _stamp(genome_builds, dry_run: bool):
+        stamps = []
+        for genome_build in genome_builds:
+            stamps.extend(stamp_plugin_pins(VariantAnnotationVersion, AnnotationRangeLock,
+                                            genome_build_name=genome_build.name, dry_run=dry_run))
+        return stamps
+
     def handle(self, *args, **options):
         if build_name := options["genome_build"]:
             genome_builds = [GenomeBuild.get_name_or_alias(build_name)]
@@ -63,7 +71,10 @@ class Command(BaseCommand):
                 self.stdout.write(f"{genome_build}: not stamping {', '.join(keys)} - non-commercial data, and "
                                   f"ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED is False")
 
-        if not options["force"]:
+        stamps = self._stamp(genome_builds, dry_run=True)
+        # Only a pin change puts runs at risk: a re-run for a later backfill pass stamps nothing and can go ahead
+        # with the annotation lane busy
+        if any(stamp.changed_pins for stamp in stamps) and not options["force"]:
             pending_runs = AnnotationRun.objects.filter(
                 annotation_range_lock__version__genome_build__in=genome_builds,
                 annotation_range_lock__version__status__in=ACTIVE_STATUSES,
@@ -73,11 +84,8 @@ class Command(BaseCommand):
                 raise CommandError(f"{count} STANDARD annotation runs have VEP output from the current command that "
                                    f"isn't imported yet, and would fail to import without the new CSQ fields. Let "
                                    f"the import lane drain (or re-run them afterwards) and use --force")
-
-        stamps = []
-        for genome_build in genome_builds:
-            stamps.extend(stamp_plugin_pins(VariantAnnotationVersion, AnnotationRangeLock,
-                                            genome_build_name=genome_build.name, dry_run=options["dry_run"]))
+        if not options["dry_run"]:
+            stamps = self._stamp(genome_builds, dry_run=False)
 
         verb = "Would stamp" if options["dry_run"] else "Stamped"
         for stamp in stamps:

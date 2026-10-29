@@ -329,5 +329,5 @@ def backfill_note(variant_annotation_version_model, genome_build_name: Optional[
             "earlier backfills left null, and re-annotate the 5' UTR effects Ensembl's UTRAnnotator "
             f"reported one of at random (#2499), with one VEP run per version: {versions}. "
             f"Write the steps as one script with '{ENABLE_COMMAND} --bash-script backfill.sh' and run it under "
-            "screen or nohup (hours per version). Admin steps: "
-            "https://github.com/SACGF/variantgrid/issues/2433#issuecomment-6393595562")
+            "screen or nohup (hours per version); once it ends with 'Backfill complete', record this step done in "
+            "the upgrader. Admin steps: https://github.com/SACGF/variantgrid/issues/2433#issuecomment-6393595562")
