@@ -15,7 +15,7 @@ DBSNP_PATTERN = re.compile(r"^rs(\d+)$", re.IGNORECASE)
 class DbSNP(TimeStampedModel):
     """ Wrapper around DbSNP API service, @see https://api.ncbi.nlm.nih.gov/variation/v0/ """
     # id = "rs" stripped off, e.g. rs121964969 => 121964969
-    id = models.IntegerField(primary_key=True)
+    id = models.BigIntegerField(primary_key=True)
     api_response = models.JSONField(null=False)  # returned
 
     @staticmethod
@@ -45,12 +45,22 @@ class DbSNP(TimeStampedModel):
         return dbsnp
 
     @staticmethod
+    def get_first_valid(dbsnp_rs_ids: str) -> 'DbSNP':
+        """ VEP packs multiple ids into one field, e.g. "rs1&rs2" """
+        for dbsnp_rs_id in dbsnp_rs_ids.split("&"):
+            try:
+                return DbSNP.get(dbsnp_rs_id)
+            except ValueError:
+                pass
+        raise ValueError(f"No valid dbSNP record in '{dbsnp_rs_ids}'")
+
+    @staticmethod
     def get_for_variant(variant: 'Variant', variant_annotation_version) -> 'DbSNP':
         dbsnp = None
         try:
             variant_annotation = variant.variantannotation_set.get(version=variant_annotation_version)
             if variant_annotation.dbsnp_rs_id:
-                dbsnp = DbSNP.get(variant_annotation.dbsnp_rs_id)
+                dbsnp = DbSNP.get_first_valid(variant_annotation.dbsnp_rs_id)
         except ObjectDoesNotExist:
             pass
         return dbsnp
