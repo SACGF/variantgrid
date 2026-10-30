@@ -48,8 +48,8 @@ _COMPOSITE_LEVEL_ORDER = [
 # table is written out here - (format column, label, description), zygosity first as the headline
 # @see VariantGrid._get_grid_genotype_columns
 _SAMPLE_CELL_DESCRIPTION = (
-    "Everything the VCF says about this sample&#146;s call, in the one cell - the zygosity glyph, the "
-    "allele frequency and depths, quality marks for GQ/PL, the caller&#146;s copy number and a warning "
+    "Everything the VCF says about this sample's call, in the one cell - the zygosity glyph, the "
+    "allele frequency and depths, quality marks for GQ/PL, the caller's copy number and a warning "
     "where the call failed a filter"
 )
 _SAMPLE_MEMBER_COLUMNS = [
@@ -57,7 +57,7 @@ _SAMPLE_MEMBER_COLUMNS = [
      "Zygosity call (HET/HOM_ALT/REF or Unknown)"),
     ("samples_allele_depth", "AD (Allele Depth)", "AD",
      "Unfiltered allele depth, the number of reads that support each of the reported alleles. All reads "
-     "at the position (including reads that did not pass the variant caller&#146;s filters) are included "
+     "at the position (including reads that did not pass the variant caller's filters) are included "
      "in this number, except reads that were considered uninformative. Reads are considered uninformative "
      "when they do not provide enough statistical evidence to support one allele over another."),
     ("samples_allele_frequency", "AF (Allele Frequency)", "AF",
@@ -66,18 +66,18 @@ _SAMPLE_MEMBER_COLUMNS = [
      'to see which was used for a particular file.'),
     ("samples_read_depth", "DP (Depth)", "DP",
      "Filtered depth, at the sample level. This gives you the number of filtered reads that support each "
-     "of the reported alleles. You can check the variant caller&#146;s documentation to see which filters "
-     "are applied by default. Only reads that passed the variant caller&#146;s filters are included in this "
+     "of the reported alleles. You can check the variant caller's documentation to see which filters "
+     "are applied by default. Only reads that passed the variant caller's filters are included in this "
      "number. However, unlike the AD calculation, uninformative reads are included in DP."),
     ("samples_genotype_quality", "GQ (Genotype Quality)", "GQ",
      "Genotype Quality, the Phred-scaled marginal (or unconditional) probability of the called genotype."),
     ("samples_phred_likelihood", "PL (Phred Likelihood)", "PL",
      "Normalised, Phred-scaled likelihoods for genotypes as defined in the VCF specification"),
     ("samples_filters", "FT (Sample Filters)", "FT",
-     "Which of the VCF&#146;s filters this sample&#146;s call failed, where the caller reports them per "
+     "Which of the VCF's filters this sample's call failed, where the caller reports them per "
      "sample rather than per record. The cell only marks a call that failed one"),
     (COPY_NUMBER_COLUMN, "Copy Number", "CN / SM / FC",
-     "The caller&#146;s copy number over the segment - an integer copy number (CN), a linear copy ratio "
+     "The caller's copy number over the segment - an integer copy number (CN), a linear copy ratio "
      "(SM) or a fold change (FC), whichever the VCF header declared. The chip is labelled with the "
      "key it came from, since what the number means differs between them"),
 ]

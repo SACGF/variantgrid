@@ -135,7 +135,7 @@ def _catalogue_column_kwargs(column) -> dict:
         "model_field": column.model_field,
         "queryset_field": column.queryset_field or column.variant_column in VARIANT_GRID_EXTRA_ANNOTATION_ALIASES,
         "label": column.label,
-        "header_title": header_title.replace("'", "&#146;"),
+        "header_title": header_title,
     }
     if column.width is not None:
         kwargs["width"] = column.width

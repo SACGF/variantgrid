@@ -7,7 +7,7 @@ function setupExampleCell(table, exampleExtra) {
     const col = table.data("columnJson");
     const row = table.data("rowJson");
     const th = table.find("thead th");
-    th.text(col.label);
+    th.html(col.label);
     if (col.headerTitle) {
         th.attr("title", col.headerTitle);
     }
