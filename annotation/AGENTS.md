@@ -113,6 +113,9 @@ Gotchas:
 - Non-commercial data (annotation/vep_config.py:NON_COMMERCIAL_VEP_CONFIG_KEYS) is cleared from VEPConfig and the pins
   when ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED is False, so it never reaches the command line, the pins or the page.
   Read vep_config through VEPConfig / vep_component_version_kwargs, never genome_build.settings directly.
+  The page, filters and classification autopopulate go off the version's pin as well as the setting
+  (annotation/models/models_version.py:VariantAnnotationVersion.withheld_non_commercial_columns): the setting doesn't
+  add the data to a version annotated without it, nor remove it from one annotated before it was turned off.
 - The SpliceVault plugin matches the data file's transcript column against the transcript's stable_id, a versioned NM
   under --refseq, while Ensembl's file holds unversioned ENST: a RefSeq build configures the copy
   `splicevault_to_refseq` rewrites to MANE RefSeq (annotation/splicevault.py), which only covers MANE transcripts.

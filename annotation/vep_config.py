@@ -76,6 +76,15 @@ def disallowed_non_commercial_keys(vep_config_data: dict) -> list[str]:
     return [key for key in NON_COMMERCIAL_VEP_CONFIG_KEYS if vep_config_data.get(key)]
 
 
+def withheld_non_commercial_keys(variant_annotation_version) -> list[str]:
+    """ Non-commercial data a VariantAnnotationVersion can't offer: it wasn't annotated with it (its pin is null),
+        or the deployment may not use it - a version annotated before the setting was turned off still holds it """
+    if not settings.ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED:
+        return list(NON_COMMERCIAL_VEP_CONFIG_KEYS)
+    return [key for key in NON_COMMERCIAL_VEP_CONFIG_KEYS
+            if not getattr(variant_annotation_version, _BASENAME_PIN_FIELDS[key])]
+
+
 def _pin_basename(path: Optional[str]) -> Optional[str]:
     if not path:
         return None

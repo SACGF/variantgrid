@@ -38,8 +38,8 @@ from annotation.pathogenicity_predictions import (
     pred_pathogenic_funcs,
     raw_score_pathogenic_funcs,
 )
-from annotation.vep_columns import visible_columns_for
-from annotation.vep_config import VEPConfig
+from annotation.vep_columns import variant_grid_column_ids_for_data_keys, visible_columns_for
+from annotation.vep_config import VEPConfig, withheld_non_commercial_keys
 from genes.enums import AnnotationConsortium
 from genes.models import (
     GeneAnnotationRelease,
@@ -467,13 +467,18 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
             vep_version=self.vep,
             cosmic_version=self.cosmic,
             gnomad4_minor_version=self.gnomad,
-        )
+        ) - self.withheld_non_commercial_columns
 
     @cached_property
     def visible_columns(self) -> frozenset[str]:
         """ Columns populated by any pipeline on this version - what filter nodes can offer, as they
             work off the version rather than an individual annotation run. """
         return self.get_visible_columns()
+
+    @cached_property
+    def withheld_non_commercial_columns(self) -> frozenset[str]:
+        """ Columns of the non-commercial data this version can't offer (vep_config.withheld_non_commercial_keys) """
+        return variant_grid_column_ids_for_data_keys(withheld_non_commercial_keys(self))
 
     @cached_property
     def vep_gene_set_versions(self) -> VepGeneSetVersions:
