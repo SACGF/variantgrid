@@ -4,7 +4,8 @@ import re
 from django.conf import settings
 from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTranscriptManager
 from genes.gene_matching import GeneSymbolMatcher
-from genes.models import GeneCoverageCollection, AnnotationConsortium, TranscriptVersion
+from genes.models import GeneCoverage, GeneCoverageCollection, AnnotationConsortium, TranscriptVersion
+from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
 from library.file_utils import name_from_filename
 from library.log_utils import log_traceback
 import pandas as pd
@@ -101,7 +102,10 @@ class ImportGeneCoverageTask(ImportTask):
         gene_coverage_collection.data_state = DataState.COMPLETE
         gene_coverage_collection.save()
 
-        num_records = gene_coverage_collection.genecoverage_set.count()
+        # Count from the collection's own partition: a query on the inheritance parent locks every child table
+        qs = get_queryset_with_transformer_hook(klass=GeneCoverage)
+        qs.add_sql_transformer(gene_coverage_collection.sql_partition_transformer)
+        num_records = qs.filter(gene_coverage_collection=gene_coverage_collection).count()
         return num_records
 
 
