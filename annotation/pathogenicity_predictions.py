@@ -135,7 +135,7 @@ TOOLS: tuple[PathogenicityTool, ...] = (
         raw_max_benign_threshold=None,
         raw_pathogenic_threshold=0.5,
         pred_pathogenic_values=("D",),
-        source="dbNSFP readme 118", source_detail=_ALIREZAIE_2018[0], source_url=_ALIREZAIE_2018[1],
+        source="Alirezaie 2018 (author cutoff)", source_detail=_ALIREZAIE_2018[0], source_url=_ALIREZAIE_2018[1],
     ),
     # EVE - Frazer 2021, Nature (DOI 10.1038/s41586-021-04043-8). GRCh38, VEP >= 116; higher = more pathogenic.
     # Bergquist 2024 measured EVE supporting thresholds (pathogenic >= 0.684, benign <= 0.137) but explicitly
@@ -170,7 +170,7 @@ TOOLS: tuple[PathogenicityTool, ...] = (
         raw_pathogenic_threshold=None,
         raw_direction=RawScoreDirection.LOWER,
         node_label="popEVE score",
-        source="popEVE (no calibration)",
+        source="Orenbuch 2023 (no calibration)",
         source_detail="Orenbuch R, Kollasch AW, Spinner HD, et al. Deep generative modeling of the human "
                       "proteome reveals over a hundred novel genes involved in rare genetic disorders. "
                       "medRxiv 2023.11.27.23299062. Population-adjusted EVE; no ClinGen calibration.",
@@ -189,7 +189,7 @@ TOOLS: tuple[PathogenicityTool, ...] = (
         raw_max_benign_threshold=None,
         raw_pathogenic_threshold=0.5,
         pred_pathogenic_values=("D",),
-        source="dbNSFP readme 82", source_detail=_LI_2022[0], source_url=_LI_2022[1],
+        source="Li 2022 (author cutoff)", source_detail=_LI_2022[0], source_url=_LI_2022[1],
     ),
     # MPC - Samocha 2017, bioRxiv 148353 (DOI 10.1101/148353).
     # Range 0-5 (page 14). Pejaver 2022 PP3-supporting band [1.360, 1.828). No BP4 band defined.
@@ -308,7 +308,7 @@ TOOLS: tuple[PathogenicityTool, ...] = (
         raw_max_benign_threshold=None,
         raw_pathogenic_threshold=None,
         node_label="ProtVar ddG stability",
-        source="ProtVar (no calibration)",
+        source="Stephenson 2024 (no calibration)",
         source_detail="Stephenson JD, Totoo P, Burke DF, et al. ProtVar: mapping and contextualizing human "
                       "missense variation. Nucleic Acids Res. 2024;52(W1):W140-W147. Stability is ddG in "
                       "kcal/mol, not a pathogenicity score; no ClinGen calibration.",
@@ -387,7 +387,6 @@ class ColourBand:
         return self.direction == RawScoreDirection.MAGNITUDE
 
 
-_VG_DEFAULT = "VariantGrid default"
 _POLLARD_2010 = (
     "Pollard KS, Hubisz MJ, Rosenbloom KR, Siepel A. Detection of nonneutral substitution rates on mammalian "
     "phylogenies. Genome Res. 2010;20(1):110-121. The phyloP cutoffs are a VariantGrid display choice.",
@@ -428,7 +427,7 @@ COLOUR_BANDS: tuple[ColourBand, ...] = (
         max_benign_threshold=70.0,
         pathogenic_threshold=150.0,
         direction=RawScoreDirection.MAGNITUDE,
-        source=_VG_DEFAULT,
+        source="Yeo 2004 (VariantGrid cutoff)",
         source_detail="Yeo G, Burge CB. Maximum entropy modeling of short sequence motifs with applications "
                       "to RNA splicing signals. J Comput Biol. 2004;11(2-3):377-394. The band sizes are a "
                       "VariantGrid display choice - the paper sets no % change cutoff.",
@@ -442,7 +441,7 @@ COLOUR_BANDS: tuple[ColourBand, ...] = (
         fields=("phastcons_100_way_vertebrate", "phastcons_46_way_mammalian", "phastcons_30_way_mammalian"),
         max_benign_threshold=None,
         pathogenic_threshold=0.85,
-        source=_VG_DEFAULT,
+        source="Siepel 2005 (VariantGrid cutoff)",
         source_detail="Siepel A, Bejerano G, Pedersen JS, et al. Evolutionarily conserved elements in "
                       "vertebrate, insect, worm, and yeast genomes. Genome Res. 2005;15(8):1034-1050. "
                       "phastCons is a probability of lying in a conserved element; the 0.85 cutoff is a "
@@ -454,21 +453,21 @@ COLOUR_BANDS: tuple[ColourBand, ...] = (
         fields=("phylop_100_way_vertebrate",),
         max_benign_threshold=None,
         pathogenic_threshold=1.4,
-        source=_VG_DEFAULT, source_detail=_POLLARD_2010[0], source_url=_POLLARD_2010[1],
+        source="Pollard 2010 (VariantGrid cutoff)", source_detail=_POLLARD_2010[0], source_url=_POLLARD_2010[1],
     ),
     ColourBand(
         name="phyloP 30 way mammalian",
         fields=("phylop_30_way_mammalian",),
         max_benign_threshold=None,
         pathogenic_threshold=1.0,
-        source=_VG_DEFAULT, source_detail=_POLLARD_2010[0], source_url=_POLLARD_2010[1],
+        source="Pollard 2010 (VariantGrid cutoff)", source_detail=_POLLARD_2010[0], source_url=_POLLARD_2010[1],
     ),
     ColourBand(
         name="phyloP 46 way mammalian",
         fields=("phylop_46_way_mammalian",),
         max_benign_threshold=None,
         pathogenic_threshold=None,
-        source=_VG_DEFAULT, source_detail=_POLLARD_2010[0], source_url=_POLLARD_2010[1],
+        source="Pollard 2010 (VariantGrid cutoff)", source_detail=_POLLARD_2010[0], source_url=_POLLARD_2010[1],
         note="Left uncoloured - the 46 way alignment scores run on a different scale to the 100 way and "
              "30 way sets, and we have no cutoff for it.",
     ),
@@ -478,7 +477,7 @@ COLOUR_BANDS: tuple[ColourBand, ...] = (
         fields=("grantham",),
         max_benign_threshold=57.0,
         pathogenic_threshold=105.0,
-        source=_VG_DEFAULT,
+        source="Grantham 1974 (VariantGrid cutoff)",
         source_detail="Grantham R. Amino acid difference formula to help explain protein evolution. "
                       "Science. 1974;185(4154):862-864. Distance 0-215 between the reference and alternate "
                       "residue; the band edges are a VariantGrid display choice.",
@@ -491,7 +490,7 @@ COLOUR_BANDS: tuple[ColourBand, ...] = (
         fields=("gerp_pp_rs",),
         max_benign_threshold=None,
         pathogenic_threshold=3.0,
-        source=_VG_DEFAULT,
+        source="Davydov 2010 (VariantGrid cutoff)",
         source_detail="Davydov EV, Goode DL, Sirota M, et al. Identifying a high fraction of the human "
                       "genome to be under selective constraint using GERP++. PLoS Comput Biol. "
                       "2010;6(12):e1001025. Rejected-substitutions score, range -12 to 6.8; the cutoff is a "
@@ -517,8 +516,8 @@ class EffectNodeFilter:
     raw_min: Optional[float] = None
     raw_max: Optional[float] = None
     raw_direction: RawScoreDirection = RawScoreDirection.HIGHER
-    # further (detail, url) citations behind the rule, for the page's references
-    references: tuple[tuple[str, str], ...] = ()
+    # further (source, detail, url) citations behind the rule, cited beside the source on the thresholds page
+    references: tuple[tuple[str, str, str], ...] = ()
 
 
 # AlphaGenome merged splicing score: splice site + splice site usage (each 0-1) + splice junction / 5, so 0 to ~3.
@@ -538,16 +537,19 @@ _MARTIN_GEARY_2025 = (
     "https://doi.org/10.1186/s13073-025-01464-2",
 )
 _WHIFFIN_2020 = (
+    "Whiffin 2020",
     "Whiffin N, Karczewski KJ, Zhang X, et al. Characterising the loss-of-function impact of 5' untranslated "
     "region variants in 15,708 individuals. Nat Commun. 2020;11(1):2523.",
     "https://pmc.ncbi.nlm.nih.gov/articles/PMC7253449/",
 )
 _ZHANG_2021 = (
+    "Zhang 2021",
     "Zhang X, Wakeling M, Ware J, Whiffin N. Annotating high-impact 5'untranslated region variants with the "
     "UTRannotator. Bioinformatics. 2021;37(8):1171-1173.",
     "https://doi.org/10.1093/bioinformatics/btaa783",
 )
 _ELLINGFORD_2022 = (
+    "Ellingford 2022",
     "Ellingford JM, Ahn JW, Bagnall RD, et al. Recommendations for clinical interpretation of variants found in "
     "non-coding regions of the genome. Genome Med. 2022;14(1):73.",
     "https://pmc.ncbi.nlm.nih.gov/articles/PMC9295495/",

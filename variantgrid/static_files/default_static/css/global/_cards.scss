@@ -564,6 +564,12 @@ ul.compact {
 	background-color: #C64A42;
 }
 
+// A numbered reference jumped to from a citation link
+.reference-list li:target {
+	background-color: #fff8c5;
+	scroll-margin-top: 20px;
+}
+
 .text-monospace {
 	color: #444;
 }

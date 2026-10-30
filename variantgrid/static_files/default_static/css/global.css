@@ -2395,6 +2395,11 @@ ul.compact li:before {
   background-color: #C64A42;
 }
 
+.reference-list li:target {
+  background-color: #fff8c5;
+  scroll-margin-top: 20px;
+}
+
 .text-monospace {
   color: #444;
 }

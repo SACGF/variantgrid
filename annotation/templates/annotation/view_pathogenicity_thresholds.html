@@ -36,11 +36,14 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for t in tools %}
+                        {% for t, ref in tools %}
                             <tr>
                                 <th>
                                     {{ t.name }}
-                                    {% if t.note %}<div class="text-muted small font-weight-normal mt-1">{{ t.note }}</div>{% endif %}
+                                    {% if t.note %}
+                                        <a class="hover-link small font-weight-normal ml-1" data-toggle="collapse" href="#tool-note-{{ forloop.counter }}" role="button" aria-expanded="false" aria-controls="tool-note-{{ forloop.counter }}">notes</a>
+                                        <div id="tool-note-{{ forloop.counter }}" class="collapse text-muted small font-weight-normal mt-1">{{ t.note }}</div>
+                                    {% endif %}
                                 </th>
                                 <td class="text-monospace">{{ t.raw_direction.comparison }}</td>
                                 <td class="text-monospace">{{ t.raw_min }}</td>
@@ -56,23 +59,22 @@
                                 </td>
                                 <td class="text-monospace">{{ t.raw_max }}</td>
                                 <td>
-                                    {% if t.source_url %}
-                                        <a class="hover-link" href="{{ t.source_url }}" target="_blank" title="{{ t.source_detail }}">{{ t.source }}</a>
-                                    {% else %}
-                                        {{ t.source }}
-                                    {% endif %}
+                                    {% if ref %}<a class="hover-link" href="#{{ ref }}" title="{{ t.source_detail }}">{{ t.source }}</a>{% else %}{{ t.source }}{% endif %}
                                 </td>
                             </tr>
                         {% endfor %}
-                        {% for f in effect_node_filters %}
+                        {% for f, ref, see_also in effect_node_filters %}
                             <tr>
                                 <th>
                                     {{ f.name }}
+                                    <a class="hover-link small font-weight-normal ml-1" data-toggle="collapse" href="#effect-rule-{{ forloop.counter }}" role="button" aria-expanded="false" aria-controls="effect-rule-{{ forloop.counter }}">rule &amp; notes</a>
                                     <div class="text-muted small font-weight-normal mt-1">
                                         {% for field in f.fields %}<span class="text-monospace">{{ field }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}
                                     </div>
-                                    <div class="text-muted small font-weight-normal mt-1">{{ f.rule }}</div>
-                                    {% if f.note %}<div class="text-muted small font-weight-normal mt-1">{{ f.note }}</div>{% endif %}
+                                    <div id="effect-rule-{{ forloop.counter }}" class="collapse">
+                                        <div class="text-muted small font-weight-normal mt-1">{{ f.rule }}</div>
+                                        {% if f.note %}<div class="text-muted small font-weight-normal mt-1">{{ f.note }}</div>{% endif %}
+                                    </div>
                                 </th>
                                 <td class="text-monospace">{% if f.raw_min is not None %}{{ f.raw_direction.comparison }}{% else %}rule{% endif %}</td>
                                 <td class="text-monospace">{% if f.raw_min is not None %}{{ f.raw_min }}{% else %}—{% endif %}</td>
@@ -80,7 +82,12 @@
                                 <td class="text-monospace">—</td>
                                 <td class="text-monospace">{% if f.raw_max is not None %}{{ f.raw_max }}{% else %}—{% endif %}</td>
                                 <td>
-                                    <a class="hover-link" href="{{ f.source_url }}" target="_blank" title="{{ f.source_detail }}">{{ f.source }}</a>
+                                    <a class="hover-link" href="#{{ ref }}" title="{{ f.source_detail }}">{{ f.source }}</a>
+                                    {% if see_also %}
+                                        <div class="text-muted small mt-1">
+                                            see also {% for source, see_also_ref in see_also %}<a class="hover-link" href="#{{ see_also_ref }}">{{ source }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}
+                                        </div>
+                                    {% endif %}
                                 </td>
                             </tr>
                         {% endfor %}
@@ -124,14 +131,17 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for b in colour_bands %}
+                        {% for b, ref in colour_bands %}
                             <tr>
                                 <th>
                                     {{ b.name }}
+                                    {% if b.note %}
+                                        <a class="hover-link small font-weight-normal ml-1" data-toggle="collapse" href="#band-note-{{ forloop.counter }}" role="button" aria-expanded="false" aria-controls="band-note-{{ forloop.counter }}">notes</a>
+                                    {% endif %}
                                     <div class="text-muted small font-weight-normal mt-1">
                                         {% for field in b.fields %}<span class="text-monospace">{{ field }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}
                                     </div>
-                                    {% if b.note %}<div class="text-muted small font-weight-normal mt-1">{{ b.note }}</div>{% endif %}
+                                    {% if b.note %}<div id="band-note-{{ forloop.counter }}" class="collapse text-muted small font-weight-normal mt-1">{{ b.note }}</div>{% endif %}
                                 </th>
                                 <td class="text-monospace">
                                     {% if b.max_benign_threshold is not None %}
@@ -144,11 +154,7 @@
                                     {% else %}&mdash;{% endif %}
                                 </td>
                                 <td>
-                                    {% if b.source_url %}
-                                        <a class="hover-link" href="{{ b.source_url }}" target="_blank" title="{{ b.source_detail }}">{{ b.source }}</a>
-                                    {% else %}
-                                        {{ b.source }}
-                                    {% endif %}
+                                    {% if ref %}<a class="hover-link" href="#{{ ref }}" title="{{ b.source_detail }}">{{ b.source }}</a>{% else %}{{ b.source }}{% endif %}
                                 </td>
                             </tr>
                         {% endfor %}
@@ -158,13 +164,13 @@
         </div>
 
         <h5 class="mt-4">References</h5>
-        <ul>
-            {% for detail, url in references.items %}
-                <li>
+        <ol class="reference-list">
+            {% for anchor, detail, url in references %}
+                <li id="{{ anchor }}">
                     {{ detail }}
                     {% if url %}<a class="hover-link" href="{{ url }}" target="_blank">{{ url }}</a>{% endif %}
                 </li>
             {% endfor %}
-        </ul>
+        </ol>
     </div>
 {% endblock content %}

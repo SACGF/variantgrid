@@ -1,4 +1,4 @@
-import itertools
+from typing import Optional
 
 import cdot
 from django.conf import settings
@@ -336,28 +336,38 @@ def view_pathogenicity_thresholds(request):
     """ Reference page for every cutoff that colours a number on the variant details page: the
     ClinGen-calibrated PP3/BP4 raw-score cutoffs DamageNode also filters on (TOOLS) with the Effect node's rules
     over categorical or uncalibrated annotations (EFFECT_NODE_FILTERS) in the same table, the rankscore bands,
-    and the conservation / splicing / amino acid bands (COLOUR_BANDS). """
-    tools = [t for t in TOOLS if t.raw_field]
-    rankscore_tools = [t for t in TOOLS if t.rankscore_field]
-    citations = [(t.source_detail, t.source_url) for t in itertools.chain(tools, rankscore_tools, COLOUR_BANDS,
-                                                                          EFFECT_NODE_FILTERS)]
-    citations.extend(ref for f in EFFECT_NODE_FILTERS for ref in f.references)
-    # One reference per paper (keyed by URL, so a paper cited with different detail text appears once), first-seen order
-    references = {}
-    cited_urls = set()
-    for source_detail, source_url in citations:
+    and the conservation / splicing / amino acid bands (COLOUR_BANDS). Each source links to its numbered
+    reference at the foot of the page, which links out to the paper. """
+    # One reference per paper (keyed by URL, so a paper cited with different detail text appears once),
+    # numbered in the order the page first cites it
+    references: dict[str, tuple[str, str, str]] = {}
+
+    def reference_anchor(source_detail: str, source_url: str) -> Optional[str]:
+        if not source_detail:
+            return None
         key = source_url or source_detail
-        if source_detail and key not in cited_urls:
-            cited_urls.add(key)
-            references[source_detail] = source_url
+        if key not in references:
+            references[key] = (f"ref-{len(references) + 1}", source_detail, source_url)
+        return references[key][0]
+
+    tools = [(t, reference_anchor(t.source_detail, t.source_url)) for t in TOOLS if t.raw_field]
+    effect_node_filters = [
+        (f, reference_anchor(f.source_detail, f.source_url),
+         [(source, reference_anchor(detail, url)) for source, detail, url in f.references])
+        for f in EFFECT_NODE_FILTERS
+    ]
+    colour_bands = [(b, reference_anchor(b.source_detail, b.source_url)) for b in COLOUR_BANDS]
+    rankscore_tools = [t for t in TOOLS if t.rankscore_field]
+    for t in rankscore_tools:
+        reference_anchor(t.source_detail, t.source_url)
     context = {
         "tools": tools,
         "rankscore_tools": rankscore_tools,
-        "colour_bands": COLOUR_BANDS,
-        "effect_node_filters": EFFECT_NODE_FILTERS,
+        "colour_bands": colour_bands,
+        "effect_node_filters": effect_node_filters,
         "max_benign_rankscore": settings.ANNOTATION_MAX_BENIGN_RANKSCORE,
         "min_pathogenic_rankscore": settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE,
-        "references": references,
+        "references": references.values(),
     }
     return render(request, "annotation/view_pathogenicity_thresholds.html", context)
 
