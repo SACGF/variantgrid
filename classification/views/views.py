@@ -625,7 +625,7 @@ def view_classification_diff(request):
     context = {
         'records_json': records_json,
         'show_copied_only': settings.CLASSIFICATION_DIFF_COPIED_ONLY,
-        'copied_only': settings.CLASSIFICATION_DIFF_COPIED_ONLY and request.GET.get('copied_only') == '1',
+        'copied_only': request.GET.get('copied_only') == '1',
     }
     return render(request, 'classification/classification_diff.html', context)
 

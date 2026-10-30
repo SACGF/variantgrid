@@ -12,7 +12,7 @@ const Diff = (function() {
         
         this.flagParams = flagParams;
         this.showCopiedOnly = Boolean((options || {}).showCopiedOnly);
-        this.copiedOnly = Boolean((options || {}).copiedOnly);
+        this.copiedOnly = this.showCopiedOnly && Boolean((options || {}).copiedOnly);
         this.versions = records.map(r => {
             const merged = Object.assign({}, r, r.data); 
             delete merged['data'];
