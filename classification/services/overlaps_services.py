@@ -456,13 +456,11 @@ class OverlapServices:
         if not OverlapSnapshot.is_notify_relevant(old_state, new_state):
             # change isn't worth notifying, but if we were already notifying (with a previous state), update that notification
             # so find the existing notification (if one exists) and update it, but don't create one
-            odn = OverlapDiscordanceNotification.objects.filter(overlap=overlap, lab__isnull=True,
-                                                                notification_sent_date__isnull=True).first()
+            odn = OverlapDiscordanceNotification.objects.filter(overlap=overlap, notification_sent_date__isnull=True).first()
         else:
             # change is worth notifying, so find the existing notification if one exists and update it, or create a new one
             odn, created = OverlapDiscordanceNotification.objects.get_or_create(
                 overlap=overlap,
-                lab=None,
                 notification_sent_date=None,
                 defaults={
                     "old_state": old_state.to_dict(),
@@ -487,9 +485,8 @@ class OverlapServices:
         Also sends an overall notification to admins about the discordances
 
         The notifications are marked sent and the messages built inside the transaction, but only sent once it commits,
-        each send on its own, so a failing Slack/email send never rolls back or repeats the rest of the batch. A failed
-        admin message is only reported. A failed lab message is reported and its notifications left unsent for that lab
-        alone (OverlapDiscordanceNotification.lab), so the next run retries it without repeating anyone else's (#2279).
+        each send on its own: a failing Slack/email send is reported, not retried, and never rolls back or repeats the
+        rest of the batch (#2279).
         :param outstanding_notifications: which notifications to send, if blank then inspect all unsent notifications
         :return: True if notifications were processed (False if there were none, or an import is ongoing)
         """
@@ -505,14 +502,14 @@ class OverlapServices:
         if not outstanding_notifications.exists():
             return False
 
-        outstanding_notifications = outstanding_notifications.select_related("overlap", "lab")
+        outstanding_notifications = outstanding_notifications.select_related("overlap")
         with transaction.atomic():
-            outstanding_notifications = outstanding_notifications.select_for_update(of=("self", "overlap"))
+            outstanding_notifications = outstanding_notifications.select_for_update()
 
             current_date = now()
             relevant_notifications: list[OverlapDiscordanceNotification] = []
             notifications_by_lab: dict[Lab, list[OverlapDiscordanceNotification]] = defaultdict(list)
-            admin_messages: list[NotificationBuilder] = []
+            messages: list[NotificationBuilder] = []
 
             for notification in outstanding_notifications:
                 if not notification.is_still_relevant:
@@ -525,11 +522,6 @@ class OverlapServices:
                 notification.notification_sent_date = current_date
                 relevant_notifications.append(notification)
 
-                if notification.lab:
-                    # a retry of a lab message that failed to send, admins were already told
-                    notifications_by_lab[notification.lab].append(notification)
-                    continue
-
                 # we could also contact labs that were once part of the Overlap but are no longer
                 # though currently not possible to tell if they were part of the allele from years back or from minutes ago and just withdrew
                 # so for now only support notifying when new labs add to the Overlap
@@ -541,48 +533,24 @@ class OverlapServices:
                         notifications_by_lab[lab].append(notification)
 
                 # one admin message per discordance so we don't try to send a single message too big for slack
-                admin_messages.append(OverlapServices._admin_message(notification, labs))
+                messages.append(OverlapServices._admin_message(notification, labs))
 
-            lab_messages = [(OverlapServices._lab_message(lab, notifications), notifications)
-                            for lab, notifications in notifications_by_lab.items()]
+            for lab, notifications in notifications_by_lab.items():
+                messages.append(OverlapServices._lab_message(lab, notifications))
 
             OverlapDiscordanceNotification.objects.bulk_update(relevant_notifications,
                                                                fields=['notification_sent_date'])
             # on_commit rather than after the block, as we may be inside a caller's transaction (e.g. a recalc_overlap)
-            transaction.on_commit(partial(OverlapServices._send_messages, admin_messages, lab_messages))
+            transaction.on_commit(partial(OverlapServices._send_messages, messages))
         return True
 
     @staticmethod
-    def _send_messages(admin_messages: list[NotificationBuilder],
-                       lab_messages: list[tuple[LabNotificationBuilder, list[OverlapDiscordanceNotification]]]):
-        for message in admin_messages:
-            OverlapServices._send_message(message)
-
-        failed_lab_messages = [(message, notifications) for message, notifications in lab_messages
-                               if not OverlapServices._send_message(message)]
-        for message, notifications in failed_lab_messages:
-            OverlapServices._retry_for_lab(message.lab, notifications)
-
-    @staticmethod
-    def _send_message(message: NotificationBuilder) -> bool:
-        try:
-            message.send()
-            return True
-        except Exception:
-            report_exc_info(extra_data={"notification": message.message})
-            return False
-
-    @staticmethod
-    def _retry_for_lab(lab: Lab, notifications: list[OverlapDiscordanceNotification]):
-        """ Leaves notifications unsent for lab alone, so the next run sends it the lab message again """
-        retries = [notification for notification in notifications if notification.lab_id]
-        OverlapDiscordanceNotification.objects.filter(pk__in=[retry.pk for retry in retries]).update(
-            notification_sent_date=None)
-        OverlapDiscordanceNotification.objects.bulk_create([
-            OverlapDiscordanceNotification(overlap=notification.overlap, old_state=notification.old_state,
-                                           new_state=notification.new_state, lab=lab)
-            for notification in notifications if not notification.lab_id
-        ])
+    def _send_messages(messages: list[NotificationBuilder]):
+        for message in messages:
+            try:
+                message.send()
+            except Exception:
+                report_exc_info(extra_data={"notification": message.message})
 
     @staticmethod
     def _admin_message(notification: OverlapDiscordanceNotification, labs: set[Lab]) -> NotificationBuilder:
