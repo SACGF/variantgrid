@@ -1,9 +1,12 @@
 {% extends "uicore/page/base.html" %}
 {% load static %}
 {% load js_tags %}
+{% load compress %}
 {% block title %}Variant Diffs{% endblock %}
 {% block head %}
+{% compress js %}
 <script src="{% static 'js/vc_diff.js' %}"></script>
+{% endcompress %}
 <script>
     let records = {{ records_json | jsonify }};
 

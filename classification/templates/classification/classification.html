@@ -16,7 +16,9 @@
 <script src="{% static 'js/lib/filepond/4.32.12/filepond.min.js' %}"></script>
 <script src="{% static 'js/lib/filepond/file-poster/2.5.2/filepond-plugin-file-poster.min.js' %}"></script>
 {% endif %}
+{% compress js %}
 <script src="{% static 'js/vc_form.js' %}"></script>
+{% endcompress %}
 <script>
     let vcform = new VCForm();
 
