@@ -260,3 +260,17 @@ class StructuralFilter(models.TextChoices):
     ANY = 'A', "Any"
     ONLY = 'O', "Structural only"
     EXCLUDE = 'E', "Exclude structural"
+
+
+class SpliceVaultOutOfFrame(models.TextChoices):
+    """ Which SpliceVault top events must be out of frame: ALL is Dawes 2023's "consistent with null outcomes" case,
+        TOP the most frequent event (annotation/effect_filters.py says why there's no "any event") """
+    ALL = 'A', "All top events out of frame"
+    TOP = 'T', "Top event out of frame"
+
+
+class UTRHighImpact(models.TextChoices):
+    """ The Martin-Geary 2025 high-impact 5' UTR rule, as published (oORF in any frame) or keeping only an oORF out
+        of frame with the CDS - an in-frame one is an N-terminal extension (Ellingford 2022) """
+    OUT_OF_FRAME = 'O', "High-impact 5' UTR, out-of-frame oORF only"
+    ANY_FRAME = 'A', "High-impact 5' UTR, any frame (Martin-Geary 2025)"

@@ -1,5 +1,6 @@
 {% extends "analysis/node_editors/grid_editor.html" %}
 {% load js_tags %}
+{% load static %}
 {% block content %}
 <style>
 	.individual-pathogenic-prediction {
@@ -78,206 +79,14 @@
 	    color: #888;
 	}
 </style>
+<script src="{% static 'js/analysis/damagenode_editor.js' %}"></script>
 <script>
-    var columnsVersion = {{ node.columns_version | jsonify }};
-    var showRequiredFilter = {{ node.has_required | jsonify }};
-    var hasIndividualPathogenicPredictions = {{ node.has_individual_pathogenic_predictions | jsonify }};
-    var hasRankscorePredictions = {{ node.has_rankscore_predictions | jsonify }};
-
-    function toggleRequiredFilter() {
-        showRequiredFilter = !showRequiredFilter;
-        if (showRequiredFilter) {
-            $(".filter-required").show();
-        } else {
-            $(".filter-required").hide();
-            // clear them so they don't apply if invisible
-            let frInputs = $("input", ".filter-required");
-            frInputs.prop("checked", false);
-        }
-    }
-
-    function setupVariantClassGroups() {
-        // Group checkboxes are unnamed - they drive the individual (named) checkboxes that get submitted
-        $(".variant-class-group").each(function() {
-            let groupCheckbox = $(this);
-            updateVariantClassGroup(groupCheckbox);
-            groupCheckbox.change(function() {
-                variantClassGroupCheckboxes(groupCheckbox).prop("checked", groupCheckbox.prop("checked"));
-            });
-            variantClassGroupCheckboxes(groupCheckbox).change(function() {
-                updateVariantClassGroup(groupCheckbox);
-            });
-        });
-    }
-
-    function variantClassGroupCheckboxes(groupCheckbox) {
-        return $("#variant-class-individual").find(".variant-class-group-classes[data-group='" +
-                 groupCheckbox.data("group") + "'] input[type=checkbox]");
-    }
-
-    function updateVariantClassGroup(groupCheckbox) {
-        let boxes = variantClassGroupCheckboxes(groupCheckbox);
-        let numChecked = boxes.filter(":checked").length;
-        groupCheckbox.prop("checked", numChecked > 0 && numChecked === boxes.length);
-        groupCheckbox.prop("indeterminate", numChecked > 0 && numChecked < boxes.length);
-    }
-
-    function toggleVariantClasses() {
-        $("#variant-class-individual").toggle();
-    }
-
-    function showIndividualPathogenicPredictions() {
-        // From v4 the rankscores share this class but are split into their own legacy group, so the
-        // main toggle reveals only the non-rankscore (raw-score) rows; rankscores use showRankscores().
-        let rows = $(".individual-pathogenic-prediction");
-        if (columnsVersion >= 4) {
-            rows = rows.not(".rankscore-prediction");
-        }
-        rows.show();
-        $("#show-individual-pathogenic-prediction").hide();
-    }
-
-    function showRankscores() {
-        $(".rankscore-prediction").show();
-        $("#show-rankscore-prediction").hide();
-    }
-
-    // Draw the calibrated PP3/BP4 cutoff bands over a raw-score slider track. The thresholds come
-    // from data-pathogenic-min / data-benign-max (set in DamageNodeForm from the per-tool TOOLS table);
-    // sliders without them (rankscores, splice, cosmic) get no bands.
-    function addCutoffBands(inputSelector, sliderSelector) {
-        let sliderMin = Number(inputSelector.attr("min"));
-        let sliderMax = Number(inputSelector.attr("max"));
-        let range = sliderMax - sliderMin;
-        if (!range) {
-            return;
-        }
-        let benignMax = inputSelector.attr("data-benign-max");
-        if (typeof benignMax !== 'undefined') {
-            let pct = (Number(benignMax) - sliderMin) / range * 100;
-            $('<div class="cutoff-band cutoff-band-benign"></div>')
-                .css({left: 0, width: pct + "%"})
-                .attr("title", "BP4-supporting (benign) ≤ " + benignMax)
-                .prependTo(sliderSelector.parent(".slider-track"));
-        }
-        let pathMin = inputSelector.attr("data-pathogenic-min");
-        if (typeof pathMin !== 'undefined') {
-            let pct = (Number(pathMin) - sliderMin) / range * 100;
-            $('<div class="cutoff-band cutoff-band-pathogenic"></div>')
-                .css({left: pct + "%", width: (100 - pct) + "%"})
-                .attr("title", "PP3-supporting (pathogenic) ≥ " + pathMin)
-                .prependTo(sliderSelector.parent(".slider-track"));
-        }
-    }
-
-    // Colour the chosen threshold readout by which calibrated band it falls in. No-op for sliders
-    // that have no calibrated thresholds, so splice/cosmic/rankscore values keep their default colour.
-    function colourSliderValue(inputSelector, sliderSelector) {
-        let container = sliderSelector.parents(".slider-container");
-        let sliderValue = $(".slider-value", container);
-        sliderValue.removeClass("in-benign in-intermediate in-pathogenic");
-        let benignMax = inputSelector.attr("data-benign-max");
-        let pathMin = inputSelector.attr("data-pathogenic-min");
-        if (typeof benignMax === 'undefined' && typeof pathMin === 'undefined') {
-            return;
-        }
-        let value = inputSelector.val();
-        if (value === '') {
-            return;
-        }
-        let v = Number(value);
-        if (typeof pathMin !== 'undefined' && v >= Number(pathMin)) {
-            sliderValue.addClass("in-pathogenic");
-        } else if (typeof benignMax !== 'undefined' && v <= Number(benignMax)) {
-            sliderValue.addClass("in-benign");
-        } else {
-            sliderValue.addClass("in-intermediate");
-        }
-    }
-
-
-    function setupDamageNodeSlider(inputSelector, sliderSelector, enableInput) {
-        setupSlider(inputSelector, sliderSelector);
-        addCutoffBands(inputSelector, sliderSelector);
-        colourSliderValue(inputSelector, sliderSelector);
-        // setupSlider's own input handler updates inputSelector.val() first, so recolour from it here
-        sliderSelector.on("input", function () {
-            colourSliderValue(inputSelector, sliderSelector);
-        });
-        let sliderVal = inputSelector.val();
-
-        if (enableInput) {
-            let row = enableInput.parents("tr");
-            let filterRequired = $(".filter-required", row);
-            let frInputs = $("input", filterRequired);
-
-            enableInput.change(function () {
-                if ($(this).is(":checked")) {
-                    sliderSelector.prop("disabled", false);
-                    frInputs.prop("disabled", false);
-                    colourSliderValue(inputSelector, sliderSelector);
-                } else {
-                    setVisibleSliderValue(inputSelector, sliderSelector, "");
-                    sliderSelector.val(sliderSelector.attr("min"));
-                    sliderSelector.prop("disabled", true);
-                    inputSelector.val("");
-                    colourSliderValue(inputSelector, sliderSelector);
-                    frInputs.prop("disabled", true);
-                }
-            });
-            if (sliderVal === '') {
-                enableInput.prop("checked", false);
-                frInputs.prop("disabled", true);
-            } else {
-                enableInput.prop("checked", true);
-                frInputs.prop("disabled", false);
-            }
-        }
-
-        sliderSelector.prop("disabled", sliderVal === '');
-    }
-
-
-    $(document).ready(function() {
-        let damageForm = $("form#damage-filter");
-        ajaxForm(damageForm);
-
-        setupVariantClassGroups();
-
-        setupDamageNodeSlider($("#id_splice_min"), $("#splice-slider"), $("input#enable-splice"));
-        setupDamageNodeSlider($("#id_cosmic_count_min"), $("#cosmic-count-slider"), $("input#enable-cosmic-count"));
-        setupDamageNodeSlider($("#id_damage_predictions_min"), $("#damage-predictions-min-slider"), $("input#enable-damage-predictions"));
-
-        {% if node.columns_version == 1 %}
-            setupDamageNodeSlider($("#id_cadd_score_min"), $("#cadd-slider"), $("input#enable-cadd"));
-            setupDamageNodeSlider($("#id_revel_score_min"), $("#revel-slider"), $("input#enable-revel"));
-        {% elif node.columns_version >= 2 %}
-            {% if node.columns_version >= 3 %}
-                setupDamageNodeSlider($("#id_alphamissense_rankscore_min"), $("#alphamissense_rankscore-slider"), $("input#enable-alphamissense_rankscore"));
-            {% endif %}
-
-            setupDamageNodeSlider($("#id_bayesdel_noaf_rankscore_min"), $("#bayesdel_noaf_rankscore-slider"), $("input#enable-bayesdel_noaf_rankscore"));
-            setupDamageNodeSlider($("#id_cadd_raw_rankscore_min"), $("#cadd_raw_rankscore-slider"), $("input#enable-cadd_raw_rankscore"));
-            setupDamageNodeSlider($("#id_clinpred_rankscore_min"), $("#clinpred_rankscore-slider"), $("input#enable-clinpred_rankscore"));
-            setupDamageNodeSlider($("#id_metalr_rankscore_min"), $("#metalr_rankscore-slider"), $("input#enable-metalr_rankscore"));
-            setupDamageNodeSlider($("#id_revel_rankscore_min"), $("#revel_rankscore-slider"), $("input#enable-revel_rankscore"));
-            setupDamageNodeSlider($("#id_vest4_rankscore_min"), $("#vest4_rankscore-slider"), $("input#enable-vest4_rankscore"));
-            {% if node.columns_version >= 4 %}
-                {% for row in form.get_raw_score_rows %}
-                    setupDamageNodeSlider($("#id_{{ row.threshold_field }}"), $("#{{ row.field }}-slider"), $("input#enable-{{ row.field }}"));
-                {% endfor %}
-            {% endif %}
-        {% endif %}
-
-        if (showRequiredFilter) {
-            $(".filter-required").show();
-        }
-        if (hasIndividualPathogenicPredictions) {
-            showIndividualPathogenicPredictions();
-        }
-        if (hasRankscorePredictions) {
-            showRankscores();
-        }
+    initDamageNodeEditor({
+        columnsVersion: {{ node.columns_version | jsonify }},
+        showRequiredFilter: {{ node.has_required | jsonify }},
+        hasIndividualPathogenicPredictions: {{ node.has_individual_pathogenic_predictions | jsonify }},
+        hasRankscorePredictions: {{ node.has_rankscore_predictions | jsonify }},
+        sliders: {{ form.get_slider_setups | jsonify }},
     });
 </script>
 <div>
@@ -297,7 +106,7 @@
             <tr class="editor-table-head">
                 <th></th>
                 <th></th>
-                <th><a class="hover-link" href="javascript:toggleRequiredFilter()"
+                <th><a class="hover-link" href="#" id="toggle-required-filter"
                        title="Show/hide the Required and Allow Null columns. Variants must pass every Required filter, plus at least one of the others">Required</a></th>
                 <th class="collapse filter-required">
                     <span class="hover-detail" data-toggle="tooltip"
@@ -317,7 +126,7 @@
                         <label class="variant-class-exclude-label" title="Show everything except the selected types">
                             {{ form.variant_class_exclude }} exclude
                         </label>
-                        <a class="hover-link" href="javascript:toggleVariantClasses()">Individual variant classes...</a>
+                        <a class="hover-link" href="#" id="toggle-variant-classes">Individual variant classes...</a>
                     </div>
                     <div id="variant-class-individual">
                         {% for group_name, subwidgets in form.get_variant_class_groups %}
@@ -361,6 +170,28 @@
                             <span class='label max-value right'></span>
                         </div>
                     </span>
+                    {% if node.has_alphagenome_splicing %}
+                        <div class="mt-1">
+                            <label for="enable-alphagenome-splicing" class="mb-0"
+                                   title="AlphaGenome merged splicing score (0 to ~3), kept as another OR term in this filter beside SpliceAI and dbscSNV. No published cutoff - uncalibrated">AlphaGenome splicing &ge;</label>
+                            <a class="text-muted small" href="https://deepmind.google.com/science/alphagenome/downloads" target="_blank"
+                               title="AlphaGenome merged splicing scores are licensed for non-commercial use only, and not for diagnostic procedures">non-commercial use only</a>
+                            {{ form.alphagenome_splicing_min.errors }}
+                            <div>
+                                <input id="enable-alphagenome-splicing" title="Enable AlphaGenome splicing slider" class="enable-slider" type="checkbox" />
+                                <span class='slider-container'>
+                                    <div class="display-flex">
+                                        <span class="slider-track"><input type="range" id="alphagenome-splicing-slider" class='slider' /></span>
+                                        <div class='label slider-value'></div>
+                                    </div>
+                                    <div class='slider-labels'>
+                                        <span class='label min-value left'></span>
+                                        <span class='label max-value right'></span>
+                                    </div>
+                                </span>
+                            </div>
+                        </div>
+                    {% endif %}
                 </td>
                 <td class="collapse filter-required">{{ form.splice_required }}</td>
                 <td class="collapse filter-required">{{ form.splice_allow_null }}</td>
@@ -376,7 +207,7 @@
                     <input id="enable-damage-predictions" title="Enable Damage Predictions slider" class="enable-slider" type="checkbox" />
                     <span class='slider-container'>
                         <div class="display-flex">
-                            <span class="slider-track"><input type="range" id="damage-predictions-min-slider" class='slider' /></span>
+                            <span class="slider-track"><input type="range" id="damage-predictions-slider" class='slider' /></span>
                             <div class='label slider-value'></div>
                         </div>
                         <div class='slider-labels'>
@@ -390,7 +221,7 @@
             </tr>
             <tr id="show-individual-pathogenic-prediction">
                 <td colspan="2">
-                    <a class="hover-link" href="javascript:showIndividualPathogenicPredictions()">Show individual pathogenicity predictions</a>
+                    <a class="hover-link" href="#">Show individual pathogenicity predictions</a>
                 </td>
                 <td></td>
                 <td></td>
@@ -398,7 +229,7 @@
             {% if node.columns_version >= 4 and node.show_rankscore_sliders %}
                 <tr id="show-rankscore-prediction">
                     <td colspan="2">
-                        <a class="hover-link" href="javascript:showRankscores()">Show rankscores (legacy)</a>
+                        <a class="hover-link" href="#">Show rankscores (legacy)</a>
                     </td>
                     <td></td>
                     <td></td>
@@ -641,6 +472,22 @@
                         <td>{{ form.ptc_nmd_escaping.errors }} {{ form.ptc_nmd_escaping }}</td>
                         <td class="collapse filter-required">{{ form.ptc_nmd_escaping_required }}</td>
                         <td class="collapse filter-required"> <!-- ptc_nmd_escaping is non-nullable --> </td>
+                    </tr>
+                {% endif %}
+                {% if node.has_splicevault %}
+                    <tr>
+                        <th title="SpliceVault's top mis-splicing events at a splice site SpliceAI predicts lost. 'All top events' keeps a variant whose top events are all out of frame (Dawes 2023's consistent-with-null case), 'Top event' one whose most frequent event is. A looser 'any event' screen isn't offered because nearly every SpliceVault-annotated variant has one">SpliceVault</th>
+                        <td>{{ form.splicevault_out_of_frame.errors }} {{ form.splicevault_out_of_frame }}</td>
+                        <td class="collapse filter-required">{{ form.splicevault_out_of_frame_required }}</td>
+                        <td class="collapse filter-required">{{ form.splicevault_out_of_frame_allow_null }}</td>
+                    </tr>
+                {% endif %}
+                {% if node.has_utr_annotator %}
+                    <tr>
+                        <th title="UTRAnnotator: uAUG gain or uFrameshift creating an oORF, or uSTOP loss with no alternative stop, each with strong/moderate Kozak; or uAUG loss with strong Kozak (Martin-Geary 2025). Out-of-frame only drops an oORF in frame with the CDS - an N-terminal extension, not necessarily loss of function (Ellingford 2022)">5' UTR (UTRAnnotator)</th>
+                        <td>{{ form.utr_high_impact.errors }} {{ form.utr_high_impact }}</td>
+                        <td class="collapse filter-required">{{ form.utr_high_impact_required }}</td>
+                        <td class="collapse filter-required">{{ form.utr_high_impact_allow_null }}</td>
                     </tr>
                 {% endif %}
             {% endif %}

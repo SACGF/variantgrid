@@ -9,9 +9,10 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models.query_utils import Q
 
-from analysis.enums import ALoFTPredictionOptions, StructuralFilter
+from analysis.enums import ALoFTPredictionOptions, SpliceVaultOutOfFrame, StructuralFilter, UTRHighImpact
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeChip, NodeIcon, grouped_chips
+from annotation.effect_filters import splicevault_out_of_frame_q, utr_high_impact_q
 from annotation.enums import (
     ALoFTPrediction,
     AlphaMissensePrediction,
@@ -49,7 +50,17 @@ _COLUMN_FILTERS = (
     *(_ColumnFilter(t.pred_field, t.pred_field, f"{t.pred_field}_required") for t in TOOLS if t.pred_field),
     _ColumnFilter("nmd_escaping_variant", "nmd_escaping_variant", "nmd_escaping_variant_required", prediction=False),
     _ColumnFilter("aloft_pred", "aloft", "aloft_required", prediction=False),
+    # AlphaGenome splicing is an OR term inside the splicing filter, so it shares splice_required
+    _ColumnFilter("alphagenome_splicing", "alphagenome_splicing_min", "splice_required", prediction=False),
+    _ColumnFilter("splicevault_out_of_frame_events", "splicevault_out_of_frame", "splicevault_out_of_frame_required",
+                  prediction=False),
+    _ColumnFilter("utr_annotator_annotation", "utr_high_impact", "utr_high_impact_required", prediction=False),
 )
+
+# Added to annotation versions already in use (#2426, #2433): null on variants annotated before the switch-on until
+# VariantAnnotationVersion.backfilled_utr_avi_splicevault, so filtering on them earlier would drop every such variant
+_PLUGIN_BACKFILL_COLUMNS = frozenset({"avi_phred", "alphagenome_splicing", "splicevault_out_of_frame_events",
+                                      "utr_annotator_annotation"})
 
 
 class DamageNode(AnalysisNode):
@@ -70,6 +81,8 @@ class DamageNode(AnalysisNode):
     splice_min = models.FloatField(null=True, blank=True)
     splice_required = models.BooleanField(default=False)
     splice_allow_null = models.BooleanField(default=True)
+    # GRCh38 SNVs, non-commercial data (#2561). Its own threshold (0 to ~3) but part of the splicing filter
+    alphagenome_splicing_min = models.FloatField(null=True, blank=True)
 
     cosmic_count_min = models.IntegerField(null=True, blank=True)
     cosmic_count_required = models.BooleanField(default=False)
@@ -162,6 +175,11 @@ class DamageNode(AnalysisNode):
     promoter_ai_score_required = models.BooleanField(default=False)
     promoter_ai_score_allow_null = models.BooleanField(default=True)
 
+    # AVI PHRED is a genome-wide rank with no published cutoff (#2561) - filter only, like PromoterAI
+    avi_phred_min = models.FloatField(null=True, blank=True)
+    avi_phred_required = models.BooleanField(default=False)
+    avi_phred_allow_null = models.BooleanField(default=True)
+
     metarnn_score_min = models.FloatField(null=True, blank=True)
     metarnn_score_required = models.BooleanField(default=False)
     metarnn_score_allow_null = models.BooleanField(default=True)
@@ -222,6 +240,16 @@ class DamageNode(AnalysisNode):
     aloft_required = models.BooleanField(default=False)
     aloft_allow_null = models.BooleanField(default=True)
 
+    # #2561 - categorical plugin annotations, see annotation/effect_filters.py
+    splicevault_out_of_frame = models.CharField(max_length=1, choices=SpliceVaultOutOfFrame.choices,
+                                                null=True, blank=True)
+    splicevault_out_of_frame_required = models.BooleanField(default=False)
+    splicevault_out_of_frame_allow_null = models.BooleanField(default=True)
+
+    utr_high_impact = models.CharField(max_length=1, choices=UTRHighImpact.choices, null=True, blank=True)
+    utr_high_impact_required = models.BooleanField(default=False)
+    utr_high_impact_allow_null = models.BooleanField(default=True)
+
     def get_raw_score_tools(self) -> list[PathogenicityTool]:
         """ Tools whose raw-score slider this analysis's annotation version actually populates -
             gated off visible_columns so the editor can't offer a filter over an empty column. """
@@ -247,6 +275,22 @@ class DamageNode(AnalysisNode):
             column_filters.append(_ColumnFilter("nmd_escape_status", "ptc_nmd_escaping",
                                                 "ptc_nmd_escaping_required", prediction=False))
         return column_filters
+
+    def has_alphagenome_splicing(self) -> bool:
+        return "alphagenome_splicing" in self.analysis.annotation_version.variant_annotation_version.visible_columns
+
+    def has_splicevault(self) -> bool:
+        return ("splicevault_out_of_frame_events"
+                in self.analysis.annotation_version.variant_annotation_version.visible_columns)
+
+    def has_utr_annotator(self) -> bool:
+        return "utr_annotator_annotation" in self.analysis.annotation_version.variant_annotation_version.visible_columns
+
+    def _plugin_column_backfilled(self, column: str) -> bool:
+        """ False where the column is one the version is still waiting on a backfill for - the filter is skipped
+            (and get_warnings says so) rather than treating a not-yet-imported null as "not damaging" """
+        vav = self.analysis.annotation_version.variant_annotation_version
+        return column not in _PLUGIN_BACKFILL_COLUMNS or vav.backfilled_utr_avi_splicevault
 
     def modifies_parents(self):
         all_versions = [self.impact_min, self.splice_min, self.cosmic_count_min, self.damage_predictions_min,
@@ -298,14 +342,31 @@ class DamageNode(AnalysisNode):
                 "nmd_escape_status has not been backfilled. "
                 "Set the analysis to the latest annotation version to use the filter."
             )
-        for tool in TOOLS:
-            if tool.raw_field and getattr(self, tool.node_threshold_field) is not None:
-                if tool.raw_field not in vav.visible_columns:
-                    warnings.append(
-                        f"{tool.name} filter has no data on this VariantAnnotationVersion: "
-                        f"{tool.raw_field} is not populated on {vav.genome_build} / VEP {vav.vep} / "
-                        f"columns_version {vav.columns_version}."
-                    )
+        set_filters = [(tool.name, tool.raw_field) for tool in TOOLS
+                       if tool.raw_field and getattr(self, tool.node_threshold_field) is not None]
+        if self.alphagenome_splicing_min is not None:
+            set_filters.append(("AlphaGenome splicing", "alphagenome_splicing"))
+        if self.splicevault_out_of_frame:
+            set_filters.append(("SpliceVault out of frame", "splicevault_out_of_frame_events"))
+        if self.utr_high_impact:
+            set_filters.append(("High-impact 5' UTR", "utr_annotator_annotation"))
+        for name, column in set_filters:
+            if column not in vav.visible_columns:
+                warnings.append(
+                    f"{name} filter has no data on this VariantAnnotationVersion: "
+                    f"{column} is not populated on {vav.genome_build} / VEP {vav.vep} / "
+                    f"columns_version {vav.columns_version}."
+                )
+            elif not self._plugin_column_backfilled(column):
+                warnings.append(
+                    f"{name} filter is NOT being applied on this VariantAnnotationVersion: {column} has not "
+                    "been backfilled for variants annotated before the plugin was switched on."
+                )
+        if self.utr_high_impact and not vav.backfilled_utr_effects:
+            warnings.append(
+                "High-impact 5' UTR filter may miss variants on this VariantAnnotationVersion: variants annotated "
+                "by Ensembl's UTRAnnotator kept only one of their 5' UTR effects until the UTR effects backfill."
+            )
 
         if self.splice_min is not None and vav.uses_raw_spliceai:
             warnings.append(
@@ -356,15 +417,17 @@ class DamageNode(AnalysisNode):
             else:
                 or_filters.append(q_impact)
 
+        vav = self.analysis.annotation_version.variant_annotation_version
+        splicing_q_list = []
         if self.splice_min is not None:
             # [consequence contains 'splice' OR not null splice region] AND [variant class not SNV]
             q_splice_indels = Q(variantannotation__consequence__contains='splice') | Q(variantannotation__splice_region__isnull=False)
             q_splice_indels &= Q(variantannotation__variant_class__ne="SN")
-            splicing_q_list = [
+            splicing_q_list.extend([
                 q_splice_indels,
                 Q(variantannotation__dbscsnv_ada_score__gte=self.splice_min),
                 Q(variantannotation__dbscsnv_rf_score__gte=self.splice_min),
-            ]
+            ])
             if self.splice_required and self.splice_allow_null:
                 splicing_q_list.extend([
                     Q(variantannotation__dbscsnv_ada_score__isnull=True),
@@ -374,7 +437,6 @@ class DamageNode(AnalysisNode):
             # SpliceAI: use the optimised spliceai_max_ds column when the VAV has
             # been backfilled, otherwise fall back to the per-DS-field loop
             # (pre-c6f3c4e6f). See VariantAnnotationVersion.backfilled_spliceai_max_ds.
-            vav = self.analysis.annotation_version.variant_annotation_version
             if vav.backfilled_spliceai_max_ds:
                 splicing_q_list.append(Q(variantannotation__spliceai_max_ds__gte=self.splice_min))
                 if self.splice_required and self.splice_allow_null:
@@ -385,6 +447,12 @@ class DamageNode(AnalysisNode):
                     if self.splice_required and self.splice_allow_null:
                         splicing_q_list.append(Q(**{f"variantannotation__{ds}__isnull": True}))
 
+        if self.alphagenome_splicing_min is not None and self._plugin_column_backfilled("alphagenome_splicing"):
+            splicing_q_list.append(Q(variantannotation__alphagenome_splicing__gte=self.alphagenome_splicing_min))
+            if self.splice_required and self.splice_allow_null:
+                splicing_q_list.append(Q(variantannotation__alphagenome_splicing__isnull=True))
+
+        if splicing_q_list:
             q_splicing = reduce(operator.or_, splicing_q_list)
             if self.splice_required:
                 and_filters.append(q_splicing)
@@ -429,7 +497,7 @@ class DamageNode(AnalysisNode):
             if self.columns_version >= 4:
                 for tool in TOOLS:
                     raw_field = tool.raw_field
-                    if not raw_field:
+                    if not raw_field or not self._plugin_column_backfilled(raw_field):
                         continue
                     if threshold := getattr(self, tool.node_threshold_field):
                         q_raw = self._raw_score_q(tool, threshold)
@@ -484,6 +552,25 @@ class DamageNode(AnalysisNode):
                     and_filters.append(q_aloft)
                 else:
                     or_filters.append(q_aloft)
+
+            if self.splicevault_out_of_frame and self._plugin_column_backfilled("splicevault_out_of_frame_events"):
+                top_event_only = self.splicevault_out_of_frame == SpliceVaultOutOfFrame.TOP
+                q_splicevault = splicevault_out_of_frame_q(top_event_only)
+                if self.splicevault_out_of_frame_required:
+                    if self.splicevault_out_of_frame_allow_null:
+                        q_splicevault |= Q(variantannotation__splicevault_out_of_frame_events__isnull=True)
+                    and_filters.append(q_splicevault)
+                else:
+                    or_filters.append(q_splicevault)
+
+            if self.utr_high_impact and self._plugin_column_backfilled("utr_annotator_annotation"):
+                q_utr = utr_high_impact_q(out_of_frame_only=self.utr_high_impact == UTRHighImpact.OUT_OF_FRAME)
+                if self.utr_high_impact_required:
+                    if self.utr_high_impact_allow_null:
+                        q_utr |= Q(variantannotation__utr_annotator_consequence__isnull=True)
+                    and_filters.append(q_utr)
+                else:
+                    or_filters.append(q_utr)
 
         if self.damage_predictions_min is not None:
             # Skip the damage_predictions_min filter on pre-backfill VAVs: the
@@ -578,9 +665,18 @@ class DamageNode(AnalysisNode):
         chips = super().get_node_chips()
         chips += grouped_chips(self.variant_class or [], VARIANT_CLASS_GROUPS, dict(VariantClass.choices),
                                "Variant type", exclude=self.variant_class_exclude, icon="fa-solid fa-shapes")
+        splice_titles = []
         if self.splice_min is not None:
-            chips.append(NodeChip(text="splice", icon="fa-solid fa-scissors",
-                                  title=f"Splicing prediction score >= {self.splice_min}"))
+            splice_titles.append(f"Splicing prediction score >= {self.splice_min}")
+        if self.alphagenome_splicing_min is not None:
+            splice_titles.append(f"AlphaGenome splicing >= {self.alphagenome_splicing_min}")
+        if splice_titles:
+            chips.append(NodeChip(text="splice", icon="fa-solid fa-scissors", title="\n".join(splice_titles)))
+        if self.splicevault_out_of_frame:
+            chips.append(NodeChip(text="SpliceVault", icon="fa-solid fa-scissors",
+                                  title=f"SpliceVault: {SpliceVaultOutOfFrame(self.splicevault_out_of_frame).label}"))
+        if self.utr_high_impact:
+            chips.append(NodeChip(text="5' UTR", title=f"{UTRHighImpact(self.utr_high_impact).label} (UTRAnnotator)"))
         return chips
 
     @staticmethod

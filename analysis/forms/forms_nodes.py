@@ -41,7 +41,12 @@ from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.nodes.sources.trio_node import TrioNode
 from analysis.variant_text import resolve_variant_text
 from annotation.models import VariantAnnotation
-from annotation.pathogenicity_predictions import TOOLS
+from annotation.pathogenicity_predictions import (
+    ALPHAGENOME_SPLICING_MAX,
+    ALPHAGENOME_SPLICING_MIN,
+    ALPHAGENOME_SPLICING_STEP,
+    TOOLS,
+)
 from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.models import CustomTextGeneList, GeneList, GeneListCategory, PanelAppPanel
 from library.django_utils.autocomplete_utils import ListSelect2, ModelSelect2, ModelSelect2Multiple
@@ -592,6 +597,9 @@ class DamageNodeForm(BaseNodeForm):
         widgets = {
             "accordion_panel": HiddenInput(),
             "splice_min": HiddenInput(attrs={"min": 0, "max": 1, "step": 0.1}),
+            "alphagenome_splicing_min": HiddenInput(attrs={"min": ALPHAGENOME_SPLICING_MIN,
+                                                           "max": ALPHAGENOME_SPLICING_MAX,
+                                                           "step": ALPHAGENOME_SPLICING_STEP}),
             "cosmic_count_min": HiddenInput(attrs={"min": 0, "max": 50, "step": 1}),
             "damage_predictions_min": HiddenInput(attrs={"min": 0}),
             # Columns v1
@@ -637,6 +645,27 @@ class DamageNodeForm(BaseNodeForm):
             "required_field": self[f"{tool.raw_field}_required"],
             "allow_null_field": self[f"{tool.raw_field}_allow_null"],
         } for tool in self.instance.get_raw_score_tools()]
+
+    def get_slider_setups(self) -> list[dict]:
+        """ Selectors for each slider the editor draws: the hidden form field, the range input and its enable
+            checkbox - passed to initDamageNodeEditor (damagenode_editor.js) """
+        node = self.instance
+        sliders = [("splice_min", "splice"), ("cosmic_count_min", "cosmic-count"),
+                   ("damage_predictions_min", "damage-predictions")]
+        if node.has_alphagenome_splicing():
+            sliders.append(("alphagenome_splicing_min", "alphagenome-splicing"))
+        if node.columns_version == 1:
+            sliders.extend([("cadd_score_min", "cadd"), ("revel_score_min", "revel")])
+        elif node.columns_version >= 2:
+            rankscore_fields = ["bayesdel_noaf_rankscore", "cadd_raw_rankscore", "clinpred_rankscore",
+                                "metalr_rankscore", "revel_rankscore", "vest4_rankscore"]
+            if node.columns_version >= 3:
+                rankscore_fields.insert(0, "alphamissense_rankscore")
+            sliders.extend((f"{field}_min", field) for field in rankscore_fields)
+            if node.columns_version >= 4:
+                sliders.extend((row["threshold_field"], row["field"]) for row in self.get_raw_score_rows())
+        return [{"input": f"#id_{field}", "slider": f"#{name}-slider", "enable": f"input#enable-{name}"}
+                for field, name in sliders]
 
     def get_pred_rows(self) -> list[dict]:
         """ Per-tool bound fields for the categorical prediction dropdown rows """
