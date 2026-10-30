@@ -191,6 +191,16 @@ class ConsensusComparisonTestCase(TestCase):
         self.assertEqual(row.key, "condition")
         self.assertEqual([cell is None for cell in row.cells], [False, True])
 
+    def test_system_bookkeeping_and_hidden_keys_never_make_a_record_a_choice(self):
+        """ curation_system is set on every VariantGrid record and defaults to ALLELE copy_scope - a record with
+            only a significance besides it has nothing to copy """
+        keys = ClassificationConsensus.copy_keys(COPY_SCOPES_ALL, AlleleOriginBucket.SOMATIC)
+        self.assertNotIn(SpecialEKeys.CURATION_SYSTEM, keys)
+        self.assertNotIn("a_other", keys)  # hidden
+        modification = self._modification("sig_only", "2024-01-01", **{
+            SpecialEKeys.CLINICAL_SIGNIFICANCE: "P", SpecialEKeys.CURATION_SYSTEM: "VariantGrid", "a_other": "x"})
+        self.assertFalse(ClassificationConsensus.has_copyable_content(modification, keys))
+
 
 class ResolveDefaultValueTestCase(TestCase):
     """ The tokens a lab's classification_config can use for an evidence key's default_value """

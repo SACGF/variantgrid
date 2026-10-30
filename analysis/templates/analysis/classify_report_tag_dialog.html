@@ -61,7 +61,8 @@
             <hr/>
             <h6>Gene information from {{ row.gene_symbol }}</h6>
             <p class="text-muted small">
-                Nothing has been curated for this allele. Gene content is the same for every variant in the
+                {% if row.previous %}None of the classifications above has content to copy.{% else %}Nothing has been curated for this allele.{% endif %}
+                Gene content is the same for every variant in the
                 gene - whether the tumour type it was curated for matches this case is your call.
             </p>
             {% for group in gene_groups %}

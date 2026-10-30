@@ -6,7 +6,7 @@
 const Diff = (function() {
 
     // options.copiedOnly starts the view on the fields a copy from a previous classification would write
-    // (EvidenceKey.copy_scope other than None) - what the Classify & Report pick is actually choosing between
+    // (EvidenceKey.effective_copy_scope other than None) - what the Classify & Report pick is actually choosing between
     const Diff = function(records, diffDom, eKeys, flagParams, options) {
         
         this.flagParams = flagParams;
@@ -667,6 +667,7 @@ const Diff = (function() {
             
             Flags.instance.init(this.flagParams);
             this.applyCriteriaHiding();
+            this.applyCopiedOnly();
         }
     };
 

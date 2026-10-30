@@ -264,6 +264,15 @@ class EvidenceKey(TimeStampedModel):
     def copy_scope_enum(self) -> CopyScope:
         return CopyScope(self.copy_scope)
 
+    @property
+    def effective_copy_scope(self) -> CopyScope:
+        """ How far the value actually travels. Hidden keys (not on the form, so the curator can't see what they'd
+            be copying) and immutable ones (system bookkeeping such as curation_system, set on every record) never
+            do, whatever copy_scope says - otherwise every VariantGrid record would count as having content to copy """
+        if self.hide or self.immutable:
+            return CopyScope.NONE
+        return self.copy_scope_enum
+
     copy_allele_origin = models.CharField(max_length=1, choices=CopyAlleleOrigin.choices,
                                           default=CopyAlleleOrigin.ANY)
     """
@@ -572,7 +581,7 @@ class EvidenceKey(TimeStampedModel):
             'hide': self.hide,
             'mandatory': self.mandatory,
             'see': self.see,
-            'copy_scope': self.copy_scope
+            'copy_scope': self.effective_copy_scope.value
         })
 
     @staticmethod
