@@ -145,8 +145,7 @@ class GeneLevelGeneSymbolTest(TestCase):
         self.assertTrue(SpliceEvent.objects.exists(), "the seeded junctions are still there")
 
 
-class AlphaGenomeAutopopulateTest(TestCase):
-    """ AlphaGenome splicing is licensed for non-commercial use only (#2433) """
+class VariantColumnAutopopulateTest(TestCase):
 
     @classmethod
     def setUpTestData(cls):
@@ -159,24 +158,31 @@ class AlphaGenomeAutopopulateTest(TestCase):
         with temporary_db_table(VariantAnnotation, partition_table):
             VariantAnnotation.objects.create(version=vav, variant=cls.variant,
                                              annotation_run=AnnotationRun.objects.create(),
-                                             avi_phred=23.1, alphagenome_splicing=1.4)
+                                             avi_phred=23.1, alphagenome_splicing=1.4,
+                                             repeat_masker="AluSq2&(TA)n")
 
-    @patch("classification.autopopulate_evidence_keys.evidence_from_variant.get_clingen_allele_for_variant",
-           side_effect=ClinGenAlleleAPIException("offline"))
-    def _autopopulated(self, _get_clingen_allele) -> dict:
+    def _autopopulated(self, keys: list[str]) -> dict:
         evidence_keys_list = list(EvidenceKey.objects.all().select_related("variantgrid_column"))
-        data = get_evidence_fields_for_variant(self.genome_build, self.variant, None, None,
-                                               evidence_keys_list, self.annotation_version)
-        return {key: EvidenceKey.get_value(data.data.get(key)) for key in ["avi", "alphagenome_splicing"]}
+        with patch("classification.autopopulate_evidence_keys.evidence_from_variant.get_clingen_allele_for_variant",
+                   side_effect=ClinGenAlleleAPIException("offline")):
+            data = get_evidence_fields_for_variant(self.genome_build, self.variant, None, None,
+                                                   evidence_keys_list, self.annotation_version)
+        return {key: EvidenceKey.get_value(data.data.get(key)) for key in keys}
 
     @override_settings(ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED=True)
-    def test_populated_where_allowed(self):
-        self.assertEqual({"avi": 23.1, "alphagenome_splicing": 1.4}, self._autopopulated())
+    def test_non_commercial_populated_where_allowed(self):
+        self.assertEqual({"avi": 23.1, "alphagenome_splicing": 1.4},
+                         self._autopopulated(["avi", "alphagenome_splicing"]))
 
     @override_settings(ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED=False)
-    def test_not_populated_where_disallowed(self):
-        """ A version annotated before the deployment turned the setting off still holds the scores """
-        self.assertEqual({"avi": 23.1, "alphagenome_splicing": None}, self._autopopulated())
+    def test_non_commercial_not_populated_where_disallowed(self):
+        """ AlphaGenome splicing is licensed for non-commercial use only (#2433). A version annotated before the
+            deployment turned the setting off still holds the scores """
+        self.assertEqual({"avi": 23.1, "alphagenome_splicing": None},
+                         self._autopopulated(["avi", "alphagenome_splicing"]))
+
+    def test_multi_value_column_comma_separated(self):
+        self.assertEqual({"repeat_masker": "AluSq2, (TA)n"}, self._autopopulated(["repeat_masker"]))
 
 
 class UTRAnnotatorFormatterTest(SimpleTestCase):
