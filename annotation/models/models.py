@@ -147,8 +147,8 @@ class AbstractVariantAnnotation(models.Model):
     mavedb_urn = models.TextField(null=True, blank=True)
 
     # UTRAnnotator and SpliceVault (#2426). Rows annotated before the plugins were switched on are null
-    # until backfilled (VariantAnnotationVersion.backfilled_utr_avi_splicevault), and the backfill only
-    # reaches VariantAnnotation, never VariantTranscriptAnnotation.
+    # until backfilled: VariantAnnotationVersion.backfilled_utr_avi_splicevault fills VariantAnnotation, and
+    # backfilled_utr_splicevault_transcripts fills the VariantTranscriptAnnotation rows.
 
     # UTRAnnotator - 5' UTR variants only
     utr_annotator_consequence = models.TextField(null=True, blank=True)  # eg 5_prime_UTR_premature_start_codon_gain_variant
