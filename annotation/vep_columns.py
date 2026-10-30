@@ -1360,15 +1360,25 @@ def required_data_keys(c: VEPColumnDef) -> tuple[str, ...]:
     return ()
 
 
-def has_data_files(c: VEPColumnDef, vep_config: VEPConfig) -> bool:
-    """ True iff every required vep_config key is set (non-None) for this def's build.
-        VEPConfig.__getitem__ raises KeyError when the value is missing or None. """
-    for key in required_data_keys(c):
+def _data_keys_set(data_keys: Iterable[str], vep_config: VEPConfig) -> bool:
+    """ VEPConfig.__getitem__ raises KeyError when the value is missing or None. """
+    for key in data_keys:
         try:
             _ = vep_config[key]
         except KeyError:
             return False
     return True
+
+
+def has_data_files(c: VEPColumnDef, vep_config: VEPConfig) -> bool:
+    """ True iff every required vep_config key is set (non-None) for this def's build. """
+    return _data_keys_set(required_data_keys(c), vep_config)
+
+
+def plugin_has_data_files(vep_plugin: VEPPlugin, vep_config: VEPConfig) -> bool:
+    """ True iff every vep_config key the plugin reads is set for this build - a deployment leaves one unset
+        (None) when it has no data for it, e.g. dbNSFP on T2T. """
+    return _data_keys_set(_VEP_PLUGIN_SETTING_KEYS.get(vep_plugin, ()), vep_config)
 
 
 def plugin_applies_to_build(vep_plugin: VEPPlugin, genome_build_name: str) -> bool:

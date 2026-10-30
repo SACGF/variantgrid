@@ -1,3 +1,5 @@
+import copy
+
 from django.conf import settings
 from django.test import TestCase
 from django.test.utils import override_settings
@@ -96,6 +98,16 @@ class GetVepCommandTests(TestCase):
         self.assertNotIn("--distance", cmd)
         self.assertNotIn("--gencode_primary", cmd)
         self.assertNotIn("--gencode_basic", cmd)
+
+    def test_unset_plugin_data_skipped_without_warning(self):
+        """ A deployment with no data for a plugin (dbNSFP on T2T) leaves its key None - not worth a warning """
+        annotation = copy.deepcopy(settings.ANNOTATION)
+        annotation["GRCh38"]["vep_config"]["dbnsfp"] = None
+        with override_settings(ANNOTATION=annotation), self.assertNoLogs(level="WARNING"):
+            cmd = self._cmd(AnnotationConsortium.ENSEMBL)
+        plugins = [cmd[i + 1] for i, x in enumerate(cmd) if x == "--plugin"]
+        self.assertFalse(any(p.startswith("dbNSFP") for p in plugins))
+        self.assertTrue(any(p.startswith("MaxEntScan") for p in plugins))
 
 
 def _v5_settings(vep_version: str) -> dict:

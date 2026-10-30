@@ -315,11 +315,12 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         # config (e.g. GRCh38-only plugins on GRCh37) so we never probe for their data.
         if not vep_columns.plugin_applies_to_build(vep_plugin, genome_build.name):
             continue
+        if not vep_columns.plugin_has_data_files(vep_plugin, vc):
+            continue
         try:
             cmd.extend(["--plugin", plugin_arg_func()])
         except Exception as e:
-            logging.warning(e)
-            logging.warning("No annotation set for plugin: %s", vep_plugin)
+            logging.warning("%s: skipping VEP plugin %s: %r", genome_build.name, vep_plugin.label, e)
 
     return cmd
 
