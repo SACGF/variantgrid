@@ -127,6 +127,24 @@ class PluginVepCommandTests(TestCase):
         self.assertFalse(any(p.startswith(("UTRAnnotator", "AVI", "SpliceVault")) for p in plugins))
 
 
+class NonCommercialVisibleColumnsTests(TestCase):
+    """ Non-commercial data shows on the versions annotated with it, while the deployment may use it (#2571) """
+
+    def _visible(self, alphagenome_splicing_pin) -> bool:
+        genome_build = GenomeBuild.get_name_or_alias("GRCh38")
+        kwargs = get_fake_vep_version(genome_build, AnnotationConsortium.REFSEQ, columns_version=5)
+        vav = VariantAnnotationVersion(**{**kwargs, "vep": 116, "alphagenome_splicing": alphagenome_splicing_pin})
+        return "alphagenome_splicing" in vav.visible_columns
+
+    @override_settings(**_settings_with_plugins())
+    def test_shown_on_a_version_annotated_with_it(self):
+        self.assertTrue(self._visible(os.path.basename(ALPHAGENOME_SPLICING_FILE)))
+
+    @override_settings(**_settings_with_plugins())
+    def test_hidden_on_a_version_annotated_without_it(self):
+        self.assertFalse(self._visible(None))
+
+
 class PluginPinStampTests(TestCase):
 
     @classmethod

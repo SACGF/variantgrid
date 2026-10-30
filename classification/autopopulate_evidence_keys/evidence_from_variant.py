@@ -273,13 +273,10 @@ def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
     evidence_variant_columns = {}  # Copied from query
     ekey_formatters = ekey_from_vg_column_formatters()
     column_separators = vep_columns.separators_by_variant_grid_column()
-    if settings.ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED:
-        disallowed_columns = frozenset()
-    else:  # A version annotated before the deployment turned it off still holds the data
-        disallowed_columns = vep_columns.non_commercial_variant_grid_column_ids()
+    withheld_columns = annotation_version.variant_annotation_version.withheld_non_commercial_columns
     for evidence_key in evidence_keys_list:
         if variantgrid_column := evidence_key.variantgrid_column:
-            if variantgrid_column.pk in disallowed_columns:
+            if variantgrid_column.pk in withheld_columns:
                 continue
             if variantgrid_column.annotation_level == ColumnAnnotationLevel.TRANSCRIPT_LEVEL:
                 evidence = evidence_transcript_columns
