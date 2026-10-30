@@ -19,7 +19,7 @@
                 {
                     userId: '{{user.id}}'
                 },
-                {copiedOnly: {{ copied_only|jsonify }}}
+                {showCopiedOnly: {{ show_copied_only|jsonify }}, copiedOnly: {{ copied_only|jsonify }}}
             );
             diff.render();
         });

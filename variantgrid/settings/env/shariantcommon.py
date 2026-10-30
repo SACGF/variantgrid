@@ -53,6 +53,7 @@ CLASSIFICATION_GRID_EXTERNAL_LAB_FILTER = False  # Nothing is curated on Sharian
 CLASSIFICATION_GRID_FADE_NON_SHARED = True
 CLASSIFICATION_GRID_SUMMARY_COUNTS = False  # Shariant turns this on once it chooses to show the counts
 CLASSIFICATION_GENE_CONSENSUS = False  # Records are curated in each lab's own system, not on Shariant
+CLASSIFICATION_DIFF_COPIED_ONLY = False  # Likewise, so nothing on Shariant is copied from a previous classification
 CLASSIFICATION_ALLOW_DELETE = False
 CLASSIFICATION_ALLOW_UNKNOWN_KEYS = False
 CLASSIFICATION_NON_ACMG_ASSERTION_METHOD = [

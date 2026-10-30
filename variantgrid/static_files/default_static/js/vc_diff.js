@@ -6,10 +6,12 @@
 const Diff = (function() {
 
     // options.copiedOnly starts the view on the fields a copy from a previous classification would write
-    // (EvidenceKey.effective_copy_scope other than None) - what the Classify & Report pick is actually choosing between
+    // (EvidenceKey.effective_copy_scope other than None) - what the Classify & Report pick is actually choosing between.
+    // options.showCopiedOnly offers the toggle at all (settings.CLASSIFICATION_DIFF_COPIED_ONLY)
     const Diff = function(records, diffDom, eKeys, flagParams, options) {
         
         this.flagParams = flagParams;
+        this.showCopiedOnly = Boolean((options || {}).showCopiedOnly);
         this.copiedOnly = Boolean((options || {}).copiedOnly);
         this.versions = records.map(r => {
             const merged = Object.assign({}, r, r.data); 
@@ -216,15 +218,15 @@ const Diff = (function() {
                         ]})
                     ]})
                 }),
-                $('<div>', {class:'form-inline', html:
+                this.showCopiedOnly ? $('<div>', {class:'form-inline', html:
                     $('<div>', {class: 'form-check', html: [
                         $('<label>', {class:'form-check-label', html:[
                             $('<input>', {class:'form-check-input', type: 'checkbox', id: 'copied_only', click: ()=>this.toggledCopiedOnly(), 'checked': this.copiedOnly}),
                             ' Only fields copied from a previous classification'
                         ]})
                     ]})
-                })
-            ]}).appendTo(headerRow);
+                }) : null
+            ].filter(Boolean)}).appendTo(headerRow);
 
 
             let renderDbRefCompare = function(dbRefCompared) {
