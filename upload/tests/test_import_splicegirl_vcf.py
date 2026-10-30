@@ -171,3 +171,13 @@ class TestSpliceGirlVCF(TestCase):
         self.assertAlmostEqual(27 / 600, float(ar_v7[vaf_index].strip("{}")), places=3)
         self.assertEqual("{27}", ar_v7[allele_depth_index])
         self.assertIsNone(ar_v7[read_depth_index])
+
+    def test_junctions_in_one_gene_keep_their_own_vaf(self):
+        """ Every splice variant in a gene sits on that gene's locus, and depths summed across a locus are for
+            the alts of one site - a junction is its own event, so MSH2's two (1:90 each) are 1/91, not 1/182 """
+        records, processor = self._process()
+        vaf_index = processor.cohort_gt_vaf_index
+        for record, cohort_genotype in zip(records, processor.cohort_genotypes):
+            alt_depth, ref_depth = record.format("AD")[0][0], record.format("DP")[0][0]
+            self.assertAlmostEqual(alt_depth / (alt_depth + ref_depth), float(cohort_genotype[vaf_index].strip("{}")),
+                                   places=4, msg=record.ALT[0])

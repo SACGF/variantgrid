@@ -17,6 +17,7 @@ from library.django_utils.model_utils import AsciiValue
 from library.genomics.vcf_enums import (
     UNDECLARED_FILTERS_INFO,
     UNDECLARED_FILTERS_SEPARATOR,
+    GeneLevelSymbolicAlt,
     VCFConstant,
 )
 from library.utils import json_default_converter
@@ -385,7 +386,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
     def _add_shared_locus_modified_imported_variants(self):
         """ Separate VCF rows can land on one locus - process_entry keys it on (CHROM, POS, ref), so
             e.g. two symbolic deletions with the same start and different END join up and their depths
-            are summed into one VAF denominator.
+            are summed into one VAF denominator. Gene-level events are keyed on their alt as well (#1875).
 
             Decomposed multi-allelics are the case this summing is *for*, and they already get a
             NORMALIZATION row saying so, so only genuinely separate source rows are recorded here. """
@@ -412,6 +413,9 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         # Pre-processed by vcf_filter_unknown_contigs so only recognised contigs present
         ref, alt, svlen = self.get_ref_alt_svlen(variant)
         locus_tuple = (variant.CHROM, variant.POS, ref)
+        if GeneLevelSymbolicAlt.parse(alt):
+            # Every event in a gene shares the gene's locus, but each is its own call, not an alt of one site
+            locus_tuple += (alt,)
         if self.last_locus_tuple:
             if self.last_locus_tuple != locus_tuple:
                 self.finished_locus()
