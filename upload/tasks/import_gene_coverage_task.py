@@ -8,6 +8,8 @@ from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTr
 from genes.enums import AnnotationConsortium
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import GeneCoverageCollection, TranscriptVersion
+from genes.models.models_gene_coverage import GeneCoverage
+from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
 from library.log_utils import log_traceback
 from library.utils.file_utils import name_from_filename
 from snpdb.enums import DataState
@@ -99,7 +101,10 @@ class ImportGeneCoverageTask(ImportTask):
         gene_coverage_collection.data_state = DataState.COMPLETE
         gene_coverage_collection.save()
 
-        num_records = gene_coverage_collection.genecoverage_set.count()
+        # Count from the collection's own partition: a query on the inheritance parent locks every child table
+        qs = get_queryset_with_transformer_hook(klass=GeneCoverage)
+        qs.add_sql_transformer(gene_coverage_collection.sql_partition_transformer)
+        num_records = qs.filter(gene_coverage_collection=gene_coverage_collection).count()
         return num_records
 
 
