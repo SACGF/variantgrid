@@ -3664,7 +3664,7 @@ table.overlap-summary .overlap-criteria {
   color: #666;
   white-space: nowrap;
 }
-.gene-consensus-group table.gene-content td {
+.gene-consensus-group .gene-content-text {
   white-space: pre-wrap;
 }
 .gene-consensus-group .gene-content-text.clamp {
