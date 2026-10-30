@@ -2,6 +2,8 @@ from collections import Counter, defaultdict
 
 import celery
 from django.db import transaction
+from django.db.models import F
+from django.utils import timezone
 
 from analysis.models.models_karyomapping import (
     ContigKaryomappingCounts,
@@ -13,9 +15,16 @@ from snpdb.models import Trio
 
 
 def get_or_queue_genome_karyomapping_counts(trio: Trio) -> GenomeKaryomappingCounts:
-    """ Counting reads the whole cohort, so a trio with none (eg deleted when binning changed) is counted when viewed """
-    genome_karyomapping_counts, created = GenomeKaryomappingCounts.objects.get_or_create(trio=trio)
-    if created:
+    """ Counting reads the whole cohort, so a trio with none (eg deleted when binning changed) is counted when viewed,
+        as is one whose count failed (eg the trio was made before its cohort genotypes) or never finished """
+    genome_karyomapping_counts, queue = GenomeKaryomappingCounts.objects.get_or_create(trio=trio)
+    if not queue and (retry_after := genome_karyomapping_counts.retry_after) and retry_after <= timezone.now():
+        # Conditional on modified, so concurrent views requeue it once
+        queue = GenomeKaryomappingCounts.objects.filter(
+            pk=genome_karyomapping_counts.pk, modified=genome_karyomapping_counts.modified,
+        ).update(import_status=ImportStatus.CREATED, retries=F("retries") + 1, modified=timezone.now())
+        genome_karyomapping_counts.refresh_from_db()
+    if queue:
         transaction.on_commit(create_genome_karyomapping_for_trio.si(trio.pk).apply_async)
     return genome_karyomapping_counts
 
@@ -25,6 +34,18 @@ def create_genome_karyomapping_for_trio(trio_id):
     trio = Trio.objects.get(pk=trio_id)
 
     genome_karyomapping_counts, _ = GenomeKaryomappingCounts.objects.get_or_create(trio=trio)
+    genome_karyomapping_counts.import_status = ImportStatus.IMPORTING
+    genome_karyomapping_counts.save()
+    try:
+        _count_genome_karyomapping(genome_karyomapping_counts)
+    except Exception:
+        genome_karyomapping_counts.import_status = ImportStatus.ERROR
+        genome_karyomapping_counts.save()
+        raise
+
+
+def _count_genome_karyomapping(genome_karyomapping_counts: GenomeKaryomappingCounts):
+    trio = genome_karyomapping_counts.trio
     genome_karyomapping_counts.contigkaryomappingcounts_set.all().delete()
 
     contig_code_count = defaultdict(Counter)
@@ -50,4 +71,5 @@ def create_genome_karyomapping_for_trio(trio_id):
     for code in KaryotypeBins.COLLAPSED_BINS:
         setattr(genome_karyomapping_counts, code.lower(), genome_counts.get(code))
     genome_karyomapping_counts.import_status = ImportStatus.SUCCESS
+    genome_karyomapping_counts.retries = 0
     genome_karyomapping_counts.save()
