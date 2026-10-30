@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('analysis', '0004_variant_tags_link_alleles'),
+        ('analysis', '0005_genomekaryomappingcounts_timestamps_retries'),
     ]
 
     operations = [
