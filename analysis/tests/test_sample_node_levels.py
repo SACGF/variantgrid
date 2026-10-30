@@ -468,6 +468,16 @@ class TestSampleNodeLevels(SampleNodeLevelsTestCase):
         self.assertGreater(node.version, version)
         self.assertEqual(node.get_source_samples(), [self.snv_sample])
 
+    def test_deleting_a_sample_bumps_specimen_and_patient_nodes(self):
+        specimen_node = self._node(SampleSourceLevel.SPECIMEN, self.specimen)
+        patient_node = self._node(SampleSourceLevel.PATIENT, self.patient)
+        versions = {node.pk: node.version for node in (specimen_node, patient_node)}
+
+        self.cnv_sample.delete()
+
+        for pk, version in versions.items():
+            self.assertGreater(SampleNode.objects.get(pk=pk).version, version)
+
     def test_cloning_keeps_per_sample_overrides(self):
         node = self._extraction_node(min_ad=20)
         node.samplenodesamplefilter_set.create(sample=self.snv_sample, min_ad=10)

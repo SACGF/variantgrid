@@ -1,15 +1,19 @@
 import csv
 import io
+from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from analysis.models.models_karyomapping import GenomeKaryomappingCounts, KaryotypeBins
 from analysis.tasks.karyomapping_tasks import create_genome_karyomapping_for_trio
 from annotation.fake_data import get_fake_annotation_version
 from genes.fake_data import create_fake_transcript_version
 from patients.enums import Zygosity
+from snpdb.enums import ImportStatus
 from snpdb.fake_data import create_fake_trio, make_cohort_genotype
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
@@ -83,3 +87,52 @@ class TrioKaryomappingViewTest(TestCase):
         with self.captureOnCommitCallbacks() as callbacks:
             self.client.get(reverse("view_trio", kwargs={"pk": self.trio.pk}))
         self.assertEqual(callbacks, [])  # already queued
+
+    def _view_trio_callbacks(self):
+        with self.captureOnCommitCallbacks() as callbacks:
+            response = self.client.get(reverse("view_trio", kwargs={"pk": self.trio.pk}))
+        return response, callbacks
+
+    def test_failed_count_shown_then_retried(self):
+        with patch.object(KaryotypeBins, "iter_variant_and_genotypes", side_effect=ValueError("no genotypes")):
+            with self.assertRaises(ValueError):
+                create_genome_karyomapping_for_trio(self.trio.pk)
+        genome_counts = GenomeKaryomappingCounts.objects.get(trio=self.trio)
+        self.assertEqual(genome_counts.import_status, ImportStatus.ERROR)
+
+        response, callbacks = self._view_trio_callbacks()
+        self.assertContains(response, "could not be calculated")
+        self.assertEqual(callbacks, [])  # too soon to retry
+
+        counts_qs = GenomeKaryomappingCounts.objects.filter(trio=self.trio)
+        counts_qs.update(modified=timezone.now() - GenomeKaryomappingCounts.ERROR_RETRY_AFTER)
+        response, callbacks = self._view_trio_callbacks()
+        self.assertContains(response, "reload the page once they have been calculated")
+        self.assertEqual(len(callbacks), 1)
+        _, callbacks = self._view_trio_callbacks()
+        self.assertEqual(callbacks, [])  # requeued once
+
+    def test_retries_back_off_then_give_up(self):
+        counts_qs = GenomeKaryomappingCounts.objects.filter(trio=self.trio)
+        GenomeKaryomappingCounts.objects.create(trio=self.trio, import_status=ImportStatus.ERROR, retries=1)
+        counts_qs.update(modified=timezone.now() - GenomeKaryomappingCounts.ERROR_RETRY_AFTER)
+        _, callbacks = self._view_trio_callbacks()
+        self.assertEqual(callbacks, [])  # second retry waits twice as long
+
+        counts_qs.update(retries=GenomeKaryomappingCounts.MAX_RETRIES,
+                         modified=timezone.now() - timedelta(days=1))
+        response, callbacks = self._view_trio_callbacks()
+        self.assertContains(response, "no longer retried automatically")
+        self.assertEqual(callbacks, [])
+
+    def test_stuck_count_retried(self):
+        create_genome_karyomapping_for_trio(self.trio.pk)
+        counts_qs = GenomeKaryomappingCounts.objects.filter(trio=self.trio)
+        counts_qs.update(import_status=ImportStatus.IMPORTING)
+        _, callbacks = self._view_trio_callbacks()
+        self.assertEqual(callbacks, [])  # still running
+
+        counts_qs.update(modified=timezone.now() - GenomeKaryomappingCounts.PENDING_RETRY_AFTER)
+        _, callbacks = self._view_trio_callbacks()
+        self.assertEqual(len(callbacks), 1)
+        self.assertEqual(counts_qs.get().retries, 1)
