@@ -334,17 +334,21 @@ def annotation_versions(request):
 
 def view_pathogenicity_thresholds(request):
     """ Reference page for every cutoff that colours a number on the variant details page: the
-    ClinGen-calibrated PP3/BP4 raw-score cutoffs DamageNode also filters on (TOOLS), the rankscore
-    bands, the conservation / splicing / amino acid bands (COLOUR_BANDS), and the Effect node's rules over
-    categorical or uncalibrated annotations (EFFECT_NODE_FILTERS). """
+    ClinGen-calibrated PP3/BP4 raw-score cutoffs DamageNode also filters on (TOOLS) with the Effect node's rules
+    over categorical or uncalibrated annotations (EFFECT_NODE_FILTERS) in the same table, the rankscore bands,
+    and the conservation / splicing / amino acid bands (COLOUR_BANDS). """
     tools = [t for t in TOOLS if t.raw_field]
     rankscore_tools = [t for t in TOOLS if t.rankscore_field]
-    references = {}  # source_detail -> source_url, first-seen order, for the citations section
     citations = [(t.source_detail, t.source_url) for t in itertools.chain(tools, rankscore_tools, COLOUR_BANDS,
                                                                           EFFECT_NODE_FILTERS)]
     citations.extend(ref for f in EFFECT_NODE_FILTERS for ref in f.references)
+    # One reference per paper (keyed by URL, so a paper cited with different detail text appears once), first-seen order
+    references = {}
+    cited_urls = set()
     for source_detail, source_url in citations:
-        if source_detail and source_detail not in references:
+        key = source_url or source_detail
+        if source_detail and key not in cited_urls:
+            cited_urls.add(key)
             references[source_detail] = source_url
     context = {
         "tools": tools,

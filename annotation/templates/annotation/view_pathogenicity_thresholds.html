@@ -12,7 +12,8 @@
             BP4 threshold supports benign; values in between are indeterminate. Tools without a published
             ClinGen calibration use the author-recommended cutoff (single threshold) or, where noted, have no
             calibrated threshold. The last rows are not missense pathogenicity predictors at all - they are
-            offered as Effect node filters only, and take no part in the colour bands or the damage count.
+            offered as Effect node filters only (a slider over an uncalibrated score, or a rule over a categorical
+            annotation), and take no part in the colour bands or the damage count.
         </p>
         <p class="text-muted">
             These thresholds drive the colour bands on the analysis Effect (Damage) node sliders and the
@@ -63,19 +64,45 @@
                                 </td>
                             </tr>
                         {% endfor %}
+                        {% for f in effect_node_filters %}
+                            <tr>
+                                <th>
+                                    {{ f.name }}
+                                    <div class="text-muted small font-weight-normal mt-1">
+                                        {% for field in f.fields %}<span class="text-monospace">{{ field }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}
+                                    </div>
+                                    <div class="text-muted small font-weight-normal mt-1">{{ f.rule }}</div>
+                                    {% if f.note %}<div class="text-muted small font-weight-normal mt-1">{{ f.note }}</div>{% endif %}
+                                </th>
+                                <td class="text-monospace">{% if f.raw_min is not None %}{{ f.raw_direction.comparison }}{% else %}rule{% endif %}</td>
+                                <td class="text-monospace">{% if f.raw_min is not None %}{{ f.raw_min }}{% else %}—{% endif %}</td>
+                                <td class="text-monospace">—</td>
+                                <td class="text-monospace">—</td>
+                                <td class="text-monospace">{% if f.raw_max is not None %}{{ f.raw_max }}{% else %}—{% endif %}</td>
+                                <td>
+                                    <a class="hover-link" href="{{ f.source_url }}" target="_blank" title="{{ f.source_detail }}">{{ f.source }}</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <h4 class="mt-4">Rankscores</h4>
-        <p>
+        <h4 class="mt-4">
+            <a class="hover-link" data-toggle="collapse" href="#rankscores" role="button" aria-expanded="false" aria-controls="rankscores">
+                Rankscores <small class="text-muted">(deprecated - click to show)</small>
+            </a>
+        </h4>
+        <p id="rankscores" class="collapse">
             Rankscores are each tool's raw score expressed as its rank among all dbNSFP variants, so one
             pair of cutoffs bands them all: benign supporting <span class="threshold threshold-low">&le; {{ max_benign_rankscore }}</span>
             and pathogenic supporting <span class="threshold threshold-high">&ge; {{ min_pathogenic_rankscore }}</span>
             (settings <span class="text-monospace">ANNOTATION_MAX_BENIGN_RANKSCORE</span> /
             <span class="text-monospace">ANNOTATION_MIN_PATHOGENIC_RANKSCORE</span>). Banded rankscore columns:
             {% for t in rankscore_tools %}<span class="text-monospace">{{ t.rankscore_field }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}.
+            The raw-score cutoffs above are preferred: a rankscore says where a score sits among dbNSFP's variants,
+            not whether it supports pathogenic or benign.
         </p>
 
         <h4 class="mt-4">Conservation, splicing and amino acid change</h4>
@@ -122,48 +149,6 @@
                                     {% else %}
                                         {{ b.source }}
                                     {% endif %}
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <h4 class="mt-4">Effect node rules without a calibrated score</h4>
-        <p>
-            Effect node filters over a categorical annotation (SpliceVault, UTRAnnotator) or a score with no
-            published pathogenicity cutoff (AlphaGenome splicing). None has a ClinGen-calibrated PP3/BP4 band:
-            the rules below come from the tool's authors or the same group, so they take no part in the colour
-            bands or the damage count. Each is offered only where the analysis's annotation version populates the
-            column, and skipped (with a node warning) on a version not yet backfilled for the plugin.
-        </p>
-
-        <div class="card mt-3">
-            <div class="card-body">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Filter</th>
-                            <th>Rule</th>
-                            <th>Source</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for f in effect_node_filters %}
-                            <tr>
-                                <th>
-                                    {{ f.name }}
-                                    <div class="text-muted small font-weight-normal mt-1">
-                                        {% for field in f.fields %}<span class="text-monospace">{{ field }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}
-                                    </div>
-                                </th>
-                                <td>
-                                    {{ f.rule }}
-                                    {% if f.note %}<div class="text-muted small mt-1">{{ f.note }}</div>{% endif %}
-                                </td>
-                                <td>
-                                    <a class="hover-link" href="{{ f.source_url }}" target="_blank" title="{{ f.source_detail }}">{{ f.source }}</a>
                                 </td>
                             </tr>
                         {% endfor %}

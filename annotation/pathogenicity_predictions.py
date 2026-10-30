@@ -388,6 +388,11 @@ class ColourBand:
 
 
 _VG_DEFAULT = "VariantGrid default"
+_POLLARD_2010 = (
+    "Pollard KS, Hubisz MJ, Rosenbloom KR, Siepel A. Detection of nonneutral substitution rates on mammalian "
+    "phylogenies. Genome Res. 2010;20(1):110-121. The phyloP cutoffs are a VariantGrid display choice.",
+    "https://doi.org/10.1101/gr.097857.109",
+)
 
 COLOUR_BANDS: tuple[ColourBand, ...] = (
     # SpliceAI - Jaganathan 2019 gives 0.2 (high recall), 0.5 (recommended) and 0.8 (high precision)
@@ -449,31 +454,23 @@ COLOUR_BANDS: tuple[ColourBand, ...] = (
         fields=("phylop_100_way_vertebrate",),
         max_benign_threshold=None,
         pathogenic_threshold=1.4,
-        source=_VG_DEFAULT,
-        source_detail="Pollard KS, Hubisz MJ, Rosenbloom KR, Siepel A. Detection of nonneutral substitution "
-                      "rates on mammalian phylogenies. Genome Res. 2010;20(1):110-121. Cutoff is a "
-                      "VariantGrid display choice.",
-        source_url="https://doi.org/10.1101/gr.097857.109",
+        source=_VG_DEFAULT, source_detail=_POLLARD_2010[0], source_url=_POLLARD_2010[1],
     ),
     ColourBand(
         name="phyloP 30 way mammalian",
         fields=("phylop_30_way_mammalian",),
         max_benign_threshold=None,
         pathogenic_threshold=1.0,
-        source=_VG_DEFAULT,
-        source_detail="Pollard 2010 (as above). Cutoff is a VariantGrid display choice.",
-        source_url="https://doi.org/10.1101/gr.097857.109",
+        source=_VG_DEFAULT, source_detail=_POLLARD_2010[0], source_url=_POLLARD_2010[1],
     ),
     ColourBand(
         name="phyloP 46 way mammalian",
         fields=("phylop_46_way_mammalian",),
         max_benign_threshold=None,
         pathogenic_threshold=None,
-        source=_VG_DEFAULT,
-        source_detail="Pollard 2010 (as above).",
+        source=_VG_DEFAULT, source_detail=_POLLARD_2010[0], source_url=_POLLARD_2010[1],
         note="Left uncoloured - the 46 way alignment scores run on a different scale to the 100 way and "
              "30 way sets, and we have no cutoff for it.",
-        source_url="https://doi.org/10.1101/gr.097857.109",
     ),
     # Grantham - chemical distance between the reference and alternate amino acid, not a prediction.
     ColourBand(
@@ -507,8 +504,9 @@ COLOUR_BANDS: tuple[ColourBand, ...] = (
 @dataclass(frozen=True)
 class EffectNodeFilter:
     """ An Effect (Damage) node filter over an annotation that has no per-tool PP3/BP4 score: a categorical
-        call (SpliceVault, UTRAnnotator) or a score with no published cutoff (AlphaGenome splicing). Listed on
-        the Pathogenicity Thresholds page with the rule the node applies and where it comes from (#2561). """
+        call (SpliceVault, UTRAnnotator) or a score with no published cutoff (AlphaGenome splicing). Listed in
+        the Pathogenicity Thresholds page's tool table with the rule the node applies and where it comes from (#2561).
+        raw_min / raw_max are set for a score the node sliders on, None for a categorical rule. """
     name: str
     fields: tuple[str, ...]
     rule: str
@@ -516,6 +514,9 @@ class EffectNodeFilter:
     source_detail: str
     source_url: str
     note: str = ""
+    raw_min: Optional[float] = None
+    raw_max: Optional[float] = None
+    raw_direction: RawScoreDirection = RawScoreDirection.HIGHER
     # further (detail, url) citations behind the rule, for the page's references
     references: tuple[tuple[str, str], ...] = ()
 
@@ -556,8 +557,8 @@ EFFECT_NODE_FILTERS: tuple[EffectNodeFilter, ...] = (
     EffectNodeFilter(
         name="AlphaGenome splicing",
         fields=("alphagenome_splicing",),
-        rule=f"Score ≥ slider ({ALPHAGENOME_SPLICING_MIN:g} to {ALPHAGENOME_SPLICING_MAX:g}), an OR term in the "
-             "Splicing filter beside SpliceAI and dbscSNV, sharing its Required / Allow Null.",
+        rule="An OR term in the Splicing filter beside SpliceAI and dbscSNV, sharing its Required / Allow Null.",
+        raw_min=ALPHAGENOME_SPLICING_MIN, raw_max=ALPHAGENOME_SPLICING_MAX,
         source="Avsec 2025 (no calibration)",
         source_detail="Avsec Ž, Latysheva N, Cheng J, et al. AlphaGenome: advancing regulatory variant effect "
                       "prediction with a unified DNA sequence model. bioRxiv 2025.06.25.661532, "
