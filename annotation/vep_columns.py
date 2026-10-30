@@ -17,7 +17,7 @@ from annotation.enums import (
     VEPCustom,
     VEPPlugin,
 )
-from annotation.vep_config import VEPConfig
+from annotation.vep_config import NON_COMMERCIAL_VEP_CONFIG_KEYS, VEPConfig
 from library.genomics.vcf_enums import VariantClass
 
 
@@ -1287,7 +1287,8 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
     ),
 
     # ---------- UTRAnnotator (GRCh37/38, VEP >= 112, columns_version >= 5) - #2426 ----
-    _utr_annotator('5UTR_consequence', 'utr_annotator_consequence', formatter=fmt.format_dash_as_none),
+    _utr_annotator('5UTR_consequence', 'utr_annotator_consequence', formatter=fmt.format_dash_as_none,
+                   separator=fmt.VEP_SEPARATOR),
     _utr_annotator('5UTR_annotation', 'utr_annotator_annotation', formatter=fmt.format_dash_as_none,
                    separator=fmt.VEP_SEPARATOR),
     _utr_annotator('Existing_uORFs', 'utr_annotator_existing_uorfs'),
@@ -1440,6 +1441,16 @@ def for_variant_grid_column(vgc_id: str, *, vep_config: Optional[VEPConfig] = No
 
 def all_variant_grid_column_ids() -> frozenset[str]:
     return frozenset(vgc for c in VEP_COLUMNS for vgc in c.variant_grid_columns)
+
+
+def non_commercial_variant_grid_column_ids() -> frozenset[str]:
+    """ Columns filled from data licensed for non-commercial use only (NON_COMMERCIAL_VEP_CONFIG_KEYS) """
+    return frozenset(
+        vgc
+        for c in VEP_COLUMNS
+        if set(required_data_keys(c)) & set(NON_COMMERCIAL_VEP_CONFIG_KEYS)
+        for vgc in c.variant_grid_columns
+    )
 
 
 def separators_by_variant_grid_column() -> dict[str, str]:
