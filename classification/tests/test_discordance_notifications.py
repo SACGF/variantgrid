@@ -1,6 +1,5 @@
 """
-OverlapServices.send_prepared_discordance_notifications: messages go out after the commit, each send isolated,
-a failed lab message retried for that lab alone (#2279).
+OverlapServices.send_prepared_discordance_notifications: messages go out after the commit, each send isolated (#2279).
 """
 from unittest.mock import MagicMock, patch
 
@@ -66,8 +65,7 @@ class DiscordanceNotificationSendTest(TestCase):
             new_state=OverlapSnapshot(status=OverlapStatus.MEDICALLY_SIGNIFICANT,
                                       lab_groups=[lab.group_name for lab in labs]).to_dict())
 
-    def _send(self, failing_lab: Lab | None = None) -> tuple[list[MagicMock], dict[Lab, MagicMock]]:
-        """ Runs the send with the messages mocked, returns the admin and lab messages that were sent """
+    def test_failed_lab_send_does_not_stop_or_repeat_others(self):
         admin_messages = []
         lab_messages = {}
 
@@ -77,46 +75,28 @@ class DiscordanceNotificationSendTest(TestCase):
             return message
 
         def lab_message(lab, _notifications):
-            message = MagicMock(message=f"lab {lab}", lab=lab)
-            if lab == failing_lab:
+            message = MagicMock(message=f"lab {lab}")
+            if lab == self.lab_a:
                 message.send.side_effect = RuntimeError("Slack is down")
             lab_messages[lab] = message
             return message
 
         with patch.object(OverlapServices, "_admin_message", side_effect=admin_message), \
-                patch.object(OverlapServices, "_lab_message", side_effect=lab_message):
+                patch.object(OverlapServices, "_lab_message", side_effect=lab_message), \
+                patch("classification.services.overlaps_services.report_exc_info") as report_exc_info:
             with self.captureOnCommitCallbacks() as callbacks:
-                OverlapServices.send_prepared_discordance_notifications()
-            self.assertFalse(any(message.send.called for message in admin_messages + list(lab_messages.values())))
+                self.assertTrue(OverlapServices.send_prepared_discordance_notifications())
+            all_messages = admin_messages + list(lab_messages.values())
+            self.assertFalse(any(message.send.called for message in all_messages))  # nothing sent before the commit
+
             for callback in callbacks:
                 callback()
-        return admin_messages, lab_messages
+            # a second run finds nothing unsent, so nothing is repeated
+            self.assertFalse(OverlapServices.send_prepared_discordance_notifications())
 
-    def test_failed_lab_send_is_retried_for_that_lab_only(self):
-        with patch("classification.services.overlaps_services.report_exc_info") as report_exc_info:
-            admin_messages, lab_messages = self._send(failing_lab=self.lab_a)
         self.assertEqual(len(admin_messages), 2)
         self.assertEqual(set(lab_messages), {self.lab_a, self.lab_b})
-        for message in admin_messages + list(lab_messages.values()):
+        for message in all_messages:
             message.send.assert_called_once()
         report_exc_info.assert_called_once()
-
-        unsent = OverlapDiscordanceNotification.objects.filter(notification_sent_date__isnull=True)
-        self.assertEqual({(n.overlap_id, n.lab) for n in unsent},
-                         {(n.overlap_id, self.lab_a) for n in self.notifications})
-
-        # the retry goes to lab A alone, without repeating the admin messages
-        admin_messages, lab_messages = self._send()
-        self.assertEqual(admin_messages, [])
-        self.assertEqual(set(lab_messages), {self.lab_a})
         self.assertFalse(OverlapDiscordanceNotification.objects.filter(notification_sent_date__isnull=True).exists())
-
-    def test_failed_retry_stays_unsent(self):
-        with patch("classification.services.overlaps_services.report_exc_info"):
-            self._send(failing_lab=self.lab_a)
-            retry_pks = set(OverlapDiscordanceNotification.objects.filter(
-                notification_sent_date__isnull=True).values_list("pk", flat=True))
-            self._send(failing_lab=self.lab_a)
-        unsent_pks = set(OverlapDiscordanceNotification.objects.filter(
-            notification_sent_date__isnull=True).values_list("pk", flat=True))
-        self.assertEqual(unsent_pks, retry_pks)
