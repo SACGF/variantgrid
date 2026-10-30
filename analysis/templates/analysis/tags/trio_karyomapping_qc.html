@@ -11,7 +11,7 @@
             {{ genome_karyomapping_counts.retries }} retries, and are no longer retried automatically.</span>
     {% elif genome_karyomapping_counts.import_status == 'E' %}
         <span class="text-danger">Karyomapping counts could not be calculated - they are retried when this page is
-            viewed after {% timestamp genome_karyomapping_counts.retry_after %}.</span>
+            viewed after {% timestamp genome_karyomapping_counts.retry_after %}</span>
     {% elif not calculated %}
         <span class="text-muted">Karyomapping counts: {{ genome_karyomapping_counts.get_import_status_display }}
             - reload the page once they have been calculated.</span>
