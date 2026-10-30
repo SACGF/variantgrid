@@ -1,6 +1,5 @@
 import csv
 import io
-from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
@@ -119,9 +118,8 @@ class TrioKaryomappingViewTest(TestCase):
         _, callbacks = self._view_trio_callbacks()
         self.assertEqual(callbacks, [])  # second retry waits twice as long
 
-        counts_qs.update(retries=GenomeKaryomappingCounts.MAX_RETRIES,
-                         modified=timezone.now() - timedelta(days=1))
-        response, callbacks = self._view_trio_callbacks()
+        counts_qs.update(retries=GenomeKaryomappingCounts.MAX_RETRIES, modified=timezone.now())
+        response, callbacks = self._view_trio_callbacks()  # the last retry failed: given up straight away
         self.assertContains(response, "no longer retried automatically")
         self.assertEqual(callbacks, [])
 

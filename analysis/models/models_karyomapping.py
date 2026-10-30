@@ -262,7 +262,7 @@ class GenomeKaryomappingCounts(KaryotypeCounts, TimeStampedModel):
         """ Its last retry failed or was lost, so only deleting the row counts it again """
         if self.import_status == ImportStatus.SUCCESS or self.retries < self.MAX_RETRIES:
             return False
-        return self._due_after() <= timezone.now()
+        return self.import_status == ImportStatus.ERROR or self._due_after() <= timezone.now()
 
     def _due_after(self) -> datetime:
         if self.import_status == ImportStatus.ERROR:
