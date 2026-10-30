@@ -180,10 +180,14 @@ def mavedb_formatter(value):
     return ", ".join(mavedb_urn_to_urls(value).values())
 
 
-def vep_multi_to_comma_separated(value):
-    if value:
-        value = ", ".join(vep_multi_to_list(value))
-    return value
+def get_multi_value_formatter(separator: str):
+    """ A column's multiple values comma separated. VEP output can't hold a comma (it writes them as '&'), so a
+        comma never appears inside one of the values """
+    def multi_value_formatter(value):
+        if value:
+            value = ", ".join(value.split(separator))
+        return value
+    return multi_value_formatter
 
 
 def utr_annotator_annotation_formatter(value):
@@ -219,9 +223,7 @@ def ekey_from_vg_column_formatters():
         'pfam_protein_domain': domain_to_pfam,
         "literature": pubmed_formatter,
         "sift": get_choices_formatter(SIFTPrediction.CHOICES),
-        "splicevault_top_events": vep_multi_to_comma_separated,
         "utr_annotator_annotation": utr_annotator_annotation_formatter,
-        "utr_annotator_consequence": vep_multi_to_comma_separated,
         "variant_class": get_choices_formatter(VariantClass.choices),
     }
 
@@ -269,6 +271,8 @@ def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
 
     evidence_transcript_columns = {}  # These need to be copied off TranscriptVersion object
     evidence_variant_columns = {}  # Copied from query
+    ekey_formatters = ekey_from_vg_column_formatters()
+    column_separators = vep_columns.separators_by_variant_grid_column()
     if settings.ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED:
         disallowed_columns = frozenset()
     else:  # A version annotated before the deployment turned it off still holds the data
@@ -291,8 +295,9 @@ def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
                                           'grid_column': variantgrid_column.pk,
                                           'immutable': evidence_key.immutable,
                                           'note': variantgrid_column.ekey_note}
+            if separator := column_separators.get(variantgrid_column.pk):
+                ekey_formatters.setdefault(evidence_key.key, get_multi_value_formatter(separator))
 
-    ekey_formatters = ekey_from_vg_column_formatters()
     # Populate from query 1st so can be overwritten
     if variant:
         data.update(get_evidence_fields_from_variant_query(variant, evidence_variant_columns, ekey_formatters, annotation_version))

@@ -1287,7 +1287,8 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
     ),
 
     # ---------- UTRAnnotator (GRCh37/38, VEP >= 112, columns_version >= 5) - #2426 ----
-    _utr_annotator('5UTR_consequence', 'utr_annotator_consequence', formatter=fmt.format_dash_as_none),
+    _utr_annotator('5UTR_consequence', 'utr_annotator_consequence', formatter=fmt.format_dash_as_none,
+                   separator=fmt.VEP_SEPARATOR),
     _utr_annotator('5UTR_annotation', 'utr_annotator_annotation', formatter=fmt.format_dash_as_none,
                    separator=fmt.VEP_SEPARATOR),
     _utr_annotator('Existing_uORFs', 'utr_annotator_existing_uorfs'),
