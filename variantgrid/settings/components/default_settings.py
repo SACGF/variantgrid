@@ -671,6 +671,7 @@ CLASSIFICATION_GRID_FADE_NON_SHARED = False  # Fade grid rows and record summari
 CLASSIFICATION_GRID_SUMMARY_COUNTS = True  # Clinical significance counts above the gene / allele / variant classification grids
 CLASSIFICATION_SHOW_SPECIMEN_ID = True
 CLASSIFICATION_GENE_CONSENSUS = True  # Offer gene content curated on other records in the gene (create page, Classify & Report, Gene Content card)
+CLASSIFICATION_DIFF_COPIED_ONLY = True  # Diff page "Only fields copied from a previous classification" toggle, for deployments that curate by copying
 CLASSIFICATION_DISTINGUISH_RESEARCH = False  # Show research marker on labs/classifications where LabClassificationSettings.research=True
 RESEARCH_ICON = "🔬"  # alt: "⚗️"
 
