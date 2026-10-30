@@ -38,6 +38,10 @@ GENE_LEVEL_EXCLUSION_REASON = "Gene fusions and copy number events are not share
 
 
 def insert_nones(data: dict) -> dict:
+    """ Sends every evidence key we have, None where the record has no value. The destination stores an API null as
+        a blank cell that stays immutable ({"immutable": "api"}, see Classification.patch_value), so its users can't
+        fill in what the lab left empty - every uploaded record carries one per blank key. The 'overwrite' alone
+        would remove those keys, lock included """
     for e_key in EvidenceKeyMap.instance().all_keys:
         key = e_key.key
         if key not in data:
