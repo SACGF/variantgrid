@@ -37,7 +37,7 @@ class ServerStatusIntegrationsTest(URLTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.admin_user = User.objects.create_superuser(f"test_user_{__file__}_admin")
+        cls.admin_user = User.objects.create_superuser("server_status_integrations_admin")
 
     def _server_status_html(self) -> str:
         self.client.force_login(self.admin_user)
