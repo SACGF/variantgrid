@@ -16,7 +16,7 @@ def session_key() -> str:
         return key
     path = HOME / "sessionid"
     if not path.exists():
-        raise SystemExit(f"{path} missing: run  python3 manage.py shell -c \"$(cat scripts/browser/agent_session.py)\"")
+        raise SystemExit(f"{path} missing: python3 manage.py vg user --session-key --hours 168 | sed -n 's/^session_key: //p' > {path}")
     return path.read_text().strip()
 
 

@@ -19,7 +19,7 @@ scripts/browser/setup.sh            # venv + playwright + chromium; side-loads m
 
 ```bash
 python3 manage.py runserver localhost:8765 --insecure --noreload --skip-checks &   # working tree, static from STATIC_ROOT
-python3 manage.py shell -c "$(cat scripts/browser/agent_session.py)"               # writes $VG_BROWSER_HOME/sessionid
+python3 manage.py vg user --session-key --hours 168 | sed -n 's/^session_key: //p' > ~/.cache/claude-browser/sessionid
 PY=~/.cache/claude-browser/pw/bin/python
 $PY scripts/browser/shot.py --measure ".hotspot-graph" /genes/view_gene_symbol/BRCA1/GRCh37
 $PY scripts/browser/jsq.py /snpdb/data "() => document.querySelector('#samples-datatable').offsetHeight"
@@ -43,7 +43,7 @@ boxes of any `--measure` selectors. Options worth knowing:
 warnings, failed requests and 4xx/5xx responses. `vg page <url> --js-writes-to-database` is the usual way in: it serves the working
 tree from its own process on a free port, logs in with a short-lived session (`VG_BROWSER_BASE` and
 `VG_BROWSER_SESSION` override `harness.py`'s defaults), runs `console.py` and maps inline-script frames back to
-template lines, so it needs neither the runserver nor `agent_session.py` below.
+template lines, so it needs neither the runserver nor the `sessionid` file.
 
 `jsq.py URL 'JS'` evaluates one expression (an `async () =>` is fine) in each mode and prints both results.
 
@@ -52,7 +52,7 @@ template lines, so it needs neither the runserver nor `agent_session.py` below.
 - `--skip-checks`: the project's `variantgrid.E001` check refuses `runserver` while `SESSION_COOKIE_SECURE` is
   on. Chromium treats `http://localhost` as a secure context and sends Secure cookies anyway, so the check is
   the only thing in the way.
-- Sessions are in the cache backend (`SESSION_ENGINE`), not `django_session`: `agent_session.py` uses the
+- Sessions are in the cache backend (`SESSION_ENGINE`), not `django_session`: `vg user --session-key` uses the
   configured engine, a `SessionStore` from the db backend is never found.
 - `playwright install` prunes browser builds other versions used; pin the playwright version in `setup.sh`
   when changing it.
