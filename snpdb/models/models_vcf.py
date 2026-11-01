@@ -1,3 +1,11 @@
+"""
+The imported VCF and its samples: `VCF` (header, which FORMAT/INFO fields carried depths, genotype, copy number,
+import status, archive state), `Sample`, the header's `VCFInfo` / `VCFFormat` / `VCFFilter`, `SampleFilePath`
+(BAM/CRAM), per-sample stats and locus counts, and `VCFSourceSettings` (import tweaks keyed on the `source`
+header). The `has_*` properties say which genotype data the file actually had, so callers can hide filters that
+would mean nothing. Permission can be granted on a whole VCF or a single sample, so use `Sample.filter_for_user`,
+never a VCF lookup alone; both hide VCFs in a deletion state.
+"""
 import logging
 import operator
 import re

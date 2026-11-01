@@ -1,3 +1,8 @@
+"""
+Miscellaneous site pages that belong to no other snpdb views module: the index, help/static pages, `wait_for_task`
+(polls a celery task, then redirects to a same-site URL), wiki saves, genome build and contig pages, deleting a
+CachedGeneratedFile, bulk message delete and the public `view_uptime` check.
+"""
 import json
 
 from celery.result import AsyncResult

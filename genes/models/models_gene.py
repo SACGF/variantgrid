@@ -1,3 +1,12 @@
+"""
+Genes and transcripts: `HGNC` and UniProt, `GeneSymbol` with its aliases and name resolution
+(`GeneSymbol.resolve_names`), the build-independent `Gene` / `Transcript` identifiers and their per-build
+`GeneVersion` / `TranscriptVersion`, whose cdot JSON in `data` holds exons, coordinates and tags. Also the cdot
+import records, transcript sequence info, LRG, MANE, and protein domains (custom and Pfam). Accessions are stored
+as identifier plus version (ENST00000284274.4 -> transcript, 4); look one up with
+`TranscriptVersion.get_transcript_version`. `GeneSymbol.symbol` has a case-insensitive collation, so a LIKE lookup
+needs `GeneSymbol.get_deterministic_queryset()`.
+"""
 import json
 import os
 import re

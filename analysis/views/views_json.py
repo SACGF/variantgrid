@@ -1,3 +1,10 @@
+"""
+The ajax the analysis editor calls: creating, copying, deleting and connecting nodes (`NodeUpdate`), node data,
+versions, status and tasks for the client's polling, variant tags and selection, creating filter children, template
+variables and saving a template version, and candidate search status. A change to the DAG ends with
+`update_analysis`, which queues the celery tasks that reload whatever nodes are now out of date. Node position
+updates save only x/y, so a drag can't overwrite the status a worker wrote meanwhile.
+"""
 import json
 import logging
 import random

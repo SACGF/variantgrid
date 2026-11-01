@@ -1,3 +1,12 @@
+"""
+The VEP column registry: `VEP_COLUMNS`, one `VEPColumnDef` per VEP CSQ / plugin / custom output field, saying which
+VariantGridColumn(s) it fills, how its value is formatted, and which builds, pipeline types and columns / VEP /
+COSMIC / gnomAD versions it applies to. `filter_for` is the one selector the VEP command builder, the inserter and
+the annotation descriptions page share; given a `VEPConfig` it also drops defs whose plugin or custom data file the
+deployment hasn't configured. To add a column to builds already annotated, gate it on min_columns_version /
+min_vep_version at the existing version rather than bumping columns_version, or `annotation_backfill_columns` can't
+fill it.
+"""
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Optional, Union

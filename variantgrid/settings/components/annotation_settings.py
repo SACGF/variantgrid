@@ -1,3 +1,11 @@
+"""
+Annotation settings: VEP (version, paths, fork / buffer / batch sizes, memory limit), the annotation dispatcher's
+worker slots and leases, AnnotSV, and `ANNOTATION`, the per-build config of reference fastas, liftover chains,
+`columns_version` and `vep_config` (the data file for each VEP plugin / custom source). The defaults ship the
+latest columns_version; a deployment that hasn't installed that data calls one of the
+`pin_annotation_to_columns_version_*` / `use_pre_vep112_fasta` helpers from its env settings file. A `vep_config`
+key left None drops that source's columns rather than failing (`annotation/vep_columns.py`).
+"""
 import os
 
 from variantgrid.settings.components.secret_settings import get_secret

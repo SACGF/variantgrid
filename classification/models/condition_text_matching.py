@@ -1,3 +1,12 @@
+"""
+Condition matching: turning the free-text condition a lab put on a classification into ontology terms. Each
+normalised text per lab is a `ConditionText` with a tree of `ConditionTextMatch` levels (root, gene, mode of
+inheritance, classification); a classification resolves from the nearest valid level above it, written back as its
+condition resolution. Suggestions come from IDs embedded in the text (`embedded_ids_check`), then the local MONDO
+search and Monarch (`top_level_suggestion`, `condition_matching_suggestions`). Publishing or withdrawing a
+classification re-syncs its tree through the signal receivers here. Monarch is an external API, so imports only
+flag text `pending_automatch` and a celery beat sweep searches it later.
+"""
 import json
 import operator
 import re

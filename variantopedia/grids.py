@@ -1,3 +1,11 @@
+"""
+Variantopedia grids, each served by a `DatabaseTableView` in variantopedia/urls.py: All Variants, nearby variants,
+variant tags (tag-centric `VariantTagsColumns`, variant-centric `TaggedVariantGrid`, and the counts and detail
+grids on the variant page) and variant wikis. `variant_tags_for_user` is the one rule for which taggings a user
+sees on a variant; resolved taggings are hidden unless the tag config or `show_resolved` asks for them.
+`AllVariantsGrid` runs over the whole variant table: it is served only in genomic order, pages by pk before
+fetching columns, and reports the planner's row estimate rather than a COUNT(*).
+"""
 import json
 import operator
 from functools import cached_property, reduce

@@ -1,3 +1,10 @@
+"""
+Variantopedia pages: the dashboard, search, the All Variants page and the variant page. `view_variant` wraps
+`variant_details_annotation_version` (the variant at one annotation version) in the site menu; its tabs - tags,
+samples, nearby variants, gene coverage, annotation history - are views here, and `variant_grid_row_detail` is the
+expanded row under any variant grid. A gene-level variant (fusion, copy number event, splice event) has a gene ID
+rather than a locus, so the page and its IGV link resolve it through the `_get_gene_*` helpers.
+"""
 from collections import defaultdict
 from datetime import timedelta
 from typing import Optional

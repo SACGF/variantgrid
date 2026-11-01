@@ -1,3 +1,10 @@
+"""
+Analysis pages: the analysis list, the analysis editor (`view_analysis`, plus the editor-and-grid frame it embeds),
+analysis templates (list, settings, auto launch, creating an analysis from one), JSON export, the superuser status
+page and mutational signatures. `CreateClassificationForVariantTagView` is the classification create form launched
+from a tagging, defaulting the sample to the tagging's patient. Per-node editors are in `analysis/views/nodes/`;
+the ajax the editor calls is in `views_json`.
+"""
 from collections import Counter
 from functools import cached_property
 from typing import Optional

@@ -27,6 +27,15 @@ from variantgrid.settings.components.settings_paths import (
 )
 from variantgrid.settings.components.tso500_settings import *  # noqa: F403 # pylint: disable=wildcard-import, unused-wildcard-import
 
+# Some settings are read only by third-party packages, so a grep of VariantGrid code finding nothing doesn't make
+# one unused - check site-packages before removing it. Known ones, set here or in env files:
+#   axes: AXES_*                                   termsandconditions: ACCEPT_TERMS_PATH, DEFAULT_TERMS_SLUG, TERMS_*
+#   django-registration-redux: ACCOUNT_ACTIVATION_DAYS, REGISTRATION_FORM    django-avatar: AVATAR_THUMB_FORMAT
+#   django-crispy-forms: CRISPY_*    django-compressor: COMPRESS_ENABLED    django-amazon-ses: AWS_SES_*
+#   django-js-reverse: JS_REVERSE_OUTPUT_PATH      drf-spectacular: SPECTACULAR_SETTINGS
+#   django-storages: AWS_S3_ACCESS_KEY_ID, AWS_S3_SECRET_ACCESS_KEY (from get_s3_secrets), AWS_DEFAULT_ACL
+#   mozilla-django-oidc: LOGIN_REDIRECT_URL_FAILURE
+
 CSRF_FAILURE_VIEW = 'variantgrid.views.csrf_error'
 
 # used by

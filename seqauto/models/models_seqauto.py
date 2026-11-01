@@ -1,3 +1,12 @@
+"""
+Sequencing run records: `SequencingRun`, its `SampleSheet`s and `SequencingSample` rows, the files and QC under
+them (fastqs, alignments, single-sample and joint-called VCFs, flagstats, exec summaries, gene coverage, gold
+references), and the DRAGEN TSO 500 pair results that arrive by upload (`LibraryQC`,
+`DragenTSO500CombinedVariantOutput`, keyed on run name and pair rather than a path). The file records are
+`SeqAutoRecord`s; `get_params` cascades names down the levels to fill the SEQAUTO_*_PATTERN settings that give each
+file's expected path. A run can have several sample sheets and only the one in `SequencingRunCurrentSampleSheet`
+counts, so use `SequencingSample.get_current()` rather than every row.
+"""
 import logging
 import os
 import re

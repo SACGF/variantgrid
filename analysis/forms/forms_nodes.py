@@ -1,3 +1,12 @@
+"""
+The editor form for each analysis node type, one ModelForm per node (`<Type>NodeForm`), set as `form_class` on the
+node's view in `analysis/views/nodes/node_views.py`. `BaseNodeForm` restricts every model choice to what the
+analysis owner can see (and, for another user with write access, what they can see too) - the autocompletes only
+narrow what's offered, so this is the permission check - and copies the node's own field errors onto the form. The
+`*Mixin` forms carry JSON in hidden fields that the node editor's JS fills in before submit (allele frequency, VCF
+locus filters, sample filters) or a single picker standing in for several FKs (`AncestorSampleSourceMixin`,
+`SampleNodeForm.source`).
+"""
 import json
 import re
 
