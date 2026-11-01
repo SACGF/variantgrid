@@ -7,6 +7,9 @@ Start with: templatetags/ui_utils.py (labelled, modal, preview, if_user_can_edit
   views/ajax_form_view.py (LazyRender, AjaxFormView), json/validated_json.py (ValidatedJson, JsonMessages),
   variantgrid/static_files/default_static/js/global.js (the DOM processor registry that wires behaviour to markup).
 Patterns here:
+- No new select2 or chosen widgets: both are being retired (#1497, #2009). A new dropdown is a native `<select>`
+  (or `autocomplete_light` where the page already uses it), and a page you touch keeps the widget it has unless
+  the change is to remove it.
 - Behaviour is attached to markup, not called: `registerDomProcessor(selector, func)` adds a processor that runs on
   document ready and again for every node the MutationObserver sees added
   (variantgrid/static_files/default_static/js/global.js:processDomNode). Render the attribute/class

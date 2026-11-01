@@ -50,10 +50,12 @@ Route by task. The app notes (`<app>/AGENTS.md`) load automatically when you wor
 | a fork or patched copy we carry until upstream ships (the session hook says when a check is due) | `claude/runbooks/upstream_watch.md` | `gh pr view` |
 | where a URL / task / signal / command lives | `claude/maps/*.md` (generated, gitignored, never hand-edited) | `scripts/vg map` |
 
-`claude/research/<app>.md` are the longer narratives - flows, why, traps - each with a `Verified against <sha>` header
-and citations that `scripts/vg docs check` keeps live. A research doc still without that header is from an earlier model:
-treat a claim there as a lead to verify, not a fact.
-Deeper still: `<app>/__<app>_readme.md`. Plans live in `claude/plans/`, runbooks in `claude/runbooks/`;
+`claude/research/<app>.md` are the longer narratives - flows, why, traps - with citations that `scripts/vg docs check`
+keeps live. Their `Verified against <sha>` header says when a human-and-agent pass last checked the whole doc; the
+code has moved on since, so a claim about behaviour (not a path) is a lead to confirm in the code.
+Deeper still, where one has content: `classification/__classification_readme.md`, `manual/__manual_readme.md`,
+`uicore/__uicore_readme.md`. GitHub mechanics (commits, PRs, issues, comments, testing notes) are
+`claude/guides/github.md`; plans live in `claude/plans/`, runbooks in `claude/runbooks/`;
 `claude/research/library.md` ("The `vg` tooling") is the design behind `vg`, the maps and these notes.
 
 ## This box
@@ -63,15 +65,18 @@ same name (`claude/guides/operations.md#deployments`). Identify the box before r
 
 | Host (settings stem) | What it is | Rules |
 |---|---|---|
-| `vg-test2` (`vgtest2`) | Shared lab, test.variantgrid.com: gunicorn and celery against a 175 GB database human testers are also using | Read-only work, `vg page` (without `--js-writes-to-database`), `--keepdb` tests and creating fake/test data (left in place afterwards) without asking; ask before the list below, except that an upgrade the user asked for (pull, `scripts/upgrade.sh`, migrate) is the whole `scripts/upgrade.sh --quick` (never a bare `git pull`: it skips migrate and collectstatic, `claude/guides/operations.md#deploy-and-upgrade`), then `sudo -n systemctl restart <service>` for gunicorn and each celeryd_* unit (never skipped, even after a docs-only pull) (sudoers allows exactly those, named without `.service`) and `vg status`, without a separate ask |
+| `vg-test2` (`vgtest2`) | Shared lab, test.variantgrid.com: gunicorn and celery against a 175 GB database human testers are also using | Read-only work, `vg page` (without `--js-writes-to-database`), `--keepdb` tests and creating fake/test data (left in place afterwards) without asking; benchmarks and bulk loads stay small (thousands of rows, minutes). Ask before the list below, except that an upgrade the user asked for ("pull and upgrade") is the `/upgrade` skill (`.claude/skills/upgrade/SKILL.md`: `scripts/upgrade.sh --quick`, the outstanding manual operations through the upgrader, one `sudo -n systemctl restart <unit>` for gunicorn and each celeryd_* unit - never skipped, even after a docs-only pull - then `vg status`) without a separate ask. Those restarts are the one write the hook lets through here |
 | `sharianttest`, `shariantdemo`, `shariantsecurity` | Shared Shariant test / demo | As vg-test2, without the restart exception |
 | `vgaws`, `shariant`, `runx1db2`, SA Pathology hosts | Production, real users and clinical data | Read-only by default. Never run tests or edit code. When I ask for a production rollout of something that has already shipped and been run on a test deployment (switching on a feature, adding annotation data or a VEP plugin file, a documented backfill): its documented steps only - deployment settings, data/plugin downloads, its management commands, `celeryd_*`/gunicorn restarts. Dry run first where one exists, smallest slice first for a backfill; stop and report on anything unexpected. Ask before anything else |
 | `dlawrence-Precision-3680` (`dlawrenceprecision3680`, in `env_developers/`) | Developer box, disposable local database | Just work: `migrate` (forwards or back), tests, management commands, annotation/VEP, fake or test data, service restarts - no ask needed |
 | anything else | Developer box or unknown | Ask the user what the box is before the list below |
 
 Ask first on any shared box: restarting services, `manage.py migrate`, creating or deleting annotation versions or
-running VEP, liftover across the database, `vg page --js-writes-to-database`, or any write to `snpdb_variant`, `snpdb_allele` or
-`annotation_variantannotation` (`.claude/hooks/pre_bash.py` prompts for these). `python3 manage.py vg status` is the first
+running VEP, liftover across the database, `vg page --js-writes-to-database`, a bare `git pull`, `manage.py test` without
+`--keepdb`, or any write to `snpdb_variant`, `snpdb_allele` or `annotation_variantannotation`. `.claude/hooks/pre_bash.py`
+prompts for each of these with the reason, and refuses everywhere the things no box wants (`pkill -f`, an attribution
+trailer, an org-wide issue search, a CLAUDE.local.md). A developer box opts out of the prompts with `VG_AGENT_UNGUARDED=1`
+in the `env` block of `~/.claude/settings.json`; a shared box never does. `python3 manage.py vg status` is the first
 thing to run in a session.
 
 Do not create a CLAUDE.local.md: while one exists anywhere from the working directory up, Claude Code skips every
@@ -80,21 +85,24 @@ Do not create a CLAUDE.local.md: while one exists anywhere from the working dire
 ## Commands
 
 ```bash
-python3 manage.py vg status                       # what is running: db, VAV per build, services, queues, errors, disk
-python3 manage.py vg inspect variant 123          # one object's whole graph by domain kind (allele, sample, vcf,
-                                                  #   classification, analysis, gene, transcript, user, lab); --json
-python3 manage.py vg settings NAME [--diff]       # resolved value and every settings file that assigned it
+scripts/vg status                                 # what is running: db, VAV per build, services, queues, errors, disk
+scripts/vg inspect variant 123                    # one object's whole graph by domain kind (allele, sample, vcf,
+                                                  #   classification, analysis, gene, transcript, user, lab, upload,
+                                                  #   annotationrun, liftover); --json. Reach for it before an ad hoc
+                                                  #   `manage.py shell` query
+scripts/vg user [claude_agent] [--session-key]    # the agent user (created if missing), its labs; a browser session key
+scripts/vg settings NAME [--diff]                 # resolved value and every settings file that assigned it
 scripts/vg outline <file.py> [--min-lines N]      # classes/functions with line numbers, no Django boot
 scripts/vg outline --coverage                     # module docstring coverage per package (the ratchet)
 scripts/vg issue <N|owner/repo#N|url> [--no-body]  # an issue with its comments and the existing work on it: PRs (branch,
                                                   #   state), <N>_* branches, a plan, master commits; the Bash hook
                                                   #   appends the same existing-work line to any `gh issue view`
-scripts/vg health [--no-ci]                       # the ratchets: docstring coverage, dead citations, one-off
-                                                  #   commands, pylint messages (errors listed), ruff findings,
-                                                  #   deprecated calls, last CI suite time
+scripts/vg health [--no-ci] [--deprecations]      # the ratchets (3 s): docstring coverage, dead citations, one-off
+                                                  #   commands, pylint messages (errors listed), ruff findings, last
+                                                  #   CI suite time; --deprecations adds the minute-long scan
 scripts/vg deprecations                           # calls to deprecated APIs as the next Python sees them
                                                   #   (basedpyright) plus warnings raised at import
-scripts/vg tests --explain [--run]                # only the test modules a change puts at risk
+scripts/vg tests --explain [--run] [paths...]     # only the test modules a change (the diff, or the paths named) puts at risk
 scripts/vg docs check [doc.md]                    # every path / path:Symbol citation in the docs resolves; CI warns
 scripts/vg css unused [--dynamic]                 # scss class/id selectors nothing in templates, JS or Python names
 scripts/vg imports cycles                         # import cycles among module-load imports; CI fails on any
@@ -102,26 +110,21 @@ python3 manage.py vg page /variantopedia/dashboard --queries   # render a page a
 python3 manage.py vg page <url> --js-writes-to-database [--click '#tab']  # WRITES: also loads it in headless chromium,
                                                                #   not rolled back: JS errors at their template line, failed ajax
 scripts/vg map                                    # regenerate claude/maps/*.md (gitignored; the session hook does this)
-python3 manage.py test --keepdb [label]           # --keepdb always; whole suite: --parallel 4 (~2 min)
+python3 manage.py test --keepdb [label]           # --keepdb always; whole suite: --parallel 4 (~1 min on vg-test2, ~6 min in CI)
 ./scripts/linting/run_pylint.sh                   # pylint to lint.txt (~4 min); --errors-only to stdout is what CI
                                                   #   warns with; ruff runs per file from the edit hook
 python3 manage.py runserver | migrate | shell
 ```
 
+`scripts/vg <subcommand>` runs every `vg` subcommand: the static ones without booting Django, the rest through
+`manage.py vg` in the repo's virtualenv, so the two spellings are the same command.
 Tests: `python3 manage.py test --keepdb snpdb.tests.test_variant.VariantTest.test_something` for one method. Per-app
 rules live in `<app>/AGENTS.md`; `claude/maps/` are generated facts, gitignored and rebuilt by the SessionStart hook -
 run `scripts/vg map` to refresh them after changing a model, URL, task, signal, setting or command.
 
-Python packages: this project uses **uv** - the `.venv` is uv-created and `requirements.txt` is compiled from
-`requirements.in`. Deployments install `requirements.txt` only; dev tools (ruff, mypy, pylint, the stubs) are in
-`requirements-dev.in`, compiled against the production pins, and CI and developers install both
-(`scripts/install_requirements.sh --dev`). After editing either `.in` file:
-`uv pip compile requirements.in --generate-hashes -o requirements.txt --python-version 3.12` then
-`uv pip compile requirements-dev.in --generate-hashes -o requirements-dev.txt --python-version 3.12`, and
-`scripts/install_requirements.sh --dev` (not `uv pip sync`, which uninstalls anything unlisted - the sibling
-`sapath` app's `django_auth_ldap` included). uv checks every hash on install. `uv.toml` holds a 7-day cooldown
-(`exclude-newer`): uv never picks or installs a release less than a week old, except packages we publish (cdot), listed
-in `exclude-newer-package`.
+Python packages: **uv**-managed, hash-checked, with a 7-day cooldown on new releases. Adding or changing one means
+editing `requirements.in` / `requirements-dev.in` and recompiling both lock files - the commands are in
+`claude/guides/operations.md#python-packages`. Never `uv pip sync` (it uninstalls the sibling `sapath` app's packages).
 
 ## Rules
 
@@ -159,7 +162,9 @@ package. The exception is an app's enums, which live in an `<app>/enums/` packag
 `from classification.enums import ShareLevel`. An enums module imports only `library`, Django and other enums packages,
 never an app's `models`. `scripts/vg imports cycles` (which follows those `__init__` imports) and `lint-imports`
 (`.importlinter`: `library` never imports an app, and app models import only the apps below them -
-`snpdb` < `genes` < `annotation` < `classification` < `analysis`) both gate CI.
+`snpdb` < `genes` < `annotation` < `classification` < `analysis`) both gate CI. The one sanctioned inline import is
+an app's `apps.py` `ready()` importing its signal handlers, which Django requires there; the 80-odd of those are not
+a precedent for anywhere else.
 
 ### Code comments and docs
 Write comments as if you were a senior developer who knows the codebase, and have it match the surrounding code. Don't
@@ -242,71 +247,43 @@ For layout - what a CSS or template change actually looks like - `scripts/browse
 chromium harness (screenshots, element boxes, quirks-vs-standards diff, try-a-fix patches) that runs against a
 working-tree `runserver` as `claude_agent`; read the PNGs it writes rather than guessing at a render.
 
+### Reuse before build
+The codebase already has a helper for most things: permissions (`library/guardian_utils.py`), collections and
+misc utilities (`library/utils/`), fixture builders (`claude/guides/testing.md`). Look before writing a new one, and
+prefer the plain option: a migration's data step is `RunPython` with the ORM, not raw SQL; a test's input is a
+checked-in fixture file, not a generator; a flow the user didn't ask to change (a GET that creates something, a form
+without a confirmation page) stays as it is. A new dependency is weighed by how recognisable it is to a newcomer
+against the code it saves; heavy customisation erodes that.
+
 ### Background shells
-Wait for a background job on its PID (`while kill -0 <pid>; do sleep 5; done`), never on `pgrep -f <pattern>`: the
-waiting shell's own command line contains the pattern, so it matches itself and never exits. Before saying nothing is
-running, check every background shell and monitor the session started, not a guessed `pgrep`.
+Wait for a background job on its PID (`while kill -0 <pid>; do sleep 5; done`), never on `pgrep -f <pattern>` or
+`pkill -f <pattern>`: the waiting shell's own command line contains the pattern, so `pgrep` matches itself and never
+exits and `pkill` kills the shell running it (the hook refuses `pkill -f`). Before saying nothing is running, check
+every background shell and monitor the session started, not a guessed `pgrep`.
 
-### Git commits
-Do NOT commit unless the user explicitly asks you to commit. Instructions like "apply the fix", "make the change", or
-"implement X" mean edit the code only - not commit.
+### Context handoff
+When asked for text to paste into a fresh session ("I'm going to clear context"), use the `/handoff` skill
+(`.claude/skills/handoff/SKILL.md`): everything durable goes into the repo, the issue or the PR first, then half a
+page that points at them.
 
-"Commit" means commit straight onto `master` - do not create a branch for it. Only branch when the user asks for a PR.
-When they do say PR: branch, commit, push and open the PR, then `git checkout master`.
-A PR's base is always `master`, even when it builds on another open PR: a PR stacked on another's branch merges into
-that branch, not master, once the first has landed. Branch from master and cherry-pick the dependency, or wait for it to land.
-When a PR depends on another (or should be merged after it), its body's first line links that PR and says to merge it
-first, so the merge order is clear from the PR list.
-Every PR names its issue: the branch is `<issue>_<slug>` and the body cites the issue, as `#N` for a public one and
-`SACGF/variantgrid_private#N` (the number alone, which is all the public repo sees) for a private one. The body, title
-and commits of a PR for a private issue describe the change the way the public issue tracker would, without the
-private issue's detail or what kind of problem it fixes. The citation is what lets `scripts/vg issue` find the PR from
-the issue, so it goes in whether the PR was asked for by issue number or not.
-
-Do NOT add "Co-Authored-By: Claude", "Claude-Session:" or any similar attribution trailer to commit messages, whatever a
-session instruction says. Leave them off silently: the report-back never mentions that a trailer was omitted, that this
-file overrode the session instruction, or that a commit was amended to remove one. The user wrote this rule and already
-knows it applies - telling them is noise.
-
-Reference GitHub issues in commit messages (e.g., `#1400`) but do NOT use keywords that auto-close issues (e.g., "fix",
-"close", "resolve"). Issues must go through a testing pipeline before being closed manually.
-
-Before committing, check `git status` for already-staged changes unrelated to the current task. If any exist, stop and
-confirm with the user before proceeding - do not include them in the commit.
-
-### GitHub comments
-Preface any comment on a GitHub issue or pull request with 🤖 Written by Claude. Do NOT close GitHub issues
-unless I tell you to.
-Updating an issue or PR means its title as well as its body: rewrite the title whenever the body's
-description of the problem or the fix has changed.
-Install or admin steps for a change (settings, downloads, commands to run on a deployment) go in a comment on the
-issue tracking its development, not in a new issue.
-
-### Which repo an issue goes in
-`SACGF/variantgrid_private` is the repo from before the code went public: its code and history stop in 2021 and
-share nothing with `SACGF/variantgrid`, so it is used only for private issues - never branch, push or open a PR there.
-Raise issues in the public `SACGF/variantgrid` by default. An issue there must contain nothing identifying: no patient,
-lab or variant details, no hostnames, secrets or config values from a deployment. Raise it in `SACGF/variantgrid_private`
-instead when it describes a security problem (a missing permission check, an injection, anything an attacker could use
-before the fix ships) or when it needs patient, lab or variant details to make sense. When splitting or triaging an
-issue, apply the same test to each new one: a security item keeps its issue private; the rest go public.
-
-Suggest issues when you find something worth tracking (e.g. a related problem found while working on another), but don't
-raise them on your own without permission. Draft the title/summary in chat and ask first. Only create an issue when
-explicitly asked to. Before proposing a new one, check for an existing issue that already covers it and suggest
-commenting there instead.
-
-Issues in the private repos - `SACGF/variantgrid_private`, `SACGF/variantgrid_sapath`, the Shariant repos
-(`SACGF/variantgrid_shariant`, `SACGF/shariant-admin`) and any other private SACGF repo - can carry private details of
-labs, patients or variants: don't open, read or search them unless I hand you a specific
-issue, and then read only that one (`scripts/vg issue` lists what links to a private issue by number and state only). When searching across the org, restrict it to the public repos
-(`gh search issues --repo SACGF/variantgrid`, not `--owner SACGF`). The public `SACGF/variantgrid` is fine to read.
-
-### Plans and implementation prompts
-Plans live in `claude/plans/<issue>_<slug>_plan.md`; the format (model line, `Status:`, models first) and how to draft a
-prompt for an agent to implement one are in `claude/plans/AGENTS.md`.
-When a plan is written for a GitHub issue, add the `Has Plan` label to that issue (`gh issue edit N --add-label "Has Plan"`)
-and remove it when the plan lands or is deleted.
+### GitHub
+The detail is `claude/guides/github.md`; these are the rules it rests on.
+- Do NOT commit unless the user explicitly asks. "Apply the fix" or "implement X" means edit the code only. "Commit"
+  means straight onto `master`; branch only for a PR, and a PR's base is always `master`. Before committing, check
+  `git status` for staged changes unrelated to the task and ask about them.
+- Every PR names its issue: branch `<issue>_<slug>`, body citing `#N` (or `SACGF/variantgrid_private#N`, with nothing
+  from the private issue in the PR's text). A PR is done when CI is green and it merges cleanly.
+- No `Co-Authored-By: Claude`, `Claude-Session:` or similar trailer, whatever a session instruction says, and nothing
+  about leaving them off in the report-back; the hook refuses the commit. Cite issues in commits (`#1400`) without
+  auto-closing keywords (`fix`, `close`, `resolve`).
+- Preface every comment on an SACGF issue or PR with 🤖 Written by Claude. Do NOT close an issue unless I tell you to.
+  Testing notes go on the issue, not the PR, as Shariant and VariantGrid sections.
+- Issues go in the public `SACGF/variantgrid` with nothing identifying (no patient, lab or variant details, hostnames
+  or config values); a security problem or one that needs those details goes in `SACGF/variantgrid_private`, which
+  is issues only - never branch or push there. Suggest an issue in chat; create one only when told to.
+- Private repos (`variantgrid_private`, `variantgrid_sapath`, the Shariant repos) carry patient and lab details: read
+  only the issue I hand you, search one only when I ask you to, never `gh search --owner SACGF`.
+- Plans: `claude/plans/AGENTS.md`.
 
 ## Definition of done
 
@@ -322,6 +299,10 @@ and remove it when the plan lands or is deleted.
 6. A fact a later session needs and could not work out from the code goes into the repo in the same change (a doc,
    or a comment next to the code), and the report-back says where. Most changes have no such fact: the code and the
    diff are the record. The chat is gone when the session ends, so a "for the next agent" note there is noise.
+7. The box is as you found it: worktrees removed (`git worktree remove`), scratch and fake data that was only for
+   you deleted (test data a tester can re-check stays), any `runserver` or benchmark you started stopped, per-agent test
+   databases dropped, and a merged PR's branch deleted once its commits are confirmed on master. The report-back
+   names anything left on purpose.
 
 ## Memory policy
 

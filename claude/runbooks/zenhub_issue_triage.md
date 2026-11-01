@@ -100,7 +100,8 @@ branch (e.g. `origin/shariant_prod_2025_04`), and if so can it be closed.
    belongs in a new issue (draft it for the user) and doesn't block this one.
 6. For close-ready issues: comment (prefixed `🤖 Written by Claude`) saying it went into the named prod branch and has
    been released, with the commits or the test pass as evidence, then `gh issue edit N -R SACGF/<repo> --add-label
-   "can we close this?"`. Humans close issues; agents never do.
+   "can we close this?"`. Humans close issues; an agent closes one only under the explicit per-run grant in
+   `claude/runbooks/agent_testing.md`.
 
 ## 5. Triage Coding Complete into test pipelines
 
