@@ -27,6 +27,12 @@
         "hooks": [
           {"type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.venv/bin/python \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre_bash.py"}
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {"type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.venv/bin/python \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/pre_edit.py"}
+        ]
       }
     ]
   },
@@ -40,9 +46,16 @@
       "Bash(git branch:*)",
       "Bash(git rev-parse:*)",
       "Bash(git ls-files:*)",
+      "Bash(git fetch:*)",
       "Bash(gh issue view:*)",
+      "Bash(gh issue list:*)",
       "Bash(gh pr view:*)",
       "Bash(gh pr diff:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh search issues --repo SACGF/variantgrid:*)",
+      "Bash(python3 manage.py manual_outstanding:*)",
+      "Bash(python3 manage.py profile_analysis_nodes:*)",
       "Bash(scripts/vg:*)",
       "Bash(python3 manage.py vg:*)",
       "Bash(python3 manage.py test --keepdb:*)",
