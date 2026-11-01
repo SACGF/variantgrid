@@ -32,7 +32,7 @@ from pathlib import Path
 
 from library.vg.repo import REPO_ROOT, first_party_packages
 
-DOC_GLOBS = ("claude/**/*.md", "*/AGENTS.md", "*/__*_readme.md", "AGENTS.md")
+DOC_GLOBS = ("claude/**/*.md", "*/AGENTS.md", "*/*/AGENTS.md", "*/__*_readme.md", "AGENTS.md")
 GENERATED_DIRS = ("claude/maps",)
 # Gitignored build output: present on a box that has run the build, absent from a fresh checkout
 BUILD_OUTPUTS = ("variantgrid/sitestatic", "lint.txt")

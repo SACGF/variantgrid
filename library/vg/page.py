@@ -32,6 +32,7 @@ from django.urls import NoReverseMatch, reverse
 
 from library.django_utils.unittest_utils import _normalize_sql, production_query_count
 from library.guardian_utils import all_users_group
+from snpdb.models.models import Lab
 
 AGENT_USERNAME = "claude_agent"
 _WHITESPACE_RE = re.compile(r"\s+")
@@ -97,6 +98,26 @@ def agent_session_key(user: User, expiry_seconds: int) -> str:
     session.set_expiry(expiry_seconds)
     session.create()
     return session.session_key
+
+
+def render_user(username: str = AGENT_USERNAME, session_hours: int | None = None) -> str:
+    """ `vg user`: the agent user (created if missing) or an existing user, their labs, and optionally a session
+        key for a headless browser. Only the agent user is ever created """
+    if username == AGENT_USERNAME:
+        user, created = create_agent_user()
+    else:
+        user, created = get_agent_user(username), False
+    labs = Lab.valid_labs_qs(user).select_related("organization").order_by("group_name")
+    lines = [f"username: {user.username}" + (" (created)" if created else ""),
+             f"pk: {user.pk}",
+             f"is_superuser: {user.is_superuser}",
+             "labs:" + ("" if labs else " none")]
+    lines += [f"  {lab.group_name}  (lab {lab.pk}, {lab.organization.name or 'no organization'})" for lab in labs]
+    if session_hours is not None:
+        key = agent_session_key(user, session_hours * 3600)
+        lines.append(f"session_key: {key}")
+        lines.append(f"  send as the {settings.SESSION_COOKIE_NAME} cookie; expires in {session_hours}h")
+    return "\n".join(lines)
 
 
 def quiet_side_effects(block_subprocesses: bool = True) -> ExitStack:

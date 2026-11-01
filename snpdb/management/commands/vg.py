@@ -3,16 +3,17 @@ manage.py vg — introspection for driving VariantGrid from an agent or a termin
 
     vg status [--json]
     vg map [models|urls|commands|tasks|signals|settings|all] [--json] [--app X] [--counts]
-    vg tests [--changed] [--base REF] [--run] [--parallel N] [--explain]
+    vg tests [--changed] [path ...] [--base REF] [--run] [--parallel N] [--explain]
     vg page <url-or-url-name> [--as USER] [--kwargs k=v ...] [--text|--html|--links|--forms|--json] [--queries]
                                       [--js-writes-to-database [--click SELECTOR ...] [--wait MS]]
     vg page --create-user
+    vg user [USERNAME] [--session-key [--hours N]]
     vg outline <file.py> [--min-lines N] | vg outline --coverage [package ...]
     vg settings [NAME] [--diff] [--json]
     vg docs check [doc.md|dir ...] [--all-plans]
     vg css unused [file.scss ...] [--dynamic] [--rendered [--max-pages N] [--per-name N] [--as USER]]
     vg imports cycles
-    vg health [--no-ci] [--no-deprecations] [--json]
+    vg health [--no-ci] [--deprecations] [--json]
     vg deprecations [--no-runtime] [--json]
     vg inspect <kind> <id> [--depth N] [--json]
     vg issue <number|owner/repo#number|url> [--no-body] [--no-comments] [--json]
@@ -46,7 +47,13 @@ from library.vg.issue import (
     render_issue,
 )
 from library.vg.outline import outline, render_coverage, render_outline
-from library.vg.page import AgentUserMissing, create_agent_user, render_page
+from library.vg.page import (
+    AGENT_USERNAME,
+    AgentUserMissing,
+    create_agent_user,
+    render_page,
+    render_user,
+)
 from library.vg.page_js import (
     HarnessFailed,
     HarnessMissing,
@@ -62,7 +69,7 @@ from library.vg.settings_chain import (
     trail,
 )
 from library.vg.status import gather_status, render_status
-from library.vg.test_selection import select_tests
+from library.vg.test_selection import paths_as_changed, select_tests
 
 MAP_CHOICES = [*maps.MAP_GENERATORS, "all"]
 
@@ -85,8 +92,9 @@ class Command(BaseCommand):
         map_parser.add_argument("--counts", action="store_true", help="models: add pg_class row estimates (queries)")
 
         tests_parser = subparsers.add_parser("tests", help="Select test modules for changed files")
+        tests_parser.add_argument("paths", nargs="*", help="Treat these files as the changes, instead of asking git")
         tests_parser.add_argument("--changed", action="store_true", default=True,
-                                  help="Select from git changes (default and only mode for now)")
+                                  help="Select from git changes (the default when no paths are given)")
         tests_parser.add_argument("--base", help="Git ref to diff against (default: merge-base with origin/master)")
         tests_parser.add_argument("--run", action="store_true", help="Run the selected tests with --keepdb")
         tests_parser.add_argument("--parallel", type=int, help="Pass --parallel N to the test runner")
@@ -111,6 +119,13 @@ class Command(BaseCommand):
         output.add_argument("--links", action="store_true", help="Links as 'text → href'")
         output.add_argument("--forms", action="store_true", help="Forms and their fields")
         output.add_argument("--json", action="store_true", help="Everything as JSON")
+
+        user_parser = subparsers.add_parser("user", help=f"Get or create {AGENT_USERNAME} (or show an existing user): pk, "
+                                                         f"superuser, labs, and a session key for a headless browser")
+        user_parser.add_argument("username", nargs="?", default=AGENT_USERNAME,
+                                 help=f"Default {AGENT_USERNAME}, created if missing; any other user must exist")
+        user_parser.add_argument("--session-key", action="store_true", help="Also create a logged-in session and print its key")
+        user_parser.add_argument("--hours", type=int, default=48, help="Session lifetime (default 48)")
 
         outline_parser = subparsers.add_parser("outline", help="Classes/functions of a module with line numbers and doc lines")
         outline_parser.add_argument("file", nargs="*", help="Module to outline (or packages, with --coverage)")
@@ -137,7 +152,7 @@ class Command(BaseCommand):
 
         health_parser = subparsers.add_parser("health", help="Ratchet numbers: docstring coverage, dead citations, one-off commands, lint, deprecations, suite time")
         health_parser.add_argument("--no-ci", action="store_true", help="Skip the CI suite time (it asks GitHub through gh)")
-        health_parser.add_argument("--no-deprecations", action="store_true", help="Skip the deprecation scan (~25s)")
+        health_parser.add_argument("--deprecations", action="store_true", help="Also run the deprecation scan (about a minute)")
         health_parser.add_argument("--json", action="store_true")
 
         deprecations_parser = subparsers.add_parser("deprecations", help="Calls to deprecated APIs: basedpyright statically, plus warnings at import")
@@ -146,7 +161,8 @@ class Command(BaseCommand):
 
         inspect_parser = subparsers.add_parser("inspect", help="An object's whole graph by domain kind: " + ", ".join(KINDS))
         inspect_parser.add_argument("kind", choices=list(KINDS))
-        inspect_parser.add_argument("key", help="pk, or a natural key (CA id, gene symbol, transcript accession, username, lab group name)")
+        inspect_parser.add_argument("key", help="pk, or a natural key (CA id, gene symbol, transcript accession, username, lab group name); "
+                                                "upload is an UploadPipeline pk, liftover a LiftoverRun pk")
         inspect_parser.add_argument("--depth", type=int, default=2, help="How far to follow relations (default 2)")
         inspect_parser.add_argument("--json", action="store_true")
 
@@ -189,8 +205,8 @@ class Command(BaseCommand):
 
     # --- tests ---
 
-    def handle_tests(self, base, run, parallel, explain, **_):
-        selection = select_tests(base=base)
+    def handle_tests(self, paths, base, run, parallel, explain, **_):
+        selection = select_tests(paths_as_changed(paths)) if paths else select_tests(base=base)
         if not selection.changed:
             self.stdout.write("No changed files.")
             return
@@ -198,6 +214,8 @@ class Command(BaseCommand):
             for label in selection.labels:
                 self.stdout.write(f"{label}  <- {', '.join(selection.reasons[label])}")
             self.stdout.write("")
+        for warning in selection.warnings:
+            self.stdout.write(f"warning: {warning}")
         if not selection.labels:
             self.stdout.write(f"{len(selection.changed)} changed file(s) select no tests.")
             return
@@ -262,6 +280,14 @@ class Command(BaseCommand):
             self.stdout.write(render_js_report(js_report))
             self.stdout.write("js: not rolled back - anything the page or its ajax wrote is still in the database")
 
+    # --- user ---
+
+    def handle_user(self, username, session_key, hours, **_):
+        try:
+            self.stdout.write(render_user(username, session_hours=hours if session_key else None))
+        except AgentUserMissing as e:
+            raise CommandError(f"No user '{username}': only {AGENT_USERNAME} is created by `vg user`") from e
+
     # --- outline ---
 
     def handle_outline(self, file, min_lines, coverage, **_):
@@ -306,8 +332,8 @@ class Command(BaseCommand):
 
     # --- health ---
 
-    def handle_health(self, no_ci, no_deprecations, json: bool, **_):  # pylint: disable=redefined-outer-name
-        health = gather_health(ci=not no_ci, deprecations=not no_deprecations)
+    def handle_health(self, no_ci, deprecations, json: bool, **_):  # pylint: disable=redefined-outer-name
+        health = gather_health(ci=not no_ci, deprecations=deprecations)
         self.stdout.write(_json_dumps(asdict(health)) if json else render_health(health))
 
     # --- deprecations ---

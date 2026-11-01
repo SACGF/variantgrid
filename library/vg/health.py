@@ -7,8 +7,8 @@ suite's wall time down. Entry points are `gather_health` and `render_health`. No
 command categories are read from the tree by AST; the pylint counts come from the last
 `scripts/linting/run_pylint.sh` run (`lint.txt`, gitignored, so it is as old as that run - CI reports the errors
 fresh on every push, in `agent-maps.yml`); ruff is run live (`ruff check` over the tree takes about a second);
-deprecations are `library/vg/deprecations.py:find_deprecations` (basedpyright plus `manage.py check`, ~25s,
-skipped with --no-deprecations); the suite time is the "Run unit tests" step of the last green Django Tests run on master, through `gh`.
+deprecations are `library/vg/deprecations.py:find_deprecations` (basedpyright plus `manage.py check`, about a
+minute, so only with --deprecations); the suite time is the "Run unit tests" step of the last green Django Tests run on master, through `gh`.
 A number that can't be had (no lint.txt, no `gh` or network) is reported as unavailable rather than failing.
 """
 import ast
@@ -179,7 +179,7 @@ def deprecation_health() -> tuple[DeprecationHealth, dict[str, str]]:
                              import_in_packages=len(report.runtime) - in_repo), report.unavailable
 
 
-def gather_health(ci: bool = True, deprecations: bool = True) -> Health:
+def gather_health(ci: bool = True, deprecations: bool = False) -> Health:
     unavailable = {}
     coverage = docstring_coverage()
     docs = check_docs()
@@ -198,7 +198,7 @@ def gather_health(ci: bool = True, deprecations: bool = True) -> Health:
             deprecated = None
             unavailable["deprecations"] = missing["static"]
     else:
-        unavailable["deprecations"] = "skipped (--no-deprecations)"
+        unavailable["deprecations"] = "skipped (about a minute; --deprecations runs it)"
     suite = None
     if ci:
         try:

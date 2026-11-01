@@ -51,7 +51,7 @@ from library.vg.settings_chain import (
     settings_chain,
     trail,
 )
-from library.vg.test_selection import select_tests
+from library.vg.test_selection import paths_as_changed, select_tests
 
 
 def _graph(edges: dict[str, list[str]]) -> ImportGraph:
@@ -142,6 +142,26 @@ class TestSelectionTest(SimpleTestCase):
 
     def test_docs_and_data_select_nothing(self):
         self.assertEqual(self._labels(["claude/plans/x.md", "snpdb/AGENTS.md", "requirements.txt"]), [])
+
+    def test_web_module_selects_the_owning_apps_url_test_as_well_as_importers(self):
+        self.assertEqual(self._labels(["snpdb/views/views_data.py"]), ["snpdb.tests.test_urls"])
+        self.assertEqual(self._labels(["analysis/grid_export.py"]), ["analysis.tests.test_urls"])
+        self.assertEqual(self._labels(["snpdb/models/models_genome.py"]), [])
+
+    def test_template_tag_library_selects_url_tests_of_apps_whose_templates_load_it(self):
+        labels = self._labels(["uicore/templatetags/ui_utils.py"])
+        self.assertIn("snpdb.tests.test_urls", labels)
+        self.assertIn("analysis.tests.test_urls", labels)
+
+    def test_settings_change_selects_nothing_with_a_warning(self):
+        selection = select_tests(changed=["variantgrid/settings/components/default_settings.py"], graph=self.GRAPH)
+        self.assertEqual(selection.labels, [])
+        self.assertEqual(len(selection.warnings), 1)
+        self.assertIn("default_settings.py", selection.warnings[0])
+
+    def test_paths_as_changed_makes_paths_repo_relative(self):
+        self.assertEqual(paths_as_changed([str(REPO_ROOT / "snpdb" / "urls.py"), "snpdb/deleted_module.py"]),
+                         ["snpdb/urls.py", "snpdb/deleted_module.py"])
 
 
 class TasksMapTest(SimpleTestCase):

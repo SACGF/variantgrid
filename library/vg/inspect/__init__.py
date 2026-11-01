@@ -16,7 +16,8 @@ from typing import Any
 from django.db import transaction
 
 CAP = 10
-KINDS = ("variant", "allele", "sample", "vcf", "classification", "analysis", "gene", "transcript", "user", "lab")
+KINDS = ("variant", "allele", "sample", "vcf", "classification", "analysis", "gene", "transcript", "user", "lab",
+         "upload", "annotationrun", "liftover")
 
 
 def inspect(kind: str, key: str, depth: int = 2) -> dict[str, Any]:
