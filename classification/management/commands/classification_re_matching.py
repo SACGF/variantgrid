@@ -123,7 +123,7 @@ class Command(BaseCommand):
 
         passed_validation = True
         rematch_requests: list[RematchRequest] = []
-        for idx, row in df.iterrows():
+        for _idx, row in df.iterrows():
             rematch_request = RematchRequest.from_row(row)
             try:
                 rematch_request.validate(nuke=nuke)

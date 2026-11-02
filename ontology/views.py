@@ -21,7 +21,7 @@ def ontology_term_text(request, ontology_service, name):
     try:
         ontology_service = OntologyService(ontology_service)
     except ValueError:
-        raise Http404
+        raise Http404 from None
     term = get_object_or_404(OntologyTerm, name=name, ontology_service=ontology_service)
     return redirect(term)
 

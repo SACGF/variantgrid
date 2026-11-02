@@ -298,7 +298,7 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
         try:
             return OntologyTerm.objects.get(pk=pk)
         except OntologyTerm.DoesNotExist:
-            raise Http404
+            raise Http404 from None
 
     @staticmethod
     def get_gene_symbol(gene_symbol: Union[str, GeneSymbol]) -> 'OntologyTerm':

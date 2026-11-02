@@ -365,7 +365,7 @@ class ClassificationExportFormatterVCF(ClassificationExportFormatter):
         if allele_data.cms:
             if self.target_system == VCFTargetSystem.CLASSIFICATION_DUMP:
                 rows = []
-                if variant := allele_data.cached_variant:
+                if allele_data.cached_variant:
                     for cm in allele_data.cms:
                         simple_row = ClassificationSimpleVCF(
                             classification_modification=cm,

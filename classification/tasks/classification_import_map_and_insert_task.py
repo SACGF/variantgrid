@@ -92,7 +92,6 @@ class ClassificationImportMapInsertTask(Task):
             user = upload_file.user
             ClassificationImportMapInsertTask.update_status(upload_file, UploadedClassificationsUnmappedStatus.Mapping)
 
-            file_data = upload_file.file_data
             sub_folder = f"upload_{upload_file.pk}"
             working_sub_folder = self.data_dir / sub_folder
             working_sub_folder.mkdir(exist_ok=True)

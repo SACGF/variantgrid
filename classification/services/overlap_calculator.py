@@ -203,7 +203,6 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
             all_bucket_values.add(bucket)
             all_classification_values.add(value)
 
-        desired_value: OverlapStatus
         if len(all_classification_values) == 2 and "VUS" in all_classification_values and len(all_bucket_values) == 1:
             # here we would have VUS and one of VUS_A, VUS_B, VUS_C
             return OverlapStatus.RESOLUTION_DIFFERENCES

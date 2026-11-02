@@ -36,11 +36,11 @@ def get_node_subclass_or_404(user: User, node_id, write=False, version=None) -> 
         return _get_node(user, node_id, write=write, version=version)
     except AnalysisNode.DoesNotExist:
         msg = f"No AnalysisNode of pk={node_id}"
-        raise Http404(msg)
+        raise Http404(msg) from None
 
 
 def get_node_subclass_or_non_fatal_exception(user: User, node_id, write=False, version=None) -> AnalysisNode:
     try:
         return _get_node(user, node_id, write=write, version=version)
     except AnalysisNode.DoesNotExist:  # @UndefinedVariable
-        raise NodeNotFoundException(node_id)
+        raise NodeNotFoundException(node_id) from None

@@ -110,7 +110,7 @@ class TestVCFUtils(TestCase):
         with tempfile.NamedTemporaryFile(delete=True) as temp_file:
             write_vcf_from_variant_coordinates(temp_file.name, variant_coordinates)
             out = vcf_to_variant_coordinates_and_records(temp_file.name)
-            for in_vc, (out_vc, out_record) in zip(variant_coordinates, out):
+            for in_vc, (_out_vc, out_record) in zip(variant_coordinates, out):
                 self.assertEqual(out_record.INFO["END"], in_vc.end)
 
     def test_vcf_split_multi_get_ref_alt_svlen_and_modification(self):

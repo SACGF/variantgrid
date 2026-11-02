@@ -93,7 +93,7 @@ def _parse_ids(values):
             try:
                 ids.append(int(part))
             except ValueError:
-                raise CommandError(f"Expected an integer ID, got '{part}'")
+                raise CommandError(f"Expected an integer ID, got '{part}'") from None
     return ids
 
 
@@ -189,7 +189,7 @@ class Command(BaseCommand):
             try:
                 jcl_modes = [int(jcl_arg)]
             except ValueError:
-                raise CommandError(f"--join-collapse-limit must be an integer or 'both', got '{jcl_arg}'")
+                raise CommandError(f"--join-collapse-limit must be an integer or 'both', got '{jcl_arg}'") from None
 
         # Issue #546 explicit-PK substitution is gated on ANALYSIS_NODE_STORE_ID_SIZE_MAX, which a node
         # reads when it loads and stores its PKs with its count - so use --rerun for the mode to take

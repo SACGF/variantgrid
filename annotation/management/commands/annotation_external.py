@@ -65,7 +65,7 @@ class Command(BaseCommand):
         try:
             _require_sv_offload_supported(options["pipeline_type"])
         except ValueError as e:
-            raise CommandError(str(e))
+            raise CommandError(str(e)) from e
         if options["dump"]:
             self._run_dump(genome_build, options)
         elif options["dump_existing"]:

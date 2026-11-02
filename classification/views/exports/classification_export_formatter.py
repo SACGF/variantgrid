@@ -88,7 +88,7 @@ class ClassificationExportFormatter(ABC):
         Start generating the data and return it in a HTTP Response
         """
         if self.classification_filter.benchmarking:
-            for count, row in enumerate(self._yield_single_file()):
+            for count, _row in enumerate(self._yield_single_file()):
                 if count > 100:
                     break
             return HttpResponse("<html><body>Benchmark complete - for use with Debug Toolbar</body></html>")

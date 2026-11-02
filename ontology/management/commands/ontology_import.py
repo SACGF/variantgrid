@@ -405,7 +405,7 @@ def load_phenotype_to_genes(filename: str, force: bool):
         )
 
         by_omim = by_hpo_data.groupby("omim_id")
-        for omim_id, by_omim_data in by_omim:
+        for omim_id, _by_omim_data in by_omim:
             # link HPO -> OMIM
             ontology_builder.add_ontology_relation(
                 source_term_id=hpo_id,
@@ -420,7 +420,7 @@ def load_phenotype_to_genes(filename: str, force: bool):
             hgnc_term = OntologyTerm.get_gene_symbol(gene_symbol)
 
             by_omim = gene_data.groupby("omim_id")
-            for omim_id, by_omim_data in by_omim:
+            for omim_id, _by_omim_data in by_omim:
                 ontology_builder.add_ontology_relation(
                     source_term_id=omim_id,
                     dest_term_id=hgnc_term.id,

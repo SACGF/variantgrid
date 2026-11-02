@@ -532,7 +532,7 @@ class ClassificationExportFormatterClinVarCompareExpert(ClassificationExportForm
                         return cm.classification.lab
 
                     all_cms = sorted([cm for cm in allele_data.all_cms if not cm.withdrawn], key=sort_key)
-                    for lab, cms_by_lab in groupby(all_cms, key=sort_key):
+                    for _lab, cms_by_lab in groupby(all_cms, key=sort_key):
                         new_rows = [delimited_row(
                             ClinVarExpertCompareRow(
                                 allele_group=allele_data,

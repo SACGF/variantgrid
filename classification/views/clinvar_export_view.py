@@ -429,7 +429,7 @@ class ClinVarExportSummary(ExportRow):
     @export_column("Sync Status")
     def _sync_status(self):
         if self.clinvar_export.status == ClinVarExportStatus.UP_TO_DATE:
-            if clinvar_error := self.clinvar_export.last_submission_error:
+            if self.clinvar_export.last_submission_error:
                 return "ClinVar Error"
         return self.clinvar_export.get_status_display()
 

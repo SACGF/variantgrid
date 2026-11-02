@@ -326,7 +326,7 @@ class Wiki(TimeStampedModel):
         try:
             klass._meta.get_field(unique_keyword)
         except FieldDoesNotExist:
-            raise PermissionDenied(f"'{unique_keyword}' is not a valid field for {class_name}")
+            raise PermissionDenied(f"'{unique_keyword}' is not a valid field for {class_name}") from None
         if user is not None:
             # Check permission on an unsaved instance before creating the row (throws 403)
             klass(**{unique_keyword: unique_value}).check_user_edit_permission(user)
