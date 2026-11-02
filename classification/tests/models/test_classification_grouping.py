@@ -19,6 +19,7 @@ from classification.models import (
     ClassificationModification,
 )
 from classification.tests.models.test_utils import ClassificationTestUtils
+from library.django_utils.unittest_utils import frozen_cache_expiry
 from library.utils import strip_json
 from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Allele
@@ -160,10 +161,11 @@ class ClassificationGroupingUpdateQueriesTestCase(TestCase):
         return [q["sql"] for q in ctx.captured_queries]
 
     def test_update_queries_do_not_grow_with_classifications(self):
-        self._update_queries(self._grouping(1))  # Fill the evidence key cache
-        single_queries = self._update_queries(self._grouping(1))
-        several = self._grouping(6)
-        several_queries = self._update_queries(several)
+        with frozen_cache_expiry():
+            self._update_queries(self._grouping(1))  # Fill the evidence key cache
+            single_queries = self._update_queries(self._grouping(1))
+            several = self._grouping(6)
+            several_queries = self._update_queries(several)
         self.assertEqual(len(single_queries), len(several_queries))
         # SAVEPOINT/RELEASE, the last published modifications (one query, select_related), search terms
         # (allele info + resolved variant info, ClinVar SCVs, DELETE), the grouping UPDATE, and the post_save
