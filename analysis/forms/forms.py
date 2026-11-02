@@ -166,7 +166,7 @@ class AutoLaunchAnalysisTemplateForm(forms.ModelForm):
             try:
                 re.compile(value)
             except re.error as e:
-                raise forms.ValidationError(f"RegEx error: {e}")
+                raise forms.ValidationError(f"RegEx error: {e}") from e
         return value
 
 

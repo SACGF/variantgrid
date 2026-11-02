@@ -52,6 +52,7 @@ from annotation.models import HumanProteinAtlasAnnotation
 from classification.models import Classification
 from genes.grids import GeneListGenesColumns
 from genes.models import HGNC, GeneList
+from genes.models.models_gene_annotation_release import GeneAnnotationRelease
 from library.unit_percent import get_allele_frequency_formatter
 from library.utils import (
     JsonDataType,
@@ -807,7 +808,7 @@ class NodeGeneListGenesColumns(GeneListGenesColumns):
         It's assumed that if someone added the gene list via auto-complete then they give people who can see
         that analysis permissions (according to analysis not gene list) """
 
-    def _get_gene_annotation_releases(self) -> list['GeneAnnotationRelease']:
+    def _get_gene_annotation_releases(self) -> list[GeneAnnotationRelease]:
         analysis_id = self.get_query_param("analysis_id")
         analysis = Analysis.get_for_user(self.user, pk=analysis_id)
         return [analysis.gene_annotation_release]
