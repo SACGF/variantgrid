@@ -190,12 +190,33 @@ def get_multi_value_formatter(separator: str):
     return multi_value_formatter
 
 
+def _utr_annotator_effect_summary(effect: dict[str, str]) -> str:
+    """ Each effect writes its own keys (annotation/effect_filters.py): a uAUG gain or loss names the ORF in 'type',
+        a uFrameshift the ORF before and after in 'ref_type' / 'alt_type', a uSTOP gain the ORF it shortens in
+        'ref_type', and a uSTOP loss whether the lengthened ORF meets the CDS in frame ('FrameWithCDS') or ends at
+        an alternative stop before it ('AltStop') """
+    if effect_type := effect.get("type"):
+        return effect_type
+    if alt_type := effect.get("alt_type"):
+        return f"uFrameshift {effect.get('ref_type')} to {alt_type}"
+    if ref_type := effect.get("ref_type"):
+        return f"uSTOP gain in {ref_type}"
+    if "AltStop" in effect:
+        summary = "uSTOP loss"
+        if frame_with_cds := effect.get("FrameWithCDS"):
+            summary += f", {frame_with_cds} with CDS"
+        if effect.get("AltStop") == "True":
+            summary += ", alternative stop"
+        return summary
+    return ""
+
+
 def utr_annotator_annotation_formatter(value):
     """ Each uORF effect's type and Kozak strength - what decides how damaging it is (Whiffin 2020). The rest of
         UTRAnnotator's detail is on the variant page """
     effect_summaries = []
     for effect in utr_annotator_effects(value):
-        summary = effect.get("type", "")
+        summary = _utr_annotator_effect_summary(effect)
         if kozak_strength := effect.get("KozakStrength"):
             summary += f" ({kozak_strength} Kozak)"
         if summary := summary.strip():
