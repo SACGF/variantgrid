@@ -57,6 +57,12 @@ class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
         ordering = ["name"]
         base_manager_name = 'objects'
 
+    def __deepcopy__(self, memo):
+        """ Immutable reference data, shared like the cached instances from ObjectManagerCachingImmutable.
+            Copying would also copy the cached contig mappings (every Contig) - Django deepcopies
+            setUpTestData attributes, and objects referencing a build, for every test """
+        return self
+
     def get_absolute_url(self):
         return reverse("view_genome_build", kwargs={"genome_build_name": self.name})
 

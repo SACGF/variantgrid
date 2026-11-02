@@ -35,6 +35,8 @@ def _decorator_name(decorator) -> str:
 
 
 def _registers_on_import(source: str) -> bool:
+    if not any(word in source for word in [*REGISTRATION_DECORATORS, "connect"]):
+        return False  # parsing every file is most of this test's time
     try:
         with warnings.catch_warnings():
             # a few modules have regexes in non-raw strings - not this test's problem

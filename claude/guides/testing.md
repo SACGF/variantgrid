@@ -26,8 +26,9 @@ python3 manage.py vg tests --changed                                        # on
   `library/vg/test_selection.py:select_tests(changed=None, base=None)`.
   `scripts/vg tests --explain` shows which changed file selected each label without booting Django; `--run`
   executes them. Name files to ask about them instead of the git diff: `scripts/vg tests --explain snpdb/grids.py`.
-- `--parallel 4 --keepdb` runs the whole suite (3,212 tests) in about 65 s wall on vg-test2 (4 cores) with
-  nothing failing (2026-09-10); serially it is about 3 minutes. Django clones `test_snpdb` into
+- `--parallel 4 --keepdb` runs the whole suite (4,448 tests) in about 87 s wall, 78 s of it tests, on vg-test2 (4 cores)
+  with nothing failing (2026-11-02); serially it is about 4 minutes. The box is CPU-bound for the whole run (Python and
+  Postgres together), so more workers don't help - only less work per test does. Django clones `test_snpdb` into
   `test_snpdb_1..4`. `VariantGridTestRunner` drops the clones before each `--keepdb` run (about 3 s each to
   recreate) because Django would otherwise reuse them unmigrated. CI runs it the same way (`.github/workflows/django-tests.yml`). A test that fails only in parallel
   is sharing a file under `data/` or a fixed temp path - give it its own directory rather than marking it serial.
