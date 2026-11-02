@@ -2,6 +2,7 @@
 import logging
 from collections import defaultdict
 from datetime import timedelta
+from functools import cache
 from random import random
 from time import perf_counter, time
 from typing import Optional
@@ -15,7 +16,7 @@ from django.db import connection, models, transaction
 from django.db.models import QuerySet, Subquery
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.utils import timezone
-from model_utils.managers import InheritanceManager
+from model_utils.managers import InheritanceIterable, InheritanceManager, InheritanceQuerySet
 from model_utils.models import TimeStampedModel
 
 from analysis.enums import NodeErrorSource, NodeStatus
@@ -56,15 +57,81 @@ def _default_position():
     return 10 + random() * 50
 
 
+@cache
+def _node_subclass_paths(base_model: type[models.Model]) -> dict[str, str]:
+    """ node_type (class name) -> the select_subclasses() path from base_model down to that subclass """
+    paths = {}
+    for path in InheritanceQuerySet(base_model)._get_subclasses_recurse(base_model):
+        model = base_model
+        for part in path.split("__"):
+            model = model._meta.get_field(part).related_model
+        paths[model.__name__] = path
+    return paths
+
+
+class NodeInheritanceIterable(InheritanceIterable):
+    def __iter__(self):
+        queryset = self.queryset
+        if queryset.select_present_node_types:
+            if not (node_types := queryset.present_node_types()):
+                return iter(())
+            queryset = queryset.select_node_types(*node_types)
+        return iter(InheritanceIterable(queryset, self.chunked_fetch, self.chunk_size))
+
+
+class NodeInheritanceQuerySet(InheritanceQuerySet):
+    """ select_subclasses() with no arguments joins only the subclass tables of the node_types the queryset
+        returns, read with a cheap query when it is evaluated. Joining all ~24 costs far more to plan than to
+        run (#2586) """
+    select_present_node_types = False
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._iterable_class = NodeInheritanceIterable
+
+    def _clone(self):
+        queryset = super()._clone()
+        queryset.select_present_node_types = self.select_present_node_types
+        return queryset
+
+    def select_subclasses(self, *subclasses):
+        if subclasses:
+            return super().select_subclasses(*subclasses)
+        queryset = self._chain()
+        queryset.select_present_node_types = True
+        return queryset
+
+    def select_node_types(self, *node_types: str) -> 'NodeInheritanceQuerySet':
+        """ Subclasses by class name - the queryset's own model (or a bare AnalysisNode row) loads as itself """
+        queryset = self._chain()
+        queryset.select_present_node_types = False
+        paths = _node_subclass_paths(self.model)
+        if subclass_paths := [paths[node_type] for node_type in node_types if node_type in paths]:
+            return queryset.select_subclasses(*subclass_paths)
+        return queryset
+
+    def present_node_types(self) -> set[str]:
+        node_types_qs = self.values_list("node_type", flat=True)
+        node_types_qs.query.select_for_update = False  # FOR UPDATE can't go with DISTINCT
+        if not node_types_qs.query.is_sliced:  # a slice (get(), first()) can't be reordered
+            node_types_qs = node_types_qs.order_by().distinct()
+        return set(node_types_qs)
+
+
 class NodeInheritanceManager(InheritanceManager):
+    _queryset_class = NodeInheritanceQuerySet
+
     def get_queryset(self):
-        queryset = super()._queryset_class(self.model)
+        queryset = self._queryset_class(self.model)
         return queryset.select_related("analysis",
                                        "analysis__user",
                                        "analysis__genome_build",
                                        "analysis__annotation_version",
                                        "analysis__annotation_version__variant_annotation_version",
                                        "analysis__annotation_version__variant_annotation_version__gene_annotation_release")
+
+    def select_node_types(self, *node_types: str) -> NodeInheritanceQuerySet:
+        return self.get_queryset().select_node_types(*node_types)
 
 
 class AnalysisNode(NodeSamplesMixin, NodeQueryMixin, NodeDisplayMixin, NodeErrorsMixin, NodeAuditLogMixin,  # pylint: disable=abstract-method
@@ -94,6 +161,8 @@ class AnalysisNode(NodeSamplesMixin, NodeQueryMixin, NodeDisplayMixin, NodeError
     # This is set to node/version you cloned - cleared upon modification
     cloned_from = models.ForeignKey('NodeVersion', null=True, on_delete=SET_NULL)
     status = models.CharField(max_length=1, choices=NodeStatus.choices, default=NodeStatus.DIRTY)
+    # Concrete class name, set on first save - lets select_subclasses() join only the tables it needs
+    node_type = models.TextField(editable=False)
 
     PARENT_CAP_NOT_SET = -1
     min_inputs = 1
@@ -121,7 +190,7 @@ class AnalysisNode(NodeSamplesMixin, NodeQueryMixin, NodeDisplayMixin, NodeError
 
     def get_subclass(self):
         """ Returns the node loaded as a subclass """
-        return AnalysisNode.objects.get_subclass(pk=self.pk)
+        return AnalysisNode.objects.select_node_types(self.node_type).get(pk=self.pk)
 
     def log_entry_qs(self) -> QuerySet[LogEntry]:
         # This is put on there via AnalysisNode.get_additional_data
@@ -548,6 +617,8 @@ class AnalysisNode(NodeSamplesMixin, NodeQueryMixin, NodeDisplayMixin, NodeError
     def save(self, *args, **kwargs):
         """ To avoid race conditions, don't use save() in a celery task (unless running in scheduling_single_worker)
             instead use update() method above """
+        if not self.node_type:
+            self.node_type = type(self).__name__
         with transaction.atomic():
             if not self._saved_by_parent:
                 # Lock the analysis row first so concurrent node-tree saves serialize in a consistent order.

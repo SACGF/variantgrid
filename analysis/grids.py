@@ -44,7 +44,7 @@ from analysis.models.nodes.node_counts import (
     get_node_extra_filters_q,
     is_extra_filter,
 )
-from analysis.models.nodes.node_types import get_node_class_choices, get_node_class_name_expression
+from analysis.models.nodes.node_types import get_node_class_choices
 from analysis.models.nodes.node_version import NodeColumnSummaryCacheCollection
 from analysis.variant_tag_operations import VARIANT_TAG_CLASSIFIED
 from analysis.views.analysis_permissions import get_node_subclass_or_404
@@ -742,7 +742,7 @@ class AnalysisNodeIssuesColumns(DatatableConfig[AnalysisNode]):
             RichColumn(key='analysis__name', label='Analysis', orderable=True,
                        renderer=self.render_node_link,
                        client_renderer='TableFormat.linkUrl'),
-            RichColumn(key='node_class', label='Node Class', orderable=True,
+            RichColumn(key='node_type', label='Node Class', orderable=True,
                        **RichColumn.choices_client_renderer(get_node_class_choices())),
             RichColumn(key='status', orderable=True,
                        **RichColumn.choices_client_renderer(NodeStatus.choices)),
@@ -759,8 +759,7 @@ class AnalysisNodeIssuesColumns(DatatableConfig[AnalysisNode]):
 
     def get_initial_queryset(self) -> QuerySet[AnalysisNode]:
         data = {field: self.get_query_param(field) for field in AnalysisNodeIssuesFilterForm.base_fields}
-        qs = AnalysisNodeIssuesFilterForm(data).get_queryset()
-        return qs.annotate(node_class=get_node_class_name_expression())
+        return AnalysisNodeIssuesFilterForm(data).get_queryset()
 
 
 class NodeTissueExpressionGenesColumns(DatatableConfig[HumanProteinAtlasAnnotation]):
