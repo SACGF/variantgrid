@@ -52,6 +52,8 @@ class ChainedClassmethodPropertyAuditTest(SimpleTestCase):
         for path in _iter_project_python_files():
             with open(path, encoding="utf-8") as f:
                 source = f.read()
+            if "classmethod" not in source or "property" not in source:
+                continue  # parsing every file is most of this test's time
             try:
                 tree = ast.parse(source, filename=path)
             except SyntaxError:

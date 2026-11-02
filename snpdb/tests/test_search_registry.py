@@ -25,6 +25,8 @@ from snpdb.search import (
 
 def _declared_search_receivers(source: str) -> list[str]:
     """ Names of the module-level functions decorated with @search_receiver """
+    if "search_receiver" not in source:
+        return []  # parsing every file is most of this test's time
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", SyntaxWarning)
