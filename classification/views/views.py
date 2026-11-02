@@ -1,3 +1,11 @@
+"""
+Core classification pages: the listing and activity pages, creating a classification (from a variant, a variant tag
+via `CreateClassificationForVariantView` subclasses, or HGVS) and the `AutopopulateView` API that pre-fills its
+evidence, viewing one (history, diff, lookup by lab record id), file attachments, the evidence key page, the
+classification graphs and grouping detail. Most other classification screens have their own module under
+`classification/views/`. Attachments live in private storage and are served by
+`view_classification_file_attachment` after the same security check as the classification page.
+"""
 import json
 import re
 from dataclasses import dataclass

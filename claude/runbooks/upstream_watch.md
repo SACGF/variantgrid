@@ -3,8 +3,8 @@
 Each row is a fork, patched copy or workaround that exists only because an upstream fix has not shipped. The
 SessionStart hook (`.claude/hooks/session_start.sh`) prints a line when any `Next check` date has passed; the
 agent that sees it runs the row's check, records the date and outcome, and either pushes `Next check` out a month or
-carries out `When resolved` and deletes the row. Dates are ISO (`YYYY-MM-DD`) and the hook reads the fourth and fifth
-columns, so keep the table shape.
+carries out `When resolved` and deletes the row. Dates are ISO (`YYYY-MM-DD`) and the hook reads the `Next check`
+column (the fifth `|`-separated field), so keep the table shape.
 
 | Item | Waiting on | Last checked | Next check |
 |---|---|---|---|
@@ -61,8 +61,8 @@ the PR is closed unmerged, keep the copy and note why here.
 ## VEP plugin per-variant cache
 
 Ensembl/ensembl-vep#2069: a base-class helper (ensembl-variation#1220) and six plugins converted to it
-(VEP_plugins#871) cut VEP CPU by a quarter on coding-heavy input. We ship nothing for this; the patched files and the
-benchmark harness are in the scratch dir named in the session memory for #2499.
+(VEP_plugins#871) cut VEP CPU by a quarter on coding-heavy input. We ship nothing for this; the patched files are the
+upstream PRs' diffs and the measurements are in the comments on #2499.
 
 Check:
 

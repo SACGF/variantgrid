@@ -97,6 +97,24 @@ one call. After that it runs `vg status` (all services active, 0 manual tasks ou
 `vg page /variantopedia/dashboard`. If `--quick` stops at the menu ("No input available for the menu" under `< /dev/null`, exit 1), a step failed or manual steps are outstanding: `--auto-manage`
 runs the unblocked `manage` ones (carrying on past a failure, exit 1 if any failed), and anything else goes back to the user.
 
+### Python packages <a id="python-packages"></a>
+
+This project uses **uv**: the `.venv` is uv-created and `requirements.txt` is compiled from `requirements.in`.
+Deployments install `requirements.txt` only; dev tools (ruff, mypy, pylint, the stubs) are in `requirements-dev.in`,
+compiled against the production pins, and CI and developers install both (`scripts/install_requirements.sh --dev`).
+After editing either `.in` file:
+
+```bash
+uv pip compile requirements.in --generate-hashes -o requirements.txt --python-version 3.12
+uv pip compile requirements-dev.in --generate-hashes -o requirements-dev.txt --python-version 3.12
+scripts/install_requirements.sh --dev
+```
+
+Not `uv pip sync`, which uninstalls anything unlisted - the sibling `sapath` app's `django_auth_ldap` included. uv checks
+every hash on install. `uv.toml` holds a 7-day cooldown (`exclude-newer`): uv never picks or installs a release less
+than a week old, except packages we publish (cdot), listed in `exclude-newer-package`; a security fix let in early
+gets its own dated entry there, removed once the week has passed (`claude/runbooks/upstream_watch.md`).
+
 Releases are git tags `vg<major>.<minor>` (`vg3.0`, and `vg4.0` once cut). `VARIANTGRID_VERSION` is `git describe` against the
 latest tag for `VARIANTGRID_MAJOR_VERSION` (`vg4.0-12-gc174556`, or `vg4-gc174556` before that major has a tag), read
 once per process from the checkout and reported by the API docs and `variantgrid/views_rest.py:CapabilitiesView`. Cutting a

@@ -12,8 +12,12 @@ fi
 # claude/runbooks/upstream_watch.md: a row per fork / patched copy we carry, with its "Next check" date in column 5
 due=$(awk -F'|' -v today="$(date +%F)" '/^\|/ && $5 ~ /[0-9]{4}-[0-9]{2}-[0-9]{2}/ { gsub(/ /, "", $5); if ($5 <= today) n++ } END { print n + 0 }' claude/runbooks/upstream_watch.md 2>/dev/null)
 [ "${due:-0}" -gt 0 ] && echo "upstream watch: $due check(s) due - claude/runbooks/upstream_watch.md"
-newest_plan=$(ls -t claude/plans/*.md 2>/dev/null | head -1)
+newest_plan=$(ls -t claude/plans/*_plan.md 2>/dev/null | head -1)
 [ -n "$newest_plan" ] && echo "newest plan: $newest_plan ($(sed -n 's/^Status: *//p' "$newest_plan" | head -1))"
-# claude/maps/*.md are gitignored: regenerate in the background so they are fresh and never in a diff.
-(scripts/vg map >/dev/null 2>&1 &)
+# claude/maps/*.md are gitignored: regenerate in the background so they are fresh and never in a diff. The stamp
+# records the commit and working-tree state the maps were last built from, so an unchanged checkout skips the build.
+stamp="$(git rev-parse HEAD 2>/dev/null)-$( (git status --porcelain; git diff HEAD) 2>/dev/null | md5sum | cut -c1-12)"
+if [ "$(cat claude/maps/.stamp 2>/dev/null)" != "$stamp" ]; then
+  (scripts/vg map >/dev/null 2>&1 && echo "$stamp" > claude/maps/.stamp &)
+fi
 echo "orient with: python3 manage.py vg status · scripts/vg tests --explain · vg page <url> --queries (AGENTS.md 'Start here')"

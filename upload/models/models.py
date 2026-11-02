@@ -1,3 +1,11 @@
+"""
+The upload pipeline: `FileUpload` (the file and who sent it), `UploadPipeline` (one per upload - status, progress,
+errors) and its `UploadStep`s (the multi-stage VCF import), plus `UploadedVCF` and the import's record of what
+happened (`VCFImportInfo` subclasses, `ModifiedImportedVariant` for what bcftools normalisation changed, skipped
+contigs). The `UploadData` rows for other file types are in `models_uploaded_files`. A running step holds a lease
+its worker renews, so a lapsed lease means the worker died (`UploadStep.lease_lapsed_q`). Raise `UploadUserError`
+for a bad file: the import fails showing the user why, without an error report.
+"""
 import logging
 import os
 import shutil

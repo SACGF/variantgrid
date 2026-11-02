@@ -7,8 +7,10 @@ PostToolUse hook for Edit/Write: the fastest feedback loop.
   *.md    -> vg docs check on that file when it is one of the agent docs, so a dead citation is caught
              as it is written rather than by the Agent maps job on push
   *.html, *.scss, our *.js -> vg css unused, as a warning: a class this edit stopped naming (or a rule it added
-             that nothing names) is reported while the agent can still act on it. Deliberately not a CI check -
-             the scan cannot see classes built from data or added by JS, so a human or agent decides
+             that nothing names) is reported while the agent can still act on it. Only selectors the edited file
+             names now or named at HEAD are reported, so an unused rule that predates the edit stays out of the
+             way. Deliberately not a CI check - the scan cannot see classes built from data or added by JS, so a
+             human or agent decides
   *.html with a <script>, our *.js -> once per file per session, a reminder to load a page that runs it with
              `vg page <url> --js-writes-to-database`, naming candidate URLs from claude/maps/urls.md
 """
@@ -19,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 
 REPO = os.environ.get("CLAUDE_PROJECT_DIR") or os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -41,12 +44,24 @@ def _is_our_static_js(relative: str) -> bool:
     return relative.endswith(".js") and "static_files" in relative and "/js/lib/" not in relative
 
 
-def _css_unused_warning(relative: str) -> str:
+def _names_in_edit(relative: str, path: str) -> set[str]:
+    """ Every [\\w-]+ token in the edited file now and at HEAD: a selector outside this set was unused before the edit """
+    texts = [Path(path).read_text(errors="replace")]
+    head = subprocess.run(["git", "show", f"HEAD:{relative}"], capture_output=True, text=True, cwd=REPO, check=False)
+    if head.returncode == 0:
+        texts.append(head.stdout)
+    return set(re.findall(r"[\w-]+", "\n".join(texts)))
+
+
+def _css_unused_warning(relative: str, path: str) -> str:
     if not relative.endswith(CSS_SOURCE_SUFFIXES) or (relative.endswith(".js") and not _is_our_static_js(relative)):
         return ""
     report = find_unused()
-    if report.ok:
+    names = _names_in_edit(relative, path)
+    unused = [selector for selector in report.unused if selector.name in names]
+    if not unused:
         return ""
+    report = replace(report, unused=unused, dynamic=[], library=[])
     return (f"Warning (not blocking) - vg css unused after editing {relative}:\n{render_unused_report(report)}\n"
             "Delete a rule nothing uses, or if the class is built from data or added by JS, add it to "
             "DATA_DERIVED / LIBRARY_ADDED in library/vg/css.py.\n")
@@ -138,9 +153,9 @@ def main() -> int:
     elif relative.endswith(".scss"):
         css = relative[:-5] + ".css"
         sys.stderr.write(f"{relative} is compiled by a PyCharm watcher; hand-apply the same minimal change to {css} "
-                         f"(match its formatting, leave the .css.map alone).\n{_css_unused_warning(relative)}")
+                         f"(match its formatting, leave the .css.map alone).\n{_css_unused_warning(relative, path)}")
         return 2
-    warning = _css_unused_warning(relative) + _js_check_reminder(relative, path, payload.get("session_id") or "no-session")
+    warning = _css_unused_warning(relative, path) + _js_check_reminder(relative, path, payload.get("session_id") or "no-session")
     if warning:
         sys.stderr.write(warning)
         return 2

@@ -19,10 +19,13 @@ python3 manage.py vg tests --changed                                        # on
   holding migrations that aren't on disk (another branch's) is recreated automatically.
 - `vg tests --changed` maps changed files to test labels through the
   first-party import graph and prints `manage.py test` args: a changed module selects every test module that
-  transitively imports it, templates / JS / `urls.py` select the app's `tests.test_urls`, a migration selects the
-  app's whole `tests` package. The engine is `library/vg/test_selection.py:select_tests(changed=None, base=None)`.
+  transitively imports it; templates / JS / `urls.py` and view, grid, form and template tag modules also select the
+  app's `tests.test_urls` (tests reach views by URL, not import), and a template tag library selects the `test_urls`
+  of every app whose templates load it; a migration selects the app's whole `tests` package. A settings change
+  selects nothing and prints a warning, as does a view module in an app with no `test_urls`. The engine is
+  `library/vg/test_selection.py:select_tests(changed=None, base=None)`.
   `scripts/vg tests --explain` shows which changed file selected each label without booting Django; `--run`
-  executes them.
+  executes them. Name files to ask about them instead of the git diff: `scripts/vg tests --explain snpdb/grids.py`.
 - `--parallel 4 --keepdb` runs the whole suite (3,212 tests) in about 65 s wall on vg-test2 (4 cores) with
   nothing failing (2026-09-10); serially it is about 3 minutes. Django clones `test_snpdb` into
   `test_snpdb_1..4`. `VariantGridTestRunner` drops the clones before each `--keepdb` run (about 3 s each to
@@ -48,7 +51,14 @@ python3 manage.py vg tests --changed                                        # on
   `variantgrid.settings`: `variantgrid/__init__.py` imports celery, which reads settings while the settings module
   is still importing, so a module anywhere else fails with a missing attribute. Drop the `test_<name>*`
   databases afterwards. A fresh worktree also needs `manage.py collectstatic_js_reverse` before its first run
-  (the suite fails without the generated `reverse.js`).
+  (the suite fails without the generated reverse.js).
+- A worktree or agent is spawned from `/opt/variantgrid` (or the box's checkout), never from inside
+  `variantgrid_sapath/`: that directory is a separate git checkout of the private SA Pathology repo (excluded via
+  `.git/info/exclude`), so a worktree created with it as the current directory is a sapath worktree with no
+  VariantGrid code in it.
+- Test input is a checked-in fixture file (a small VCF, a JSON dump, a CSV under the app's `tests/test_data/`), not
+  a generator script that builds one: the file is what a reader checks against, and it is less code to maintain. A
+  sample a test needs is created in the test from the builders below, not imported through a pipeline.
 
 ## Fixture builders
 

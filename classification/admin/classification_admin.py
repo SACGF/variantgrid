@@ -1,3 +1,11 @@
+"""
+Django admin for the classification records and their pipeline: classifications and import runs, imported allele
+info (re-matching, validation overrides), evidence keys, clinical contexts and discordance reports (including the
+`DiscordanceReportAdminExport` spreadsheet), case reports and their templates, groupings and reclassification
+state. Most admins build on `ModelAdminBasics`, and the admin actions here are how staff repair data (re-match
+variants, fix permissions, re-publish, withdraw, refresh groupings). ClinVar export, condition text, overlaps and
+settings have their own modules in `classification/admin/`.
+"""
 import json
 from collections.abc import Callable
 from datetime import timedelta

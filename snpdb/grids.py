@@ -1,3 +1,11 @@
+"""
+snpdb grids: the list pages (VCFs, samples, cohorts, trios/quads/duos, genomic intervals, named collections,
+liftover runs, skipped annotation), each served by a `DatabaseTableView` in snpdb/urls.py, and
+`AbstractVariantGrid`, the base of every variant grid (analysis node grid, All Variants, gene and tag grids).
+Variant grid columns come per user from a CustomColumnsCollection; `get_standard_overrides` layers on renderers and
+formatting. Keep data conversion (eg AF unit to percent) server side: the CSV export doesn't run the JS renderers,
+so a client-side conversion would make it disagree with the grid.
+"""
 import operator
 from collections import defaultdict
 from functools import cached_property, reduce

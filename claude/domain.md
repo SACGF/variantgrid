@@ -103,7 +103,11 @@ in one build, shared by every release that contains it (`ReleaseGeneVersion`). S
 
 **Transcript / TranscriptVersion** - `genes/models/models_gene.py:Transcript`, `TranscriptVersion`. Transcript is the
 versionless accession; TranscriptVersion (`NM_000059.4`, per build) carries the cdot exon data used for HGVS. HGVS
-resolution lives in `genes/hgvs/`, biocommons first with ClinGen fallback.
+resolution lives in `genes/hgvs/`, biocommons first with ClinGen fallback. Naming follows the nomenclature
+(hgvs-nomenclature.org): `c.`, `g.`, `n.` and `m.` descriptions are **DNA**, `p.` is **protein**, `r.` is RNA - so a
+variable that can hold any DNA description is `hgvs` or `dna_hgvs`, and `c_hgvs` only when the value is always a
+coding (`c.`) description. `c.` is not the default kind of HGVS, and a name like `all_chgvs` for a list that also
+holds `p.` is wrong.
 
 **GeneAnnotationRelease** - `genes/models/models_gene_annotation_release.py:GeneAnnotationRelease`. The GTF/cdot release a
 VEP version was built against; ties `VariantAnnotationVersion` to the gene/transcript versions it reports.

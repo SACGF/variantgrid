@@ -32,7 +32,7 @@ class TestVCFDetectBuild(TestCase):
         with self.assertRaises(GenomeBuildDetectionException):
             vcf_detect_genome_build(vcf_filename)
 
-    @skip  # TODO: Issue #1857 - Proper handling of hg19 vs GRCh37
+    @skip  # TODO: Issue #1974 - Proper handling of hg19 vs GRCh37
     def test_detect_hg19(self):
         """ hg19 - due to MT size  """
         vcf_filename = os.path.join(self.TEST_DATA_DIR, "hg19_contigs.vcf")

@@ -1,3 +1,10 @@
+"""
+Celery settings: the broker (from the CELERY secret, in memory under tests), the queues and the `*_WORKERS` route
+dicts tasks name, `CELERY_TASK_ROUTES` for tasks that need a worker other than the default db_workers,
+`CELERY_IMPORTS` (every module with a beat-scheduled task must be listed here or be an app's `tasks` module),
+per-queue worker memory caps and the reboot crash-loop brake. Env settings files star-import this alongside
+default_settings.
+"""
 from kombu import Exchange, Queue
 
 from variantgrid.settings.components.default_settings import UNIT_TEST
