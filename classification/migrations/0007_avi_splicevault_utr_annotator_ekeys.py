@@ -43,11 +43,11 @@ _NEW_KEYS = [
         'label': 'SpliceVault top events',
         'sub_label': 'Splicing',
         'description': "SpliceVault's most common mis-splicing events seen in RNA-seq at the splice site SpliceAI "
-                       'predicts lost, each rank:type;position;percent of samples;frame. Type is exon skipping (ES, '
+                       'predicts lost, each rank:type:position:percent of samples:frame. Type is exon skipping (ES, '
                        'position is the exons skipped), cryptic donor (CD) or cryptic acceptor (CA). <p> It predicts the kind of mis-splicing, not '
                        'whether splicing is disrupted. The authors suggest PVS1 at Very Strong only when intron '
                        'retention and all top events are consistent with a null outcome. MANE transcripts only.',
-        'examples': ['Top1:CD;-35;31%;Frameshift, Top2:ES;1;5%;Inframe'],
+        'examples': ['Top1:CD:-35:31%:Frameshift, Top2:ES:1:5%:inFrame'],
         'see': _SPLICEVAULT_SEE,
         'order': 23,
         'variantgrid_column_id': 'splicevault_top_events',

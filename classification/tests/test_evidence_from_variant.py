@@ -192,3 +192,15 @@ class UTRAnnotatorFormatterTest(SimpleTestCase):
                       "&Evidence=True:Unlisted=1:type=OutOfFrame_oORF:KozakStrength=Strong")
         self.assertEqual("uORF (Weak Kozak), OutOfFrame_oORF (Strong Kozak)",
                          utr_annotator_annotation_formatter(annotation))
+
+    def test_effects_without_a_type_are_named(self):
+        """ uSTOP loss, uSTOP gain and uFrameshift records carry no 'type' """
+        annotation = ("AltStop=False:AltStopDistanceToCDS=NA:Evidence=False:FrameWithCDS=outOfFrame:KozakStrength=Moderate"
+                      "&AltStop=True:AltStopDistanceToCDS=113:FrameWithCDS=inFrame:KozakStrength=Strong"
+                      "&Evidence=True:KozakStrength=Strong:newSTOPDistanceToCDS=133:ref_type=OutOfFrame_oORF"
+                      "&Evidence=False:KozakStrength=Moderate:alt_type=InFrame_oORF:ref_type=uORF")
+        self.assertEqual("uSTOP loss, outOfFrame with CDS (Moderate Kozak), "
+                         "uSTOP loss, inFrame with CDS, alternative stop (Strong Kozak), "
+                         "uSTOP gain in OutOfFrame_oORF (Strong Kozak), "
+                         "uFrameshift uORF to InFrame_oORF (Moderate Kozak)",
+                         utr_annotator_annotation_formatter(annotation))
