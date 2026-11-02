@@ -169,15 +169,15 @@ class VariantColumnAutopopulateTest(TestCase):
                                                    evidence_keys_list, self.annotation_version)
         return {key: EvidenceKey.get_value(data.data.get(key)) for key in keys}
 
-    @override_settings(ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED=True)
-    def test_non_commercial_populated_where_allowed(self):
+    @override_settings(DEPLOYMENT_DIAGNOSTIC_USE=False)
+    def test_licence_restricted_populated_on_a_research_deployment(self):
         self.assertEqual({"avi": 23.1, "alphagenome_splicing": 1.4},
                          self._autopopulated(["avi", "alphagenome_splicing"]))
 
-    @override_settings(ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED=False)
-    def test_non_commercial_not_populated_where_disallowed(self):
-        """ AlphaGenome splicing is licensed for non-commercial use only (#2433). A version annotated before the
-            deployment turned the setting off still holds the scores """
+    @override_settings(DEPLOYMENT_DIAGNOSTIC_USE=True)
+    def test_licence_restricted_not_populated_on_a_diagnostic_deployment(self):
+        """ AlphaGenome splicing is licensed for non-commercial, non-diagnostic use only (#2433). A version annotated
+            before the deployment became diagnostic still holds the scores """
         self.assertEqual({"avi": 23.1, "alphagenome_splicing": None},
                          self._autopopulated(["avi", "alphagenome_splicing"]))
 

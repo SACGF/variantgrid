@@ -1318,7 +1318,7 @@ VEP_COLUMNS: tuple[VEPColumnDef, ...] = (
     _avi('AVI_RAW', 'avi_raw'),
 
     # ---------- AlphaGenome merged splicing (custom VCF, GRCh38, columns_version >= 5) - #2433 ----
-    # Non-commercial data, dropped by VEPConfig unless ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED. Added to versions
+    # Licence-restricted data, dropped by VEPConfig on diagnostic/commercial deployments. Added to versions
     # in use like the #2426 plugins, so it shares their pin stamping and backfill
     VEPColumnDef(
         source_field='score',

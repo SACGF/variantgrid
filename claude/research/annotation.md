@@ -221,11 +221,12 @@ one backfill VEP pass and one import:
   `min_vep_version=116`, from a `--custom` VCF (`VEPCustom.ALPHAGENOME_SPLICING`, CSQ field
   `AlphaGenome_splicing_score`). No plugin reads DeepMind's TSV and `--custom` only matches alleles for VCF, so
   `annotation/annotation_data/generate_annotation/alphagenome_splicing_to_vcf.sh` converts it once, with contigs
-  stripped of `chr` like our other GRCh38 custom VCFs. The data is licensed for non-commercial use only:
-  `ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED` (default True) False clears it in
+  stripped of `chr` like our other GRCh38 custom VCFs. The data is licensed for non-commercial use only, and not for
+  diagnostic procedures (`annotation/vep_config.py:LICENCE_RESTRICTED_VEP_CONFIG_KEYS`). `DEPLOYMENT_DIAGNOSTIC_USE`
+  (default True, set False on research deployments) or `DEPLOYMENT_COMMERCIAL_USE` clears it in
   `annotation/vep_config.py:allowed_vep_config_data`, which both `VEPConfig` and `vep_component_version_kwargs` go
-  through, so a commercial deployment never passes it to VEP, never stamps its pin and never shows the column, even
-  with the file configured. The variant page shows a "non-commercial use only" note next to the score.
+  through, so a diagnostic or commercial deployment never passes it to VEP, never stamps its pin and never shows the
+  column, even with the file configured. The variant page shows a "non-commercial use only" note next to the score.
 
 All are gated `min_columns_version=5` with the `utr_annotator`, `splicevault`, `avi` and `alphagenome_splicing`
 basename pins and one flag, `backfilled_utr_avi_splicevault`. `annotation/vep_plugin_backfill.py:SOURCE_PINS` maps each
@@ -264,7 +265,7 @@ carries the steps; `annotation/migrations/0007_alphagenome_splicing.py` does the
      `_VARIANTGRID_VEP_PLUGINS` once that PR is on the release branch we download from.
    - `AVI.pm`, which `download_annotation_data` fetches from VEP_plugins `release/<ANNOTATION_VEP_VERSION>` into
      ANNOTATION_VEP_PLUGINS_DIR along with any other configured plugin missing there.
-   - GRCh38, non-commercial deployments only: "AlphaGenome SNV merged splicing scores",
+   - GRCh38, non-commercial research deployments only (`DEPLOYMENT_DIAGNOSTIC_USE = False`): "AlphaGenome SNV merged splicing scores",
      combined_splicing_snvs_tabix.zip (20.6 GB, same sign-in), stored rather than compressed: extract
      combined_alphagenome_splicing_snvs.tsv.gz + .tbi, then convert it with
      `annotation/annotation_data/generate_annotation/alphagenome_splicing_to_vcf.sh` to

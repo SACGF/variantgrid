@@ -140,11 +140,6 @@ ANNOTATION_MIN_PATHOGENIC_RANKSCORE = 0.85
 # regardless of this flag.
 ANNOTATION_SHOW_LEGACY_RANKSCORES = False
 
-# Some annotation data is licensed for non-commercial use only (vep_config.NON_COMMERCIAL_VEP_CONFIG_KEYS, eg
-# AlphaGenome merged splicing scores). A commercial deployment sets this False: that data is then never passed to
-# VEP, pinned or shown, even when its file is configured (#2433)
-ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED = True
-
 _ANNOTATION_FASTA_BASE_DIR = os.path.join(ANNOTATION_BASE_DIR, "fasta")
 
 BUILD_GRCH37 = "GRCh37"
@@ -278,7 +273,7 @@ ANNOTATION = {
             # annotation_data/GRCh38/alphagenome_variant_impact_score_snvs.tsv.gz (VEP >= 116), from
             # avi_scores_snvs_tabix.zip
             "avi": None,
-            # Non-commercial (ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED): annotation_data/GRCh38/
+            # Non-commercial, non-diagnostic use only (DEPLOYMENT_DIAGNOSTIC_USE): annotation_data/GRCh38/
             # alphagenome_splicing_snvs.GRCh38.vcf.gz (VEP >= 116), from combined_splicing_snvs_tabix.zip by
             # annotation/annotation_data/generate_annotation/alphagenome_splicing_to_vcf.sh
             "alphagenome_splicing": None,

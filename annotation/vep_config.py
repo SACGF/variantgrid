@@ -57,32 +57,39 @@ _CONSERVATION_KEYS = ("phastcons100way", "phastcons30way", "phastcons46way",
                       "phylop100way", "phylop30way", "phylop46way")
 
 
-# vep_config data licensed for non-commercial use only - never passed to VEP (so never pinned or shown) unless
-# settings.ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED
-NON_COMMERCIAL_VEP_CONFIG_KEYS = ("alphagenome_splicing",)
+# vep_config data whose licence rules out some uses, by the settings that declare a deployment makes that use. Where
+# the deployment makes one, the data is never passed to VEP (so never pinned or shown)
+LICENCE_RESTRICTED_VEP_CONFIG_KEYS = {
+    # AlphaGenome merged splicing: non-commercial use only, and not for diagnostic procedures
+    "alphagenome_splicing": ("DEPLOYMENT_COMMERCIAL_USE", "DEPLOYMENT_DIAGNOSTIC_USE"),
+}
+
+
+def licence_excluded_keys() -> list[str]:
+    """ Licence-restricted data whose licence rules out a use this deployment makes """
+    return [key for key, ruled_out_uses in LICENCE_RESTRICTED_VEP_CONFIG_KEYS.items()
+            if any(getattr(settings, use) for use in ruled_out_uses)]
 
 
 def allowed_vep_config_data(vep_config_data: dict) -> dict:
-    """ vep_config with the non-commercial data cleared when the deployment may not use it """
-    if settings.ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED:
-        return vep_config_data
-    return {key: None if key in NON_COMMERCIAL_VEP_CONFIG_KEYS else value for key, value in vep_config_data.items()}
+    """ vep_config with the data cleared that the deployment may not use """
+    if excluded_keys := licence_excluded_keys():
+        return {key: None if key in excluded_keys else value for key, value in vep_config_data.items()}
+    return vep_config_data
 
 
-def disallowed_non_commercial_keys(vep_config_data: dict) -> list[str]:
-    """ Non-commercial data configured, but left out because the deployment may not use it """
-    if settings.ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED:
-        return []
-    return [key for key in NON_COMMERCIAL_VEP_CONFIG_KEYS if vep_config_data.get(key)]
+def configured_licence_excluded_keys(vep_config_data: dict) -> list[str]:
+    """ Licence-restricted data configured, but left out because the deployment may not use it """
+    return [key for key in licence_excluded_keys() if vep_config_data.get(key)]
 
 
-def withheld_non_commercial_keys(variant_annotation_version) -> list[str]:
-    """ Non-commercial data a VariantAnnotationVersion can't offer: it wasn't annotated with it (its pin is null),
-        or the deployment may not use it - a version annotated before the setting was turned off still holds it """
-    if not settings.ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED:
-        return list(NON_COMMERCIAL_VEP_CONFIG_KEYS)
-    return [key for key in NON_COMMERCIAL_VEP_CONFIG_KEYS
-            if not getattr(variant_annotation_version, _BASENAME_PIN_FIELDS[key])]
+def withheld_licence_restricted_keys(variant_annotation_version) -> list[str]:
+    """ Licence-restricted data a VariantAnnotationVersion can't offer: the deployment may not use it, or the version
+        wasn't annotated with it (its pin is null) - a version annotated before the deployment's use changed still
+        holds it """
+    excluded_keys = licence_excluded_keys()
+    return [key for key in LICENCE_RESTRICTED_VEP_CONFIG_KEYS
+            if key in excluded_keys or not getattr(variant_annotation_version, _BASENAME_PIN_FIELDS[key])]
 
 
 def _pin_basename(path: Optional[str]) -> Optional[str]:

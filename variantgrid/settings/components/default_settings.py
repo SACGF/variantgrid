@@ -78,6 +78,13 @@ DISCORDANCE_ENABLED = False
 # labs flagged as research (LabClassificationSettings.research) do not participate in discordance detection.
 DISCORDANCE_RESEARCH_ENABLED = True
 
+# What this deployment is used for. Annotation data whose licence rules a use out
+# (annotation/vep_config.py:LICENCE_RESTRICTED_VEP_CONFIG_KEYS, eg AlphaGenome merged splicing - non-commercial,
+# not for diagnostic procedures) is never passed to VEP, pinned or shown, even when its file is configured.
+# A research deployment sets DEPLOYMENT_DIAGNOSTIC_USE = False
+DEPLOYMENT_COMMERCIAL_USE = False
+DEPLOYMENT_DIAGNOSTIC_USE = True
+
 ALLELE_ORIGIN_NOT_PROVIDED_BUCKET = "U"
 # If allele origin isn't provided, what bucket do we group it in
 # "U" for Unknown, "G" for Germline, and "S" for Somatic

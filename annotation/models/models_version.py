@@ -39,7 +39,7 @@ from annotation.pathogenicity_predictions import (
     raw_score_pathogenic_funcs,
 )
 from annotation.vep_columns import variant_grid_column_ids_for_data_keys, visible_columns_for
-from annotation.vep_config import VEPConfig, withheld_non_commercial_keys
+from annotation.vep_config import VEPConfig, withheld_licence_restricted_keys
 from genes.enums import AnnotationConsortium
 from genes.models import (
     GeneAnnotationRelease,
@@ -157,7 +157,7 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # basename, so installing different data registers as a change - as does removing it, which
     # drops that data's columns. All derived by vep_config.vep_component_version_kwargs().
     # NULL on versions created before #462 other than the ones migration 0161 backfilled.
-    alphagenome_splicing = models.TextField(null=True, blank=True)  # non-commercial custom VCF - GRCh38 only
+    alphagenome_splicing = models.TextField(null=True, blank=True)  # licence-restricted custom VCF - GRCh38 only
     avi = models.TextField(null=True, blank=True)  # AlphaGenome Variant Impact scores - GRCh38 + VEP >= 116 only
     conservation = models.TextField(null=True, blank=True)  # phastCons/phyloP bigwig basenames
     dbscsnv = models.TextField(null=True, blank=True)
@@ -467,7 +467,7 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
             vep_version=self.vep,
             cosmic_version=self.cosmic,
             gnomad4_minor_version=self.gnomad,
-        ) - self.withheld_non_commercial_columns
+        ) - self.withheld_licence_restricted_columns
 
     @cached_property
     def visible_columns(self) -> frozenset[str]:
@@ -476,9 +476,9 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         return self.get_visible_columns()
 
     @cached_property
-    def withheld_non_commercial_columns(self) -> frozenset[str]:
-        """ Columns of the non-commercial data this version can't offer (vep_config.withheld_non_commercial_keys) """
-        return variant_grid_column_ids_for_data_keys(withheld_non_commercial_keys(self))
+    def withheld_licence_restricted_columns(self) -> frozenset[str]:
+        """ Licence-restricted data columns this version can't offer (vep_config.withheld_licence_restricted_keys) """
+        return variant_grid_column_ids_for_data_keys(withheld_licence_restricted_keys(self))
 
     @cached_property
     def vep_gene_set_versions(self) -> VepGeneSetVersions:

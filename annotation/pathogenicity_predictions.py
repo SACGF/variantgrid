@@ -568,8 +568,8 @@ EFFECT_NODE_FILTERS: tuple[EffectNodeFilter, ...] = (
                       "splice site usage + splice junction / 5.",
         source_url="https://doi.org/10.1038/s41586-025-10014-0",
         note="No published pathogenicity cutoff - the paper's thresholds are quantiles against common SNPs. "
-             "GRCh38 SNVs only, and licensed for non-commercial use only, so it is offered only "
-             "where the deployment allows non-commercial data.",
+             "GRCh38 SNVs only, and licensed for non-commercial use only and not for diagnostic procedures, "
+             "so it is offered only on non-commercial research deployments.",
     ),
     EffectNodeFilter(
         name="SpliceVault out of frame",

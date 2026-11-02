@@ -81,7 +81,7 @@ class DamageNode(AnalysisNode):
     splice_min = models.FloatField(null=True, blank=True)
     splice_required = models.BooleanField(default=False)
     splice_allow_null = models.BooleanField(default=True)
-    # GRCh38 SNVs, non-commercial data (#2561). Its own threshold (0 to ~3) but part of the splicing filter
+    # GRCh38 SNVs, licence-restricted data (#2561). Its own threshold (0 to ~3) but part of the splicing filter
     alphagenome_splicing_min = models.FloatField(null=True, blank=True)
 
     cosmic_count_min = models.IntegerField(null=True, blank=True)

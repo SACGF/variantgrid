@@ -48,6 +48,7 @@ ANNOTATION[BUILD_GRCH38]["vep_config"].update({
     "avi": "annotation_data/GRCh38/alphagenome_variant_impact_score_snvs.tsv.gz",
     "alphagenome_splicing": "annotation_data/GRCh38/alphagenome_splicing_snvs.GRCh38.vcf.gz",
 })
+DEPLOYMENT_DIAGNOSTIC_USE = False  # research - AlphaGenome splicing's licence rules out diagnostic use
 
 GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID = 1  # MedEx
 DEFAULT_FROM_EMAIL = 'noreply@variantgrid.com'

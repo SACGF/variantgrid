@@ -294,7 +294,7 @@ def get_evidence_fields_for_variant(genome_build: GenomeBuild, variant: Variant,
     evidence_variant_columns = {}  # Copied from query
     ekey_formatters = ekey_from_vg_column_formatters()
     column_separators = vep_columns.separators_by_variant_grid_column()
-    withheld_columns = annotation_version.variant_annotation_version.withheld_non_commercial_columns
+    withheld_columns = annotation_version.variant_annotation_version.withheld_licence_restricted_columns
     for evidence_key in evidence_keys_list:
         if variantgrid_column := evidence_key.variantgrid_column:
             if variantgrid_column.pk in withheld_columns:

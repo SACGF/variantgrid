@@ -1,7 +1,7 @@
 """
 UTRAnnotator, AVI and SpliceVault (#2426) and the AlphaGenome splicing custom VCF (#2433), added to
 VariantAnnotationVersions already in use: the VEP command, enable_vep_plugin_backfill / the migration stamping their
-pins and flagging versions for the backfill, the non-commercial data setting, and the display parsing.
+pins and flagging versions for the backfill, the deployment use settings, and the display parsing.
 """
 import io
 import os
@@ -64,6 +64,7 @@ _flag_versions_that_ran_transcript_plugins = import_module(
 def _settings_with_plugins(vep_version: str = "116") -> dict:
     d = get_fake_annotation_settings_dict(columns_version=5)
     d["ANNOTATION_VEP_VERSION"] = vep_version
+    d["DEPLOYMENT_DIAGNOSTIC_USE"] = False  # a research deployment, which may use AlphaGenome splicing
     d["ANNOTATION"][settings.BUILD_GRCH37]["vep_config"]["utr_annotator"] = UTR_ANNOTATOR_FILE
     for build_name, splicevault_file in SPLICEVAULT_FILES.items():
         d["ANNOTATION"][build_name]["vep_config"]["splicevault"] = splicevault_file
@@ -106,14 +107,14 @@ class PluginVepCommandTests(TestCase):
                       f"short_name=AlphaGenome_splicing,fields=score,format=vcf", grch38_customs)
         self.assertFalse(any("AlphaGenome" in c for c in grch37_customs))
 
-    def test_non_commercial_data_left_out_when_not_allowed(self):
-        settings_dict = _settings_with_plugins()
-        with override_settings(**settings_dict, ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED=False):
-            customs = self._customs("GRCh38")
-            pins = vep_component_version_kwargs(settings.ANNOTATION["GRCh38"])
-        self.assertFalse(any("AlphaGenome" in c for c in customs))
-        self.assertIsNone(pins["alphagenome_splicing"])
-        self.assertEqual(pins["avi"], "alphagenome_variant_impact_score_snvs.tsv.gz")
+    def test_licence_restricted_data_left_out_where_the_licence_rules_out_the_use(self):
+        for use in ("DEPLOYMENT_COMMERCIAL_USE", "DEPLOYMENT_DIAGNOSTIC_USE"):
+            with self.subTest(use=use), override_settings(**{**_settings_with_plugins(), use: True}):
+                customs = self._customs("GRCh38")
+                pins = vep_component_version_kwargs(settings.ANNOTATION["GRCh38"])
+                self.assertFalse(any("AlphaGenome" in c for c in customs))
+                self.assertIsNone(pins["alphagenome_splicing"])
+                self.assertEqual(pins["avi"], "alphagenome_variant_impact_score_snvs.tsv.gz")
 
     def test_avi_needs_vep_116(self):
         with override_settings(**_settings_with_plugins(vep_version="115")):
@@ -127,8 +128,8 @@ class PluginVepCommandTests(TestCase):
         self.assertFalse(any(p.startswith(("UTRAnnotator", "AVI", "SpliceVault")) for p in plugins))
 
 
-class NonCommercialVisibleColumnsTests(TestCase):
-    """ Non-commercial data shows on the versions annotated with it, while the deployment may use it (#2571) """
+class LicenceRestrictedVisibleColumnsTests(TestCase):
+    """ Licence-restricted data shows on the versions annotated with it, while the deployment may use it (#2571) """
 
     def _visible(self, alphagenome_splicing_pin) -> bool:
         genome_build = GenomeBuild.get_name_or_alias("GRCh38")
@@ -280,9 +281,9 @@ class PluginPinStampTests(TestCase):
         self.assertIsNone(vav.splicevault)
         self.assertFalse(vav.backfilled_utr_avi_splicevault)
 
-    def test_command_does_not_stamp_non_commercial_data_when_not_allowed(self):
+    def test_command_does_not_stamp_licence_restricted_data_on_a_diagnostic_deployment(self):
         vav = self._vav(self.grch38, VariantAnnotationVersion.Status.ACTIVE)
-        settings_dict = {**_settings_with_plugins(), "ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED": False}
+        settings_dict = {**_settings_with_plugins(), "DEPLOYMENT_DIAGNOSTIC_USE": True}
         output = self._enable("--genome-build", "GRCh38", settings_dict=settings_dict)
         vav.refresh_from_db()
         self.assertIsNone(vav.alphagenome_splicing)

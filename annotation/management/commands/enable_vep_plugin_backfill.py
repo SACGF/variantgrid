@@ -12,7 +12,7 @@ from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
 from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
 from annotation.models.models_version import VariantAnnotationVersion
 from annotation.vep_annotation import get_missing_vep_files
-from annotation.vep_config import disallowed_non_commercial_keys
+from annotation.vep_config import configured_licence_excluded_keys
 from annotation.vep_plugin_backfill import (
     ACTIVE_STATUSES,
     SOURCE_PINS,
@@ -67,9 +67,9 @@ class Command(BaseCommand):
                                + "\n".join(problems))
 
         for genome_build in genome_builds:
-            if keys := disallowed_non_commercial_keys(genome_build.settings["vep_config"]):
-                self.stdout.write(f"{genome_build}: not stamping {', '.join(keys)} - non-commercial data, and "
-                                  f"ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED is False")
+            if keys := configured_licence_excluded_keys(genome_build.settings["vep_config"]):
+                self.stdout.write(f"{genome_build}: not stamping {', '.join(keys)} - its licence rules out this "
+                                  f"deployment's use (DEPLOYMENT_COMMERCIAL_USE / DEPLOYMENT_DIAGNOSTIC_USE)")
 
         stamps = self._stamp(genome_builds, dry_run=True)
         # Only a pin change puts runs at risk: a re-run for a later backfill pass stamps nothing and can go ahead

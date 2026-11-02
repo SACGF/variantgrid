@@ -110,12 +110,13 @@ Gotchas:
   NEW/ACTIVE versions, flags each build's newest, prints its backfill, or `--bash-script PATH` writes it as one script;
   annotation/vep_plugin_backfill.py), restarts annotation_workers, then runs the backfill - setting a file without the
   command halts the VEP lane on VEPVersionMismatchError.
-- Non-commercial data (annotation/vep_config.py:NON_COMMERCIAL_VEP_CONFIG_KEYS) is cleared from VEPConfig and the pins
-  when ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED is False, so it never reaches the command line, the pins or the page.
+- Licence-restricted data (annotation/vep_config.py:LICENCE_RESTRICTED_VEP_CONFIG_KEYS) is cleared from VEPConfig and
+  the pins when its licence rules out the deployment's use (DEPLOYMENT_COMMERCIAL_USE / DEPLOYMENT_DIAGNOSTIC_USE), so it
+  never reaches the command line, the pins or the page.
   Read vep_config through VEPConfig / vep_component_version_kwargs, never genome_build.settings directly.
   The page, filters and classification autopopulate go off the version's pin as well as the setting
-  (annotation/models/models_version.py:VariantAnnotationVersion.withheld_non_commercial_columns): the setting doesn't
-  add the data to a version annotated without it, nor remove it from one annotated before it was turned off.
+  (annotation/models/models_version.py:VariantAnnotationVersion.withheld_licence_restricted_columns): the settings don't
+  add the data to a version annotated without it, nor remove it from one annotated before the deployment's use changed.
 - The SpliceVault plugin matches the data file's transcript column against the transcript's stable_id, a versioned NM
   under --refseq, while Ensembl's file holds unversioned ENST: a RefSeq build configures the copy
   `splicevault_to_refseq` rewrites to MANE RefSeq (annotation/splicevault.py), which only covers MANE transcripts.

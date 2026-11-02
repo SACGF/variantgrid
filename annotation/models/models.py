@@ -393,8 +393,8 @@ class VariantAnnotation(AbstractVariantAnnotation):
     # AlphaGenome Variant Impact (#2426) - GRCh38 SNVs, VEP >= 116. Null before the backfill as above
     avi_phred = models.FloatField(null=True, blank=True)
     avi_raw = models.FloatField(null=True, blank=True)
-    # AlphaGenome merged splicing score (#2433) - GRCh38 SNVs, non-commercial data
-    # (ANNOTATION_NON_COMMERCIAL_DATA_ALLOWED). Null before the backfill as above
+    # AlphaGenome merged splicing score (#2433) - GRCh38 SNVs, licence-restricted data
+    # (vep_config.LICENCE_RESTRICTED_VEP_CONFIG_KEYS). Null before the backfill as above
     alphagenome_splicing = models.FloatField(null=True, blank=True)
     pubmed = models.TextField(null=True, blank=True)
     # Mastermind Cited Variants Reference. @see https://www.genomenon.com/cvr/
