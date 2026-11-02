@@ -292,9 +292,8 @@ botocore==1.43.89 \
     # via
     #   boto3
     #   s3transfer
-cdot==0.2.31 \
-    --hash=sha256:5df923ea8aa48024fd04310ea6d991078d84b8be4de66f92fc96ffb43dd8ae53 \
-    --hash=sha256:91d42d5ba973fc158beb41a559a9abdcc19eab927d229fa3814d65e6b943afb2
+cdot==0.2.35 \
+    --hash=sha256:c2e64d790fa59ef696bdc4e71d28d10461f07251193cf048f466c4b0254a7eee
     # via -r requirements.in
 celery==5.6.3 \
     --hash=sha256:0808f42f80909c4d5833202360ffafb2a4f83f4d8e23e1285d926610e9a7afa6 \
