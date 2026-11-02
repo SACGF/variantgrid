@@ -139,14 +139,15 @@ absence is intentional and must not be flagged during audits:
 DRF is configured with `DEFAULT_PERMISSION_CLASSES = [IsAuthenticated]`, so REST endpoints need no explicit `permission_classes`.
 
 Files a user downloads: nginx serves `MEDIA_ROOT` with no login or permission check, so where a generated file lives
-decides who can read it.
-- **Restricted by user (almost everything):** stored in private storage (`UPLOAD_DIR`, `PrivateUploadStorage`) and served
-  by a Django view that checks the object's permissions (`classification/views/views_case_report.py`).
-- **Pre-generated, cheap to leak (a graph PNG):** may go in `MEDIA_ROOT` only under an unguessable name - a
-  `SECRET_KEY`-salted cache key (`snpdb/graphs/graphcache.py:CacheableGraph`), handed out by a view that has done the
-  permission check.
-- **Named by pk, object id or anything else derivable:** anyone can guess the URL, so this is only for files that are
-  completely public.
+decides who can read it. A file restricted by user (almost everything) goes in one of two places:
+- **Private storage** (`UPLOAD_DIR`, `PrivateUploadStorage`), served by a Django view that checks the object's
+  permissions (`classification/views/views_case_report.py`).
+- **`MEDIA_ROOT` under an unguessable name**: a `SECRET_KEY`-salted hash (`snpdb/graphs/graphcache.py:CacheableGraph`)
+  or a random UUID directory (`snpdb/models/models.py:CachedGeneratedFile`'s exports). The URL is handed out only by a
+  view that has done the permission check.
+
+A file named by pk, object id or anything else derivable has a URL anyone can guess, so that is only for files that
+are completely public.
 
 ### Python style
 All imports go at the top of the file. Do not add inline imports inside functions, methods, or conditional blocks - not
