@@ -185,6 +185,8 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # goes to the STRUCTURAL_VARIANT pipeline. Null (versions made before #1708) routes them all to STANDARD
     explicit_structural_variant_min_size = models.IntegerField(null=True, blank=True)
     sv_overlap_min_fraction = models.FloatField(null=True, blank=True)  # gnomAD SV overlap_cutoff
+    # ANNOTATION_VEP_SV_OVERLAP_RECIPROCAL at creation: overlap_cutoff applies to both SVs, not only gnomAD's (#2589)
+    sv_overlap_reciprocal = models.BooleanField(default=False)
     vep_args = models.TextField(null=True, blank=True)  # ANNOTATION_VEP_ARGS, space joined
 
     # Strategy used to map RefSeq <-> Ensembl transcripts when picking dbNSFP
