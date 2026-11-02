@@ -165,8 +165,12 @@ Patterns here:
   (`analysis/models/nodes/cohort_mixin.py:get_samples_pk_q`, the same helper SampleNode's group levels use) - a Q keyed
   on an alias runs as soon as that alias is annotated, so an OR across two samples' aliases has nowhere to hang. A sample
   with nothing to filter on (no GT, no AF) contributes its rows unfiltered rather than emptying the node.
-- Load nodes with `AnalysisNode.objects.get_subclass(pk=...)` / `.select_subclasses()` (`analysis/models/nodes/analysis_node.py:NodeInheritanceManager`);
-  in views use `analysis/views/analysis_permissions.py:get_node_subclass_or_404`, which enforces
+- Load nodes with `AnalysisNode.objects.get_subclass(pk=...)` / `.select_subclasses()` (`analysis/models/nodes/analysis_node.py:NodeInheritanceManager`).
+  `AnalysisNode.node_type` is the concrete class name, so `select_subclasses()` first reads the node types the queryset
+  returns and joins only those subclass tables (`analysis/models/nodes/analysis_node.py:NodeInheritanceQuerySet`):
+  the full ~24-way join costs far more to plan than to run (#2586). With the type in hand, `node.get_subclass()` or
+  `select_node_types("SampleNode")` is one query, and filtering by type is `node_type=`, never a `<subclass>__isnull` join.
+  In views use `analysis/views/analysis_permissions.py:get_node_subclass_or_404`, which enforces
   `analysis/models/models_analysis.py:Analysis.can_write` (locked analyses and template snapshots are read-only).
 - The request user decides who may open an analysis; everything inside it is permission-checked as the analysis owner
   (`analysis.user`): the grid (`analysis/grids.py:VariantGrid._get_permission_user`), the source pickers

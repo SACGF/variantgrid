@@ -33,7 +33,6 @@ from analysis.models import (
 )
 from analysis.models.nodes.node_types import (
     get_node_class_choices,
-    get_node_types_hash_by_class_name,
     get_nodes_by_classification,
 )
 from annotation.models.models_annotation_version import AnnotationVersion
@@ -167,7 +166,7 @@ class AutoLaunchAnalysisTemplateForm(forms.ModelForm):
             try:
                 re.compile(value)
             except re.error as e:
-                raise forms.ValidationError(f"RegEx error: {e}")
+                raise forms.ValidationError(f"RegEx error: {e}") from e
         return value
 
 
@@ -539,8 +538,7 @@ class AnalysisNodeIssuesFilterForm(forms.Form):
         data = self.cleaned_data
         qs = AnalysisNode.objects.filter(status=NodeStatus.ERROR)
         if node_class := data.get('node_class'):
-            model_name = get_node_types_hash_by_class_name()[node_class]._meta.model_name
-            qs = qs.filter(**{f"{model_name}__isnull": False})
+            qs = qs.filter(node_type=node_class)
         if modified_from := data.get('modified_from'):
             qs = qs.filter(modified__date__gte=modified_from)
         if modified_to := data.get('modified_to'):
