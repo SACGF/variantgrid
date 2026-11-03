@@ -54,6 +54,14 @@ from annotation.pathogenicity_predictions import (
     ALPHAGENOME_SPLICING_MAX,
     ALPHAGENOME_SPLICING_MIN,
     ALPHAGENOME_SPLICING_STEP,
+    GENE_LOEUF_CUTOFF,
+    GENE_LOEUF_MAX,
+    GENE_LOEUF_MIN,
+    GENE_LOEUF_STEP,
+    GENE_MIS_Z_CUTOFF,
+    GENE_MIS_Z_MAX,
+    GENE_MIS_Z_MIN,
+    GENE_MIS_Z_STEP,
     TOOLS,
 )
 from genes.custom_text_gene_list import create_custom_text_gene_list
@@ -610,6 +618,11 @@ class DamageNodeForm(BaseNodeForm):
                                                            "max": ALPHAGENOME_SPLICING_MAX,
                                                            "step": ALPHAGENOME_SPLICING_STEP}),
             "cosmic_count_min": HiddenInput(attrs={"min": 0, "max": 50, "step": 1}),
+            # data-default: the published cutoff (Pathogenicity Thresholds page), where the slider starts
+            "gene_loeuf_max": HiddenInput(attrs={"min": GENE_LOEUF_MIN, "max": GENE_LOEUF_MAX,
+                                                 "step": GENE_LOEUF_STEP, "data-default": GENE_LOEUF_CUTOFF}),
+            "gene_mis_z_min": HiddenInput(attrs={"min": GENE_MIS_Z_MIN, "max": GENE_MIS_Z_MAX,
+                                                 "step": GENE_MIS_Z_STEP, "data-default": GENE_MIS_Z_CUTOFF}),
             "damage_predictions_min": HiddenInput(attrs={"min": 0}),
             # Columns v1
             "cadd_score_min": HiddenInput(attrs={"min": 0, "max": 70}),
@@ -663,6 +676,8 @@ class DamageNodeForm(BaseNodeForm):
                    ("damage_predictions_min", "damage-predictions")]
         if node.has_alphagenome_splicing():
             sliders.append(("alphagenome_splicing_min", "alphagenome-splicing"))
+        if node.has_gene_constraint:
+            sliders.extend([("gene_loeuf_max", "gene-loeuf"), ("gene_mis_z_min", "gene-mis-z")])
         if node.columns_version == 1:
             sliders.extend([("cadd_score_min", "cadd"), ("revel_score_min", "revel")])
         elif node.columns_version >= 2:

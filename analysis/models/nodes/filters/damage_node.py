@@ -1,6 +1,6 @@
 import itertools
 import operator
-from functools import reduce
+from functools import cached_property, reduce
 from typing import NamedTuple, Optional
 
 from auditlog.registry import auditlog
@@ -18,7 +18,11 @@ from analysis.enums import (
 )
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeChip, NodeIcon, grouped_chips
-from annotation.effect_filters import splicevault_out_of_frame_q, utr_high_impact_q
+from annotation.effect_filters import (
+    gene_constraint_q,
+    splicevault_out_of_frame_q,
+    utr_high_impact_q,
+)
 from annotation.enums import (
     ALoFTPrediction,
     AlphaMissensePrediction,
@@ -35,6 +39,7 @@ from annotation.pathogenicity_predictions import (
     PathogenicityTool,
     RawScoreDirection,
 )
+from genes.models.models_gnomad_gene_constraint import GnomADGeneConstraint
 from library.genomics.vcf_enums import VARIANT_CLASS_GROUPS, VariantClass
 from snpdb.models.models_variant import Variant
 
@@ -255,6 +260,19 @@ class DamageNode(AnalysisNode):
     utr_high_impact_required = models.BooleanField(default=False)
     utr_high_impact_allow_null = models.BooleanField(default=True)
 
+    # #2600 - gnomAD gene constraint of the variant's gene (genes.GnomADGeneConstraint, not a VEP column).
+    # LOEUF: PVS1's "LoF is a known mechanism"; missense Z: PP2 / BP1
+    gene_loeuf_max = models.FloatField(null=True, blank=True)
+    gene_loeuf_required = models.BooleanField(default=False)
+    gene_loeuf_allow_null = models.BooleanField(default=True)
+
+    gene_mis_z_min = models.FloatField(null=True, blank=True)
+    gene_mis_z_required = models.BooleanField(default=False)
+    gene_mis_z_allow_null = models.BooleanField(default=True)
+
+    # PM4's "non-repeat region" - a restriction like variant_class, so it has no _required flag
+    outside_repeat_region = models.BooleanField(default=False)
+
     def get_raw_score_tools(self) -> list[PathogenicityTool]:
         """ Tools whose raw-score slider this analysis's annotation version actually populates -
             gated off visible_columns so the editor can't offer a filter over an empty column. """
@@ -291,6 +309,26 @@ class DamageNode(AnalysisNode):
     def has_utr_annotator(self) -> bool:
         return "utr_annotator_annotation" in self.analysis.annotation_version.variant_annotation_version.visible_columns
 
+    @cached_property
+    def has_gene_constraint(self) -> bool:
+        """ The gnomAD gene constraint is a CachedWebResource import, so a deployment may not have it """
+        return GnomADGeneConstraint.objects.exists()
+
+    def has_repeat_masker(self) -> bool:
+        return "repeat_masker" in self.analysis.annotation_version.variant_annotation_version.visible_columns
+
+    def _gene_constraint_filters(self) -> list[tuple[str, str, Optional[float], bool, bool]]:
+        """ (constraint field, lookup, threshold, required, allow_null) for each gene constraint filter set """
+        if not self.has_gene_constraint:
+            return []
+        filters = [("lof_oe_ci_upper", "lte", self.gene_loeuf_max, self.gene_loeuf_required,
+                    self.gene_loeuf_allow_null),
+                   ("mis_z_score", "gte", self.gene_mis_z_min, self.gene_mis_z_required, self.gene_mis_z_allow_null)]
+        return [f for f in filters if f[2] is not None]
+
+    def _applies_outside_repeat_region(self) -> bool:
+        return self.outside_repeat_region and self.has_repeat_masker()
+
     def _plugin_column_backfilled(self, column: str) -> bool:
         """ False where the column is one the version is still waiting on a backfill for - the filter is skipped
             (and get_warnings says so) rather than treating a not-yet-imported null as "not damaging" """
@@ -300,12 +338,14 @@ class DamageNode(AnalysisNode):
     def modifies_parents(self):
         all_versions = [self.impact_min, self.splice_min, self.cosmic_count_min, self.damage_predictions_min,
                         self.protein_domain, self.published, self.variant_class,
-                        self.structural != StructuralFilter.ANY]
+                        self.structural != StructuralFilter.ANY, bool(self._gene_constraint_filters()),
+                        self._applies_outside_repeat_region()]
         return any(all_versions) or any(getattr(self, cf.value_field) for cf in self._column_filters())
 
     def has_required(self) -> bool:
         all_versions = [self.impact_required, self.splice_required, self.cosmic_count_required,
-                        self.damage_predictions_required, self.protein_domain_required, self.published_required]
+                        self.damage_predictions_required, self.protein_domain_required, self.published_required,
+                        *(required for _, _, _, required, _ in self._gene_constraint_filters())]
         # A rankscore's required checkbox is only on screen while the rankscore sliders are
         show_rankscores = self.show_rankscore_sliders()
         return any(all_versions) or any(getattr(self, cf.required_field) for cf in self._column_filters()
@@ -371,6 +411,17 @@ class DamageNode(AnalysisNode):
             warnings.append(
                 "High-impact 5' UTR filter may miss variants on this VariantAnnotationVersion: variants annotated "
                 "by Ensembl's UTRAnnotator kept only one of their 5' UTR effects until the UTR effects backfill."
+            )
+
+        if (self.gene_loeuf_max is not None or self.gene_mis_z_min is not None) and not self.has_gene_constraint:
+            warnings.append(
+                "Gene constraint filter is NOT being applied: this server has not imported the gnomAD gene "
+                "constraint data."
+            )
+        if self.outside_repeat_region and not self.has_repeat_masker():
+            warnings.append(
+                f"Outside repeat region filter is NOT being applied: repeat_masker is not populated on "
+                f"{vav.genome_build} / VEP {vav.vep} / columns_version {vav.columns_version}."
             )
 
         if self.splice_min is not None and vav.uses_raw_spliceai:
@@ -596,6 +647,16 @@ class DamageNode(AnalysisNode):
                 else:
                     or_filters.append(q_damage)
 
+        for field, lookup, threshold, required, allow_null in self._gene_constraint_filters():
+            q_constraint = gene_constraint_q(field, lookup, threshold, allow_null=required and allow_null)
+            if required:
+                and_filters.append(q_constraint)
+            else:
+                or_filters.append(q_constraint)
+
+        if self._applies_outside_repeat_region():
+            and_filters.append(Q(variantannotation__repeat_masker__isnull=True))
+
         if self.cosmic_count_min is not None:
             q_cosmic_count = Q(variantannotation__cosmic_count__gte=self.cosmic_count_min)
             if self.cosmic_count_required:
@@ -705,6 +766,14 @@ class DamageNode(AnalysisNode):
         if self.aloft:
             chips.append(self._filter_chip("ALoFT", f"ALoFT: {ALoFTPredictionOptions(self.aloft).label}",
                                            self.aloft_required, self.aloft_allow_null))
+        if self.gene_loeuf_max is not None:
+            chips.append(self._filter_chip("LOEUF", f"gnomAD LOEUF ≤ {self.gene_loeuf_max:g}",
+                                           self.gene_loeuf_required, self.gene_loeuf_allow_null))
+        if self.gene_mis_z_min is not None:
+            chips.append(self._filter_chip("missense Z", f"gnomAD missense Z ≥ {self.gene_mis_z_min:g}",
+                                           self.gene_mis_z_required, self.gene_mis_z_allow_null))
+        if self.outside_repeat_region:
+            chips.append(NodeChip(text="no repeat", title="Outside RepeatMasker repeat regions"))
         return chips
 
     def _score_chips(self) -> list[NodeChip]:
