@@ -1,0 +1,26 @@
+{% load static %}
+{% load js_tags %}
+{% comment %}
+    The ACMG criterion preset dropdown (#2605) - include at the top of a node editor's form with form_id, the form's
+    CSS selector. Renders nothing when the form offers no presets. The values come from form.get_preset_data and
+    node_presets.js fills the form; nothing is saved until the user does.
+{% endcomment %}
+{% with presets=form.get_preset_data %}
+{% if presets %}
+<script src="{% static 'js/analysis/node_presets.js' %}"></script>
+<div class="editor-row node-presets">
+    <label class="editor-label" for="node-preset-{{ node.pk }}">ACMG preset</label>
+    <select id="node-preset-{{ node.pk }}" class="form-control form-control-sm d-inline-block w-auto">
+        <option value="">Fill from a criterion...</option>
+        {% for preset in presets %}
+            <option value="{{ preset.key }}" title="{{ preset.description }}">{{ preset.label }}</option>
+        {% endfor %}
+    </select>
+    <span class="editor-help">Sets the filters below to the criterion's published cutoffs - adjust, then Save</span>
+    <div class="editor-help node-preset-description"></div>
+</div>
+<script>
+    initNodePresets({select: "#node-preset-{{ node.pk }}", form: "{{ form_id }}", presets: {{ presets|jsonify }}});
+</script>
+{% endif %}
+{% endwith %}

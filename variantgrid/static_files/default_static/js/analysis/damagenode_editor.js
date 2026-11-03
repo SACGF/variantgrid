@@ -1,7 +1,7 @@
 // @ts-check
 // analysis/templates/analysis/node_editors/damagenode_editor.html
 /* global setupSlider, setVisibleSliderValue */ // analysis.js
-/* global ajaxForm */ // analysis/templates/analysis/node_editors/base_editor.html
+/* global ajaxForm, nodeEditorHooks */ // analysis/templates/analysis/node_editors/base_editor.html
 
 function toggleRequiredFilter(show) {
     if (show) {
@@ -108,6 +108,19 @@ function colourSliderValue(inputSelector, sliderSelector) {
     }
 }
 
+// A preset's value for a slider: switch it on (or off for null) and move the handle, as a user would
+function setDamageNodeSliderValue(inputSelector, sliderSelector, enableInput, value) {
+    if (value === null || value === "") {
+        enableInput.prop("checked", false).trigger("change");
+        return;
+    }
+    enableInput.prop("checked", true).trigger("change");
+    inputSelector.val(value);
+    sliderSelector.val(value);
+    setVisibleSliderValue(inputSelector, sliderSelector, value);
+    colourSliderValue(inputSelector, sliderSelector);
+}
+
 function setupDamageNodeSlider(inputSelector, sliderSelector, enableInput) {
     setupSlider(inputSelector, sliderSelector);
     addCutoffBands(inputSelector, sliderSelector);
@@ -165,9 +178,35 @@ function initDamageNodeEditor(options) {
         ajaxForm($("form#damage-filter"));
         setupVariantClassGroups();
 
+        const slidersByField = {};
         for (const s of options.sliders) {
             setupDamageNodeSlider($(s.input), $(s.slider), $(s.enable));
+            slidersByField[$(s.input).attr("name")] = s;
         }
+
+        // ACMG presets (node_presets.js): the sliders are ours to fill, then reveal what the preset set
+        nodeEditorHooks.applyPresetField = function (name, value) {
+            const s = slidersByField[name];
+            if (!s) {
+                return false;
+            }
+            setDamageNodeSliderValue($(s.input), $(s.slider), $(s.enable), value);
+            return true;
+        };
+        nodeEditorHooks.presetApplied = function (values) {
+            const setsRequired = Object.entries(values).some(([name, value]) => name.endsWith("_required") && value);
+            if (setsRequired && !showRequiredFilter) {
+                showRequiredFilter = true;
+                toggleRequiredFilter(true);
+            }
+            // The hidden form field sits at the top of the form, so the row is the range input's
+            const setsHiddenSlider = Object.entries(values).some(([name, value]) =>
+                value !== null && slidersByField[name] &&
+                $(slidersByField[name].slider).closest("tr").is(".individual-pathogenic-prediction:hidden"));
+            if (setsHiddenSlider) {
+                showIndividualPathogenicPredictions(options.columnsVersion);
+            }
+        };
 
         $("#toggle-required-filter").click(function (event) {
             event.preventDefault();

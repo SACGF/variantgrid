@@ -77,6 +77,13 @@ Patterns here:
   with `model` set + template `analysis/node_editors/<classname>_editor.html`.
   `analysis/views/views_node.py:get_node_views_by_class` finds the view by `model`, so defining the class registers it;
   `analysis/views/nodes/node_view.py:NodeView.form_valid` does the dirty/save/update_analysis dance for you.
+- ACMG presets on the Effect, Population and ClinVar editors (`analysis/node_presets.py`, #2605) fill the form
+  client side and save nothing: `BaseNodeForm.get_preset_data` hands `node_presets.js` a complete form state per
+  preset (every field back to the model default, then the criterion's cutoffs), so a filter the node already had
+  can't quietly AND itself in. A form-only field names its reset value in `PRESET_FIELD_DEFAULTS`, a field a
+  preset must leave alone goes in `PRESET_KEEP_FIELDS`, and an editor control the generic fill can't drive (the
+  Effect node's sliders) registers `nodeEditorHooks.applyPresetField`. The PM2 cutoff is
+  `ANALYSIS_NODE_PRESET_PM2_MAX_PERCENT`, a lab policy; every other cutoff is the Pathogenicity Thresholds page's.
 - The sample / patient / specimen / extraction page's Classify & Report tab is `analysis/classify_report.py` +
   `analysis/views/views_classify_report.py` (it lives here because it is built on VariantTag - analysis may import
   classification, never the other way round). Above sample level a case is whatever

@@ -1,66 +1,11 @@
 {% extends "analysis/node_editors/grid_editor.html" %}
-
-{% block inlinejs %}
-{{ block.super }}
-
-function showGnomadPopulations() {
-    $("#id_gnomad_af").prop("checked", false);
-    $("#id_gnomad_popmax_af").prop("checked", false);
-    $("#show-gnomad-populations-link").fadeOut();
-    $("#gnomad-populations").slideDown();
-}
-{% endblock inlinejs %}
-
-{% block docreadyjs %}
-    var pop_form = $("form#population");
-    ajaxForm(pop_form);
-
-    var gnomadPopulationSelector = $("input[type='checkbox']", "#id_gnomad_population");
-    function deselectGnomadPopulations() {
-        gnomadPopulationSelector.prop("checked", false);
-        $("#show-gnomad-populations-link").fadeIn();
-        $("#gnomad-populations").slideUp();
-    }
-
-    $("#id_gnomad_af").click(function() {
-        if ($(this).is(":checked")) {
-            deselectGnomadPopulations();
-            $("#id_gnomad_popmax_af").prop("checked", false);
-        }
-    });
-
-    $("#id_gnomad_popmax_af").click(function() {
-        if ($(this).is(":checked")) {
-            deselectGnomadPopulations();
-            $("#id_gnomad_af").prop("checked", false);
-        }
-    });
-    
-    function selectedGnomadPopulations() {
-        return gnomadPopulationSelector.filter(function() { return $(this).is(":checked")});
-    }
-
-    function changeUseInternalCounts() {
-       var internalPop = $("#internal-population-container");
-       if ($("#id_use_internal_counts").is(":checked")) {
-            internalPop.slideDown();
-       } else {
-           internalPop.slideUp();
-       }
-    }
-
-    // Show hidden things if set
-    if (selectedGnomadPopulations().length) {
-        $("#show-gnomad-populations-link").hide();
-        $("#gnomad-populations").show();
-    }
-    
-    $("#id_use_internal_counts").change(changeUseInternalCounts);
-    changeUseInternalCounts();
-	
-{% endblock docreadyjs %}
+{% load static %}
 
 {% block content %}
+<script src="{% static 'js/analysis/populationnode_editor.js' %}"></script>
+<script>
+    initPopulationNodeEditor();
+</script>
 <style>
     #id_percent, #id_internal_percent {
         width: 5em;
@@ -96,6 +41,7 @@ function showGnomadPopulations() {
 </style>
 <form id="population" method="post" action="{{ request.path }}">
     {% csrf_token %}
+    {% include "analysis/node_editors/_node_presets.html" with form_id="form#population" %}
     <div class="editor-row">
         <span class="editor-label">Max frequency</span>
         {{ form.percent }} % in

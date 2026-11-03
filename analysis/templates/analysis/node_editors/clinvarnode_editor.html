@@ -9,6 +9,7 @@
 <form id="clinvar-node-form" method="post" action="{{ request.path }}">
     {% csrf_token %}
     <div id="clinvar-node-form-widgets" class="significance-pills-form">
+        {% include "analysis/node_editors/_node_presets.html" with form_id="form#clinvar-node-form" %}
         <div class="editor-row" id="node-input-select">
             <label class="editor-label" for="{{ form.node_input.id_for_label }}">Input</label>
             {{ form.node_input }}
