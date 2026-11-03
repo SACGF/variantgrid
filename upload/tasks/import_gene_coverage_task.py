@@ -3,12 +3,13 @@ import os
 import re
 
 import pandas as pd
+from django.conf import settings
 
 from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTranscriptManager
 from genes.enums import AnnotationConsortium
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import GeneCoverageCollection, TranscriptVersion
-from genes.models.models_gene_coverage import GeneCoverage
+from genes.models.models_gene_coverage import GeneCoverage, GeneCoverageCanonicalTranscript
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
 from library.log_utils import log_traceback
 from library.utils.file_utils import name_from_filename
@@ -83,6 +84,11 @@ class ImportGeneCoverageTask(ImportTask):
 
         # TODO: This is hardcoded - need to be able to pass this in or select in GUI
         annotation_consortium = AnnotationConsortium.REFSEQ
+        # Built before the collection so a missing default canonical transcript collection leaves nothing behind
+        gene_matcher = GeneSymbolMatcher()
+        canonical_transcript_manager = CanonicalTranscriptManager()
+        transcript_versions_by_id = TranscriptVersion.transcript_versions_by_id(genome_build, annotation_consortium)
+
         gene_coverage_collection = GeneCoverageCollection.objects.create(path=filename,
                                                                          data_state=DataState.RUNNING,
                                                                          genome_build=genome_build)
@@ -92,17 +98,25 @@ class ImportGeneCoverageTask(ImportTask):
         if source:
             source.link_collection(gene_coverage_collection)
 
-        gene_matcher = GeneSymbolMatcher()
-        canonical_transcript_manager = CanonicalTranscriptManager()
-        transcript_versions_by_id = TranscriptVersion.transcript_versions_by_id(genome_build, annotation_consortium)
-        gene_coverage_collection.load_from_file(enrichment_kit, gene_matcher=gene_matcher,
-                                                canonical_transcript_manager=canonical_transcript_manager,
-                                                transcript_versions_by_id=transcript_versions_by_id)
+        try:
+            gene_coverage_collection.load_from_file(enrichment_kit, gene_matcher=gene_matcher,
+                                                    canonical_transcript_manager=canonical_transcript_manager,
+                                                    transcript_versions_by_id=transcript_versions_by_id)
+        except Exception:
+            gene_coverage_collection.data_state = DataState.ERROR
+            gene_coverage_collection.save()
+            raise
+
         gene_coverage_collection.data_state = DataState.COMPLETE
         gene_coverage_collection.save()
 
+        # GeneCoverage rows are only written with STORE_ALL, otherwise the canonical ones are all that's stored
+        if settings.SEQAUTO_QC_GENE_COVERAGE_STORE_ALL:
+            klass = GeneCoverage
+        else:
+            klass = GeneCoverageCanonicalTranscript
         # Count from the collection's own partition: a query on the inheritance parent locks every child table
-        qs = get_queryset_with_transformer_hook(klass=GeneCoverage)
+        qs = get_queryset_with_transformer_hook(klass=klass)
         qs.add_sql_transformer(gene_coverage_collection.sql_partition_transformer)
         num_records = qs.filter(gene_coverage_collection=gene_coverage_collection).count()
         return num_records
