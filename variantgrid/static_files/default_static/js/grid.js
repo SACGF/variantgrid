@@ -175,6 +175,12 @@ function restoreVariantLink() {
     $(this).attr('href', orig_href);
 }
 
+// A variant link's href is javascript:load_variant_details() so a left click opens it in the analysis editor,
+// but right/middle click (open in new tab) needs the real URL. Delegated, so every grid rendering
+// VariantGridFormat.representativeVariant gets it - not only the analysis node grids (#2608)
+$(document).on("contextmenu mouseup", "a.variant-link", setFullscreenVariantLink);
+$(document).on("click mouseout", "a.variant-link", restoreVariantLink);
+
 
 function createGridLink(title, url, contents, extraLinkClasses, extraIconClasses) {
     let linkCSS = ['grid-link'];
@@ -470,15 +476,6 @@ function gridCompleteExtra() {
             }
         });
     }
-
-    // We want to be able to right click to open full screen link new tab
-    // but normal click does JS / load() call to open in the editor.
-    const variantLink = $('a.variant-link');
-    variantLink.on("contextmenu", setFullscreenVariantLink);
-    variantLink.on("mouseup", setFullscreenVariantLink);
-    variantLink.on('click', restoreVariantLink);
-    variantLink.on('mouseout', restoreVariantLink);
-
 }
 
 
