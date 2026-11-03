@@ -9,6 +9,7 @@ locus filters, sample filters) or a single picker standing in for several FKs (`
 """
 import json
 import re
+from typing import Any
 
 from dal import forward
 from django import forms
@@ -48,6 +49,12 @@ from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.quad_node import QuadNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.nodes.sources.trio_node import TrioNode
+from analysis.node_presets import (
+    NodePreset,
+    clinvar_node_presets,
+    damage_node_presets,
+    population_node_presets,
+)
 from analysis.variant_text import resolve_variant_text
 from annotation.models import VariantAnnotation
 from annotation.pathogenicity_predictions import (
@@ -263,6 +270,32 @@ class BaseNodeForm(forms.ModelForm):
             if field in self.fields:
                 for error in errors:
                     self.add_error(field, error)
+
+    # ACMG criterion presets (#2605, analysis/node_presets.py). Applying one resets every form field to the node's
+    # default then sets the preset's own, so a leftover filter can't quietly AND itself in. A field that isn't a
+    # model field names its reset value here; one the preset should leave alone goes in PRESET_KEEP_FIELDS.
+    PRESET_KEEP_FIELDS: frozenset[str] = frozenset()
+    PRESET_FIELD_DEFAULTS: dict[str, Any] = {}
+
+    def get_presets(self) -> list[NodePreset]:
+        return []
+
+    def get_preset_data(self) -> list[dict]:
+        """ The presets as the editor's dropdown and node_presets.js take them, each with the complete form state """
+        return [{"key": preset.key, "label": preset.label, "description": preset.description,
+                 "values": self._preset_form_values(preset)} for preset in self.get_presets()]
+
+    def _preset_form_values(self, preset: NodePreset) -> dict[str, Any]:
+        values = {}
+        for name in self.fields:
+            if name in self.PRESET_KEEP_FIELDS:
+                continue
+            if name in self.PRESET_FIELD_DEFAULTS:
+                values[name] = self.PRESET_FIELD_DEFAULTS[name]
+            else:
+                values[name] = self._meta.model._meta.get_field(name).get_default()
+        values.update(preset.values)
+        return values
 
     @property
     def media(self):
@@ -486,9 +519,16 @@ class ClinVarNodeForm(SignificanceFilterFormMixin, BaseNodeForm):
             'conflicting_significance': TextInput(attrs={'placeholder': 'eg Pathogenic'}),
         }
 
+    # Whether the node reads its parent or all of ClinVar is the node's shape, not evidence
+    PRESET_KEEP_FIELDS = frozenset({"node_input"})
+    PRESET_FIELD_DEFAULTS = {"variation_ids": ""}
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["variation_ids"].initial = ", ".join(str(v) for v in self.instance.variation_ids)
+
+    def get_presets(self) -> list[NodePreset]:
+        return clinvar_node_presets(self.instance)
 
     def clean_variation_ids(self) -> list[int]:
         variation_ids = []
@@ -655,6 +695,9 @@ class DamageNodeForm(BaseNodeForm):
                 if tool.node_label:
                     # Only where the auto label would mislead - a signed or inverted score
                     field.label = f"{tool.node_label} {tool.raw_direction.comparison}"
+
+    def get_presets(self) -> list[NodePreset]:
+        return damage_node_presets(self.instance)
 
     def get_raw_score_rows(self) -> list[dict]:
         """ Per-tool bound fields for the raw-score slider rows and their setup calls in the editor,
@@ -1089,6 +1132,11 @@ class PopulationNodeForm(BaseNodeForm):
                   'internal_percent', 'keep_internally_classified_pathogenic')
         widgets = {'gnomad_hom_alt_max': WIDGET_INTEGER_MIN_0,
                    'max_samples': WIDGET_INTEGER_MIN_1}
+
+    PRESET_FIELD_DEFAULTS = {"gnomad_population": []}
+
+    def get_presets(self) -> list[NodePreset]:
+        return population_node_presets(self.instance)
 
     def save(self, commit=True):
         node = super().save(commit=False)

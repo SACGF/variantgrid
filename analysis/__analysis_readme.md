@@ -31,3 +31,10 @@ The gene constraint filters read the representative transcript's `symbol` agains
 v4 has a row per transcript, and a MANE gene has an Ensembl and a RefSeq row with the same values). They are offered
 when the gnomAD gene constraint has been imported; Allow Null keeps a variant with no symbol or whose gene has no
 MANE Select value. Outside repeat region is a restriction (ANDed), offered where the version populates `repeat_masker`.
+
+The Effect, Population and ClinVar editors offer an ACMG preset dropdown (`analysis/node_presets.py`, #2605) that
+fills the form with one criterion's cutoffs for the user to adjust and save: PVS1 (impact HIGH, LOEUF), PP3 (any
+ClinGen-calibrated predictor at its supporting cutoff), PP2 (missense Z), PM2 (gnomAD popmax and filtering AF at
+`ANALYSIS_NODE_PRESET_PM2_MAX_PERCENT`) and PP5 (ClinVar P/LP at two or more stars). Each preset is one criterion
+because the criteria on a node pull in different directions (PM2 vs BA1, PVS1 vs PP3), and they look for pathogenic
+evidence only. Nothing is stored on the node, so its name and chips describe what it filters on.

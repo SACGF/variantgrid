@@ -102,6 +102,7 @@
         {% endfor %}
 
 		{{ form.non_field_errors }}
+        {% include "analysis/node_editors/_node_presets.html" with form_id="form#damage-filter" %}
         <table class="editor-table" id="damage-table">
             <tr class="editor-table-head">
                 <th></th>
