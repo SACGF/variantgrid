@@ -1,5 +1,5 @@
 from django.apps.config import AppConfig
-from django.db.models.signals import post_delete, post_save
+from django.db.models.signals import post_delete, post_save, pre_delete
 
 
 class AnnotationConfig(AppConfig):
@@ -25,6 +25,7 @@ class AnnotationConfig(AppConfig):
             annotation_run_complete_cleanup_handler,
             annotation_run_discarded_cleanup_handler,
             annotation_run_post_delete_handler,
+            annotation_run_pre_delete_handler,
         )
         from annotation.signals.citation_search import search_citations
         from annotation.signals.gene_symbol_wiki_citations import gene_symbol_wiki_post_save_handler
@@ -59,6 +60,7 @@ class AnnotationConfig(AppConfig):
         # #1670: every route by which an AnnotationRun's on-disk output is reclaimed
         annotation_run_complete_signal.connect(annotation_run_complete_cleanup_handler)
         annotation_run_discarded_signal.connect(annotation_run_discarded_cleanup_handler)
+        pre_delete.connect(annotation_run_pre_delete_handler, sender=AnnotationRun)
         post_delete.connect(annotation_run_post_delete_handler, sender=AnnotationRun)
 
         classification_withdraw_signal.connect(gene_counts_classification_withdraw_handler,
