@@ -11,7 +11,7 @@ from django.db.models.query_utils import Q
 from analysis.enums import GroupOperation
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
-from analysis.models.nodes.node_display import NodeIcon
+from analysis.models.nodes.node_display import NodeChip, NodeIcon
 from annotation.models.models import VariantAnnotation
 from classification.models.classification import Classification
 from library.constants import MINUTE_SECS
@@ -267,6 +267,34 @@ class PopulationNode(AnalysisNode):
         else:
             name = ''
         return name
+
+    POPULATION_DATABASE_SHORT_LABELS = {
+        "gnomad_af": "gnomAD",
+        "gnomad_popmax_af": "gnomAD popmax",
+        "af_1kg": "1KG",
+        "af_uk10k": "UK10K",
+        "topmed_af": "TOPMed",
+        "gnomad_fafmax_faf95_max": "gnomAD FAF95",
+        "gnomad_fafmax_faf99_max": "gnomAD FAF99",
+    }
+
+    def get_node_chips(self) -> list[NodeChip]:
+        """ Which frequencies the threshold in the name is applied to """
+        chips = super().get_node_chips()
+        if self.filtering_by_population:
+            max_allele_frequency = self.percent / 100
+            for field in self.population_database_fields:
+                if getattr(self, field):
+                    chips.append(NodeChip(text=self.POPULATION_DATABASE_SHORT_LABELS[field],
+                                          title=f"{field} ≤ {max_allele_frequency:g}"))
+            if self.pk:
+                for gnomad_pop in self.populationnodegnomadpopulation_set.all():
+                    population = gnomad_pop.get_population_display()
+                    chips.append(NodeChip(text=gnomad_pop.population,
+                                          title=f"gnomAD {population} ≤ {max_allele_frequency:g}"))
+        if not self.show_gnomad_filtered:
+            chips.append(NodeChip(text="no gnomAD filtered", title="Removing variants gnomAD flags as filtered"))
+        return chips
 
     @staticmethod
     def get_help_text() -> str:

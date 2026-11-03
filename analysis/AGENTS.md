@@ -66,6 +66,13 @@ Patterns here:
 - `analysis/models/nodes/filters/phenotype_node.py:PhenotypeNode.get_phenotype_source` is the one place the node's
   patient-or-cohort choice is resolved - every term and gene lookup goes through it, and both models carry
   `patients/models/has_phenotype_description_mixin.py:HasPhenotypeDescriptionMixin` so the calls are identical.
+- A node card says what the node is in its name (`get_node_name`, up to 3 lines), badge (`get_node_icon`) and chips
+  (`get_node_chips`, `analysis/models/nodes/node_display.py:NodeChip`, full text in `title`). Line 1 is the thing the
+  node reads - the sample, cohort, family, gene list, tag - never a count ("1 x panels") or a mode; line 2 the mode
+  or headline filter; every other setting that differs between two nodes of the class is a chip, left out at its
+  default. A line is cut to 30 characters by `analysis/models/nodes/node_display.py:truncate_name_line`; several
+  things sharing line 1 are the first plus "+N more" (`first_and_more_name_line`), with a chip each. `name` is
+  stored at save (`auto_node_name`), so a changed `get_node_name` shows on existing nodes once they are next saved.
 - Node editor = ModelForm subclass of `analysis/forms/forms_nodes.py:BaseNodeForm` + a `NodeView` subclass in views/nodes/
   with `model` set + template `analysis/node_editors/<classname>_editor.html`.
   `analysis/views/views_node.py:get_node_views_by_class` finds the view by `model`, so defining the class registers it;

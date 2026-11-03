@@ -19,6 +19,7 @@ from cache_memoize import cache_memoize
 from django.db.models import Count, TextChoices
 from django.db.models.query_utils import Q
 
+from analysis.models.nodes.node_display import truncate_name_line
 from annotation.models.models import VariantTranscriptAnnotation
 from library.constants import DAY_SECS
 from patients.enums import Sex, Zygosity
@@ -664,6 +665,8 @@ class FamilyInheritanceNodeMixin:
         if not all(getattr(self, field) for field in self.FAMILY_SHAPE.require_zygosity_fields):
             label += "?"
         name_parts = [label]
+        if family := self.family:
+            name_parts.insert(0, truncate_name_line(str(family)))
         if desc := self.get_filter_description():
             name_parts.append(f"({desc})")
         return "\n".join(name_parts)

@@ -14,7 +14,7 @@ from django.db.models.query_utils import Q
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
-from analysis.models.nodes.node_display import NodeIcon
+from analysis.models.nodes.node_display import NodeIcon, first_and_more_name_line
 from analysis.variant_text import get_variant_text_summary, parse_region, resolve_variant_text
 from snpdb.enums import ImportStatus
 from snpdb.models import GenomicIntervalsCollection, VariantCollection
@@ -139,10 +139,7 @@ class IntersectionNode(AnalysisNode):
         return name
 
     def _get_variant_text_name(self) -> str:
-        entries = self.get_variant_text_entries()
-        if len(entries) == 1:
-            return entries[0]
-        return f"{len(entries)} variant entries"
+        return first_and_more_name_line(self.get_variant_text_entries())
 
     def get_variant_text_entries(self) -> list[str]:
         return [line for line in (self.variant_text or "").splitlines() if line.strip()]

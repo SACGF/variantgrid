@@ -10,6 +10,7 @@ from django.db.models import Q, QuerySet
 from analysis.enums import GroupOperation
 from analysis.models.models_analysis import Analysis
 from analysis.models.nodes.node_allele_frequency import NodeAlleleFrequencyFilter
+from analysis.models.nodes.node_display import truncate_name_line
 from analysis.models.nodes.node_query_mixin import (
     annotate_and_filter_queryset,
     queryset_to_pk_in_q,
@@ -544,6 +545,14 @@ class AncestorSampleMixin(SampleMixin):
                        if get_patient_for_source(SampleSourceLevel.SAMPLE, s) == self.patient]
             return sorted(samples, key=lambda s: s.pk)
         return []
+
+    def get_filter_source_name_line(self) -> str:
+        """ Line 1 of the node name - who the filter is applied to """
+        if self.patient:
+            return truncate_name_line(f"{self.patient} ({len(self.get_filter_samples())} samples)")
+        if self.sample:
+            return truncate_name_line(self.sample.name)
+        return ""
 
     def _get_filter_samples_arg_q_dict(self, per_sample) -> dict[Optional[str], dict[str, Q]]:
         """ The one place the per-sample union is built. per_sample(sample) returns that sample's
