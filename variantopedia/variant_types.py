@@ -20,7 +20,6 @@ from django.conf import settings
 
 from annotation.annotation_pipeline_routing import pipeline_type_for_alt
 from annotation.enums import VariantAnnotationPipelineType
-from annotation.vep_config import sv_overlap_reciprocal_for_new_version
 from library.genomics import format_bp
 from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.models import ClinGenAllele, VariantCoordinate
@@ -206,9 +205,7 @@ def _annotation_cells(outcome: Outcome) -> tuple[str, str]:
             pipeline += " (given to VEP as its sequence)"
         return pipeline, "gnomAD - exact match"
     same_type = ", same type" if settings.ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE else ""
-    reciprocal = " of both" if sv_overlap_reciprocal_for_new_version() else " of the gnomAD SV"
-    overlap = (f"gnomAD-SV - overlapping SV (≥ {settings.ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION:.0%}{reciprocal}"
-               f"{same_type})")
+    overlap = f"gnomAD-SV - overlapping SV (≥ {settings.ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION:.0%} of both{same_type})"
     pipeline = outcome.pipeline.label
     if not outcome.symbolic:
         pipeline += " (given to VEP as its sequence)"

@@ -164,11 +164,6 @@ class VAVSetting:
     value: Callable[[VAVSettingContext], Any]  # what a version created now records
 
 
-def sv_overlap_reciprocal_for_new_version() -> bool:
-    """ ANNOTATION_VEP_SV_OVERLAP_RECIPROCAL needs VEP's reciprocal custom option (#2589) """
-    return settings.ANNOTATION_VEP_SV_OVERLAP_RECIPROCAL and int(settings.ANNOTATION_VEP_VERSION) >= 116
-
-
 def _min_pathogenic_rankscore(context: VAVSettingContext) -> Optional[float]:
     """ Rankscores count towards predictions_num_pathogenic at columns_version 2/3 only (1 uses the predictions,
         4+ the raw scores), so elsewhere the threshold isn't recorded and changing it doesn't make a new version """
@@ -197,7 +192,7 @@ VAV_SETTINGS: tuple[VAVSetting, ...] = (
                lambda c: " ".join(settings.ANNOTATION_VEP_ARGS) or None),
     VAVSetting("sv_max_size", "ANNOTATION_VEP_SV_MAX_SIZE", SettingRole.PIN,
                lambda c: settings.ANNOTATION_VEP_SV_MAX_SIZE),
-    # gnomAD SV overlap_cutoff
+    # gnomAD SV overlap_cutoff, applied by VEP to the gnomAD SV and by SVOverlapProcessor to ours (#2589)
     VAVSetting("sv_overlap_min_fraction", "ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION", SettingRole.PIN,
                lambda c: settings.ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION),
     # A symbolic del/dup/inv shorter than this goes to the STANDARD pipeline (annotation/annotation_pipeline_routing.py)
@@ -216,9 +211,6 @@ VAV_SETTINGS: tuple[VAVSetting, ...] = (
     # the same setting as structural_variant_min_size, whose pin makes the new version when it changes (#1708)
     VAVSetting("explicit_structural_variant_min_size", "ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE", SettingRole.DEFAULT,
                lambda c: settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE),
-    # overlap_cutoff applies to both SVs, not only gnomAD's (#2589)
-    VAVSetting("sv_overlap_reciprocal", "ANNOTATION_VEP_SV_OVERLAP_RECIPROCAL", SettingRole.DEFAULT,
-               lambda c: sv_overlap_reciprocal_for_new_version()),
 )
 
 SETTINGS_SNAPSHOT_FIELDS = frozenset(s.field for s in VAV_SETTINGS if s.role is SettingRole.SNAPSHOT)

@@ -190,7 +190,6 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     structural_variant_min_size = models.IntegerField()
     explicit_structural_variant_min_size = models.IntegerField(null=True, blank=True)
     sv_overlap_min_fraction = models.FloatField(null=True, blank=True)
-    sv_overlap_reciprocal = models.BooleanField(default=False)
     sv_overlap_same_type = models.BooleanField(default=True)
     sv_overlap_single_value_method = models.TextField(default="lowest_af")
     min_pathogenic_rankscore = models.FloatField(null=True, blank=True)

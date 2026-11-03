@@ -70,6 +70,9 @@ Gotchas:
 - Call NCBI E-utilities through `library/entrez.py` (`efetch`, `esearch`, `esummary`, `epost`), keeping Bio only to parse: `Bio.Entrez.efetch` etc.
   open urllib with no timeout (`Entrez.timeout` is not read), so a stalled NCBI hangs the web worker (#2440).
 - VEP's RefSeq cache names mitochondrial transcripts after the gene ('ND4.1'), never a real accession: the inserter links them to cdot's 'fake-rna-ND4' (annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:BulkVEPVCFAnnotationInserter._get_transcript_id_and_transcript_version_id), ahead of a gene-named 'ND4.1' row a pre-cdot import may have left (no genome_builds data), and stores hgvs_c as the 'NC_012920.1:m.' HGVS. tRNA/rRNA rows stay unlinked - cdot has nothing for them.
+- VEP's `--custom … reciprocal=1` is one-way since VEP 116 (Ensembl/ensembl-vep#2074), so gnomAD-SV's
+  `overlap_cutoff` only bounds the gnomAD side: annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:SVOverlapProcessor
+  checks both directions from the `coords=1` custom (#2589), and gnomad_sv_overlap_percent is its share of our SV.
 - Every VEP value in the inserter is still a string until PostgreSQL parses the COPY CSV, and gnomAD mixes notations
   ('9.1e-06', '0.25'): picking one of several values (max/min/sort) must convert with float(), or string order wins.
 - A VAV must match the VEP that will run: annotation/vep_annotation.py:vep_check_command_line_version_match raises
