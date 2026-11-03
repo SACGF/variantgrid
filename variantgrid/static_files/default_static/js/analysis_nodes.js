@@ -429,13 +429,19 @@ function copyNode() {
 
 	const addNewNodesToPage = function (data) {
 		const nodes_data = data['nodes'];
+		const newNodes = [];
 		for (let i = 0; i < nodes_data.length; ++i) {
-			const node_data = nodes_data[i];
-			const node = addNewNodeToPage(node_data);
-			node.addClass(ACTIVE_CLASS);
+			const node = addNewNodeToPage(nodes_data[i]);
+			setActiveNode(node);
+			newNodes.push(node);
 		}
 		const edges = data['edges'];
 		attatchAnalysisNodeConnections(edges);
+
+		// The editor must follow the ring, or its Save goes to the original (#2615). Several copies
+		// have no single node to edit, so clear it rather than leave an unselected node loaded
+		const loadNodeId = newNodes.length === 1 ? newNodes[0].attr('node_id') : null;
+		loadNodeData(loadNodeId, null, true);
 	};
 
 	const data = 'nodes=' + encodeURIComponent(JSON.stringify(nodes));
