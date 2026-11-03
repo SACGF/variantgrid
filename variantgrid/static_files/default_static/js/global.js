@@ -1101,6 +1101,16 @@ function limitLengthSpan(text, limit) {
     }
 }
 
+// Matches genes/hgvs/hgvs.py:abbreviate_hgvs_sequences - a long explicit del/dup/ins sequence shown as its length (#2612)
+const LONG_HGVS_SEQUENCE = /(del|dup|ins)([ACGTN]{21,})/g;
+
+function abbreviateHgvsSequences(hgvs) {
+    if (!hgvs) {
+        return hgvs;
+    }
+    return hgvs.replace(LONG_HGVS_SEQUENCE, (match, operation, sequence) => `${operation}<${sequence.length.toLocaleString('en')} bp>`);
+}
+
 function limitLength(text, limit) {
     if (text && text.length > limit) {
         return text.substring(0, limit) + '...';

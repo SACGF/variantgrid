@@ -22,7 +22,7 @@
             {% else %}
                 <span style="margin-left: 1pt; margin-right: 1pt; color: #666;">:</span>
             {% endif %}
-            <span style="word-break: break-all">{{ hgvs.dna_nomen }}</span>
+            <span style="word-break: break-all"{% if hgvs.is_abbreviated %} title="{{ hgvs.dna_nomen }}"{% endif %}>{{ hgvs.dna_nomen_display }}</span>
         {% else %}
             <span class="c-hgvs-body">
             <span class="c-hgvs-transcript">{{ hgvs.transcript }}</span>
@@ -32,13 +32,13 @@
                 </span>
                 <span class="colon">:</span>
             {% else %}<span class="colon-no-gene-symbol">:</span>{% endif %}
-            <span class="c-hgvs-nomen">{{ hgvs.dna_nomen }}</span>
+            <span class="c-hgvs-nomen"{% if hgvs.is_abbreviated %} title="{{ hgvs.dna_nomen }}"{% endif %}>{{ hgvs.dna_nomen_display }}</span>
         </span>
         {% endif %}
         {% p_hgvs hgvs.p_hgvs %}
     {% else %}
         {% comment %}Anything we couldn't split (gene fusions, legacy junk) - show it as it came in{% endcomment %}
-        <span class="c-hgvs-nomen">{{ hgvs.full_dna_hgvs }}</span>
+        <span class="c-hgvs-nomen"{% if hgvs.is_abbreviated %} title="{{ hgvs.full_dna_hgvs }}"{% endif %}>{{ hgvs.full_dna_hgvs_display }}</span>
     {% endif %}
 {% endif %}
 {% endspaceless %}

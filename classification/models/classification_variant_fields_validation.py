@@ -195,6 +195,7 @@ def validate_variant_fields(sender, patch_meta: PatchMeta, key_map: EvidenceKeyM
     # Only do this validation if at least variant linking key value has changed
     variant_values = {}
     variant_map = {}
+    variant_display: dict[str, str] = {}
 
     build_name = patch_meta.get(SpecialEKeys.GENOME_BUILD)
     if not build_name:
@@ -240,6 +241,7 @@ def validate_variant_fields(sender, patch_meta: PatchMeta, key_map: EvidenceKeyM
 
                     variant_str = Variant.format_tuple(*variant_coordinate)
                     variant_map[variant_str] = variant_map.get(variant_str, []) + [evidence_key]
+                    variant_display[variant_str] = Variant.format_tuple(*variant_coordinate, abbreviate=True)
                 except NoTranscript:
                     # this should find its way into Validation Matching flag
                     pass
@@ -256,7 +258,7 @@ def validate_variant_fields(sender, patch_meta: PatchMeta, key_map: EvidenceKeyM
     if len(variant_map) > 1:
         # generate message like:
         # c HGVS resolves to 4:53454A>T but g HGVS resolves to 4:4:53454A>C
-        resolutions = [f'{" and ".join([key_map.get(key).pretty_label for key in keys])} resolves to ({variant_str})' for variant_str, keys in variant_map.items()]
+        resolutions = [f'{" and ".join([key_map.get(key).pretty_label for key in keys])} resolves to ({variant_display[variant_str]})' for variant_str, keys in variant_map.items()]
         message = ' but '.join(resolutions)
 
         vm.add_message(SpecialEKeys.VARIANT_COORDINATE, code=ValidationCode.INCONSISTENT_VARIANT, severity='warning', message=message)
