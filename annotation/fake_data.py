@@ -31,7 +31,7 @@ from annotation.models.models_gene_annotation import (
     HumanProteinAtlasAnnotationVersion,
 )
 from annotation.models.models_version import SubVersionPartition, VariantAnnotationVersion
-from annotation.vep_config import VEPConfig
+from annotation.vep_config import SettingRole, VAVSettingContext, VEPConfig, vav_settings_kwargs
 from genes.enums import AnnotationConsortium
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneAnnotationImport, TranscriptVersion
@@ -179,9 +179,11 @@ def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium, colum
                     "assembly": assembly,
                     "annotation_consortium": annotation_consortium,
                     "columns_version": columns_version}
+    context = VAVSettingContext(annotation_consortium=annotation_consortium, columns_version=columns_version)
+    creation_defaults = vav_settings_kwargs(context, SettingRole.DEFAULT)
     for f in VariantAnnotationVersion._meta.fields:  # @UndefinedVariable
-        if f.name in fake_version or f.name in ("vep_version_mismatch_reason", "explicit_structural_variant_min_size"):
-            continue  # already set, or not a VEP pin (#1679 latch, #1708 set on creation)
+        if f.name in fake_version or f.name == "vep_version_mismatch_reason" or f.name in creation_defaults:
+            continue  # already set, or not a VEP pin (#1679 latch, set on creation)
         if isinstance(f, IntegerField):
             value = -1
         elif isinstance(f, TextField):
@@ -201,7 +203,7 @@ def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium, colum
     # Real COSMIC release from the (test-pinned) vep_config, as the sample count INFO field is
     # gated on it - see the cosmic_count VEPColumnDefs
     fake_version["cosmic"] = VEPConfig(genome_build).cosmic_version
-    fake_version["structural_variant_min_size"] = settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
+    fake_version.update(vav_settings_kwargs(context, SettingRole.PIN, SettingRole.SNAPSHOT))
     return fake_version
 
 
@@ -239,7 +241,8 @@ def create_fake_annotation_version(genome_build: GenomeBuild) -> AnnotationVersi
         vav_kwargs["gene_annotation_release"] = gene_annotation_release
         vav_defaults = {k: vav_kwargs.pop(k) for k in list(vav_kwargs) if k != "genome_build"}
         vav_defaults["status"] = VariantAnnotationVersion.Status.ACTIVE
-        vav_defaults["explicit_structural_variant_min_size"] = settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
+        vav_defaults.update(vav_settings_kwargs(VAVSettingContext(2, AnnotationConsortium.ENSEMBL),
+                                                SettingRole.DEFAULT))
         variant_annotation_version, _ = VariantAnnotationVersion.objects.get_or_create(
             genome_build=genome_build,
             status=VariantAnnotationVersion.Status.ACTIVE,

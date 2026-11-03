@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from typing import Optional
 
-from django.conf import settings
 from django.db import transaction
 from django.db.models import F, Window
 from django.db.models.aggregates import Count, Max, Min
@@ -28,10 +27,8 @@ from annotation.models import (
     VariantAnnotation,
     VariantAnnotationVersion,
 )
-from annotation.vep_annotation import (
-    get_vep_variant_annotation_version_kwargs,
-    sv_overlap_reciprocal_for_new_version,
-)
+from annotation.vep_annotation import get_vep_variant_annotation_version_kwargs
+from annotation.vep_config import SettingRole, VAVSettingContext, VEPConfig, vav_settings_kwargs
 from library.django_utils import highest_pk
 from library.django_utils.database_utils import pg_settings, query_was_cancelled
 from snpdb.models.models_genome import GenomeBuild
@@ -41,13 +38,9 @@ from snpdb.models.models_variant import Variant
 def get_or_create_variant_annotation_version_from_current_vep(genome_build: GenomeBuild) -> tuple[VariantAnnotationVersion, bool]:
     kwargs = get_vep_variant_annotation_version_kwargs(genome_build)
     # New rows start as NEW; promotion to ACTIVE happens once tables are populated.
-    # explicit_structural_variant_min_size is a default rather than a lookup so a version made before it
-    # existed (null) still matches: it comes from the same setting as structural_variant_min_size, which is
-    # in the lookup, so changing that setting still makes a new version.
-    # sv_overlap_reciprocal is a default for the same reason: existing versions keep the overlap they were made with
+    context = VAVSettingContext.for_vep_config(VEPConfig(genome_build))
     defaults = {"status": VariantAnnotationVersion.Status.NEW,
-                "explicit_structural_variant_min_size": settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE,
-                "sv_overlap_reciprocal": sv_overlap_reciprocal_for_new_version()}
+                **vav_settings_kwargs(context, SettingRole.DEFAULT)}
     variant_annotation_version, created = VariantAnnotationVersion.objects.get_or_create(**kwargs, defaults=defaults)
     now = timezone.now()
     if created:

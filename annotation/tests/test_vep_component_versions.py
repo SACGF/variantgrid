@@ -9,8 +9,13 @@ from annotation.fake_data import (
     get_fake_vep_version,
 )
 from annotation.models import VariantAnnotationVersion
+from annotation.vep_annotation import _vep_check_version_match
 from annotation.vep_config import (
+    VAV_SETTINGS,
+    SettingRole,
+    VAVSettingContext,
     parse_cosmic_version_from_filename,
+    vav_settings_kwargs,
     vep_component_version_kwargs,
 )
 from genes.enums import AnnotationConsortium
@@ -25,6 +30,7 @@ GRCH38_SETTINGS = {
         "dbscsnv": "annotation_data/GRCh38/dbscSNV1.1_GRCh38.txt.gz",
         "eve": "annotation_data/GRCh38/eve_merged.vcf.gz",
         "gnomad_sv": "annotation_data/GRCh38/gnomad.v4.0.sv.merged.no_filters.vcf.gz",
+        "gnomad_sv_name": "annotation_data/GRCh38/gnomad.v4.1.sv.merged.no_filters.vcf.gz",
         "mastermind": "annotation_data/GRCh38/mastermind_cited_variants_reference-2023.10.02-grch38.vcf.gz",
         "maxentscan": "annotation_data/all_builds/maxentscan",
         "phastcons100way": "annotation_data/GRCh38/hg38.phastCons100way.bw",
@@ -36,6 +42,7 @@ GRCH38_SETTINGS = {
         "promoter_ai": "annotation_data/GRCh38/promoterAI_tss500.tsv.bgz",
         "protvar": "annotation_data/all_builds/ProtVar_data.db",
         "repeatmasker": "annotation_data/GRCh38/repeatmasker_hg38.bed.gz",
+        "spliceai_indel": "annotation_data/GRCh38/spliceai_scores.masked.indel.hg38.vcf.gz",
         "topmed": "annotation_data/GRCh38/TOPMED_GRCh38_20180418.vcf.gz",
         "transcript_blocklist": "annotation_data/GRCh38/blocklist_brca1_new_transcripts.txt",
         "uk10k": "annotation_data/GRCh38/UK10K_COHORT.20160215.sites.GRCh38.vcf.gz",
@@ -55,6 +62,9 @@ GRCH37_SETTINGS = {
 }
 
 
+ENSEMBL_V2 = VAVSettingContext(columns_version=2, annotation_consortium=AnnotationConsortium.ENSEMBL)
+
+
 class VEPComponentVersionKwargsTests(TestCase):
     """ #462 - the VEP command line components the ##VEP= header doesn't report. """
 
@@ -65,6 +75,7 @@ class VEPComponentVersionKwargsTests(TestCase):
         self.assertEqual("20180418", kwargs["topmed"])
         self.assertEqual("20160215", kwargs["uk10k"])
         self.assertEqual("4.0", kwargs["gnomad_sv"])
+        self.assertEqual("4.1", kwargs["gnomad_sv_name"])
 
     def test_gnomad_sv_grch37_naming(self):
         kwargs = vep_component_version_kwargs(GRCH37_SETTINGS)
@@ -80,6 +91,7 @@ class VEPComponentVersionKwargsTests(TestCase):
         self.assertEqual("blocklist_brca1_new_transcripts.txt", kwargs["transcript_blocklist"])
         self.assertEqual("ProtVar_data.db", kwargs["protvar"])
         self.assertEqual("maxentscan", kwargs["maxentscan"])
+        self.assertEqual("spliceai_scores.masked.indel.hg38.vcf.gz", kwargs["spliceai_indel"])
 
     def test_unconfigured_data_is_none(self):
         kwargs = vep_component_version_kwargs(GRCH37_SETTINGS)
@@ -123,7 +135,7 @@ class VEPComponentVersionKwargsTests(TestCase):
                        ANNOTATION_VEP_SV_MAX_SIZE=5_000_000,
                        ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION=0.5)
     def test_command_line_settings_pinned(self):
-        kwargs = vep_component_version_kwargs(GRCH38_SETTINGS)
+        kwargs = vav_settings_kwargs(ENSEMBL_V2, SettingRole.PIN)
         self.assertEqual("mane_select,canonical", kwargs["pick_order"])
         self.assertEqual("--mane --shift_hgvs 0", kwargs["vep_args"])
         self.assertEqual(5_000_000, kwargs["sv_max_size"])
@@ -131,9 +143,46 @@ class VEPComponentVersionKwargsTests(TestCase):
 
     @override_settings(ANNOTATION_VEP_PICK_ORDER=None, ANNOTATION_VEP_ARGS=[])
     def test_empty_command_line_settings_are_none(self):
-        kwargs = vep_component_version_kwargs(GRCH38_SETTINGS)
+        kwargs = vav_settings_kwargs(ENSEMBL_V2, SettingRole.PIN)
         self.assertIsNone(kwargs["vep_args"])
         self.assertIsNone(kwargs["pick_order"])
+
+
+class VAVSettingsTests(TestCase):
+    """ Every setting a version records is one VAV_SETTINGS row; its role decides whether a change halts the
+        version in use (pin), makes a new one (snapshot) or waits for one (default) """
+
+    def test_every_field_exists_once(self):
+        fields = [s.field for s in VAV_SETTINGS]
+        self.assertEqual(len(fields), len(set(fields)))
+        model_fields = {f.name for f in VariantAnnotationVersion._meta.fields}
+        self.assertEqual([], [f for f in fields if f not in model_fields])
+
+    def test_roles_partition_the_kwargs(self):
+        all_fields = {s.field for s in VAV_SETTINGS}
+        by_role = [set(vav_settings_kwargs(ENSEMBL_V2, role)) for role in SettingRole]
+        self.assertEqual(all_fields, set.union(*by_role))
+        self.assertEqual(len(all_fields), sum(len(fields) for fields in by_role))
+
+    @override_settings(ANNOTATION_MIN_PATHOGENIC_RANKSCORE=0.9)
+    def test_rankscore_pinned_only_where_counted(self):
+        for columns_version, expected in {1: None, 2: 0.9, 3: 0.9, 4: None, 5: None}.items():
+            with self.subTest(columns_version=columns_version):
+                context = VAVSettingContext(columns_version, AnnotationConsortium.ENSEMBL)
+                self.assertEqual(expected, vav_settings_kwargs(context, SettingRole.SNAPSHOT)["min_pathogenic_rankscore"])
+
+    @override_settings(ANNOTATION_VEP_ENSEMBL_GENCODE="primary")
+    def test_gencode_subset_ensembl_only(self):
+        for consortium, expected in {AnnotationConsortium.ENSEMBL: "primary", AnnotationConsortium.REFSEQ: None}.items():
+            with self.subTest(consortium=consortium):
+                context = VAVSettingContext(2, consortium)
+                self.assertEqual(expected, vav_settings_kwargs(context, SettingRole.SNAPSHOT)["gencode_subset"])
+
+    def test_changed_setting_is_not_a_vep_mismatch(self):
+        vav = VariantAnnotationVersion(sv_overlap_same_type=True, sv_overlap_single_value_method="lowest_af",
+                                       sift_enabled=True)
+        _vep_check_version_match(vav, {"sv_overlap_same_type": False, "sv_overlap_single_value_method": "other",
+                                       "sift_enabled": True}, "test")
 
 
 class ParseCosmicVersionTests(TestCase):

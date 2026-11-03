@@ -128,7 +128,8 @@ variants already annotated. Four pieces have to agree.
 
 **The pin.** Every data file `get_vep_command` passes is pinned on the VAV, either through a dedicated field filled
 from the `##VEP=` header or through `annotation/vep_config.py:vep_component_version_kwargs` (basename or parsed
-version, from settings alone). A new source means a new VAV field (an entry in `_BASENAME_PIN_FIELDS` /
+version, from settings alone); the scalar settings (pick order, VEP args, SV sizes, the snapshots) are rows of
+`annotation/vep_config.py:VAV_SETTINGS`, whose role says what changing one does to a VAV in use. A new source means a new VAV field (an entry in `_BASENAME_PIN_FIELDS` /
 `_VERSION_PIN_FIELDS`, or header parsing in `vep_dict_to_variant_annotation_version_kwargs`). Setting the file in
 `settings.ANNOTATION[build]["vep_config"]` while the ACTIVE VAV still holds NULL in that field is a pin mismatch (see
 Traps): the VEP lane halts on that VAV, and `create_new_variant_annotation_version` would `get_or_create` a fresh

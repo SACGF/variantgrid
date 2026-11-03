@@ -69,7 +69,8 @@ class VariantAnnotationVersionAdmin(ArchivePartitionDataAdminMixin, ModelAdminBa
                     "vep", "columns_version", "gencode_subset", "distance",
                     "status_badge", "data_archived_date")
     list_filter = ("status", "genome_build", "annotation_consortium", "data_archived_date")
-    readonly_fields = ("status", "gencode_subset", "distance", "sv_overlap_reciprocal",
+    readonly_fields = ("status", "gencode_subset", "distance", "sv_overlap_reciprocal", "sv_overlap_same_type",
+                       "sv_overlap_single_value_method", "min_pathogenic_rankscore", "vep_commands",
                        "data_archived_date", "data_archived_by",
                        "data_archive_reason", "data_restorable_from")
     ordering = ("genome_build", "-annotation_date")
