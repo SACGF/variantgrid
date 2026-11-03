@@ -562,6 +562,22 @@ class AnnotationDispatchTestCase(TestCase):
         self.assertIsNone(sv_run.count)
         self.assertIsNone(std_run.count)  # stale count nulled for re-count
 
+    def test_absorb_removes_cascaded_empty_run_dump(self):
+        # An empty-finished run still names its (empty) dump. The cascade from the absorbed lock deletes
+        # the lock before the run's post_delete, so the run's output paths must be named in pre_delete.
+        survivor = self._make_lock(0, 0, count=100)
+        absorbed = self._make_lock(1, 1, count=100, pipeline_types=(STANDARD, STRUCTURAL))
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            sv_run = absorbed.annotationrun_set.get(pipeline_type=STRUCTURAL)
+            self._count_run(sv_run)
+            sv_run.refresh_from_db()
+            sv_run.vcf_dump_filename = os.path.join(tmp_dir, f"dump_{sv_run.pk}.vcf")
+            sv_run.save()
+            open(sv_run.vcf_dump_filename, "w", encoding="utf-8").close()
+            _absorb_range_lock(survivor, absorbed)
+            self.assertFalse(os.path.exists(sv_run.vcf_dump_filename))
+        self.assertFalse(AnnotationRangeLock.objects.filter(pk=absorbed.pk).exists())
+
     # ================================================================== #1646 Part 2: resume upload-only
     def _make_past_vep_run(self, lo_idx=0, annotated_filename="/tmp/fake.vep_annotated.vcf.gz", vav=None):
         """ A run that has completed VEP (annotated VCF present) but not yet uploaded. """

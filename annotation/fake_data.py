@@ -16,7 +16,7 @@ from django.utils import timezone
 
 from annotation.enums import AnnotationStatus, CitationSource, PathogenicityImpact
 from annotation.models import ClinVarReviewStatus
-from annotation.models.models import VariantAnnotation
+from annotation.models.models import VariantAnnotation, VariantGeneOverlap
 from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
 from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.models.models_citations import CitationIdNormalized
@@ -31,12 +31,12 @@ from annotation.models.models_gene_annotation import (
     HumanProteinAtlasAnnotationVersion,
 )
 from annotation.models.models_version import SubVersionPartition, VariantAnnotationVersion
-from annotation.vep_config import VEPConfig
+from annotation.vep_config import SettingRole, VAVSettingContext, VEPConfig, vav_settings_kwargs
 from genes.enums import AnnotationConsortium
 from genes.hgvs import HGVSMatcher
-from genes.models import GeneAnnotationImport, TranscriptVersion
+from genes.models import Gene, GeneAnnotationImport, TranscriptVersion
 from genes.models.models_gene_annotation_release import GeneAnnotationRelease
-from library.django_utils.django_partition import temporary_db_table
+from library.django_utils.django_partition import bulk_create_in_partition
 from library.fake_data import FakeData, FakeDataContext, register
 from library.genomics.vcf_enums import VariantClass
 from ontology.tests.test_data_ontology import (
@@ -179,9 +179,11 @@ def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium, colum
                     "assembly": assembly,
                     "annotation_consortium": annotation_consortium,
                     "columns_version": columns_version}
+    context = VAVSettingContext(annotation_consortium=annotation_consortium, columns_version=columns_version)
+    creation_defaults = vav_settings_kwargs(context, SettingRole.DEFAULT)
     for f in VariantAnnotationVersion._meta.fields:  # @UndefinedVariable
-        if f.name in fake_version or f.name in ("vep_version_mismatch_reason", "explicit_structural_variant_min_size"):
-            continue  # already set, or not a VEP pin (#1679 latch, #1708 set on creation)
+        if f.name in fake_version or f.name == "vep_version_mismatch_reason" or f.name in creation_defaults:
+            continue  # already set, or not a VEP pin (#1679 latch, set on creation)
         if isinstance(f, IntegerField):
             value = -1
         elif isinstance(f, TextField):
@@ -201,7 +203,7 @@ def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium, colum
     # Real COSMIC release from the (test-pinned) vep_config, as the sample count INFO field is
     # gated on it - see the cosmic_count VEPColumnDefs
     fake_version["cosmic"] = VEPConfig(genome_build).cosmic_version
-    fake_version["structural_variant_min_size"] = settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
+    fake_version.update(vav_settings_kwargs(context, SettingRole.PIN, SettingRole.SNAPSHOT))
     return fake_version
 
 
@@ -239,7 +241,8 @@ def create_fake_annotation_version(genome_build: GenomeBuild) -> AnnotationVersi
         vav_kwargs["gene_annotation_release"] = gene_annotation_release
         vav_defaults = {k: vav_kwargs.pop(k) for k in list(vav_kwargs) if k != "genome_build"}
         vav_defaults["status"] = VariantAnnotationVersion.Status.ACTIVE
-        vav_defaults["explicit_structural_variant_min_size"] = settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
+        vav_defaults.update(vav_settings_kwargs(VAVSettingContext(2, AnnotationConsortium.ENSEMBL),
+                                                SettingRole.DEFAULT))
         variant_annotation_version, _ = VariantAnnotationVersion.objects.get_or_create(
             genome_build=genome_build,
             status=VariantAnnotationVersion.Status.ACTIVE,
@@ -336,6 +339,19 @@ def create_fake_variant_annotation(variant, variant_annotation_version: VariantA
     va, _ = VariantAnnotation.objects.get_or_create(variant=variant, version=variant_annotation_version,
                                                     annotation_run=annotation_run, defaults=defaults)
     return va
+
+
+def create_fake_variant_gene_overlaps(variant_annotation_version: VariantAnnotationVersion, gene: Gene, variants,
+                                     annotation_run: Optional[AnnotationRun] = None) -> list[VariantGeneOverlap]:
+    """ Written into the version's partition, the table gene list queries read (an ORM create lands in the
+        base table, which they never see) """
+    if annotation_run is None:
+        annotation_run = AnnotationRun.objects.create()
+    overlaps = [VariantGeneOverlap(version=variant_annotation_version, annotation_run=annotation_run,
+                                   gene=gene, variant=variant) for variant in variants]
+    bulk_create_in_partition(variant_annotation_version, VariantGeneOverlap,
+                             VariantAnnotationVersion.VARIANT_GENE_OVERLAP, overlaps)
+    return overlaps
 
 
 def get_variant_ids_by_gene(genome_build: GenomeBuild, genes: list[str],
@@ -477,9 +493,8 @@ class FakeVariants(FakeData):
                 hgvs_g=fake_variant.hgvs_g, hgvs_c=fake_variant.hgvs_c, hgvs_p=fake_variant.hgvs_p,
                 gnomad_af=_random_population_af(rng))
         # Into the version's partition, which is the table analysis nodes join to
-        representative_table = vav.get_partition_table(VariantAnnotationVersion.REPRESENTATIVE_TRANSCRIPT_ANNOTATION)
-        with temporary_db_table(VariantAnnotation, representative_table):
-            VariantAnnotation.objects.bulk_create(annotations.values())
+        bulk_create_in_partition(vav, VariantAnnotation, VariantAnnotationVersion.REPRESENTATIVE_TRANSCRIPT_ANNOTATION,
+                                 list(annotations.values()))
         context.stdout.write(f"Created {len(annotations)} annotated variants")
 
     def delete(self, context: FakeDataContext, **options):

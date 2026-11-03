@@ -12,8 +12,9 @@
             BP4 threshold supports benign; values in between are indeterminate. Tools without a published
             ClinGen calibration use the author-recommended cutoff (single threshold) or, where noted, have no
             calibrated threshold. The last rows are not missense pathogenicity predictors at all - they are
-            offered as Effect node filters only (a slider over an uncalibrated score, or a rule over a categorical
-            annotation), and take no part in the colour bands or the damage count.
+            offered as Effect node filters only (a slider over an uncalibrated score or a gene-level gnomAD constraint
+            metric, or a rule over a categorical annotation), and take no part in the colour bands or the damage
+            count.
         </p>
         <p class="text-muted">
             These thresholds drive the colour bands on the analysis Effect (Damage) node sliders and the
@@ -76,7 +77,7 @@
                                         {% if f.note %}<div class="text-muted small font-weight-normal mt-1">{{ f.note }}</div>{% endif %}
                                     </div>
                                 </th>
-                                <td class="text-monospace">{% if f.raw_min is not None %}{{ f.raw_direction.comparison }}{% else %}rule{% endif %}</td>
+                                <td class="text-monospace">{% if f.raw_min is not None %}{{ f.raw_direction.comparison }}{% if f.cutoff is not None %} <span title="Published cutoff - where the slider starts">{{ f.cutoff }}</span>{% endif %}{% else %}rule{% endif %}</td>
                                 <td class="text-monospace">{% if f.raw_min is not None %}{{ f.raw_min }}{% else %}—{% endif %}</td>
                                 <td class="text-monospace">—</td>
                                 <td class="text-monospace">—</td>

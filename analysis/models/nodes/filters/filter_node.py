@@ -8,7 +8,12 @@ from django.db.models.deletion import CASCADE
 
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
-from analysis.models.nodes.node_display import NodeIcon
+from analysis.models.nodes.node_display import (
+    NodeChip,
+    NodeIcon,
+    first_and_more_name_line,
+    named_chip,
+)
 from library.django_utils.filter_rules import format_operation, rules_to_q
 from snpdb.models import VariantGridColumn
 
@@ -57,19 +62,25 @@ class FilterNode(AnalysisNode):
         joiner = f" {self.group_operation} "
         return joiner.join(rules_summary)
 
+    def _get_rule_descriptions(self) -> list[str]:
+        return [str(fn_item) for fn_item in self.filternodeitem_set.order_by('sort_order')]
+
     def get_node_name(self):
         node_name = ''
         if self.pk:
-            fn_items = list(self.filternodeitem_set.all())  # Evaluate once
-            num_filters = len(fn_items)
-            if num_filters == 0:
-                node_name = ''
-            elif num_filters == 1:
-                node_name = str(fn_items[0])
-            else:
-                node_name = f"{num_filters} filters"
-
+            if rules := self._get_rule_descriptions():
+                node_name = first_and_more_name_line(rules)
+                if len(rules) > 1:
+                    node_name += "\n" + ("match all" if self.group_operation == "AND" else "match any")
         return node_name
+
+    def get_node_chips(self) -> list[NodeChip]:
+        chips = super().get_node_chips()
+        if self.pk:
+            rules = self._get_rule_descriptions()
+            if len(rules) > 1:
+                chips.extend(named_chip(rule, icon="fa-solid fa-filter") for rule in rules)
+        return chips
 
     @staticmethod
     def get_help_text() -> str:

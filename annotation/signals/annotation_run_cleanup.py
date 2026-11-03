@@ -13,11 +13,13 @@ Three ways in, one exit:
   annotation_run_discarded_signal  an attempt's output is being thrown away (a losing attempt
                                    unwinding, or a stalled run scrubbed back to CREATED). Always
                                    removed - it is unreachable, and a re-dump would collide with it.
-  post_delete                      the row is going away, and it was the only thing that could name
-                                   these files. Using the signal rather than overriding
+  pre_delete / post_delete         the row is going away, and it was the only thing that could name
+                                   these files. Using the signals rather than overriding
                                    AnnotationRun.delete() also covers queryset deletes (registering a
                                    receiver disables Django's fast-delete path), which an override
-                                   would silently miss.
+                                   would silently miss. The paths are named in pre_delete because a
+                                   cascade from AnnotationRangeLock has already deleted the lock by
+                                   post_delete, and the VEP paths derive from the lock's genome build.
 
 Deliberately absent: a failure path. A run that errored keeps everything on disk for investigation,
 which is the behaviour #1670 asked for - so it is achieved by there being no signal to send.
@@ -54,7 +56,7 @@ def get_all_run_output_paths(annotation_run) -> list[str]:
     return paths
 
 
-def remove_annotation_run_output(annotation_run, remove_annotsv_dir: bool = True):
+def remove_annotation_run_output(annotation_run, remove_annotsv_dir: bool = True, paths: list[str] | None = None):
     """ Best-effort removal of everything this run owns on disk.
 
         remove_annotsv_dir=False is for a caller holding only its *own* attempt's files: the AnnotSV
@@ -62,7 +64,9 @@ def remove_annotation_run_output(annotation_run, remove_annotsv_dir: bool = True
         attempt deleting it would take the winning attempt's output with it. A run that is finished or
         being deleted has no such rival, and clearing the whole directory is the only way the non-TSV
         files AnnotSV writes alongside its output are ever reclaimed. """
-    for path in dict.fromkeys(get_all_run_output_paths(annotation_run)):  # de-dupe, keeping order
+    if paths is None:
+        paths = get_all_run_output_paths(annotation_run)
+    for path in dict.fromkeys(paths):  # de-dupe, keeping order
         if path and os.path.exists(path):
             try:
                 os.remove(path)
@@ -96,7 +100,13 @@ def annotation_run_discarded_cleanup_handler(sender, annotation_run, **kwargs): 
     remove_annotation_run_output(annotation_run, remove_annotsv_dir=False)
 
 
+def annotation_run_pre_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
+    """ Name the files while the range lock can still be read: Django sends every pre_delete before
+        deleting any row, so a cascade from AnnotationRangeLock hasn't removed the lock yet. """
+    instance._output_paths_at_delete = get_all_run_output_paths(instance)
+
+
 def annotation_run_post_delete_handler(sender, instance, **kwargs):  # pylint: disable=unused-argument
     """ The row is gone and nothing else can name these files - there is no sweep of
         ANNOTATION_VCF_DUMP_DIR to catch them later. """
-    remove_annotation_run_output(instance)
+    remove_annotation_run_output(instance, paths=getattr(instance, "_output_paths_at_delete", None))

@@ -153,6 +153,7 @@ class VariantAnnotationVersionColumns(DatatableConfig[VariantAnnotationVersion])
             RichColumn(key="dbscsnv", label="dbscSNV", orderable=True, detail=True),
             RichColumn(key="mastermind", label="Mastermind", orderable=True, detail=True),
             RichColumn(key="gnomad_sv", label="gnomAD SV", orderable=True, detail=True),
+            RichColumn(key="gnomad_sv_name", label="gnomAD SV (name)", orderable=True, detail=True),
             RichColumn(key="topmed", label="TopMed", orderable=True, detail=True),
             RichColumn(key="uk10k", label="UK10K", orderable=True, detail=True),
             RichColumn(key="conservation", orderable=True, detail=True),
@@ -163,6 +164,7 @@ class VariantAnnotationVersionColumns(DatatableConfig[VariantAnnotationVersion])
             RichColumn(key="promoter_ai", label="PromoterAI", orderable=True, detail=True),
             RichColumn(key="utr_annotator", label="UTRAnnotator", orderable=True, detail=True),
             RichColumn(key="splicevault", label="SpliceVault", orderable=True, detail=True),
+            RichColumn(key="spliceai_indel", label="SpliceAI indel", orderable=True, detail=True),
             RichColumn(key="avi", label="AVI", orderable=True, detail=True),
             RichColumn(key="alphagenome_splicing", label="AlphaGenome splicing", orderable=True, detail=True),
             RichColumn(key="fasta", orderable=True, detail=True),
@@ -176,6 +178,10 @@ class VariantAnnotationVersionColumns(DatatableConfig[VariantAnnotationVersion])
             RichColumn(key="sv_overlap_min_fraction", label="SV Overlap Min Fraction",
                        orderable=True, detail=True),
             RichColumn(key="sv_overlap_reciprocal", label="SV Overlap Reciprocal", orderable=True, detail=True),
+            RichColumn(key="sv_overlap_same_type", label="SV Overlap Same Type", orderable=True, detail=True),
+            RichColumn(key="sv_overlap_single_value_method", label="SV Overlap Single Value",
+                       orderable=True, detail=True),
+            RichColumn(key="min_pathogenic_rankscore", label="Min Pathogenic Rankscore", orderable=True, detail=True),
             RichColumn(key="vep_args", label="VEP Args", orderable=True, detail=True),
             RichColumn(key="distance", orderable=True, detail=True)
         ]

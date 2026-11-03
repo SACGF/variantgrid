@@ -492,6 +492,45 @@
                 {% endif %}
             {% endif %}
 
+            {% if node.has_gene_constraint %}
+                <tr>
+                    <th title="gnomAD v4 LOEUF of the gene's MANE Select transcript - the upper bound of the loss-of-function observed/expected 90% CI. Lower is more intolerant of loss of function (PVS1's 'LoF is a known mechanism'). Starts at gnomAD v4's constrained-gene cutoff, 0.6">gnomAD LOEUF &le;</th>
+                    <td>{{ form.gene_loeuf_max.errors }}
+                        <input id="enable-gene-loeuf" title="Enable gnomAD LOEUF slider" class="enable-slider" type="checkbox" />
+                        <span class='slider-container'>
+                            <div class="display-flex">
+                                <span class="slider-track"><input type="range" id="gene-loeuf-slider" class='slider' /></span>
+                                <div class='label slider-value'></div>
+                            </div>
+                            <div class='slider-labels'>
+                                <span class='label min-value left'></span>
+                                <span class='label max-value right'></span>
+                            </div>
+                        </span>
+                    </td>
+                    <td class="collapse filter-required">{{ form.gene_loeuf_required }}</td>
+                    <td class="collapse filter-required">{{ form.gene_loeuf_allow_null }}</td>
+                </tr>
+                <tr>
+                    <th title="gnomAD v4 missense Z of the gene's MANE Select transcript - higher means fewer missense variants than expected (PP2 / BP1). Starts at 3.09, ExAC's missense-constrained gene cutoff">gnomAD missense Z &ge;</th>
+                    <td>{{ form.gene_mis_z_min.errors }}
+                        <input id="enable-gene-mis-z" title="Enable gnomAD missense Z slider" class="enable-slider" type="checkbox" />
+                        <span class='slider-container'>
+                            <div class="display-flex">
+                                <span class="slider-track"><input type="range" id="gene-mis-z-slider" class='slider' /></span>
+                                <div class='label slider-value'></div>
+                            </div>
+                            <div class='slider-labels'>
+                                <span class='label min-value left'></span>
+                                <span class='label max-value right'></span>
+                            </div>
+                        </span>
+                    </td>
+                    <td class="collapse filter-required">{{ form.gene_mis_z_required }}</td>
+                    <td class="collapse filter-required">{{ form.gene_mis_z_allow_null }}</td>
+                </tr>
+            {% endif %}
+
             <tr>
                 <th>{{ form.protein_domain.label }}</th>
                 <td>{{ form.protein_domain.errors }} {{ form.protein_domain }}</td>
@@ -505,6 +544,14 @@
                 <td class="collapse filter-required">{{ form.published_required }}</td>
                 <td class="collapse filter-required"> <!-- published is non-nullable --> </td>
             </tr>
+            {% if node.has_repeat_masker %}
+                <tr>
+                    <th title="Keep only variants with no RepeatMasker overlap - PM4's in-frame indel or stop loss 'in a non-repeat region'. Always restricts, like Variant type">Outside repeat region</th>
+                    <td>{{ form.outside_repeat_region.errors }} {{ form.outside_repeat_region }}</td>
+                    <td class="collapse filter-required"> <!-- outside_repeat_region always restricts --> </td>
+                    <td class="collapse filter-required"> <!-- outside_repeat_region is non-nullable --> </td>
+                </tr>
+            {% endif %}
         </table>
 
         <div class="editor-note">

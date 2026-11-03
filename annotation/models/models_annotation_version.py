@@ -102,6 +102,9 @@ class AnnotationVersion(models.Model):
         """ The GeneAnnotationVersion must be consistent with this AnnotationVersion's VariantAnnotationVersion
             (GeneAnnotationRelease) and OntologyVersion. Raises InvalidAnnotationVersionError - the same error that
             breaks variant pages if an inconsistent version goes live. """
+        if consortium_error := self.variant_annotation_version.get_gene_annotation_release_consortium_error():
+            raise InvalidAnnotationVersionError(consortium_error)
+
         if not self.gene_annotation_version_id:
             return
 
