@@ -2,7 +2,7 @@
 analysis' enums: analysis and template types, NodeStatus (the load lifecycle, with LOADING / CLAIMABLE /
 ERROR sets the scheduler reads), the inheritance modes and sample roles for Trio, Quad and Duo nodes, set
 and group operations, tag-node modes and tag locations, node error sources, the candidate search types
-and statuses, and the damage node's ALoFT and structural filter options. Stored codes: add values, never
+and statuses, and the damage node's ALoFT, PTC NMD and structural filter options. Stored codes: add values, never
 renumber.
 """
 import operator
@@ -10,7 +10,7 @@ from functools import reduce
 
 from django.db import models
 
-from annotation.enums import ALoFTPrediction
+from annotation.enums import ALoFTPrediction, NMDEscapeStatus
 from library.utils import Constant
 from patients.enums import Zygosity
 
@@ -260,6 +260,19 @@ class StructuralFilter(models.TextChoices):
     ANY = 'A', "Any"
     ONLY = 'O', "Structural only"
     EXCLUDE = 'E', "Exclude structural"
+
+
+class PTCNMDFilter(models.TextChoices):
+    """ DamageNode's PTC-aware NMD filter (#579, #2596) over VariantAnnotation.nmd_escape_status. There's no
+        "NMD predicted" only option: as a filter it would drop escaping frameshifts, which can still be PVS1 """
+    ESCAPING = 'E', "Escapes NMD"
+    ESCAPING_OR_PREDICTED = 'A', "Escapes NMD or NMD predicted"
+
+    @property
+    def nmd_escape_statuses(self) -> list[NMDEscapeStatus]:
+        if self == PTCNMDFilter.ESCAPING:
+            return [NMDEscapeStatus.ESCAPING]
+        return [NMDEscapeStatus.ESCAPING, NMDEscapeStatus.PREDICTED_NMD]
 
 
 class SpliceVaultOutOfFrame(models.TextChoices):

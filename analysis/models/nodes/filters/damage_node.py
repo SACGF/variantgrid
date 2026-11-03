@@ -9,7 +9,13 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models.query_utils import Q
 
-from analysis.enums import ALoFTPredictionOptions, SpliceVaultOutOfFrame, StructuralFilter, UTRHighImpact
+from analysis.enums import (
+    ALoFTPredictionOptions,
+    PTCNMDFilter,
+    SpliceVaultOutOfFrame,
+    StructuralFilter,
+    UTRHighImpact,
+)
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeChip, NodeIcon, grouped_chips
 from annotation.effect_filters import splicevault_out_of_frame_q, utr_high_impact_q
@@ -19,7 +25,6 @@ from annotation.enums import (
     ClinPredPrediction,
     EVEClass,
     MetaRNNPrediction,
-    NMDEscapeStatus,
     PathogenicityImpact,
     PrimateAIPrediction,
 )
@@ -232,9 +237,9 @@ class DamageNode(AnalysisNode):
     nmd_escaping_variant = models.BooleanField(default=False)
     nmd_escaping_variant_required = models.BooleanField(default=False)
 
-    # Matches nmd_escape_status = ESCAPING - the PVS1-relevant state (columns v5, #579)
-    ptc_nmd_escaping = models.BooleanField(default=False)
-    ptc_nmd_escaping_required = models.BooleanField(default=False)
+    # Filters on nmd_escape_status (columns v5, #579, #2596)
+    ptc_nmd = models.CharField(max_length=1, choices=PTCNMDFilter.choices, null=True, blank=True)
+    ptc_nmd_required = models.BooleanField(default=False)
 
     aloft = models.CharField(max_length=1, choices=ALoFTPredictionOptions.choices, null=True, blank=True)
     aloft_required = models.BooleanField(default=False)
@@ -272,8 +277,8 @@ class DamageNode(AnalysisNode):
         column_filters = [cf for cf in _COLUMN_FILTERS if cf.column in visible_columns]
         # nmd_escape_status is calculated by VariantGrid, not a VEP column
         if self.columns_version >= 5:
-            column_filters.append(_ColumnFilter("nmd_escape_status", "ptc_nmd_escaping",
-                                                "ptc_nmd_escaping_required", prediction=False))
+            column_filters.append(_ColumnFilter("nmd_escape_status", "ptc_nmd", "ptc_nmd_required",
+                                                prediction=False))
         return column_filters
 
     def has_alphagenome_splicing(self) -> bool:
@@ -336,9 +341,9 @@ class DamageNode(AnalysisNode):
                 f"predictions_num_pathogenic / predictions_num_benign aggregates have not been backfilled. "
                 "Set the analysis to the latest annotation version to use the filter."
             )
-        if self.ptc_nmd_escaping and self.columns_version >= 5 and not vav.backfilled_ptc:
+        if self.ptc_nmd and self.columns_version >= 5 and not vav.backfilled_ptc:
             warnings.append(
-                "ptc_nmd_escaping filter is NOT being applied on this VariantAnnotationVersion: "
+                "PTC NMD filter is NOT being applied on this VariantAnnotationVersion: "
                 "nmd_escape_status has not been backfilled. "
                 "Set the analysis to the latest annotation version to use the filter."
             )
@@ -527,15 +532,16 @@ class DamageNode(AnalysisNode):
                 else:
                     or_filters.append(q_nmd)
 
-            if self.ptc_nmd_escaping and self.columns_version >= 5:
+            if self.ptc_nmd and self.columns_version >= 5:
                 # Skip on pre-backfill VAVs: nmd_escape_status is null on every row annotated
                 # before the PTC calculation existed, so the filter would exclude the whole
                 # partition. See VariantAnnotationVersion.backfilled_ptc; get_warnings()
                 # surfaces the skip to the user.
                 vav = self.analysis.annotation_version.variant_annotation_version
                 if vav.backfilled_ptc:
-                    q_ptc = Q(variantannotation__nmd_escape_status=NMDEscapeStatus.ESCAPING)
-                    if self.ptc_nmd_escaping_required:
+                    nmd_escape_statuses = PTCNMDFilter(self.ptc_nmd).nmd_escape_statuses
+                    q_ptc = Q(variantannotation__nmd_escape_status__in=nmd_escape_statuses)
+                    if self.ptc_nmd_required:
                         and_filters.append(q_ptc)
                     else:
                         or_filters.append(q_ptc)
