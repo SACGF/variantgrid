@@ -178,8 +178,11 @@ Tests:
   snpdb/tests/utils/vcf_testing_utils.py:slowly_create_loci_and_variants_for_vcf); create_fake_variant_annotation and
   create_fake_clinvar_data add rows. genes/fake_data.py:create_fake_transcript_version (and the
   create_gata2_transcript_version / create_pten_transcript_version presets) make genes/transcripts with exon structure.
-- An ORM insert into VariantAnnotation lands in the base table, which analysis nodes never read - they join the
-  version's partition. Rows a node must see are written inside `temporary_db_table` (fake_data.py:FakeVariants).
+- An ORM insert into an inheritance-partitioned annotation table (VariantAnnotation, VariantTranscriptAnnotation,
+  VariantGeneOverlap) lands in the base table, invisible to every annotation queryset and node get_queryset() - they
+  read the version's partition. A plain model query (`Variant.objects.filter(node._get_node_q())`) still sees it, so a
+  test that only checks `_get_node_q` passes either way. Rows a node must see go in with
+  annotation/fake_data.py:create_fake_variant_gene_overlaps or library/django_utils/django_partition.py:bulk_create_in_partition.
 - @override_settings(**get_fake_annotation_settings_dict(columns_version=N)) pins settings.ANNOTATION to the
   tests/test_data/test_columns_versionN_<build>.vep_annotated.vcf fixtures; regenerate them with `vep_run --test`
   (needs a real VEP install).

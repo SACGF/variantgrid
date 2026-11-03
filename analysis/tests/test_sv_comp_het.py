@@ -4,7 +4,6 @@ A long SV is skipped by VEP (TOO_LONG) so it has no VariantTranscriptAnnotation 
 overlaps only exist as VariantGeneOverlap rows, so that's what comp het has to group genes on.
 """
 from django.contrib.auth.models import User
-from django.db import connection
 from django.test import TestCase, override_settings
 
 from analysis.enums import DuoInheritance, NodeStatus, QuadInheritance, TrioInheritance
@@ -12,8 +11,8 @@ from analysis.models import Analysis, DuoNode, QuadNode, SampleNode, TrioNode
 from analysis.models.nodes.sources.duo_node import DuoCompHet
 from analysis.models.nodes.sources.quad_node import QuadCompHet
 from analysis.models.nodes.sources.trio_node import CompHet
-from annotation.fake_data import get_fake_annotation_version
-from annotation.models import AnnotationRun, VariantGeneOverlap
+from annotation.fake_data import create_fake_variant_gene_overlaps, get_fake_annotation_version
+from annotation.models import AnnotationRun
 from annotation.models.models import VariantTranscriptAnnotation
 from annotation.models.models_version import VariantAnnotationVersion
 from genes.enums import AnnotationConsortium
@@ -22,6 +21,7 @@ from genes.fake_data import (
     create_fake_transcript_version,
     insert_transcript_data,
 )
+from library.django_utils.django_partition import bulk_create_in_partition
 from library.utils import sha256sum_str
 from snpdb.fake_data import create_fake_duo, create_fake_quad, create_fake_trio
 from snpdb.models import GenomeBuild, Locus, Sequence, Variant
@@ -60,19 +60,6 @@ def _create_test_sv(genome_build, chrom: str, position: int, end: int) -> Varian
     variant, _ = Variant.objects.get_or_create(locus=locus, alt=alt_seq, svlen=-(end - position),
                                                defaults={"end": end})
     return variant
-
-
-def _move_annotation_to_partitions(variant_annotation_version):
-    """ Annotation tables are partitioned by inheritance - ORM inserts land in the base table
-        while node querysets are rewritten to read from the partition """
-    with connection.cursor() as cursor:
-        for base_table in (VariantAnnotationVersion.TRANSCRIPT_ANNOTATION,
-                           VariantAnnotationVersion.VARIANT_GENE_OVERLAP):
-            partition = variant_annotation_version.get_partition_table(base_table_name=base_table)
-            cursor.execute(f'INSERT INTO "{partition}" SELECT * FROM ONLY "{base_table}" WHERE version_id = %s',
-                           [variant_annotation_version.pk])
-            cursor.execute(f'DELETE FROM ONLY "{base_table}" WHERE version_id = %s',
-                           [variant_annotation_version.pk])
 
 
 class AbstractSVCompHetTest:
@@ -128,22 +115,19 @@ class AbstractSVCompHetTest:
         cls.sv = _create_test_sv(cls.grch37, "21", 34_700_000, 35_200_000)
         cls._make_cg(cls.sv, cls.FATHER_SIDE)
         for gene in (cls.gene_a, cls.gene_b):
-            VariantGeneOverlap.objects.create(version=cls.vav, annotation_run=cls.annotation_run,
-                                              variant=cls.sv, gene=gene)
-
-        _move_annotation_to_partitions(cls.vav)
+            create_fake_variant_gene_overlaps(cls.vav, gene, [cls.sv], annotation_run=cls.annotation_run)
 
     @classmethod
     def _make_snv(cls, position: int, samples_zygosity: str, transcript_version) -> Variant:
         variant = slowly_create_test_variant("21", position, "A", "T", cls.grch37)
         cls._make_cg(variant, samples_zygosity)
         gene = transcript_version.gene_version.gene
-        VariantTranscriptAnnotation.objects.create(version=cls.vav, variant=variant,
-                                                   annotation_run=cls.annotation_run,
-                                                   gene=gene, transcript=transcript_version.transcript,
-                                                   transcript_version=transcript_version)
-        VariantGeneOverlap.objects.create(version=cls.vav, annotation_run=cls.annotation_run,
-                                          variant=variant, gene=gene)
+        vta = VariantTranscriptAnnotation(version=cls.vav, variant=variant, annotation_run=cls.annotation_run,
+                                          gene=gene, transcript=transcript_version.transcript,
+                                          transcript_version=transcript_version)
+        bulk_create_in_partition(cls.vav, VariantTranscriptAnnotation, VariantAnnotationVersion.TRANSCRIPT_ANNOTATION,
+                                 [vta])
+        create_fake_variant_gene_overlaps(cls.vav, gene, [variant], annotation_run=cls.annotation_run)
         return variant
 
     @classmethod
@@ -276,7 +260,6 @@ class TestDuoSVCompHet(AbstractSVCompHetTest, TestCase):
         # Both hits come from the parent - nothing says they're on different alleles
         cls._make_snv(35_301_000, cls.MOTHER_SIDE, cls.tv_c)
         cls._make_snv(35_302_000, cls.MOTHER_SIDE, cls.tv_c)
-        _move_annotation_to_partitions(cls.vav)
 
     def test_gene_with_both_hits_in_the_parent_is_not_a_two_hit_gene(self):
         self.assertNotIn(self.gene_c.pk, self._two_hit_genes())

@@ -4,7 +4,9 @@ per instance (CREATE TABLE ... INHERITS with a check constraint on the FK), crea
 dropped by delete_related_objects - CohortGenotypeCollection, VariantCollection and the zygosity
 counts use it. Records point at their collection with on_delete=DO_NOTHING (a CASCADE deletes across
 the inheritance parent, locking every other partition); bracket any query aimed at a partition with
-temporary_db_table; _warn_if_no_archive logs a drop that has no PartitionArchive but does not block it.
+temporary_db_table, and write records into one with bulk_create_in_partition (a plain ORM insert lands in the
+base table, which a query rewritten to the partition never reads); _warn_if_no_archive logs a drop that has no
+PartitionArchive but does not block it.
 """
 import logging
 from contextlib import contextmanager
@@ -199,3 +201,16 @@ class RelatedModelsPartitionModel(models.Model):
                 "Partition drop without archive: table=%s source=%s.%s#%s",
                 table_name, meta.app_label, meta.object_name, self.pk,
             )
+
+
+def bulk_create_in_partition(partition_model: RelatedModelsPartitionModel, klass, base_table_name: str, records: list,
+                             batch_size: int = 2000):
+    """ bulk_create records straight into partition_model's partition of base_table_name. Querysets
+        rewritten by sql_partition_transformer read the partition directly, so a row left in the base
+        table is invisible to them. """
+
+    if not records:
+        return
+    partition_table = partition_model.get_partition_table(base_table_name=base_table_name)
+    with temporary_db_table(klass, partition_table):
+        klass.objects.bulk_create(records, batch_size=batch_size)
