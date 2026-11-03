@@ -116,7 +116,7 @@ class MajorOperationViewMixin:
         with ExitStack() as stack:
             try:
                 stack.enter_context(major_operation(request.user, self.major_operation_name))
-            except TooManyMajorOperationsError as e:
+            except TooManyMajorOperationsError:
                 logging.warning("Major operation limit exceeded for user '%s' (operation '%s')",
                                 request.user, self.major_operation_name, exc_info=True)
                 return JsonResponse({"error": "Service temporarily unavailable. Please try again shortly."}, status=503)

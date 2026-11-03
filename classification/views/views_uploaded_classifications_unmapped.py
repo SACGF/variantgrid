@@ -245,8 +245,8 @@ class UploadedClassificationsUnmappedView(View):
                         sub_extension = UploadedClassificationsUnmappedView.get_extension(filename)
                         if sub_extension in UploadedClassificationsUnmappedView.BANNED_EXTENSIONS:
                             detected_banned_extensions.add(sub_extension)
-        except Exception:
-            raise ValueError(f"File doesn't appear to be a valid {extension}")
+        except Exception as e:
+            raise ValueError(f"File doesn't appear to be a valid {extension}") from e
 
         if detected_banned_extensions:
             raise ValueError(f"Detected banned file extension {', '.join(sorted(detected_banned_extensions))}")

@@ -122,7 +122,7 @@ class ClassificationGroupingColumns(DatatableConfig[ClassificationGrouping]):
         result_dict = row["latest_classification_modification__classification__summary__pathogenicity"] or {}
         result_dict["diff"] = diff_value
 
-        if overlaps := self.grouping_value_type_overlaps.get(row["pk"], {}).get(ClassificationResultValue.ONC_PATH):
+        if self.grouping_value_type_overlaps.get(row["pk"], {}).get(ClassificationResultValue.ONC_PATH):
             result_dict["overlaps"] = True
             # TODO only show triage link if an overlap requires it (or a triage already exists maybe?)
 

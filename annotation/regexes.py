@@ -95,9 +95,6 @@ class DbRefRegexResult:
         self.match = match
 
         # this is where we check our database to see if we know what this reference is about
-        if self.db in OntologyService.LOCAL_ONTOLOGY_PREFIXES:
-            term_id = f"{self.db}:{self.idx}"
-
         # no longer pre-emptively load citation, save that for rendering
         # but normalise the ID
         if self.db in {"PMID", "PMCID", "Bookshelf ID"}:

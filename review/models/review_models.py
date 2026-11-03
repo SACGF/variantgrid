@@ -236,7 +236,7 @@ class Review(TimeStampedModel):
 
     @cached_property
     def post_review_data_formatted(self) -> str:
-        for caller, result in review_detail_signal.send(sender=self.reviewing.source_object.__class__, instance=self):
+        for _caller, result in review_detail_signal.send(sender=self.reviewing.source_object.__class__, instance=self):
             return result
         return json.dumps(self.post_review_data)
 

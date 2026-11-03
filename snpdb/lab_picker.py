@@ -10,7 +10,6 @@ from functools import cached_property
 from typing import Optional, Union
 
 from django.contrib.auth.models import User
-from django.db.models import QuerySet
 from django.http import HttpRequest, HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import reverse
@@ -51,7 +50,6 @@ class LabSelection:
         """
         all_labs = Lab.valid_labs_qs(user=user, admin_check=True).exclude(organization__active=False).order_by(
             'organization__name', 'name').select_related('organization')
-        selected_labs: QuerySet[Lab]
         selected_org: Optional[Organization] = None
         selected_all = False
 
@@ -80,7 +78,6 @@ class LabSelection:
             selected_lab_set = {lab for lab in all_labs_list if lab == selection}
 
         else:
-            selected_labs = all_labs.filter(external=False)
             selected_lab_set = set(all_labs_list)
             selected_all = True
 

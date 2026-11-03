@@ -387,7 +387,6 @@ def get_accumulation_graph_data(mode: AccumulationReportMode = AccumulationRepor
     rows = data[1:]
     df = pd.DataFrame(rows, columns=header)
     labs = df.columns[6:]
-    statuses = df.columns[1:5]
     dates = df["Date"].tolist()
 
     by_lab = []

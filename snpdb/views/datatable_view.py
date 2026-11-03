@@ -599,7 +599,6 @@ class DatatableConfig(Generic[DC]):
 
     def render_cell(self, row: CellData, column: RichColumn) -> JsonDataType:
         """ Renders a column on a row """
-        data: Any
         if row.obj and not column.renderer:
             if key := row.key:
                 try:

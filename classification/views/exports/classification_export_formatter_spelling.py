@@ -45,7 +45,7 @@ class ClassificationSpellingRow(ExportRow):
 
     @staticmethod
     def fix_word_token(word) -> list[str]:
-        for bad_char in RE_HAS_BAD_CHAR.finditer(word):
+        for _bad_char in RE_HAS_BAD_CHAR.finditer(word):
             return []
         if "/" in word:
             words = word.split("/")

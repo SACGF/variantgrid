@@ -601,7 +601,7 @@ class ImportedAlleleInfoValidation(TimeStampedModel):
     def should_include(validation_tags: ImportedAlleleInfoValidationTags):
         if validation_tags:
             for sub_dict in validation_tags.values():
-                for key, value in sub_dict.items():
+                for value in sub_dict.values():
                     if value == "E":
                         return False
         return True

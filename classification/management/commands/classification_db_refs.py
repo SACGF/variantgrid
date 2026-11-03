@@ -41,7 +41,7 @@ class Command(BaseCommand):
                     if not new_db_refs:
                         new_db_refs = None
                     old_db_refs = blob.get(VCBlobKeys.DB_REFS.value)
-                    if diffs := JsonDiffs.differences(old_db_refs, new_db_refs):
+                    if JsonDiffs.differences(old_db_refs, new_db_refs):
                         had_changes = True
                         blob[VCBlobKeys.DB_REFS.value] = new_db_refs
             return had_changes

@@ -22,7 +22,7 @@ class ReAnalysisNewAnnotationTask(AbstractCandidateSearchTask):
 
         records = []
         sample_records = self._get_sample_candidates(candidate_search_run, analysis_filters, zygosities)
-        for sample, candidates in self.limit_sample_and_results(sample_records, search_max_results, search_max_samples):
+        for _sample, candidates in self.limit_sample_and_results(sample_records, search_max_results, search_max_samples):
             records.extend(candidates)
         return records
 

@@ -170,8 +170,8 @@ def classification_groups(
         try:
             logging_key = context_object.metrics_logging_key
             tag_context["logging_key"] = f"&{logging_key[0]}={logging_key[1]}"
-        except:
-            raise ValueError(f"Context Object {context_object} does not have metrics_logging_key property")
+        except Exception as e:
+            raise ValueError(f"Context Object {context_object} does not have metrics_logging_key property") from e
 
     if link_discordance_reports:
         clinical_grouping_list = list({cm.classification.clinical_context for cm in ordered_classifications if cm.classification.clinical_context})
@@ -434,9 +434,6 @@ def classification_quick(context,
         "show_criteria": show_criteria,
         "show_flags": show_flags,
         "show_imported_c_hgvs": show_imported_c_hgvs,
-        "record_count": record_count,
-        "show_values": show_values,
-        "show_pending": show_pending,
         "record_count": record_count,
         "show_values": show_values,
         "show_pending": show_pending,

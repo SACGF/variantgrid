@@ -50,7 +50,7 @@ def view_to_string(view) -> str:
     if inspect.isfunction(v):
         return f'{v.__module__}.{v.__qualname__}'
 
-    if hasattr(v,'__class__') and hasattr(v,'__call__'):
+    if hasattr(v,'__class__') and callable(v):
         c=v.__class__
         return f'{c.__module__}.{c.__name__}'
 

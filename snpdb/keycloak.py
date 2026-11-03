@@ -46,7 +46,7 @@ class Keycloak:
     def ping(self):
         # Method does a basic request to KeyCloak, should raise an exception if anything goes wrong
         # returns nothing otherwise
-        response = self.request_json(
+        self.request_json(
             'GET',
             url=f'/admin/realms/{self.realm}/clients',
         )

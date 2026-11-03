@@ -107,21 +107,21 @@ class ClassificationConditionResolutionRow(ExportRow):
         return f"{self.gene_symbol_entry[0] + 1} of {self.gene_symbol_entry[1]}"
 
     @export_column('Gene Symbol for Relationship DBs')
-    def gene_symbol(self):
+    def gene_symbol_for_relationships(self):
         return self.gene_symbol
 
     @export_column('Panel App Strength')
-    def panel_app_strength(self):
+    def panel_app_strength_formatted(self):
         if self.panel_app_strength:
             return ', '.join(relation.label for relation in self.panel_app_strength)
 
     @export_column('Gencc Strength')
-    def gencc_strength(self):
+    def gencc_strength_formatted(self):
         if self.gencc_strength:
             return ', '.join(relation.label for relation in self.gencc_strength)
 
     @export_column('MONDO Strength')
-    def mondo_strength(self):
+    def mondo_strength_formatted(self):
         if self.mondo_strength:
             return ', '.join(self.mondo_strength)
 

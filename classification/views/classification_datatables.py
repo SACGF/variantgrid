@@ -25,7 +25,7 @@ from library.utils import JsonDataType
 from ontology.models import OntologyTerm
 from snpdb.enums import AlleleOriginBucket, ClinicalSignificance
 from snpdb.genome_build_manager import GenomeBuildManager
-from snpdb.models import GenomeBuild, Lab, UserSettings, Variant
+from snpdb.models import GenomeBuild, Lab, Variant
 from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
 
 ALLELE_GERMLINE_VALUES = ['germline', 'likely_germline']
@@ -152,7 +152,6 @@ class ClassificationColumns(DatatableConfig[ClassificationModification]):
         self.term_cache: dict[str, OntologyTerm] = {}
         super().__init__(request)
 
-        user_settings = UserSettings.get_for_user(self.user)
         # Only GRCh37 and GRCh38 are currently supported. If user has T2T we are going to fall back
         c_hgvs = None
         genomic_sort = None
