@@ -216,7 +216,7 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:_add_pathogenicity_prediction_counts
     backfilled_damage_counts = models.BooleanField(default=True)
 
-    # #579 - DamageNode.ptc_nmd_escaping filters on nmd_escape_status, which is null on
+    # #579 - DamageNode.ptc_nmd filters on nmd_escape_status, which is null on
     # rows annotated before the PTC calculation existed. Source:
     # annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:_add_calculated_ptc
     backfilled_ptc = models.BooleanField(default=True)
