@@ -468,10 +468,10 @@
                 </tr>
                 {% if node.columns_version >= 5 %}
                     <tr>
-                        <th title="Frameshift whose predicted premature termination codon escapes Nonsense Mediated Decay">PTC escapes NMD</th>
-                        <td>{{ form.ptc_nmd_escaping.errors }} {{ form.ptc_nmd_escaping }}</td>
-                        <td class="collapse filter-required">{{ form.ptc_nmd_escaping_required }}</td>
-                        <td class="collapse filter-required"> <!-- ptc_nmd_escaping is non-nullable --> </td>
+                        <th title="Nonsense Mediated Decay predicted from where a frameshift's premature termination codon lands. 'Escapes NMD' keeps frameshifts making a truncated protein, 'Escapes NMD or NMD predicted' every frameshift whose new stop codon was located">PTC NMD</th>
+                        <td>{{ form.ptc_nmd.errors }} {{ form.ptc_nmd }}</td>
+                        <td class="collapse filter-required">{{ form.ptc_nmd_required }}</td>
+                        <td class="collapse filter-required"> <!-- nmd_escape_status is only null before the PTC backfill, when the filter is skipped --> </td>
                     </tr>
                 {% endif %}
                 {% if node.has_splicevault %}

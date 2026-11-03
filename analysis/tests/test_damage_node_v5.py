@@ -1,10 +1,11 @@
 """
-DamageNode at columns_version 5 (#579): rankscores become legacy-only, and ptc_nmd_escaping
-joins the LoF filters.
+DamageNode at columns_version 5 (#579): rankscores become legacy-only, and the PTC NMD filter
+(ptc_nmd) joins the LoF filters.
 """
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
+from analysis.enums import PTCNMDFilter
 from analysis.models import Analysis
 from analysis.models.nodes.filters.damage_node import DamageNode
 from annotation.fake_data import (
@@ -45,22 +46,31 @@ class TestDamageNodeV5(_ColumnsVersion5Mixin, TestCase):
         node = DamageNode(analysis=self.analysis, alphamissense_pred="P")
         self.assertTrue(node.modifies_parents())
 
-    def test_ptc_nmd_escaping_modifies_parents(self):
-        node = DamageNode(analysis=self.analysis, ptc_nmd_escaping=True)
+    def test_ptc_nmd_modifies_parents(self):
+        node = DamageNode(analysis=self.analysis, ptc_nmd=PTCNMDFilter.ESCAPING)
         self.assertTrue(node.modifies_parents())
         # Categorical LoF flag, not a per-tool pathogenicity prediction
         self.assertFalse(node.has_individual_pathogenic_predictions())
 
-    def test_ptc_nmd_escaping_emits_q(self):
-        node = DamageNode(analysis=self.analysis, ptc_nmd_escaping=True)
-        self.assertIn("variantannotation__nmd_escape_status", str(node._get_node_q()))
+    def test_ptc_nmd_emits_q(self):
+        node = DamageNode(analysis=self.analysis, ptc_nmd=PTCNMDFilter.ESCAPING)
+        q_str = str(node._get_node_q())
+        self.assertIn("variantannotation__nmd_escape_status", q_str)
+        self.assertNotIn("PREDICTED_NMD", q_str)
 
-    def test_ptc_nmd_escaping_required_is_and_filter(self):
-        node = DamageNode(analysis=self.analysis, ptc_nmd_escaping=True, ptc_nmd_escaping_required=True,
+    def test_ptc_nmd_required_is_and_filter(self):
+        node = DamageNode(analysis=self.analysis, ptc_nmd=PTCNMDFilter.ESCAPING, ptc_nmd_required=True,
                           alphamissense_score_min=0.5)
         q_str = str(node._get_node_q())
         self.assertIn("variantannotation__nmd_escape_status", q_str)
         self.assertTrue(node.has_required())
+
+    def test_ptc_nmd_escaping_or_predicted_keeps_nmd_predicted(self):
+        """ #2596 - a frameshift predicted to undergo NMD is kept, not just the escaping ones """
+        node = DamageNode(analysis=self.analysis, ptc_nmd=PTCNMDFilter.ESCAPING_OR_PREDICTED)
+        q_str = str(node._get_node_q())
+        self.assertIn("PREDICTED_NMD", q_str)
+        self.assertIn("ESCAPING", q_str)
 
     def test_tool_not_annotated_on_build_does_not_modify_parents(self):
         """ EVE is GRCh38 only, so a value left on a GRCh37 node filters nothing (#2345) """
@@ -102,8 +112,8 @@ class TestDamageNodeV6InheritsV5(_ColumnsVersion5Mixin, TestCase):
         node = DamageNode(analysis=self.analysis, alphamissense_score_min=0.5)
         self.assertTrue(node.modifies_parents())
 
-    def test_ptc_nmd_escaping_modifies_parents(self):
-        node = DamageNode(analysis=self.analysis, ptc_nmd_escaping=True)
+    def test_ptc_nmd_modifies_parents(self):
+        node = DamageNode(analysis=self.analysis, ptc_nmd=PTCNMDFilter.ESCAPING)
         self.assertTrue(node.modifies_parents())
 
 
@@ -112,7 +122,7 @@ class TestDamageNodeV4IgnoresV5Fields(_ColumnsVersion5Mixin, TestCase):
     COLUMNS_VERSION = 4
 
     def test_v4_does_not_emit_ptc_q(self):
-        node = DamageNode(analysis=self.analysis, ptc_nmd_escaping=True)
+        node = DamageNode(analysis=self.analysis, ptc_nmd=PTCNMDFilter.ESCAPING)
         q_str = str(node._get_node_q() or "")
         self.assertNotIn("nmd_escape_status", q_str)
 
