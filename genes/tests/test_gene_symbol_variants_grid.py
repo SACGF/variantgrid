@@ -3,12 +3,13 @@ from django.test import TestCase
 
 from analysis.models import VariantTag
 from annotation.enums import ClinVarReviewStatus
-from annotation.fake_data import create_fake_variants, get_fake_annotation_version
-from annotation.models.models import VariantGeneOverlap
-from annotation.models.models_annotation_run import AnnotationRun
+from annotation.fake_data import (
+    create_fake_variant_gene_overlaps,
+    create_fake_variants,
+    get_fake_annotation_version,
+)
 from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.models.models_clinvar import ClinVar
-from annotation.models.models_version import VariantAnnotationVersion
 from genes.fake_data import create_fake_transcript_version
 from genes.grids import GeneSymbolVariantsGrid
 from library.django_utils import FakeRequest
@@ -75,12 +76,7 @@ class GeneSymbolVariantsGridTest(TestCase):
         """ The grid reads annotation from the version partitions, so write the rows straight there """
         annotation_version = AnnotationVersion.latest(self.genome_build)
         vav = annotation_version.variant_annotation_version
-        annotation_run = AnnotationRun.objects.create()
-        overlap_partition = vav.get_partition_table(base_table_name=VariantAnnotationVersion.VARIANT_GENE_OVERLAP)
-        with temporary_db_table(VariantGeneOverlap, overlap_partition):
-            for variant in (self.artefact_variant, self.untagged_variant):
-                VariantGeneOverlap.objects.create(version=vav, annotation_run=annotation_run,
-                                                  gene=self.gene, variant=variant)
+        create_fake_variant_gene_overlaps(vav, self.gene, [self.artefact_variant, self.untagged_variant])
         clinvar_version = annotation_version.clinvar_version
         with temporary_db_table(ClinVar, clinvar_version.get_partition_table()):
             ClinVar.objects.create(version=clinvar_version, variant=self.untagged_variant,

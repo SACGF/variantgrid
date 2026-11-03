@@ -503,9 +503,11 @@ COLOUR_BANDS: tuple[ColourBand, ...] = (
 @dataclass(frozen=True)
 class EffectNodeFilter:
     """ An Effect (Damage) node filter over an annotation that has no per-tool PP3/BP4 score: a categorical
-        call (SpliceVault, UTRAnnotator) or a score with no published cutoff (AlphaGenome splicing). Listed in
-        the Pathogenicity Thresholds page's tool table with the rule the node applies and where it comes from (#2561).
-        raw_min / raw_max are set for a score the node sliders on, None for a categorical rule. """
+        call (SpliceVault, UTRAnnotator, RepeatMasker), a score with no published cutoff (AlphaGenome splicing) or
+        a gene-level metric (gnomAD constraint, #2600). Listed in the Pathogenicity Thresholds page's tool table
+        with the rule the node applies and where it comes from (#2561).
+        raw_min / raw_max are set for a score the node sliders on, None for a categorical rule; cutoff is the
+        published value the slider starts at when it is switched on. """
     name: str
     fields: tuple[str, ...]
     rule: str
@@ -516,6 +518,7 @@ class EffectNodeFilter:
     raw_min: Optional[float] = None
     raw_max: Optional[float] = None
     raw_direction: RawScoreDirection = RawScoreDirection.HIGHER
+    cutoff: Optional[float] = None
     # further (source, detail, url) citations behind the rule, cited beside the source on the thresholds page
     references: tuple[tuple[str, str, str], ...] = ()
 
@@ -525,6 +528,18 @@ class EffectNodeFilter:
 ALPHAGENOME_SPLICING_MIN = 0.0
 ALPHAGENOME_SPLICING_MAX = 3.0
 ALPHAGENOME_SPLICING_STEP = 0.1
+
+# gnomAD gene constraint (genes.GnomADGeneConstraint, the v4 import) - LOEUF is lof_oe_ci_upper, lower is more
+# constrained. v4's suggested constrained-gene cutoff is 0.6 (v2.1.1's was 0.35, its first sextile)
+GENE_LOEUF_MIN = 0.0
+GENE_LOEUF_MAX = 2.0
+GENE_LOEUF_STEP = 0.05
+GENE_LOEUF_CUTOFF = 0.6
+# Missense Z >= 3.09 (one-sided p < 0.001) is ExAC's missense-constrained gene definition, the usual PP2 / BP1 line
+GENE_MIS_Z_MIN = 0.0
+GENE_MIS_Z_MAX = 10.0
+GENE_MIS_Z_STEP = 0.01
+GENE_MIS_Z_CUTOFF = 3.09
 
 _DAWES_2023 = (
     "Dawes R, Bournazos AM, Bryen SJ, et al. SpliceVault predicts the precise nature of variant-associated "
@@ -547,6 +562,28 @@ _ZHANG_2021 = (
     "Zhang X, Wakeling M, Ware J, Whiffin N. Annotating high-impact 5'untranslated region variants with the "
     "UTRannotator. Bioinformatics. 2021;37(8):1171-1173.",
     "https://doi.org/10.1093/bioinformatics/btaa783",
+)
+_KARCZEWSKI_2020 = (
+    "Karczewski KJ, Francioli LC, Tiao G, et al. The mutational constraint spectrum quantified from variation in "
+    "141,456 humans. Nature. 2020;581(7809):434-443.",
+    "https://doi.org/10.1038/s41586-020-2308-7",
+)
+_GNOMAD_V4_CONSTRAINT = (
+    "gnomAD v4 constraint",
+    "gnomAD browser help, Constraint: for v4 the suggested LOEUF cutoff for a constrained gene is 0.6, in "
+    "place of the 0.35 suggested for v2.1.1.",
+    "https://gnomad.broadinstitute.org/help/constraint",
+)
+_LEK_2016 = (
+    "Lek M, Karczewski KJ, Minikel EV, et al. Analysis of protein-coding genetic variation in 60,706 humans. "
+    "Nature. 2016;536(7616):285-291.",
+    "https://doi.org/10.1038/nature19057",
+)
+_RICHARDS_2015 = (
+    "Richards S, Aziz N, Bale S, et al. Standards and guidelines for the interpretation of sequence variants: a "
+    "joint consensus recommendation of the American College of Medical Genetics and Genomics and the Association "
+    "for Molecular Pathology. Genet Med. 2015;17(5):405-424.",
+    "https://doi.org/10.1038/gim.2015.30",
 )
 _ELLINGFORD_2022 = (
     "Ellingford 2022",
@@ -602,6 +639,45 @@ EFFECT_NODE_FILTERS: tuple[EffectNodeFilter, ...] = (
              "oORF in frame with the CDS makes an N-terminal extension rather than disrupting translation, so is "
              "not necessarily loss of function (Ellingford 2022) - the reason for the out-of-frame option.",
         references=(_WHIFFIN_2020, _ZHANG_2021, _ELLINGFORD_2022),
+    ),
+    EffectNodeFilter(
+        name="gnomAD LOEUF (gene constraint)",
+        fields=("lof_oe_ci_upper",),
+        rule="Keeps a variant whose gene (the representative transcript's symbol) has a gnomAD MANE Select "
+             "transcript with LOEUF, the upper bound of the loss-of-function observed / expected 90% CI, at or "
+             "below the slider. Evidence that loss of function is a disease mechanism for the gene (PVS1).",
+        raw_min=GENE_LOEUF_MIN, raw_max=GENE_LOEUF_MAX, raw_direction=RawScoreDirection.LOWER,
+        cutoff=GENE_LOEUF_CUTOFF,
+        source="Karczewski 2020",
+        source_detail=_KARCZEWSKI_2020[0],
+        source_url=_KARCZEWSKI_2020[1],
+        note="A gene-level metric, the same for every variant in the gene. Allow Null keeps genes gnomAD has no "
+             "MANE Select constraint row for. Being tolerant of LoF in the population does not rule out a "
+             "recessive or late-onset LoF mechanism.",
+        references=(_GNOMAD_V4_CONSTRAINT,),
+    ),
+    EffectNodeFilter(
+        name="gnomAD missense Z (gene constraint)",
+        fields=("mis_z_score",),
+        rule="Keeps a variant whose gene (the representative transcript's symbol) has a gnomAD MANE Select "
+             "transcript with missense Z at or above the slider: fewer missense variants than expected, where "
+             "missense variation is a common mechanism of disease (PP2, and its absence for BP1).",
+        raw_min=GENE_MIS_Z_MIN, raw_max=GENE_MIS_Z_MAX, cutoff=GENE_MIS_Z_CUTOFF,
+        source="Lek 2016",
+        source_detail=_LEK_2016[0],
+        source_url=_LEK_2016[1],
+        note="3.09 is a one-sided p < 0.001 against the expected count, ExAC's definition of a missense-constrained "
+             "gene. Values are from the gnomAD v4 constraint import.",
+    ),
+    EffectNodeFilter(
+        name="Outside repeat region",
+        fields=("repeat_masker",),
+        rule="Keeps only variants with no RepeatMasker overlap - always a restriction, never an OR term. PM4 "
+             "asks for an in-frame indel or stop loss in a non-repeat region; use it with the in-frame variant "
+             "types or impact.",
+        source="Richards 2015",
+        source_detail=_RICHARDS_2015[0],
+        source_url=_RICHARDS_2015[1],
     ),
 )
 

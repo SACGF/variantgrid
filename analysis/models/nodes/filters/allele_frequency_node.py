@@ -64,9 +64,7 @@ class AlleleFrequencyNode(AncestorSampleMixin, AnalysisNode):
     def get_node_name(self):
         name = ''
         if self.modifies_parents():
-            name = self.nodeallelefrequencyfilter.get_description()
-            if self.patient:
-                name += f"\n{self.patient} ({len(self.get_filter_samples())} samples)"
+            name = f"{self.get_filter_source_name_line()}\n{self.nodeallelefrequencyfilter.get_description()}"
         return name
 
     @staticmethod

@@ -1,22 +1,23 @@
 from django.test import TestCase
-from django.test.utils import override_settings
 
 from annotation import vep_columns
 from annotation.enums import VariantAnnotationPipelineType
+from annotation.models.models_version import VariantAnnotationVersion
 from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import SVOverlapProcessor
 
 
-@override_settings(ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE=False,
-                   ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD="lowest_af")
 class SVOverlapProcessorTest(TestCase):
     """ An SV can overlap several gnomAD-SV records - one of them supplies the gnomAD columns the
         analysis PopulationNode filters on, while the gnomad_sv_overlap_* fields keep them all """
 
     @staticmethod
-    def _process(raw_db_data: dict) -> dict:
+    def _process(raw_db_data: dict, same_type: bool = False) -> dict:
+        """ The version's snapshot, not settings, decides the filter and pick """
         cvf_list = vep_columns.filter_for(genome_build_name="GRCh37",
                                           pipeline_type=VariantAnnotationPipelineType.STRUCTURAL_VARIANT)
-        SVOverlapProcessor(cvf_list).process(raw_db_data)
+        variant_annotation_version = VariantAnnotationVersion(sv_overlap_same_type=same_type,
+                                                              sv_overlap_single_value_method="lowest_af")
+        SVOverlapProcessor(cvf_list, variant_annotation_version).process(raw_db_data)
         return raw_db_data
 
     def test_lowest_af_compares_numerically(self):
@@ -38,7 +39,6 @@ class SVOverlapProcessorTest(TestCase):
         # Every overlapping record is kept for display
         self.assertEqual("4.6e-05&0.006085", raw_db_data["gnomad_sv_overlap_af"])
 
-    @override_settings(ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE=True)
     def test_same_type_filter_applies_before_pick(self):
         """ A DUP overlapping a rarer DEL takes the DUP's frequencies """
         raw_db_data = self._process({
@@ -48,7 +48,7 @@ class SVOverlapProcessorTest(TestCase):
             "gnomad_sv_overlap_percent": "88.2&97.0",
             "gnomad_sv_overlap_coords": "17:6279501-6326805&17:6294033-6314646",
             "gnomad_af": "4.6e-05&0.001383",
-        })
+        }, same_type=True)
 
         self.assertEqual("0.001383", raw_db_data["gnomad_af"])
         self.assertEqual("0.001383", raw_db_data["gnomad_sv_overlap_af"])

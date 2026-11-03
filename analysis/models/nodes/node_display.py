@@ -7,6 +7,10 @@
 from dataclasses import dataclass
 from typing import Optional
 
+# One line of a node name - the card is 128px wide and shows at most 3 lines
+NAME_LINE_MAX_LENGTH = 30
+CHIP_TEXT_MAX_LENGTH = 20
+
 
 @dataclass(frozen=True)
 class NodeIcon:
@@ -27,6 +31,26 @@ class NodeChip:
     row_break: bool = False  # draw this chip and the ones after it on a new line
     # Chips nested the way the relations are - a specimen wrapping its extractions wrapping their VCFs
     children: tuple["NodeChip", ...] = ()
+
+
+def truncate_name_line(text: str, max_length: int = NAME_LINE_MAX_LENGTH) -> str:
+    """ Cut to fit the card - whatever is cut off goes in a chip's title """
+    if len(text) > max_length:
+        text = text[:max_length - 3] + "…"
+    return text
+
+
+def first_and_more_name_line(names: list[str]) -> str:
+    """ Line 1 when several things share it - the first, with "+N more" for the rest, which the chips list """
+    if len(names) <= 1:
+        return truncate_name_line(names[0]) if names else ""
+    more = f" +{len(names) - 1} more"
+    return truncate_name_line(names[0], NAME_LINE_MAX_LENGTH - len(more)) + more
+
+
+def named_chip(name: str, title: Optional[str] = None, icon: Optional[str] = None) -> NodeChip:
+    """ A chip for one of several things a node reads (a gene list, a term) - the full name is the hover """
+    return NodeChip(text=truncate_name_line(name, CHIP_TEXT_MAX_LENGTH), icon=icon, title=title or name)
 
 
 def significance_chips(selected: list, field_count: int, short_labels: dict, long_labels: dict,

@@ -23,6 +23,7 @@ from annotation.models.models_version import VariantAnnotationVersion
 from annotation.pipelines import get_runner
 from annotation.tasks.annotation_scheduler_task import dispatch_annotation_runs
 from annotation.vep_annotation import get_vep_command, get_vep_variant_annotation_version_kwargs
+from annotation.vep_config import SETTINGS_SNAPSHOT_FIELDS
 from library.utils.file_utils import mk_path_for_file
 from snpdb.models import GenomeBuild, Variant
 
@@ -484,10 +485,10 @@ def write_snakemake_bundle(output_dir: str,
 # --------------------------------------------------------------------------------------------------------
 
 def _matchable_identity(identity: dict) -> dict:
-    """ Version identity with the settings-snapshot fields excluded: distance/gencode_subset are re-derived
-        from live settings and not in the ##VEP= header, so matching on them would produce false misses when
-        a setting drifted after VAV creation (mirrors _vep_check_version_match). """
-    return {key: value for key, value in identity.items() if key not in ("distance", "gencode_subset")}
+    """ Version identity with the settings-snapshot fields (vep_config.SETTINGS_SNAPSHOT_FIELDS) excluded: they
+        aren't in the ##VEP= header, so matching on them would produce false misses when a setting drifted after
+        VAV creation (mirrors _vep_check_version_match). """
+    return {key: value for key, value in identity.items() if key not in SETTINGS_SNAPSHOT_FIELDS}
 
 
 def _expected_matchable_identity(meta: dict) -> dict:

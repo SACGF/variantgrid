@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.test.utils import override_settings
@@ -136,6 +137,22 @@ class VariantAnnotationVersionStatusTests(TestCase):
         vav.gene_annotation_release = gar
         vav.save(update_fields=["gene_annotation_release"])
         self.assertIsNone(vav.get_annotation_run_blocker())
+
+    def test_gene_annotation_release_from_other_consortium(self):
+        """ A RefSeq VAV linked to an Ensembl release resolves gene lists to ids its overlaps never hold (#2598) """
+        gene_annotation_import = GeneAnnotationImport.objects.create(
+            annotation_consortium=AnnotationConsortium.ENSEMBL, genome_build=self.grch37, url="http://fake/gtf")
+        ensembl_gar = GeneAnnotationRelease.objects.create(
+            version="test", annotation_consortium=AnnotationConsortium.ENSEMBL,
+            genome_build=self.grch37, gene_annotation_import=gene_annotation_import)
+        vav = _make_vav(self.grch37, annotation_consortium=AnnotationConsortium.REFSEQ)
+        vav.gene_annotation_release = ensembl_gar
+        vav.save(update_fields=["gene_annotation_release"])
+
+        with self.assertRaises(ValidationError):
+            vav.clean()
+        with self.assertRaises(InvalidAnnotationVersionError):
+            AnnotationVersion(genome_build=self.grch37, variant_annotation_version=vav).validate_gene_annotation()
 
     def test_vep_mismatch_latch(self):
         """ #1679: only the first block reports (returns True), and its reason/date survive later blocks. """

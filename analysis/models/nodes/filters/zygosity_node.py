@@ -90,8 +90,10 @@ class ZygosityNode(AncestorSampleMixin, AnalysisNode):
         name = ''
         if self.modifies_parents():
             name = self.get_zygosity_name()
-            if self.patient:
-                name += f"\n{self.patient} ({len(self.get_filter_samples())} samples)"
+            if self.exclude:
+                name = f"Not {name}"
+            if self.zygosity != ZygosityNodeZygosity.MULTIPLE_HIT:  # counts hits in the parent, not a sample's
+                name = f"{self.get_filter_source_name_line()}\n{name}"
         return name
 
     @staticmethod

@@ -12,7 +12,12 @@ from django.db.models.query_utils import Q
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.cohort_mixin import AncestorSampleMixin
 from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
-from analysis.models.nodes.node_display import NodeIcon
+from analysis.models.nodes.node_display import (
+    NodeChip,
+    NodeIcon,
+    first_and_more_name_line,
+    named_chip,
+)
 from annotation.models import VariantTranscriptAnnotation
 from genes.models import GeneSymbol
 from ontology.enums import GeneDiseaseClassification
@@ -211,17 +216,32 @@ class MOINode(AncestorSampleMixin, AnalysisNode):
 
         return method_summary
 
+    def _get_ontology_term_names(self) -> list[str]:
+        ontology_term_ids = self._get_all_ontology_term_ids()
+        return sorted(OntologyTerm.objects.filter(pk__in=ontology_term_ids).values_list("name", flat=True))
+
     def get_node_name(self):
         name = ''
         if self.pk:
-            if ontology_term_ids := self._get_all_ontology_term_ids():
-                terms = sorted([ot.name for ot in OntologyTerm.objects.filter(pk__in=ontology_term_ids)])
-                terms_text = ", ".join(terms)
-                if self.accordion_panel == self.PANEL_PATIENT:
-                    name = f"{terms_text or 'No terms'} (from patient)"
-                else:
-                    name = terms_text
+            terms = self._get_ontology_term_names()
+            if self.accordion_panel == self.PANEL_PATIENT:
+                name = f"{first_and_more_name_line(terms) or 'No terms'}\nfrom patient"
+            else:
+                name = first_and_more_name_line(terms)
         return name
+
+    def get_node_chips(self) -> list[NodeChip]:
+        chips = super().get_node_chips()
+        if self.pk:
+            terms = self._get_ontology_term_names()
+            if len(terms) > 1:
+                chips.extend(named_chip(term) for term in terms)
+            for moi in self.moinodemodeofinheritance_set.values_list("mode_of_inheritance", flat=True):
+                chips.append(named_chip(moi, title=f"Mode of inheritance: {moi}"))
+            if self.min_classification != GeneDiseaseClassification.MODERATE:
+                classification = self.get_min_classification_display()
+                chips.append(NodeChip(text=f"≥ {classification}", title=f"GenCC classification ≥ {classification}"))
+        return chips
 
     @staticmethod
     def get_help_text() -> str:

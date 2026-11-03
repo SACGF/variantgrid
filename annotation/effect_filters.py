@@ -1,15 +1,19 @@
 """
 Q filters for the Effect (Damage) node over the categorical plugin annotations, where "damaging" is a rule over
 the text VEP wrote rather than a score threshold (#2561): SpliceVault's out-of-frame event count and the
-UTRAnnotator high-impact 5' UTR rule. The rules and their sources are listed on the Pathogenicity Thresholds page
+UTRAnnotator high-impact 5' UTR rule; and over the gnomAD gene constraint of the variant's gene (#2600). The rules
+and their sources are listed on the Pathogenicity Thresholds page
 (`annotation/pathogenicity_predictions.py:EFFECT_NODE_FILTERS`).
 
-Entry points: splicevault_out_of_frame_q, utr_high_impact_q - each takes the path prefix to VariantAnnotation.
+Entry points: splicevault_out_of_frame_q, utr_high_impact_q, gene_constraint_q - each takes the path prefix to
+VariantAnnotation.
 """
 import operator
 from functools import reduce
 
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
+
+from genes.models.models_gnomad_gene_constraint import GnomADGeneConstraint
 
 # splicevault_out_of_frame_events is 'Frameshift:N/M' - N of SpliceVault's M top events are out of frame. All of
 # them needs N = M (and N > 0), Dawes 2023's "consistent with null outcomes" case
@@ -80,3 +84,21 @@ def utr_high_impact_q(out_of_frame_only: bool, prefix: str = "variantannotation_
              f"{prefix}utr_annotator_annotation__iregex": record_regex})
         for consequence, record_regex in utr_high_impact_rules(out_of_frame_only)
     ))
+
+
+def gene_constraint_q(field: str, lookup: str, value: float, allow_null: bool,
+                      prefix: str = "variantannotation__") -> Q:
+    """ The variant's gene (VariantAnnotation.symbol) passes `field__lookup=value` on its gnomAD constraint.
+        gnomAD v4 has a row per transcript; the MANE Select rows (one Ensembl, one RefSeq, with the same values)
+        stand for the gene, as on the gene page. allow_null also keeps a variant with no symbol, or whose gene has
+        no MANE Select row with the field set """
+    constraint_rows = GnomADGeneConstraint.objects.filter(mane_select=True)
+    passing = constraint_rows.filter(**{f"{field}__{lookup}": value}).values("gene_symbol_id")
+    q = Q(**{f"{prefix}symbol__in": passing})
+    if allow_null:
+        # Not ~Q(symbol__in=...): negated across the VariantAnnotation relation that is a NOT EXISTS over the
+        # whole partition per row (35x slower on a 65k variant sample); this one Postgres hashes
+        with_value = constraint_rows.filter(gene_symbol_id=OuterRef(f"{prefix}symbol"),
+                                            **{f"{field}__isnull": False})
+        q |= ~Exists(with_value)
+    return q

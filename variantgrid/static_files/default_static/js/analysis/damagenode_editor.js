@@ -130,6 +130,13 @@ function setupDamageNodeSlider(inputSelector, sliderSelector, enableInput) {
         enableInput.change(function () {
             if ($(this).is(":checked")) {
                 sliderSelector.prop("disabled", false);
+                // A slider with a published cutoff (data-default) starts there rather than at its minimum
+                const defaultValue = inputSelector.attr("data-default");
+                if (inputSelector.val() === '' && typeof defaultValue !== 'undefined') {
+                    inputSelector.val(defaultValue);
+                    sliderSelector.val(defaultValue);
+                    setVisibleSliderValue(inputSelector, sliderSelector, defaultValue);
+                }
                 colourSliderValue(inputSelector, sliderSelector);
             } else {
                 setVisibleSliderValue(inputSelector, sliderSelector, "");

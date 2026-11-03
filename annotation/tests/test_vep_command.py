@@ -11,8 +11,8 @@ from annotation.models import VariantAnnotationVersion
 from annotation.vep_annotation import (
     get_vep_command,
     get_vep_skipped_variants_filename,
-    sv_overlap_reciprocal_for_new_version,
 )
+from annotation.vep_config import sv_overlap_reciprocal_for_new_version
 from genes.enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 

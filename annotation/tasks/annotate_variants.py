@@ -24,6 +24,7 @@ from annotation.vep_annotation import (
     get_vep_version,
     vep_check_command_line_version_match,
 )
+from annotation.vep_command_check import vep_command_diffs
 from annotation.vep_plugin_backfill import enable_plugins_fix
 from eventlog.models import create_event
 from library.django_utils.rollbar_middleware import RollbarIgnoreException
@@ -329,7 +330,7 @@ def _latch_vep_version_mismatch(vav: VariantAnnotationVersion, e: VEPVersionMism
 
 
 def _vep_mismatch_details(vav: VariantAnnotationVersion, e: VEPVersionMismatchError) -> str:
-    details = f"{vav}: {e}"
+    details = "\n".join([f"{vav}: {e}", *vep_command_diffs(vav)])
     if plugins_fix := enable_plugins_fix(vav):
         details += f"\n{plugins_fix}"
     return details

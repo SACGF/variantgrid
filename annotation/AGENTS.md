@@ -75,6 +75,14 @@ Gotchas:
 - A VAV must match the VEP that will run: annotation/vep_annotation.py:vep_check_command_line_version_match raises
   VEPVersionMismatchError when any data file or plugin version differs, and the annotated VCF header is checked the
   same way on import — changing a settings.ANNOTATION data path without a new VAV halts annotation.
+- Every Django setting a VAV records is a row of annotation/vep_config.py:VAV_SETTINGS, whose role says what changing
+  the setting does to a version in use: a PIN (pick order, VEP args, SV sizes) is checked against the running VEP and
+  halts it; a SNAPSHOT (distance, gencode, the SV overlap pick, the rankscore threshold) is read off the version
+  wherever it's used and left out of the check, so the version keeps going and the next create_new_variant_annotation_version
+  makes a new one; a DEFAULT is only stamped at creation. The data files are pinned by
+  annotation/vep_config.py:vep_component_version_kwargs. Neither sees a code change to get_vep_command (a plugin's
+  options): annotation/vep_command_check.py:check_vep_command records each pipeline type's normalised command on
+  the VAV's first run and warns, without halting, when a later run's differs.
 - The first VEPVersionMismatchError latches vep_version_mismatch_reason/date on the VAV (#1679,
   annotation/models/models_version.py:VariantAnnotationVersion.latch_vep_version_mismatch); get_annotation_run_blocker then makes the
   scheduler and the dispatcher's VEP lane skip it, while the import lane keeps draining. Only
@@ -170,8 +178,11 @@ Tests:
   snpdb/tests/utils/vcf_testing_utils.py:slowly_create_loci_and_variants_for_vcf); create_fake_variant_annotation and
   create_fake_clinvar_data add rows. genes/fake_data.py:create_fake_transcript_version (and the
   create_gata2_transcript_version / create_pten_transcript_version presets) make genes/transcripts with exon structure.
-- An ORM insert into VariantAnnotation lands in the base table, which analysis nodes never read - they join the
-  version's partition. Rows a node must see are written inside `temporary_db_table` (fake_data.py:FakeVariants).
+- An ORM insert into an inheritance-partitioned annotation table (VariantAnnotation, VariantTranscriptAnnotation,
+  VariantGeneOverlap) lands in the base table, invisible to every annotation queryset and node get_queryset() - they
+  read the version's partition. A plain model query (`Variant.objects.filter(node._get_node_q())`) still sees it, so a
+  test that only checks `_get_node_q` passes either way. Rows a node must see go in with
+  annotation/fake_data.py:create_fake_variant_gene_overlaps or library/django_utils/django_partition.py:bulk_create_in_partition.
 - @override_settings(**get_fake_annotation_settings_dict(columns_version=N)) pins settings.ANNOTATION to the
   tests/test_data/test_columns_versionN_<build>.vep_annotated.vcf fixtures; regenerate them with `vep_run --test`
   (needs a real VEP install).

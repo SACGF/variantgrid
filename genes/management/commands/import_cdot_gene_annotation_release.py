@@ -313,11 +313,18 @@ class Command(BaseCommand):
     def _ensure_gene_annotation(self, genome_build: GenomeBuild, releases: list[GeneAnnotationRelease]):
         """ A release is only usable once it has a GeneAnnotationVersion and the AnnotationVersion points
             at it - otherwise AnnotationVersion.validate() raises and variant pages break """
+        # gene_annotation won't pick an ontology for a named release once there's more than one, and the
+        # new GeneAnnotationVersion has to share the AnnotationVersion's for validate() to pass (#2598)
+        gene_annotation_kwargs = {}
+        if av := AnnotationVersion.objects.filter(genome_build=genome_build).order_by("annotation_date").last():
+            if av.ontology_version_id:
+                gene_annotation_kwargs["ontology_version"] = av.ontology_version_id
+
         for release in releases:
             if GeneAnnotationVersion.objects.filter(gene_annotation_release=release).exists():
                 continue
             print(f"Creating GeneAnnotationVersion for {release}")
-            call_command("gene_annotation", gene_annotation_release=release.pk)
+            call_command("gene_annotation", gene_annotation_release=release.pk, **gene_annotation_kwargs)
 
         print(f"Bringing {genome_build} AnnotationVersion into line")
         AnnotationVersion.new_sub_version(genome_build)
