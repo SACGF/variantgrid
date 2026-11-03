@@ -225,9 +225,10 @@ class GetVepCommandSVOverlapReciprocalTests(TestCase):
         return sv_customs
 
     def test_reciprocal_version(self):
-        vav = VariantAnnotationVersion(sv_overlap_reciprocal=True)
+        vav = VariantAnnotationVersion(sv_overlap_min_fraction=0.5, sv_overlap_reciprocal=True)
         for custom in self._gnomad_sv_customs(vav):
             self.assertEqual(custom.get("reciprocal"), "1")
+            self.assertEqual(custom["overlap_cutoff"], "50")
 
     def test_one_way_version_ignores_setting(self):
         vav = VariantAnnotationVersion(sv_overlap_reciprocal=False)

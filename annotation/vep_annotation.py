@@ -56,7 +56,8 @@ def _get_dbnsfp_plugin_command(genome_build: GenomeBuild, vc: VEPConfig):
     return f"dbNSFP,{dbnsfp_data_path},{','.join(fields)}"
 
 
-def _get_custom_params_list(cvf_list: list[VEPColumnDef], prefix, data_path, sv_overlap_reciprocal: bool) -> list:
+def _get_custom_params_list(cvf_list: list[VEPColumnDef], prefix, data_path,
+                            sv_overlap_min_fraction: float, sv_overlap_reciprocal: bool) -> list:
     """ All our deployments are VEP >= 110 so we can use key/value pairs """
     int_vep_version = int(settings.ANNOTATION_VEP_VERSION)
     if int_vep_version < 110:
@@ -82,8 +83,7 @@ def _get_custom_params_list(cvf_list: list[VEPColumnDef], prefix, data_path, sv_
         if prefix in ["gnomAD_SV", "gnomAD_SV_name"]:
             del params["fields"]  # Leave fields blank so that it uses ID
             params["type"] = "overlap"
-            overlap_cutoff = str(int(100 * settings.ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION))
-            params["overlap_cutoff"] = overlap_cutoff
+            params["overlap_cutoff"] = str(int(100 * sv_overlap_min_fraction))
             params["same_type"] = "1"
             if sv_overlap_reciprocal:
                 params["reciprocal"] = "1"
@@ -299,7 +299,13 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
     else:
         plugin_data_func = {}  # No plugins for SVs
 
-    sv_overlap_reciprocal = variant_annotation_version is not None and variant_annotation_version.sv_overlap_reciprocal
+    # Overlap comes from the version so re-annotating an existing one matches how it was made
+    sv_overlap_min_fraction = settings.ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION
+    sv_overlap_reciprocal = False
+    if variant_annotation_version is not None:
+        if variant_annotation_version.sv_overlap_min_fraction is not None:
+            sv_overlap_min_fraction = variant_annotation_version.sv_overlap_min_fraction
+        sv_overlap_reciprocal = variant_annotation_version.sv_overlap_reciprocal
     # Custom - filter_for(vep_config=vc) drops anything whose data file isn't configured,
     # so we don't need to probe vc[prefix_lc] separately.
     for vep_custom in VEPCustom:
@@ -316,7 +322,8 @@ def get_vep_command(vcf_filename, output_filename, genome_build: GenomeBuild, an
         )
         if cvf_list:
             cfg = vc[prefix.lower()]
-            cmd.extend(_get_custom_params_list(cvf_list, prefix, cfg, sv_overlap_reciprocal))
+            cmd.extend(_get_custom_params_list(cvf_list, prefix, cfg,
+                                               sv_overlap_min_fraction, sv_overlap_reciprocal))
 
     for vep_plugin, plugin_arg_func in plugin_data_func.items():
         # Skip plugins that don't apply to this build per their VEPColumnDef genome_builds
