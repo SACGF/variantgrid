@@ -493,7 +493,7 @@ class ClassificationFilter:
             try:
                 allele = int(allele_id_str)
             except ValueError:
-                raise ParseError(f"Invalid 'allele' parameter: '{allele_str}' - expected an allele id (eg 9678 or a9678)") from None
+                raise ParseError(f"Invalid 'allele' parameter: '{allele_str}' - expected an allele id (eg 9678 or a9678)")  # noqa: B904
 
         ## Have removed the ability to provide record filters in general from_request
         # record_filters: Optional[str] = None

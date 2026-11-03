@@ -67,7 +67,7 @@ class ManualVariantEntryCollection(models.Model):
             return cls.filter_for_user(user).get(pk=mvec_id)
         except cls.DoesNotExist:
             msg = f"User {user} doesn't have permission to access mvec_id={mvec_id}"
-            raise PermissionDenied(msg) from None
+            raise PermissionDenied(msg)  # noqa: B904
 
     def __str__(self):
         status = self.get_import_status_display()

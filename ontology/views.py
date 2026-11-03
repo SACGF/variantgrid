@@ -20,8 +20,8 @@ def ontology_term_text(request, ontology_service, name):
     """ Occasionally we have service + name but not the ID - this is a way of building an URL for that """
     try:
         ontology_service = OntologyService(ontology_service)
-    except ValueError:
-        raise Http404 from None
+    except ValueError as e:
+        raise Http404 from e
     term = get_object_or_404(OntologyTerm, name=name, ontology_service=ontology_service)
     return redirect(term)
 

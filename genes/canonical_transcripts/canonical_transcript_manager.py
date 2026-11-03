@@ -18,7 +18,7 @@ class CanonicalTranscriptManager:
                 default_canonical_collection = CanonicalTranscriptCollection.objects.get(pk=default_canonical_id)
             except CanonicalTranscriptCollection.DoesNotExist:
                 msg = f"Could not load CanonicalTranscriptCollection for settings.GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID={default_canonical_id}"
-                raise ValueError(msg) from None
+                raise ValueError(msg)  # noqa: B904
         else:
             default_canonical_collection = None
         self.default_canonical_collection = default_canonical_collection

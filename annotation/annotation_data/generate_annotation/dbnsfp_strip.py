@@ -171,7 +171,7 @@ def column_index(header: list[str], name: str) -> int:
     try:
         return header.index(name) + 1
     except ValueError:
-        raise SystemExit(f"Column {name!r} not found in dbNSFP header") from None
+        raise SystemExit(f"Column {name!r} not found in dbNSFP header")  # noqa: B904
 
 
 def build_pipeline(build: str, version: str, files: list[str], tmp_dir: str,

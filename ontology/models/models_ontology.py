@@ -297,8 +297,8 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
         pk = slug_pk.replace("_", ":")
         try:
             return OntologyTerm.objects.get(pk=pk)
-        except OntologyTerm.DoesNotExist:
-            raise Http404 from None
+        except OntologyTerm.DoesNotExist as e:
+            raise Http404 from e
 
     @staticmethod
     def get_gene_symbol(gene_symbol: Union[str, GeneSymbol]) -> 'OntologyTerm':

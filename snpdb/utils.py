@@ -18,7 +18,7 @@ def get_genome_build_or_404(build_name) -> GenomeBuild:
     try:
         return GenomeBuild.get_name_or_alias(build_name)
     except GenomeBuild.DoesNotExist:
-        raise Http404(f"Unknown genome build: '{build_name}'") from None
+        raise Http404(f"Unknown genome build: '{build_name}'")  # noqa: B904
 
 
 class LabNotificationBuilder(NotificationBuilder):
