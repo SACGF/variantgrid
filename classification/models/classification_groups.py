@@ -174,13 +174,13 @@ class ClassificationGroupUtils:
 
     def map(self, modification: ClassificationModification, genome_build: GenomeBuild) -> ClassificationGroupEntry:
         clinical_significance_old = self._classification_to_old_clin_sig.get(modification.classification_id)
-        clinical_significance_pending = None if not self.calculate_pending else self._pending_changes_flag_map.get(modification.classification.flag_collection_id)
+        #clinical_significance_pending = None if not self.calculate_pending else self._pending_changes_flag_map.get(modification.classification.flag_collection_id)
         clinical_significance_current = modification.get(SpecialEKeys.CLINICAL_SIGNIFICANCE)
         return ClassificationGroupEntry(
             modification=modification,
             genome_build=genome_build,
             clinical_significance_old=clinical_significance_old if clinical_significance_old and clinical_significance_old != clinical_significance_current else None,
-            clinical_significance_pending=clinical_significance_pending if clinical_significance_pending and clinical_significance_pending != clinical_significance_current else None
+            #clinical_significance_pending=clinical_significance_pending if clinical_significance_pending and clinical_significance_pending != clinical_significance_current else None
         )
 
 
