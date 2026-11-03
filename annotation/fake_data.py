@@ -16,7 +16,7 @@ from django.utils import timezone
 
 from annotation.enums import AnnotationStatus, CitationSource, PathogenicityImpact
 from annotation.models import ClinVarReviewStatus
-from annotation.models.models import VariantAnnotation
+from annotation.models.models import VariantAnnotation, VariantGeneOverlap
 from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
 from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.models.models_citations import CitationIdNormalized
@@ -34,9 +34,9 @@ from annotation.models.models_version import SubVersionPartition, VariantAnnotat
 from annotation.vep_config import SettingRole, VAVSettingContext, VEPConfig, vav_settings_kwargs
 from genes.enums import AnnotationConsortium
 from genes.hgvs import HGVSMatcher
-from genes.models import GeneAnnotationImport, TranscriptVersion
+from genes.models import Gene, GeneAnnotationImport, TranscriptVersion
 from genes.models.models_gene_annotation_release import GeneAnnotationRelease
-from library.django_utils.django_partition import temporary_db_table
+from library.django_utils.django_partition import bulk_create_in_partition
 from library.fake_data import FakeData, FakeDataContext, register
 from library.genomics.vcf_enums import VariantClass
 from ontology.tests.test_data_ontology import (
@@ -341,6 +341,19 @@ def create_fake_variant_annotation(variant, variant_annotation_version: VariantA
     return va
 
 
+def create_fake_variant_gene_overlaps(variant_annotation_version: VariantAnnotationVersion, gene: Gene, variants,
+                                     annotation_run: Optional[AnnotationRun] = None) -> list[VariantGeneOverlap]:
+    """ Written into the version's partition, the table gene list queries read (an ORM create lands in the
+        base table, which they never see) """
+    if annotation_run is None:
+        annotation_run = AnnotationRun.objects.create()
+    overlaps = [VariantGeneOverlap(version=variant_annotation_version, annotation_run=annotation_run,
+                                   gene=gene, variant=variant) for variant in variants]
+    bulk_create_in_partition(variant_annotation_version, VariantGeneOverlap,
+                             VariantAnnotationVersion.VARIANT_GENE_OVERLAP, overlaps)
+    return overlaps
+
+
 def get_variant_ids_by_gene(genome_build: GenomeBuild, genes: list[str],
                             without_alleles: bool = False) -> dict[str, list[int]]:
     """ without_alleles restricts to variants no allele has claimed yet, so fake data can make its own
@@ -480,9 +493,8 @@ class FakeVariants(FakeData):
                 hgvs_g=fake_variant.hgvs_g, hgvs_c=fake_variant.hgvs_c, hgvs_p=fake_variant.hgvs_p,
                 gnomad_af=_random_population_af(rng))
         # Into the version's partition, which is the table analysis nodes join to
-        representative_table = vav.get_partition_table(VariantAnnotationVersion.REPRESENTATIVE_TRANSCRIPT_ANNOTATION)
-        with temporary_db_table(VariantAnnotation, representative_table):
-            VariantAnnotation.objects.bulk_create(annotations.values())
+        bulk_create_in_partition(vav, VariantAnnotation, VariantAnnotationVersion.REPRESENTATIVE_TRANSCRIPT_ANNOTATION,
+                                 list(annotations.values()))
         context.stdout.write(f"Created {len(annotations)} annotated variants")
 
     def delete(self, context: FakeDataContext, **options):

@@ -57,10 +57,8 @@ from genes.models import (
     GeneLevelId,
     TranscriptVersion,
 )
-from library.django_utils.django_partition import temporary_db_table
+from library.django_utils.django_partition import bulk_create_in_partition
 from library.genomics.vcf_enums import VariantClass
-
-BULK_INSERT_BATCH_SIZE = 2000
 
 
 @dataclass(frozen=True)
@@ -208,15 +206,15 @@ def annotate_gene_level_run(annotation_run) -> int:
         results["annotated"] += 1
 
     with transaction.atomic():
-        _bulk_create_in_partition(variant_annotation_version, VariantAnnotation,
-                                  VariantAnnotationVersion.REPRESENTATIVE_TRANSCRIPT_ANNOTATION,
-                                  variant_annotations)
-        _bulk_create_in_partition(variant_annotation_version, VariantTranscriptAnnotation,
-                                  VariantAnnotationVersion.TRANSCRIPT_ANNOTATION,
-                                  transcript_annotations)
-        _bulk_create_in_partition(variant_annotation_version, VariantGeneOverlap,
-                                  VariantAnnotationVersion.VARIANT_GENE_OVERLAP,
-                                  gene_overlaps)
+        bulk_create_in_partition(variant_annotation_version, VariantAnnotation,
+                                 VariantAnnotationVersion.REPRESENTATIVE_TRANSCRIPT_ANNOTATION,
+                                 variant_annotations)
+        bulk_create_in_partition(variant_annotation_version, VariantTranscriptAnnotation,
+                                 VariantAnnotationVersion.TRANSCRIPT_ANNOTATION,
+                                 transcript_annotations)
+        bulk_create_in_partition(variant_annotation_version, VariantGeneOverlap,
+                                 VariantAnnotationVersion.VARIANT_GENE_OVERLAP,
+                                 gene_overlaps)
     results["transcript_annotations"] = len(transcript_annotations)
     results["gene_overlaps"] = len(gene_overlaps)
 
@@ -236,19 +234,6 @@ def annotate_gene_level_run(annotation_run) -> int:
 
     logging.info("%s gene-level annotation: %s", annotation_run, dict(results))
     return annotated_count
-
-
-def _bulk_create_in_partition(variant_annotation_version: VariantAnnotationVersion,
-                              klass, base_table_name: str, records: list):
-    """ Annotation tables are partitioned by inheritance and every annotation queryset is rewritten to
-        read the version's partition directly, so a row left in the base table is invisible to all of
-        them. @see library.django_utils.django_partition and annotation.annotation_version_querysets """
-
-    if not records:
-        return
-    partition_table = variant_annotation_version.get_partition_table(base_table_name=base_table_name)
-    with temporary_db_table(klass, partition_table):
-        klass.objects.bulk_create(records, batch_size=BULK_INSERT_BATCH_SIZE)
 
 
 def _gene_level_events_for_run(annotation_run):
