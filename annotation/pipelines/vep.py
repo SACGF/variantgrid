@@ -23,6 +23,7 @@ from annotation.vep_annotation import (
     get_vep_skipped_variants_filename,
     vep_check_command_line_version_match,
 )
+from annotation.vep_command_check import check_vep_command
 from library.utils import execute_cmd
 
 
@@ -103,6 +104,7 @@ class VEPRunner(AnnotationPipelineRunner):
             cmd = get_vep_command(vcf_dump_filename, vcf_annotated_filename, genome_build, annotation_consortium,
                                   annotation_run.pipeline_type,
                                   variant_annotation_version=annotation_run.variant_annotation_version)
+            check_vep_command(annotation_run.variant_annotation_version, annotation_run.pipeline_type, cmd)
             annotation_run.annotation_start = timezone.now()
             annotation_run.pipeline_command = " ".join(cmd)
             self.save_if_owner(annotation_run)

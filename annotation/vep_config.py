@@ -36,6 +36,7 @@ _BASENAME_PIN_FIELDS = {
     "promoter_ai": "promoter_ai",
     "protvar": "protvar",
     "repeatmasker": "repeat_masker",
+    "spliceai_indel": "spliceai_indel",  # the spliceai pin reads its version off the SNV file alone
     "splicevault": "splicevault",
     "transcript_blocklist": "transcript_blocklist",
     "utr_annotator": "utr_annotator",
@@ -46,6 +47,8 @@ _BASENAME_PIN_FIELDS = {
 _VERSION_PIN_FIELDS = {
     "dbscsnv": ("dbscsnv", re.compile(r"^dbscSNV(?P<version>[\d.]+?)_", flags=re.IGNORECASE)),
     "gnomad_sv": ("gnomad_sv", re.compile(r"^gnomad[._]v?(?P<version>[\d.]+)[._]sv", flags=re.IGNORECASE)),
+    # The second --custom over gnomAD SV - usually the same file as gnomad_sv, but configured separately
+    "gnomad_sv_name": ("gnomad_sv_name", re.compile(r"^gnomad[._]v?(?P<version>[\d.]+)[._]sv", flags=re.IGNORECASE)),
     "mastermind": ("mastermind", re.compile(r"^mastermind_cited_variants_reference-(?P<version>[\d.]+)-")),
     "topmed": ("topmed", re.compile(r"^TOPMED_(?:GRCh37|GRCh38)_(?P<version>\d{8})", flags=re.IGNORECASE)),
     "uk10k": ("uk10k", re.compile(r"^UK10K_COHORT\.(?P<version>\d{8})")),
@@ -128,6 +131,33 @@ def vep_component_version_kwargs(build_settings: dict) -> dict:
     kwargs["sv_max_size"] = settings.ANNOTATION_VEP_SV_MAX_SIZE
     kwargs["sv_overlap_min_fraction"] = settings.ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION
     return kwargs
+
+
+# VariantAnnotationVersion fields snapshotted from settings at creation, and read off the version (never settings)
+# wherever they're used - the VEP command line or the import. Changing the setting leaves existing versions as they
+# were and makes create_new_variant_annotation_version mint a new one, so they're left out of the checks that an
+# annotated file / the installed VEP match a version (which re-derive them from live settings).
+SETTINGS_SNAPSHOT_FIELDS = ("distance", "gencode_subset", "min_pathogenic_rankscore",
+                            "sv_overlap_same_type", "sv_overlap_single_value_method")
+
+
+def settings_snapshot_kwargs(columns_version: int) -> dict:
+    """ What a VariantAnnotationVersion created now records for SETTINGS_SNAPSHOT_FIELDS other than
+        gencode_subset (Ensembl only - @see vep_dict_to_variant_annotation_version_kwargs) """
+    distance = getattr(settings, "ANNOTATION_VEP_DISTANCE", None)
+    if distance is None:
+        distance = 5000
+    # Rankscores count towards predictions_num_pathogenic at columns_version 2/3 only (1 uses the predictions,
+    # 4+ the raw scores), so elsewhere the threshold isn't pinned and changing it doesn't make a new version
+    min_pathogenic_rankscore = None
+    if columns_version in (2, 3):
+        min_pathogenic_rankscore = settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE
+    return {
+        "distance": distance,
+        "min_pathogenic_rankscore": min_pathogenic_rankscore,
+        "sv_overlap_same_type": settings.ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE,
+        "sv_overlap_single_value_method": settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD,
+    }
 
 
 class VEPConfig:

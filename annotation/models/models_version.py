@@ -164,11 +164,13 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     eve = models.TextField(null=True, blank=True)  # GRCh38 + VEP >= 116 only
     fasta = models.TextField(null=True, blank=True)  # whatever _get_vep_fasta passes to --fasta
     gnomad_sv = models.TextField(null=True, blank=True)
+    gnomad_sv_name = models.TextField(null=True, blank=True)
     mastermind = models.TextField(null=True, blank=True)
     maxentscan = models.TextField(null=True, blank=True)
     promoter_ai = models.TextField(null=True, blank=True)  # GRCh38 + VEP >= 116 only
     protvar = models.TextField(null=True, blank=True)
     repeat_masker = models.TextField(null=True, blank=True)
+    spliceai_indel = models.TextField(null=True, blank=True)
     splicevault = models.TextField(null=True, blank=True)  # converted to RefSeq for RefSeq builds - GRCh37/38 only
     topmed = models.TextField(null=True, blank=True)
     transcript_blocklist = models.TextField(null=True, blank=True)  # --transcript_filter
@@ -188,6 +190,16 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # ANNOTATION_VEP_SV_OVERLAP_RECIPROCAL at creation: overlap_cutoff applies to both SVs, not only gnomAD's (#2589)
     sv_overlap_reciprocal = models.BooleanField(default=False)
     vep_args = models.TextField(null=True, blank=True)  # ANNOTATION_VEP_ARGS, space joined
+
+    # Settings the import reads, snapshotted at creation (vep_config.SETTINGS_SNAPSHOT_FIELDS): read off the
+    # version, so changing a setting makes a new version rather than changing what this one imports
+    sv_overlap_same_type = models.BooleanField(default=True)  # ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE
+    # ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD - which overlapping gnomAD SV supplies the gnomAD columns
+    sv_overlap_single_value_method = models.TextField(default="lowest_af")
+    # ANNOTATION_MIN_PATHOGENIC_RANKSCORE - predictions_num_pathogenic at columns_version 2/3, null otherwise
+    min_pathogenic_rankscore = models.FloatField(null=True, blank=True)
+    # pipeline type -> the normalised VEP command its first run used (annotation/vep_command_check.py)
+    vep_commands = models.JSONField(null=True, blank=True)
 
     # Strategy used to map RefSeq <-> Ensembl transcripts when picking dbNSFP
     # per-transcript scores at insert time. Populated on RefSeq pipelines for
@@ -414,7 +426,7 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
                 'polyphen2_hvar_pred_most_damaging': lambda d: d in Polyphen2Prediction.get_damage_or_greater_levels(),
             }
         if self.columns_version >= 2:
-            pathogenic_rankscore = settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE
+            pathogenic_rankscore = self.pathogenic_rankscore
             version_columns = visible_columns_for(columns_version=self.columns_version)
             return {t.rankscore_field: lambda d: float(d) >= pathogenic_rankscore
                     for t in TOOLS if t.rankscore_field in version_columns}
@@ -436,7 +448,14 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
             return (f"Count of {raw_columns} reaching their PP3-supporting threshold "
                     "(Pejaver 2022 / Bergquist 2024 ClinGen calibration; see annotation/pathogenicity_predictions.py).")
         rankscore_columns = ", ".join(self.get_rankscore_pathogenic_prediction_funcs())
-        return f"Count of {rankscore_columns} that exceed {settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE}"
+        return f"Count of {rankscore_columns} that exceed {self.pathogenic_rankscore}"
+
+    @property
+    def pathogenic_rankscore(self) -> float:
+        """ Rankscore counted as a pathogenic prediction - only pinned where it was counted at import """
+        if self.min_pathogenic_rankscore is not None:
+            return self.min_pathogenic_rankscore
+        return settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE
 
     @cached_property
     def _vep_config(self) -> dict:

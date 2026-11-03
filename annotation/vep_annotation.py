@@ -24,9 +24,11 @@ from annotation.enums import VariantAnnotationPipelineType, VEPCustom, VEPPlugin
 from annotation.fake_data import get_fake_vep_version
 from annotation.vep_columns import VEPColumnDef
 from annotation.vep_config import (
+    SETTINGS_SNAPSHOT_FIELDS,
     VEPConfig,
     parse_cosmic_version_from_filename,
     parse_gnomad_version_from_filename,
+    settings_snapshot_kwargs,
     vep_component_version_kwargs,
 )
 from genes.enums import AnnotationConsortium
@@ -513,10 +515,7 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
     kwargs["vep_cache"] = vep_config.cache_version
     kwargs["annotation_consortium"] = vep_config.annotation_consortium
     kwargs["columns_version"] = vep_config.columns_version
-    distance = getattr(settings, "ANNOTATION_VEP_DISTANCE", None)
-    if distance is None:
-        distance = 5000
-    kwargs["distance"] = distance
+    kwargs.update(settings_snapshot_kwargs(vep_config.columns_version))
     kwargs["structural_variant_min_size"] = settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
 
     if vep_config.annotation_consortium == AnnotationConsortium.ENSEMBL:
@@ -689,14 +688,9 @@ def vep_parse_version_line(line):
 
 
 def _vep_check_version_match(variant_annotation_version, vep_version_kwargs: dict, vep_version_desc: str):
-    # 'gencode_subset' and 'distance' are settings-snapshot fields: they are read from settings at VAV
-    # creation and stored on the VAV, and are not recorded in the VEP annotated VCF header. Both check
-    # callers re-derive them from live settings (see vep_dict_to_variant_annotation_version_kwargs), so
-    # comparing them here can only produce false mismatches when a setting changes after the VAV was
-    # created - exclude them from every version-match check.
-    vep_version_kwargs = dict(vep_version_kwargs)
-    for snapshot_field in ("gencode_subset", "distance"):
-        vep_version_kwargs.pop(snapshot_field, None)
+    # Settings snapshots are read off the version wherever they're used, so a setting changed since it was made
+    # doesn't change what it produces - comparing them to live settings could only be a false mismatch
+    vep_version_kwargs = {k: v for k, v in vep_version_kwargs.items() if k not in SETTINGS_SNAPSHOT_FIELDS}
     for k, v in vep_version_kwargs.items():
         version_value = getattr(variant_annotation_version, k)
         if version_value != v:

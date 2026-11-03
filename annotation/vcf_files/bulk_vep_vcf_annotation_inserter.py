@@ -293,7 +293,7 @@ class BulkVEPVCFAnnotationInserter:
         sv_overlap_processor = None
         sv_gene_overlap_resolver = None
         if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
-            sv_overlap_processor = SVOverlapProcessor(cvf_list)
+            sv_overlap_processor = SVOverlapProcessor(cvf_list, self.annotation_run.variant_annotation_version)
             sv_gene_overlap_resolver = SVGeneOverlapResolver.for_variant_annotation_version(
                 self.annotation_run.variant_annotation_version)
         self.sv_overlap_processor = sv_overlap_processor
@@ -1045,17 +1045,18 @@ class SVOverlapProcessor:
         due to some issues: https://github.com/Ensembl/VEP_plugins/issues/710
         This requires a bit of post-processing
     """
-    def __init__(self, cvf_list: tuple[VEPColumnDef, ...]):
+    def __init__(self, cvf_list: tuple[VEPColumnDef, ...], variant_annotation_version):
         sv_customs = {VEPCustom.GNOMAD_SV, VEPCustom.GNOMAD_SV_NAME}
         self.sv_fields = {
             vgc for c in cvf_list if c.vep_custom in sv_customs
             for vgc in c.variant_grid_columns
         }
+        self.same_type = variant_annotation_version.sv_overlap_same_type
+        self.single_value_method = variant_annotation_version.sv_overlap_single_value_method
 
-    @staticmethod
-    def _get_required_substrings(variant_class: str) -> list[str]:
+    def _get_required_substrings(self, variant_class: str) -> list[str]:
         required_substrings = []  # Empty means all will go through
-        if settings.ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE:
+        if self.same_type:
             # gnomad_sv_overlap_name looks like: 'gnomAD-SV_v2.1_INV_17_731&gnomAD-SV_v2.1_DEL_17_160435'
             EXPECTED_NAME = {
                 'deletion': ["DEL"],
@@ -1107,14 +1108,14 @@ class SVOverlapProcessor:
             return filtered_sv_records[0]
 
         chosen_record = None
-        if settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD == "greatest_overlap":
+        if self.single_value_method == "greatest_overlap":
             raise NotImplementedError("greatest_overlap")
-        elif settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD == "lowest_af":
+        elif self.single_value_method == "lowest_af":
             # VEP values are still strings here - compare as floats, as gnomAD-SV mixes '4.6e-05' and '0.006085'
             chosen_record = min(filtered_sv_records, key=lambda r: float(r["gnomad_sv_overlap_af"]))
-        elif settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD == "exact_or_lowest_af":
+        elif self.single_value_method == "exact_or_lowest_af":
             raise NotImplementedError("exact_or_lowest_af")
         else:
-            raise ValueError(f"Unknown value for {settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD=}")
+            raise ValueError(f"Unknown sv_overlap_single_value_method: {self.single_value_method!r}")
 
         return chosen_record

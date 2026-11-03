@@ -31,7 +31,7 @@ from annotation.models.models_gene_annotation import (
     HumanProteinAtlasAnnotationVersion,
 )
 from annotation.models.models_version import SubVersionPartition, VariantAnnotationVersion
-from annotation.vep_config import VEPConfig
+from annotation.vep_config import VEPConfig, settings_snapshot_kwargs
 from genes.enums import AnnotationConsortium
 from genes.hgvs import HGVSMatcher
 from genes.models import GeneAnnotationImport, TranscriptVersion
@@ -202,6 +202,7 @@ def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium, colum
     # gated on it - see the cosmic_count VEPColumnDefs
     fake_version["cosmic"] = VEPConfig(genome_build).cosmic_version
     fake_version["structural_variant_min_size"] = settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
+    fake_version.update(settings_snapshot_kwargs(columns_version))
     return fake_version
 
 

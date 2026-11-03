@@ -9,8 +9,10 @@ from annotation.fake_data import (
     get_fake_vep_version,
 )
 from annotation.models import VariantAnnotationVersion
+from annotation.vep_annotation import _vep_check_version_match
 from annotation.vep_config import (
     parse_cosmic_version_from_filename,
+    settings_snapshot_kwargs,
     vep_component_version_kwargs,
 )
 from genes.enums import AnnotationConsortium
@@ -25,6 +27,7 @@ GRCH38_SETTINGS = {
         "dbscsnv": "annotation_data/GRCh38/dbscSNV1.1_GRCh38.txt.gz",
         "eve": "annotation_data/GRCh38/eve_merged.vcf.gz",
         "gnomad_sv": "annotation_data/GRCh38/gnomad.v4.0.sv.merged.no_filters.vcf.gz",
+        "gnomad_sv_name": "annotation_data/GRCh38/gnomad.v4.1.sv.merged.no_filters.vcf.gz",
         "mastermind": "annotation_data/GRCh38/mastermind_cited_variants_reference-2023.10.02-grch38.vcf.gz",
         "maxentscan": "annotation_data/all_builds/maxentscan",
         "phastcons100way": "annotation_data/GRCh38/hg38.phastCons100way.bw",
@@ -36,6 +39,7 @@ GRCH38_SETTINGS = {
         "promoter_ai": "annotation_data/GRCh38/promoterAI_tss500.tsv.bgz",
         "protvar": "annotation_data/all_builds/ProtVar_data.db",
         "repeatmasker": "annotation_data/GRCh38/repeatmasker_hg38.bed.gz",
+        "spliceai_indel": "annotation_data/GRCh38/spliceai_scores.masked.indel.hg38.vcf.gz",
         "topmed": "annotation_data/GRCh38/TOPMED_GRCh38_20180418.vcf.gz",
         "transcript_blocklist": "annotation_data/GRCh38/blocklist_brca1_new_transcripts.txt",
         "uk10k": "annotation_data/GRCh38/UK10K_COHORT.20160215.sites.GRCh38.vcf.gz",
@@ -65,6 +69,7 @@ class VEPComponentVersionKwargsTests(TestCase):
         self.assertEqual("20180418", kwargs["topmed"])
         self.assertEqual("20160215", kwargs["uk10k"])
         self.assertEqual("4.0", kwargs["gnomad_sv"])
+        self.assertEqual("4.1", kwargs["gnomad_sv_name"])
 
     def test_gnomad_sv_grch37_naming(self):
         kwargs = vep_component_version_kwargs(GRCH37_SETTINGS)
@@ -80,6 +85,7 @@ class VEPComponentVersionKwargsTests(TestCase):
         self.assertEqual("blocklist_brca1_new_transcripts.txt", kwargs["transcript_blocklist"])
         self.assertEqual("ProtVar_data.db", kwargs["protvar"])
         self.assertEqual("maxentscan", kwargs["maxentscan"])
+        self.assertEqual("spliceai_scores.masked.indel.hg38.vcf.gz", kwargs["spliceai_indel"])
 
     def test_unconfigured_data_is_none(self):
         kwargs = vep_component_version_kwargs(GRCH37_SETTINGS)
@@ -134,6 +140,23 @@ class VEPComponentVersionKwargsTests(TestCase):
         kwargs = vep_component_version_kwargs(GRCH38_SETTINGS)
         self.assertIsNone(kwargs["vep_args"])
         self.assertIsNone(kwargs["pick_order"])
+
+
+class SettingsSnapshotTests(TestCase):
+    """ Settings the import reads are snapshotted on the version: a changed setting makes a new version
+        rather than halting (or silently altering) the one in use """
+
+    @override_settings(ANNOTATION_MIN_PATHOGENIC_RANKSCORE=0.9)
+    def test_rankscore_pinned_only_where_counted(self):
+        for columns_version, expected in {1: None, 2: 0.9, 3: 0.9, 4: None, 5: None}.items():
+            with self.subTest(columns_version=columns_version):
+                self.assertEqual(expected, settings_snapshot_kwargs(columns_version)["min_pathogenic_rankscore"])
+
+    def test_changed_setting_is_not_a_vep_mismatch(self):
+        vav = VariantAnnotationVersion(sv_overlap_same_type=True, sv_overlap_single_value_method="lowest_af",
+                                       sift_enabled=True)
+        _vep_check_version_match(vav, {"sv_overlap_same_type": False, "sv_overlap_single_value_method": "other",
+                                       "sift_enabled": True}, "test")
 
 
 class ParseCosmicVersionTests(TestCase):
