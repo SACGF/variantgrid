@@ -69,7 +69,7 @@ class VariantAnnotationVersionAdmin(ArchivePartitionDataAdminMixin, ModelAdminBa
                     "vep", "columns_version", "gencode_subset", "distance",
                     "status_badge", "data_archived_date")
     list_filter = ("status", "genome_build", "annotation_consortium", "data_archived_date")
-    readonly_fields = ("status", "gencode_subset", "distance",
+    readonly_fields = ("status", "gencode_subset", "distance", "sv_overlap_reciprocal",
                        "data_archived_date", "data_archived_by",
                        "data_archive_reason", "data_restorable_from")
     ordering = ("genome_build", "-annotation_date")
@@ -190,7 +190,7 @@ class ClinVarRecordCollectionAdmin(ModelAdminBasics):
 
     """
     # these took prohibitively long to load
-    
+
     @admin_list_column(limit=0)
     def clinvar(self, obj: ClinVarRecordCollection):
         try:

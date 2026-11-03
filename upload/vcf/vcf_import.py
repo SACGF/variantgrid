@@ -442,7 +442,7 @@ def import_vcf_file(upload_step, bulk_inserter) -> int:
         tb = ''.join(traceback.format_tb(exc_traceback))
         params = (str(e), upload_step.input_filename, record_id, failed_vcf_line, tb)
         message = "Exception: '%s'\nVCF file '%s' record: %d\nLine: '%s'\nTraceback:\n%s" % params
-        raise ValueError(message)
+        raise ValueError(message) from e
 
     bulk_inserter.finish()
     update_uploaded_vcf_max_variant(uploaded_vcf.pk, bulk_inserter.get_max_variant_id_by_pipeline_type())

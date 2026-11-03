@@ -154,7 +154,7 @@ class AnalysisModelTestCase(TestCase):
     def test_locking(self):
         analysis = Analysis(genome_build=self.grch37)
         analysis.set_defaults_and_save(self.owner_user)
-        analysis.is_locked
+        self.assertFalse(analysis.is_locked)
 
         AnalysisLock.objects.create(analysis=analysis, locked=True, user=self.owner_user, date=timezone.now())
         # Bump version to expire cache

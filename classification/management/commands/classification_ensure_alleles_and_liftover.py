@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from classification.autopopulate_evidence_keys.evidence_from_variant import (
@@ -6,7 +5,6 @@ from classification.autopopulate_evidence_keys.evidence_from_variant import (
 )
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models.classification import Classification
-from library.git import Git
 from library.guardian_utils import admin_bot
 from snpdb.clingen_allele import populate_clingen_alleles_for_variants
 from snpdb.enums import ImportSource
@@ -23,11 +21,8 @@ class Command(BaseCommand):
                             help="Add 'clingen_allele_id' to Classifications missing it")
 
     def handle(self, *args, **options):
-        script = __file__
         add_clingen_allele = options["add_clingen_allele"]
         for genome_build in GenomeBuild.builds_with_annotation():
-            defaults = {"git_hash": Git(settings.BASE_DIR).hash}
-
             # Note: This deliberately only gets classifications where the submitting variant was against this genome build
             # ie we don't use ClassificationQuerySet.variant_q() to get liftovers
             contigs_q = Variant.get_contigs_q(genome_build)

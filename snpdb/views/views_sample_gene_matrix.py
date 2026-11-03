@@ -225,7 +225,7 @@ def global_sample_gene_matrix(request):
             genome_build = GenomeBuild.builds_with_annotation().get()
         except GenomeBuild.MultipleObjectsReturned:
             msg = "settings.PUBLIC_SAMPLE_GENE_MATRIX_GENOME_BUILD must be set when there are multiple genome builds"
-            raise ImproperlyConfigured(msg)
+            raise ImproperlyConfigured(msg)  # noqa: B904
     else:
         genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
 

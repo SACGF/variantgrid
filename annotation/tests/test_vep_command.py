@@ -8,7 +8,11 @@ from annotation import vep_columns
 from annotation.enums import VariantAnnotationPipelineType
 from annotation.fake_data import get_fake_annotation_settings_dict
 from annotation.models import VariantAnnotationVersion
-from annotation.vep_annotation import get_vep_command, get_vep_skipped_variants_filename
+from annotation.vep_annotation import (
+    get_vep_command,
+    get_vep_skipped_variants_filename,
+    sv_overlap_reciprocal_for_new_version,
+)
 from genes.enums import AnnotationConsortium
 from snpdb.models import GenomeBuild
 
@@ -201,3 +205,42 @@ class GetVepCommandCosmicTests(TestCase):
         with override_settings(**_cosmic_settings("Cosmic_GenomeScreensMutant_Normal_v101_GRCh38.vcf.gz")):
             fields = self._cosmic_custom_fields()
         self.assertEqual(sorted(fields), ["GENOME_SCREEN_SAMPLE_COUNT", "LEGACY_ID"])
+
+
+@override_settings(**get_fake_annotation_settings_dict(columns_version=5))
+class GetVepCommandSVOverlapReciprocalTests(TestCase):
+    """ #2589 - reciprocal overlap comes from the version, so existing versions keep the one-way overlap """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.grch38 = GenomeBuild.get_name_or_alias("GRCh38")
+
+    def _gnomad_sv_customs(self, vav) -> list[dict]:
+        cmd = get_vep_command("in.vcf", "out.vcf", self.grch38, AnnotationConsortium.REFSEQ,
+                              VariantAnnotationPipelineType.STRUCTURAL_VARIANT, variant_annotation_version=vav)
+        customs = [dict(p.split("=", 1) for p in cmd[i + 1].split(","))
+                   for i, x in enumerate(cmd) if x == "--custom"]
+        sv_customs = [c for c in customs if c["short_name"].startswith("gnomAD_SV")]
+        self.assertEqual(len(sv_customs), 2)
+        return sv_customs
+
+    def test_reciprocal_version(self):
+        vav = VariantAnnotationVersion(sv_overlap_min_fraction=0.5, sv_overlap_reciprocal=True)
+        for custom in self._gnomad_sv_customs(vav):
+            self.assertEqual(custom.get("reciprocal"), "1")
+            self.assertEqual(custom["overlap_cutoff"], "50")
+
+    def test_one_way_version_ignores_setting(self):
+        vav = VariantAnnotationVersion(sv_overlap_reciprocal=False)
+        with override_settings(ANNOTATION_VEP_SV_OVERLAP_RECIPROCAL=True):
+            customs = self._gnomad_sv_customs(vav)
+        for custom in customs:
+            self.assertNotIn("reciprocal", custom)
+
+
+class SVOverlapReciprocalForNewVersionTests(TestCase):
+    def test_needs_vep_116(self):
+        for vep_version, expected in [("115", False), ("116", True)]:
+            with self.subTest(vep_version), override_settings(ANNOTATION_VEP_VERSION=vep_version,
+                                                              ANNOTATION_VEP_SV_OVERLAP_RECIPROCAL=True):
+                self.assertEqual(sv_overlap_reciprocal_for_new_version(), expected)

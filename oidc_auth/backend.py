@@ -58,8 +58,8 @@ class VariantGridOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         email = claims.get('email', '')
         try:
             _email_validator(email)
-        except ValidationError:
-            raise SuspiciousOperation(f"Invalid email in OIDC claims: {email!r}")
+        except ValidationError as e:
+            raise SuspiciousOperation(f"Invalid email in OIDC claims: {email!r}") from e
         email = _sanitize_claim_str(email, 254)
 
         # Copy over basic details from open ID connect

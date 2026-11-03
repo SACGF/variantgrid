@@ -109,8 +109,8 @@ def ontology_snake_table(snakes: Iterable[OntologySnake], reference_term: Option
             return snake.leaf_term
 
     snakes = sorted(snakes, key=sort_key)
-    for leaf, snakes in itertools.groupby(snakes, sort_key):
-        grouped.append(GroupedSnakes(snakes=list(snakes), destination=leaf))
+    for leaf, leaf_snakes in itertools.groupby(snakes, sort_key):
+        grouped.append(GroupedSnakes(snakes=list(leaf_snakes), destination=leaf))
 
     return {
         "table_id": str(uuid.uuid4()),

@@ -215,7 +215,7 @@ class Command(BaseCommand):
                             has_change = True
 
                     if is_continued_discordance:
-                        print(f"Migrating continued discordance")
+                        print("Migrating continued discordance")
                         overlap_contribution.review_agreed_value = overlap_contribution.effective_value
                         has_change = True
 
@@ -230,7 +230,7 @@ class Command(BaseCommand):
                         }):
                             overlap_contribution.save()
                     else:
-                        print(f"Triage already up to date - possibly multiple discordances for same record")
+                        print("Triage already up to date - possibly multiple discordances for same record")
                 if is_continued_discordance:
                     OverlapServices.recalc_overlap(overlap)
 

@@ -5,7 +5,7 @@ from django.core.management import BaseCommand
 
 from annotation.models import AnnotationVersion
 from annotation.transcripts_annotation_selections import VariantTranscriptSelections
-from classification.models import Classification, EvidenceKey
+from classification.models import Classification
 from snpdb.models import GenomeBuild, Variant
 
 
@@ -22,7 +22,6 @@ class Command(BaseCommand):
 
             c: Classification
             genome_build = GenomeBuild.grch38()
-            evidence_keys_list = list(EvidenceKey.objects.filter(variantgrid_column__isnull=False).select_related("variantgrid_column"))
 
             transcript_annotation_keys: Optional[list[str]] = [
                 "amino_acids", "annotation_run", "cadd_phred", "canonical", "canonical_score", "codons", "consequence",
@@ -57,7 +56,6 @@ class Command(BaseCommand):
 
             annotation_version = AnnotationVersion.latest(genome_build)
             last_variant: Optional[Variant] = None
-            variant_annotations: list
             status = "unresolved"
             count = 0
             for c in Classification.objects.filter(withdrawn=False, allele_info__isnull=False).select_related("lab", "allele_info").order_by('allele_info__allele').iterator():

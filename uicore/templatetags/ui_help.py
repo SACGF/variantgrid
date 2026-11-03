@@ -27,8 +27,6 @@ def page_help(page_id: Optional[str] = None, title=None, show_title=True, header
     of header if page help is available).
     :param header_tag: Default header if there's no attached help
     """
-    suffix_help = True
-
     if not title or title == SafeText(' '):
         title = 'Page Help'
 

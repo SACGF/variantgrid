@@ -120,6 +120,9 @@ ANNOTATION_VEP_ENSEMBL_GENCODE = "primary"
 ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE = True  # Only 'dup' for dups, false is all SVs overlap
 ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD = "lowest_af"  # "greatest_overlap", "lowest_af", "exact_or_lowest_af"
 ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION = 0.8
+# Apply the min fraction both ways (VEP --custom reciprocal=1), not just to the gnomAD SV - otherwise a large SV matches
+# every small gnomAD SV inside it (#2589). VEP >= 116. Snapshotted onto a VariantAnnotationVersion when it is created.
+ANNOTATION_VEP_SV_OVERLAP_RECIPROCAL = True
 ANNOTATION_VEP_SV_MAX_SIZE = 10_000_000  # VEP default = 10M
 # A symbolic del/dup/inv shorter than this is annotated by the STANDARD pipeline, dumped to VEP as its
 # explicit sequence - gnomAD's short-variant callset has exact AFs for indels into the hundreds of bases,
