@@ -13,6 +13,7 @@ from typing import Optional
 
 from django.apps import apps
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import OuterRef, Q, QuerySet, Subquery
 from django.db.models.deletion import CASCADE
@@ -324,6 +325,23 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
             pk__in=Subquery(latest_qs.values('pk')[:1]),
             genome_build__in=GenomeBuild.builds_with_annotation()
         )
+
+    def get_gene_annotation_release_consortium_error(self) -> Optional[str]:
+        """ VariantGeneOverlap / transcript annotation store the consortium VEP ran with, while gene lists
+            resolve symbols through gene_annotation_release - a release from the other consortium gives
+            gene ids that never match, so every gene list filter returns nothing (#2598) """
+        if release := self.gene_annotation_release:
+            if release.annotation_consortium != self.annotation_consortium:
+                return (f"VariantAnnotationVersion {self.pk} is {self.get_annotation_consortium_display()} but "
+                        f"its GeneAnnotationRelease '{release}' is {release.get_annotation_consortium_display()}. "
+                        f"Install the matching release with 'python3 manage.py "
+                        f"import_cdot_gene_annotation_release --genome-build={self.genome_build_id} --force'")
+        return None
+
+    def clean(self):
+        super().clean()
+        if consortium_error := self.get_gene_annotation_release_consortium_error():
+            raise ValidationError({"gene_annotation_release": consortium_error})
 
     def get_gene_annotation_promote_blocker(self) -> Optional[str]:
         """ Reason gene annotation prevents promoting this VAV to ACTIVE, or None if OK. Activating a VAV whose
