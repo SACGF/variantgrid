@@ -104,7 +104,7 @@ class MemoryOntologyTraverser:
     # Only what traversal and gene_annotation read - a version has ~800k relations, and full rows with a
     # separate copy of each term per relation (select_related) don't fit in memory on a production box (#2609)
     RELATION_FIELDS = ("id", "source_term", "dest_term", "relation", "extra", "from_import")
-    TERM_FIELDS = ("id", "name", "ontology_service")
+    TERM_FIELDS = ("id", "name", "ontology_service", "index")  # index: OntologyTerm.__lt__ sorts leafs by it
 
     def __init__(self, ontology_version: OntologyVersion):
         self._ontology_version = ontology_version
