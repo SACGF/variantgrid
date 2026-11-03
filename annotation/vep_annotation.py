@@ -25,10 +25,12 @@ from annotation.fake_data import get_fake_vep_version
 from annotation.vep_columns import VEPColumnDef
 from annotation.vep_config import (
     SETTINGS_SNAPSHOT_FIELDS,
+    SettingRole,
+    VAVSettingContext,
     VEPConfig,
     parse_cosmic_version_from_filename,
     parse_gnomad_version_from_filename,
-    settings_snapshot_kwargs,
+    vav_settings_kwargs,
     vep_component_version_kwargs,
 )
 from genes.enums import AnnotationConsortium
@@ -121,11 +123,6 @@ def _get_custom_params_list(cvf_list: list[VEPColumnDef], prefix, data_path,
 
     command = ",".join([f"{k}={v}" for k, v in params.items()])
     return ["--custom", command]
-
-
-def sv_overlap_reciprocal_for_new_version() -> bool:
-    """ What a VariantAnnotationVersion created now records as sv_overlap_reciprocal (#2589) """
-    return settings.ANNOTATION_VEP_SV_OVERLAP_RECIPROCAL and int(settings.ANNOTATION_VEP_VERSION) >= 116
 
 
 def _get_vep_fasta(vep_config: VEPConfig, genome_build: GenomeBuild) -> str:
@@ -515,11 +512,8 @@ def vep_dict_to_variant_annotation_version_kwargs(vep_config, vep_version_dict: 
     kwargs["vep_cache"] = vep_config.cache_version
     kwargs["annotation_consortium"] = vep_config.annotation_consortium
     kwargs["columns_version"] = vep_config.columns_version
-    kwargs.update(settings_snapshot_kwargs(vep_config.columns_version))
-    kwargs["structural_variant_min_size"] = settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
-
-    if vep_config.annotation_consortium == AnnotationConsortium.ENSEMBL:
-        kwargs["gencode_subset"] = getattr(settings, "ANNOTATION_VEP_ENSEMBL_GENCODE", None)
+    kwargs.update(vav_settings_kwargs(VAVSettingContext.for_vep_config(vep_config),
+                                      SettingRole.PIN, SettingRole.SNAPSHOT))
 
     # Plugins are optional
     try:

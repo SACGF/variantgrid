@@ -11,8 +11,11 @@ from annotation.fake_data import (
 from annotation.models import VariantAnnotationVersion
 from annotation.vep_annotation import _vep_check_version_match
 from annotation.vep_config import (
+    VAV_SETTINGS,
+    SettingRole,
+    VAVSettingContext,
     parse_cosmic_version_from_filename,
-    settings_snapshot_kwargs,
+    vav_settings_kwargs,
     vep_component_version_kwargs,
 )
 from genes.enums import AnnotationConsortium
@@ -57,6 +60,9 @@ GRCH37_SETTINGS = {
         "transcript_blocklist": None,
     },
 }
+
+
+ENSEMBL_V2 = VAVSettingContext(columns_version=2, annotation_consortium=AnnotationConsortium.ENSEMBL)
 
 
 class VEPComponentVersionKwargsTests(TestCase):
@@ -129,7 +135,7 @@ class VEPComponentVersionKwargsTests(TestCase):
                        ANNOTATION_VEP_SV_MAX_SIZE=5_000_000,
                        ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION=0.5)
     def test_command_line_settings_pinned(self):
-        kwargs = vep_component_version_kwargs(GRCH38_SETTINGS)
+        kwargs = vav_settings_kwargs(ENSEMBL_V2, SettingRole.PIN)
         self.assertEqual("mane_select,canonical", kwargs["pick_order"])
         self.assertEqual("--mane --shift_hgvs 0", kwargs["vep_args"])
         self.assertEqual(5_000_000, kwargs["sv_max_size"])
@@ -137,20 +143,40 @@ class VEPComponentVersionKwargsTests(TestCase):
 
     @override_settings(ANNOTATION_VEP_PICK_ORDER=None, ANNOTATION_VEP_ARGS=[])
     def test_empty_command_line_settings_are_none(self):
-        kwargs = vep_component_version_kwargs(GRCH38_SETTINGS)
+        kwargs = vav_settings_kwargs(ENSEMBL_V2, SettingRole.PIN)
         self.assertIsNone(kwargs["vep_args"])
         self.assertIsNone(kwargs["pick_order"])
 
 
-class SettingsSnapshotTests(TestCase):
-    """ Settings the import reads are snapshotted on the version: a changed setting makes a new version
-        rather than halting (or silently altering) the one in use """
+class VAVSettingsTests(TestCase):
+    """ Every setting a version records is one VAV_SETTINGS row; its role decides whether a change halts the
+        version in use (pin), makes a new one (snapshot) or waits for one (default) """
+
+    def test_every_field_exists_once(self):
+        fields = [s.field for s in VAV_SETTINGS]
+        self.assertEqual(len(fields), len(set(fields)))
+        model_fields = {f.name for f in VariantAnnotationVersion._meta.fields}
+        self.assertEqual([], [f for f in fields if f not in model_fields])
+
+    def test_roles_partition_the_kwargs(self):
+        all_fields = {s.field for s in VAV_SETTINGS}
+        by_role = [set(vav_settings_kwargs(ENSEMBL_V2, role)) for role in SettingRole]
+        self.assertEqual(all_fields, set.union(*by_role))
+        self.assertEqual(len(all_fields), sum(len(fields) for fields in by_role))
 
     @override_settings(ANNOTATION_MIN_PATHOGENIC_RANKSCORE=0.9)
     def test_rankscore_pinned_only_where_counted(self):
         for columns_version, expected in {1: None, 2: 0.9, 3: 0.9, 4: None, 5: None}.items():
             with self.subTest(columns_version=columns_version):
-                self.assertEqual(expected, settings_snapshot_kwargs(columns_version)["min_pathogenic_rankscore"])
+                context = VAVSettingContext(columns_version, AnnotationConsortium.ENSEMBL)
+                self.assertEqual(expected, vav_settings_kwargs(context, SettingRole.SNAPSHOT)["min_pathogenic_rankscore"])
+
+    @override_settings(ANNOTATION_VEP_ENSEMBL_GENCODE="primary")
+    def test_gencode_subset_ensembl_only(self):
+        for consortium, expected in {AnnotationConsortium.ENSEMBL: "primary", AnnotationConsortium.REFSEQ: None}.items():
+            with self.subTest(consortium=consortium):
+                context = VAVSettingContext(2, consortium)
+                self.assertEqual(expected, vav_settings_kwargs(context, SettingRole.SNAPSHOT)["gencode_subset"])
 
     def test_changed_setting_is_not_a_vep_mismatch(self):
         vav = VariantAnnotationVersion(sv_overlap_same_type=True, sv_overlap_single_value_method="lowest_af",

@@ -137,7 +137,7 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     gencode = models.TextField(blank=True, null=True)  # 37/38 only
     gencode_subset = models.TextField(
         null=True, blank=True, choices=GencodeSubset.choices,
-    )  # None = full Ensembl set; ignored on RefSeq VAVs
+    )  # None = full Ensembl set; ignored on RefSeq VAVs (vep_config.VAV_SETTINGS)
     genebuild = models.TextField()
     gnomad = models.TextField(blank=True, null=True)  # 37/38 only
     refseq = models.TextField(blank=True)
@@ -149,7 +149,7 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     open_targets = models.TextField(blank=True, null=True)  # release parsed from Open Targets filename
     popeve = models.TextField(blank=True, null=True)  # GRCh38 only - date string parsed from popEVE filename
     spliceai = models.TextField(blank=True, null=True)
-    distance = models.IntegerField(default=5000)  # VEP --distance parameter
+    distance = models.IntegerField(default=5000)  # VEP --distance (vep_config.VAV_SETTINGS)
 
     # --- remaining VEP command line component pins (#462) ------------------
     # Data files and settings that go into the VEP command line but aren't reported in the ##VEP=
@@ -177,26 +177,21 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     uk10k = models.TextField(null=True, blank=True)
     utr_annotator = models.TextField(null=True, blank=True)  # UTRAnnotator uORF file - GRCh37/38 only
 
-    pick_order = models.TextField(null=True, blank=True)  # ANNOTATION_VEP_PICK_ORDER
     sift_enabled = models.BooleanField(null=True)  # vep_config "sift" - whether we pass --sift b
-    sv_max_size = models.IntegerField(null=True, blank=True)  # ANNOTATION_VEP_SV_MAX_SIZE
-    # ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE - a symbolic del/dup/inv shorter than this went to the STANDARD
-    # pipeline (@see annotation.annotation_pipeline_routing)
-    structural_variant_min_size = models.IntegerField()
-    # ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE - an explicit (sequence) variant whose ref or alt is at least this long
-    # goes to the STRUCTURAL_VARIANT pipeline. Null (versions made before #1708) routes them all to STANDARD
-    explicit_structural_variant_min_size = models.IntegerField(null=True, blank=True)
-    sv_overlap_min_fraction = models.FloatField(null=True, blank=True)  # gnomAD SV overlap_cutoff
-    # ANNOTATION_VEP_SV_OVERLAP_RECIPROCAL at creation: overlap_cutoff applies to both SVs, not only gnomAD's (#2589)
-    sv_overlap_reciprocal = models.BooleanField(default=False)
-    vep_args = models.TextField(null=True, blank=True)  # ANNOTATION_VEP_ARGS, space joined
 
-    # Settings the import reads, snapshotted at creation (vep_config.SETTINGS_SNAPSHOT_FIELDS): read off the
-    # version, so changing a setting makes a new version rather than changing what this one imports
-    sv_overlap_same_type = models.BooleanField(default=True)  # ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE
-    # ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD - which overlapping gnomAD SV supplies the gnomAD columns
+    # --- settings recorded on the version (vep_config.VAV_SETTINGS) ------------
+    # The table says which setting each comes from and what changing it does to a version in use: a PIN halts it
+    # (above), a SNAPSHOT is read off the version instead of settings so a new version gets made, a DEFAULT is only
+    # stamped at creation. Null on versions made before the field existed.
+    pick_order = models.TextField(null=True, blank=True)
+    vep_args = models.TextField(null=True, blank=True)
+    sv_max_size = models.IntegerField(null=True, blank=True)
+    structural_variant_min_size = models.IntegerField()
+    explicit_structural_variant_min_size = models.IntegerField(null=True, blank=True)
+    sv_overlap_min_fraction = models.FloatField(null=True, blank=True)
+    sv_overlap_reciprocal = models.BooleanField(default=False)
+    sv_overlap_same_type = models.BooleanField(default=True)
     sv_overlap_single_value_method = models.TextField(default="lowest_af")
-    # ANNOTATION_MIN_PATHOGENIC_RANKSCORE - predictions_num_pathogenic at columns_version 2/3, null otherwise
     min_pathogenic_rankscore = models.FloatField(null=True, blank=True)
     # pipeline type -> the normalised VEP command its first run used (annotation/vep_command_check.py)
     vep_commands = models.JSONField(null=True, blank=True)

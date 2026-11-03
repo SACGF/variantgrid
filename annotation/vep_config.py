@@ -1,10 +1,14 @@
 import os
 import re
+from collections.abc import Callable
 from copy import deepcopy
-from typing import Optional
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Optional
 
 from django.conf import settings
 
+from genes.enums import AnnotationConsortium
 from snpdb.models.models_genome import GenomeBuild
 
 
@@ -102,9 +106,9 @@ def _pin_basename(path: Optional[str]) -> Optional[str]:
 
 
 def vep_component_version_kwargs(build_settings: dict) -> dict:
-    """ VariantAnnotationVersion pins for the VEP command line components the ##VEP= header doesn't
-        report - data files without a dedicated version field, and the settings that alter the command
-        line. Takes the raw settings.ANNOTATION[build] dict (@see #462).
+    """ VariantAnnotationVersion pins for the vep_config data the ##VEP= header doesn't report - files without
+        a dedicated version field, and whether SIFT runs. Takes the raw settings.ANNOTATION[build] dict (@see #462);
+        the scalar settings are VAV_SETTINGS.
 
         Values come from the configured paths alone, with no filesystem access, so this returns the same
         answer on a web node as on an annotation node. """
@@ -126,38 +130,103 @@ def vep_component_version_kwargs(build_settings: dict) -> dict:
     # Mirrors _get_vep_fasta - the vep_config override only exists on deployments pinned below VEP 112
     kwargs["fasta"] = _pin_basename(vep_config_data.get("fasta") or build_settings.get("reference_fasta"))
     kwargs["sift_enabled"] = bool(vep_config_data.get("sift", False))
-    kwargs["pick_order"] = settings.ANNOTATION_VEP_PICK_ORDER
-    kwargs["vep_args"] = " ".join(settings.ANNOTATION_VEP_ARGS) or None
-    kwargs["sv_max_size"] = settings.ANNOTATION_VEP_SV_MAX_SIZE
-    kwargs["sv_overlap_min_fraction"] = settings.ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION
     return kwargs
 
 
-# VariantAnnotationVersion fields snapshotted from settings at creation, and read off the version (never settings)
-# wherever they're used - the VEP command line or the import. Changing the setting leaves existing versions as they
-# were and makes create_new_variant_annotation_version mint a new one, so they're left out of the checks that an
-# annotated file / the installed VEP match a version (which re-derive them from live settings).
-SETTINGS_SNAPSHOT_FIELDS = ("distance", "gencode_subset", "min_pathogenic_rankscore",
-                            "sv_overlap_same_type", "sv_overlap_single_value_method")
+class SettingRole(Enum):
+    """ What happens to the VariantAnnotationVersions in use when the setting changes """
+    # In the lookup and checked against the running VEP / the annotated file's header: the version halts with
+    # VEPVersionMismatchError until a new one is made
+    PIN = "pin"
+    # In the lookup, but read off the version wherever it's used (the VEP command line or the import) and left out of
+    # the checks: the version keeps going and create_new_variant_annotation_version mints a new one
+    SNAPSHOT = "snapshot"
+    # Stamped on creation only, never looked up: versions made before the field existed (null) still match, and a
+    # changed setting takes effect once something else mints a new version
+    DEFAULT = "default"
 
 
-def settings_snapshot_kwargs(columns_version: int) -> dict:
-    """ What a VariantAnnotationVersion created now records for SETTINGS_SNAPSHOT_FIELDS other than
-        gencode_subset (Ensembl only - @see vep_dict_to_variant_annotation_version_kwargs) """
+@dataclass(frozen=True)
+class VAVSettingContext:
+    columns_version: int
+    annotation_consortium: str
+
+    @classmethod
+    def for_vep_config(cls, vep_config: "VEPConfig") -> "VAVSettingContext":
+        return cls(vep_config.columns_version, vep_config.annotation_consortium)
+
+
+@dataclass(frozen=True)
+class VAVSetting:
+    field: str  # VariantAnnotationVersion field
+    setting: str  # the Django setting it records
+    role: SettingRole
+    value: Callable[[VAVSettingContext], Any]  # what a version created now records
+
+
+def sv_overlap_reciprocal_for_new_version() -> bool:
+    """ ANNOTATION_VEP_SV_OVERLAP_RECIPROCAL needs VEP's reciprocal custom option (#2589) """
+    return settings.ANNOTATION_VEP_SV_OVERLAP_RECIPROCAL and int(settings.ANNOTATION_VEP_VERSION) >= 116
+
+
+def _min_pathogenic_rankscore(context: VAVSettingContext) -> Optional[float]:
+    """ Rankscores count towards predictions_num_pathogenic at columns_version 2/3 only (1 uses the predictions,
+        4+ the raw scores), so elsewhere the threshold isn't recorded and changing it doesn't make a new version """
+    if context.columns_version in (2, 3):
+        return settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE
+    return None
+
+
+def _gencode_subset(context: VAVSettingContext) -> Optional[str]:
+    if context.annotation_consortium == AnnotationConsortium.ENSEMBL:
+        return getattr(settings, "ANNOTATION_VEP_ENSEMBL_GENCODE", None)
+    return None
+
+
+def _distance(_context: VAVSettingContext) -> int:
     distance = getattr(settings, "ANNOTATION_VEP_DISTANCE", None)
-    if distance is None:
-        distance = 5000
-    # Rankscores count towards predictions_num_pathogenic at columns_version 2/3 only (1 uses the predictions,
-    # 4+ the raw scores), so elsewhere the threshold isn't pinned and changing it doesn't make a new version
-    min_pathogenic_rankscore = None
-    if columns_version in (2, 3):
-        min_pathogenic_rankscore = settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE
-    return {
-        "distance": distance,
-        "min_pathogenic_rankscore": min_pathogenic_rankscore,
-        "sv_overlap_same_type": settings.ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE,
-        "sv_overlap_single_value_method": settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD,
-    }
+    return 5000 if distance is None else distance
+
+
+# Every Django setting a VariantAnnotationVersion records, with what a change to it does to the versions in use.
+# The data files are pinned separately above (vep_component_version_kwargs); this is the scalar settings.
+VAV_SETTINGS: tuple[VAVSetting, ...] = (
+    VAVSetting("pick_order", "ANNOTATION_VEP_PICK_ORDER", SettingRole.PIN,
+               lambda c: settings.ANNOTATION_VEP_PICK_ORDER),
+    VAVSetting("vep_args", "ANNOTATION_VEP_ARGS", SettingRole.PIN,
+               lambda c: " ".join(settings.ANNOTATION_VEP_ARGS) or None),
+    VAVSetting("sv_max_size", "ANNOTATION_VEP_SV_MAX_SIZE", SettingRole.PIN,
+               lambda c: settings.ANNOTATION_VEP_SV_MAX_SIZE),
+    # gnomAD SV overlap_cutoff
+    VAVSetting("sv_overlap_min_fraction", "ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION", SettingRole.PIN,
+               lambda c: settings.ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION),
+    # A symbolic del/dup/inv shorter than this goes to the STANDARD pipeline (annotation/annotation_pipeline_routing.py)
+    VAVSetting("structural_variant_min_size", "ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE", SettingRole.PIN,
+               lambda c: settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE),
+    VAVSetting("distance", "ANNOTATION_VEP_DISTANCE", SettingRole.SNAPSHOT, _distance),  # VEP --distance
+    VAVSetting("gencode_subset", "ANNOTATION_VEP_ENSEMBL_GENCODE", SettingRole.SNAPSHOT, _gencode_subset),
+    VAVSetting("min_pathogenic_rankscore", "ANNOTATION_MIN_PATHOGENIC_RANKSCORE", SettingRole.SNAPSHOT,
+               _min_pathogenic_rankscore),
+    VAVSetting("sv_overlap_same_type", "ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE", SettingRole.SNAPSHOT,
+               lambda c: settings.ANNOTATION_VEP_SV_OVERLAP_SAME_TYPE),
+    # Which overlapping gnomAD SV supplies the gnomAD columns (SVOverlapProcessor)
+    VAVSetting("sv_overlap_single_value_method", "ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD",
+               SettingRole.SNAPSHOT, lambda c: settings.ANNOTATION_VEP_SV_OVERLAP_SINGLE_VALUE_METHOD),
+    # An explicit (sequence) variant whose ref or alt is at least this long goes to the STRUCTURAL_VARIANT pipeline;
+    # the same setting as structural_variant_min_size, whose pin makes the new version when it changes (#1708)
+    VAVSetting("explicit_structural_variant_min_size", "ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE", SettingRole.DEFAULT,
+               lambda c: settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE),
+    # overlap_cutoff applies to both SVs, not only gnomAD's (#2589)
+    VAVSetting("sv_overlap_reciprocal", "ANNOTATION_VEP_SV_OVERLAP_RECIPROCAL", SettingRole.DEFAULT,
+               lambda c: sv_overlap_reciprocal_for_new_version()),
+)
+
+SETTINGS_SNAPSHOT_FIELDS = frozenset(s.field for s in VAV_SETTINGS if s.role is SettingRole.SNAPSHOT)
+
+
+def vav_settings_kwargs(context: VAVSettingContext, *roles: SettingRole) -> dict:
+    """ field -> what a VariantAnnotationVersion created now records, for the settings with these roles """
+    return {s.field: s.value(context) for s in VAV_SETTINGS if s.role in roles}
 
 
 class VEPConfig:
