@@ -12,6 +12,7 @@ from genes.models import GeneSymbol
 from ontology.enums import GeneDiseaseClassification, OntologyService, PanelAppClassification
 from ontology.models import (
     ONTOLOGY_RELATIONSHIP_STANDARD_QUALITY_FILTER,
+    OntologyImport,
     OntologyImportSource,
     OntologyRelation,
     OntologyRelationshipQualityFilter,
@@ -100,19 +101,33 @@ class MemoryOntologyTraverser:
     batch runs that touch every HGNC term.
     """
 
+    # Only what traversal and gene_annotation read - a version has ~800k relations, and full rows with a
+    # separate copy of each term per relation (select_related) don't fit in memory on a production box (#2609)
+    RELATION_FIELDS = ("id", "source_term", "dest_term", "relation", "extra", "from_import")
+    TERM_FIELDS = ("id", "name", "ontology_service")
+
     def __init__(self, ontology_version: OntologyVersion):
         self._ontology_version = ontology_version
         otr_qs = ontology_version.get_ontology_term_relations()
-        edges = list(otr_qs.select_related("from_import", "source_term", "dest_term"))
-        self._edges = edges
+        imports = {oi.pk: oi for oi in OntologyImport.objects.filter(pk__in=otr_qs.values("from_import"))}
+        term_ids_qs = otr_qs.values("source_term").union(otr_qs.values("dest_term"))
+        terms: dict[str, OntologyTerm] = {
+            term.pk: term
+            for term in OntologyTerm.objects.filter(pk__in=term_ids_qs).only(*self.TERM_FIELDS).iterator(chunk_size=10_000)
+        }
+
+        edges = []
         self._by_source: dict[str, list[OntologyTermRelation]] = defaultdict(list)
         self._by_dest: dict[str, list[OntologyTermRelation]] = defaultdict(list)
-        terms: dict[str, OntologyTerm] = {}
-        for otr in edges:
+        for otr in otr_qs.only(*self.RELATION_FIELDS).iterator(chunk_size=10_000):
+            # Every relation shares the one term / import object rather than holding its own copy
+            otr.source_term = terms[otr.source_term_id]
+            otr.dest_term = terms[otr.dest_term_id]
+            otr.from_import = imports[otr.from_import_id]
+            edges.append(otr)
             self._by_source[otr.source_term_id].append(otr)
             self._by_dest[otr.dest_term_id].append(otr)
-            terms[otr.source_term_id] = otr.source_term
-            terms[otr.dest_term_id] = otr.dest_term
+        self._edges = edges
         self._terms = terms
         self._hgnc_by_name = {
             t.name.upper(): t for t in terms.values()
