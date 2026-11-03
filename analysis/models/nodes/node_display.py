@@ -7,7 +7,8 @@
 from dataclasses import dataclass
 from typing import Optional
 
-# One line of a node name - the card is 128px wide and shows at most 3 lines
+# One line of a node name. The card is 64px wide and clamps each line to about 2 rows of 9 characters
+# (analysis_nodes.js:renderNodeName); this cap only keeps the hover title and the editor heading readable
 NAME_LINE_MAX_LENGTH = 30
 CHIP_TEXT_MAX_LENGTH = 20
 

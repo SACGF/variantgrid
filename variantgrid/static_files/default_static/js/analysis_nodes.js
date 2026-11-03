@@ -140,17 +140,28 @@ function createNodeFromData(nodeData) {
 	return node;
 }
 
-// The name is clamped to 3 lines on the card, so hovering has to give the whole thing
+// Line 1 is what the node reads and line 2 its mode (node_display.py). Each line is clamped on its own, so a long
+// sample name can't push the mode off the card
+function renderNodeName(node, name) {
+	node.data("nodeName", name || "");
+	const nodeName = $(".node-name", node).empty();
+	for (const line of (name || "").split("\n").filter(Boolean)) {
+		$("<span/>", {class: "node-name-line", text: line}).appendTo(nodeName);
+	}
+}
+
+// The card clamps the name, so hovering has to give the whole thing. The title becomes an html Bootstrap tooltip
+// (global.js), so line breaks are <br> and the text is escaped
 function updateNodeTitle(node) {
-	const parts = [$(".node-name", node).text()];
+	const parts = [node.data("nodeName").split("\n").map(escapeHtml).join("<br>")];
 	let nodeHelp = NODE_HELP[node.attr("node_class")];
 	if (nodeHelp) {
 		if (SHOW_NODE_IDS_IN_TOOLTIPS) {
 			nodeHelp += " (node #" + node.attr("node_id") + ")";
 		}
-		parts.push(nodeHelp);
+		parts.push(escapeHtml(nodeHelp));
 	}
-	node.attr("title", parts.filter(Boolean).join("\n\n"));
+	node.attr("title", parts.filter(Boolean).join("<br><br>"));
 }
 
 function isManagedByJsPlumb(el) {
@@ -171,7 +182,7 @@ function updateNodeFromData(node, nodeData) {
 	node.attr(nodeData.attributes);
 	const nodeOverlay = $(".node-overlay", node);
 	nodeOverlay.attr("class", nodeData.overlay_css_classes);
-	$(".node-name", node).text(nodeData.name);
+	renderNodeName(node, nodeData.name);
 	$(".node-klass", node).text(nodeData.class_label_short);
 	$(".node-badge", node).empty().append(renderNodeIcon(nodeData.icon));
 
