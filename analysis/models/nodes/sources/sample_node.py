@@ -457,16 +457,16 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             if source_object := self.get_source_object():
                 name_parts.append(str(source_object))
                 if not self.get_source_samples():  # Otherwise the chips show what the group holds
-                    name_parts.append("\n(no samples)")
+                    name_parts.append("(no samples)")
         elif self.sample:
             name_parts.append(self.sample.name)
             if self.sample.has_genotype:
                 if zyg := self.get_zygosity_description():
-                    name_parts.append(f"\n({zyg})")
+                    name_parts.append(f"({zyg})")
 
         if name_parts:
             if filter_description := self.get_filter_description():
-                name_parts.append(f"\n({filter_description})")
+                name_parts.append(f"({filter_description})")
 
         return "\n".join(name_parts)
 
@@ -623,11 +623,22 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         return NodeChip(text=specimen_data["label"], icon=cls.SOURCE_LEVEL_ICONS[SampleSourceLevel.SPECIMEN].fa,
                         title=specimen_data["title"], children=children)
 
+    def _get_qc_gene_list_chip(self) -> Optional[NodeChip]:
+        if not self.restrict_to_qc_gene_list:
+            return None
+        if self.sample_gene_list is None:
+            return NodeChip(text="QC gene list", icon="fa-solid fa-lock", css_class="node-chip-warning",
+                            title="Restricted to Sample Gene List, but none specified!")
+        return NodeChip(text="QC gene list", icon="fa-solid fa-lock",
+                        title=f"Restricted to sample gene list: {self.sample_gene_list.gene_list.name}")
+
     def get_node_chips(self) -> list[NodeChip]:
         """ The hierarchy from the picked object down, nested the way the relations are. Why a group
             node returns fewer rows than it used to - a VCF was archived - is a question only the
             canvas can answer, so what was left out gets an amber chip """
         chips = super().get_node_chips()
+        if qc_gene_list_chip := self._get_qc_gene_list_chip():
+            chips.append(qc_gene_list_chip)
         if self.get_source_object() is None:
             return chips
 
