@@ -149,9 +149,14 @@ VCTable.format_hgvs = (parts) => {
         }
         cDom.append($('<span>', {text: ":", class: 'colon'}));
         // used to be display:inline-block; but that doesn't underline
-        cDom.append($('<span>', {class:'c-hgvs-nomen', text: limitLength(cNomen, 100)}));
+        const nomenDisplay = abbreviateHgvsSequences(cNomen);
+        const nomenDom = $('<span>', {class:'c-hgvs-nomen', text: limitLength(nomenDisplay, 100)});
+        if (nomenDisplay !== cNomen) {
+            nomenDom.attr('title', cNomen);
+        }
+        cDom.append(nomenDom);
     } else {
-        cDom.append(document.createTextNode(limitLength(parts.full || '', 100)));
+        cDom.append(document.createTextNode(limitLength(abbreviateHgvsSequences(parts.full || ''), 100)));
     }
     if (url) {
         cDom = $('<a>', {href: url, html: cDom, class: 'hover-link'});

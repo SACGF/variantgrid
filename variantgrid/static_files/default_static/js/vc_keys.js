@@ -186,6 +186,15 @@ const EKey = (function() {
             } else if (this.value_type === 'T') {
                 this.safeHtml(val, element);
                 element.removeClass('blank');
+            } else if (this.value_type === 'F' && EKey.HGVS_KEYS.has(this.key)) {
+                const display = abbreviateHgvsSequences(val);
+                element.text(display);
+                if (display !== val) {
+                    element.attr('title', val);
+                } else {
+                    element.removeAttr('title');
+                }
+                element.removeClass('blank');
             } else if (this.value_type === 'F') {
                 element.text(val);
                 element.removeClass('blank');
@@ -236,6 +245,7 @@ const EKey = (function() {
     
 })();
 
+EKey.HGVS_KEYS = new Set(['c_hgvs', 'g_hgvs']);
 EKey.HTML_WHITE_LIST = new Set(['BR','B','I','OL','UL','LI','U','SUP','SUB','SPAN','DIV','P','STRONG','EM']);
 
 // UNSPECIFIED STRENGTH HANDLING

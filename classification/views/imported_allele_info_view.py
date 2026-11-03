@@ -19,6 +19,7 @@ from classification.models.classification_variant_info_models import (
     ResolvedVariantInfo,
 )
 from genes.hgvs import HGVSComponents, HGVSDisplay, hgvs_diff_description
+from genes.hgvs.hgvs import abbreviate_hgvs_sequences
 from library.django_utils import get_url_from_view_path, require_superuser
 from library.django_utils.admin_utils import get_admin_url
 from library.django_utils.view_utils import render_ajax_view
@@ -270,11 +271,11 @@ def _hgvs_resolution_steps(allele_info: ImportedAlleleInfo) -> tuple[Optional[HG
 
     def resolved_input(origin: str, variant_info: Optional[ResolvedVariantInfo], is_reference: bool) -> MultiDiffInput:
         label = f"{origin} ({variant_info.genome_build})" if variant_info else origin
-        return MultiDiffInput(label, variant_info.resolved_hgvs if variant_info else None, is_reference=is_reference)
+        return MultiDiffInput(label, abbreviate_hgvs_sequences(variant_info.resolved_hgvs) if variant_info else None, is_reference=is_reference)
 
     imported_input: Optional[MultiDiffInput] = None
     if allele_info.imported_c_hgvs:
-        imported_input = MultiDiffInput(f"Imported ({allele_info.imported_genome_build_patch_version})", allele_info.imported_c_hgvs)
+        imported_input = MultiDiffInput(f"Imported ({allele_info.imported_genome_build_patch_version})", abbreviate_hgvs_sequences(allele_info.imported_c_hgvs))
     normalised_input = resolved_input("Normalised", normalised_info, is_reference=True)
     liftover_input = resolved_input("Liftover", liftover_info, is_reference=False)
     inputs = [inp for inp in [imported_input, normalised_input, liftover_input] if inp]

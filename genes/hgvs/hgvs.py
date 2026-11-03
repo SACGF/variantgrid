@@ -45,6 +45,18 @@ def hgvs_diff_description(hgvs_diff: HGVSDiff, include_minor=False) -> list[str]
     return diff_list
 
 
+HGVS_SEQUENCE_DISPLAY_MAX_LENGTH = 20  # as Sequence.abbreviate
+_LONG_HGVS_SEQUENCE = re.compile(rf'(del|dup|ins)([ACGTN]{{{HGVS_SEQUENCE_DISPLAY_MAX_LENGTH + 1},}})')
+
+
+def abbreviate_hgvs_sequences(hgvs: Optional[str]) -> Optional[str]:
+    """ Replaces each explicit del/dup/ins sequence too long to read with its length,
+        e.g. c.1234_1235insTGGG... -> c.1234_1235ins<22,124 bp>. For display only - the value stays as stored (#2612) """
+    if not hgvs:
+        return hgvs
+    return _LONG_HGVS_SEQUENCE.sub(lambda m: f"{m.group(1)}<{len(m.group(2)):,} bp>", hgvs)
+
+
 _NOMEN_PARTS = re.compile(r'^(?P<pos>.*?)(?P<op>del|dup|ins)(?P<nuc>.*?)(ins(?P<ins>.*?))?$')
 
 
@@ -260,6 +272,18 @@ class HGVSDisplay:
     @property
     def dna_nomen(self) -> Optional[str]:
         return self.dna_hgvs.nomen
+
+    @property
+    def dna_nomen_display(self) -> Optional[str]:
+        return abbreviate_hgvs_sequences(self.dna_nomen)
+
+    @property
+    def full_dna_hgvs_display(self) -> str:
+        return abbreviate_hgvs_sequences(self.full_dna_hgvs)
+
+    @property
+    def is_abbreviated(self) -> bool:
+        return self.full_dna_hgvs_display != self.full_dna_hgvs
 
     @property
     def p_hgvs_short(self) -> Optional[str]:

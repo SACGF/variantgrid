@@ -45,6 +45,12 @@ class PathogenicityTool:
         suffix = "max" if self.raw_direction == RawScoreDirection.LOWER else "min"
         return f"{self.raw_field}_{suffix}"
 
+    @property
+    def clingen_calibrated(self) -> bool:
+        """ The PP3 / BP4 cutoffs are ClinGen's calibration (Pejaver 2022, Bergquist 2024) rather than the
+            authors' own, so a filter at raw_pathogenic_threshold is PP3 supporting evidence """
+        return self.source_url in CLINGEN_CALIBRATION_URLS
+
 
 # Pejaver V, Byrne AB, Feng B-J, et al. Calibration of computational tools for missense variant
 # pathogenicity classification and ClinGen recommendations for PP3/BP4 criteria.
@@ -66,6 +72,7 @@ _BERGQUIST_2024 = (
     "Genet Med. 2025;27(3):101353.",
     "https://doi.org/10.1016/j.gim.2025.101353",
 )
+CLINGEN_CALIBRATION_URLS = frozenset({_PEJAVER_2022[1], _BERGQUIST_2024[1]})
 _ALIREZAIE_2018 = (
     "Alirezaie N, Kernohan KD, Hartley T, Majewski J, Hocking TD. ClinPred: Prediction Tool to Identify "
     "Disease-Relevant Nonsynonymous Single-Nucleotide Variants. Am J Hum Genet. 2018;103(4):474-483. "

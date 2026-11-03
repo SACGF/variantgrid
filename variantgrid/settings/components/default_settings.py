@@ -604,6 +604,9 @@ ANALYSIS_WARN_IF_NO_QC_GENE_LIST_MESSAGE = None  # disabled by default
 # editor. A deployment with no patient data trims this down to just the sample
 ANALYSIS_SAMPLE_NODE_LEVELS = ["S", "E", "P", "T"]
 ANALYSIS_NODE_CACHE_Q = True
+# Population node PM2 preset (#2605): the max gnomAD popmax / filtering AF, in percent. The published guidance is
+# gene and inheritance specific; 0.01% is the usual dominant-disease line, and a lab policy choice
+ANALYSIS_NODE_PRESET_PM2_MAX_PERCENT = 0.01
 # Node dispatch throttles (see analysis.tasks.analysis_update_tasks). A single dispatch leases at
 # most this many nodes for one analysis - a node finishing re-triggers the dispatcher, so a wide
 # graph flows through in waves rather than flooding analysis_workers in one go
