@@ -9,19 +9,12 @@ column (the fifth `|`-separated field), so keep the table shape.
 | Item | Waiting on | Last checked | Next check |
 |---|---|---|---|
 | hgvs fork | biocommons/hgvs release with #899, #901, #902, #911 | 2026-10-27 | 2026-11-27 |
-| UTRAnnotator copy | Ensembl/VEP_plugins#869 on the `release/<VEP>` branch | 2026-10-27 | 2026-11-27 |
-| VEP plugin per-variant cache | Ensembl/ensembl-variation#1220, Ensembl/VEP_plugins#871 | 2026-10-27 | 2026-11-27 |
-| CSI index docs | Ensembl/ensembl-vep#2068 | 2026-10-27 | 2027-01-27 |
-| uv cooldown exceptions | the 7-day cooldown passing the pinned cutoffs | 2026-10-27 | 2026-10-30 |
-
-## uv cooldown exceptions
-
-`uv.toml` names packages whose security fix was less than seven days old when it was needed, each with a fixed
-cutoff date that admits it. The entry freezes that package at the cutoff, so it comes out once the default cooldown
-has passed the date: certifi and pillow after 2026-10-28, pypdf after 2026-10-29.
-
-Check: `grep exclude-newer-package uv.toml` against today's date. When resolved: delete the expired entries, recompile
-both requirements files (root `AGENTS.md`, Python packages), and delete this row when none are left.
+| UTRAnnotator copy | Ensembl/VEP_plugins#869 on the `release/<VEP>` branch | 2026-11-03 | 2026-12-03 |
+| VEP plugin per-variant cache | Ensembl/ensembl-variation#1220, Ensembl/VEP_plugins#871 | 2026-11-03 | 2026-12-03 |
+| CSI index docs | Ensembl/ensembl-vep#2068 | 2026-11-03 | 2027-01-27 |
+| Pre-112 VEP fasta | Shariant and runx1db2 moving to VEP >= 112 (Ensembl/ensembl-vep#1635 fixed in 112) | 2026-11-03 | 2027-02-03 |
+| MaveDB stripped file | every deployment running MaveDB on a VEP_plugins `release/116` checkout from 2026-09-01 (Ensembl/VEP_plugins#853) | 2026-11-03 | 2027-02-03 |
+| gnomAD SV overlap via two `--custom` | Ensembl/ensembl-vep#1989 (`coords=2`, `show_overlaps`) for #1645 | 2026-11-03 | 2027-02-03 |
 
 ## hgvs fork
 
@@ -82,3 +75,39 @@ our indexes are built and distributed regardless (`annotation/annotation_data/ge
 `download_annotation_data`).
 
 Check: `gh issue view 2068 --repo Ensembl/ensembl-vep --json state -q .state`. When closed, delete this row.
+
+## Pre-112 VEP fasta
+
+`variantgrid/settings/components/annotation_settings.py:use_pre_vep112_fasta` points VEP at the chromosome-named
+fasta, because VEP before 112 renamed NCBI-fasta contigs and silently dropped plugin/custom annotations
+(Ensembl/ensembl-vep#1635). Shariant (`variantgrid/settings/env/shariantcommon.py`) and runx1db2
+(`variantgrid/settings/env/runx1db2.py`) pin `ANNOTATION_VEP_VERSION = "110"` and call it.
+
+Check: `grep -rn "use_pre_vep112_fasta\|ANNOTATION_VEP_VERSION *=" variantgrid/settings/env/`. When resolved (no env
+file calls it): delete `use_pre_vep112_fasta`, the `vep_config["fasta"]` fallback in
+`annotation/vep_annotation.py:_get_vep_fasta` stays only while a `vep_config` sets `fasta`, and delete this row.
+`annotation/annotation_run_files.py:write_qs_to_vcf` writing contig names rather than accessions is independent of
+this and stays.
+
+## MaveDB stripped file
+
+`annotation/annotation_data/generate_annotation/mavedb_strip.py` cuts the MaveDB download to the columns MaveDB.pm
+emits, because the plugin hashed all ~250 columns of every record in a variant's span and a single long deletion
+could OOM VEP. Ensembl/VEP_plugins#853 (on `release/116` from 2026-09-01) makes the plugin keep only those columns
+and skip VRS-mapped records, with output unchanged, so the strip is redundant on that plugin - but a VEP 110
+deployment, or a 116 plugins checkout made before then, still has the old MaveDB.pm.
+
+Check: the pre-112 row above, plus `git -C <ANNOTATION_VEP_PLUGINS_DIR> log -1 --format=%cs -- MaveDB.pm` on each 116
+deployment. When resolved: stop generating `.stripped` files (keep accepting the name in
+`annotation/vep_annotation.py`, deployments already have them), delete `mavedb_strip.py` and this row.
+
+## gnomAD SV overlap via two `--custom`
+
+`annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:SVOverlapProcessor` runs the gnomAD SV file as two
+`--custom` entries and stitches them back together, because `--custom` cannot return both the matched record's ID and
+its coordinates (Ensembl/ensembl-vep#1645, open; the feature is Ensembl/ensembl-vep#1989). The StructuralVariantOverlap INV bug that first ruled the plugin out
+(Ensembl/VEP_plugins#710) is fixed from VEP 114.
+
+Check: `gh pr view 1989 --repo Ensembl/ensembl-vep --json state,mergedAt -q '"\(.state) \(.mergedAt)"'`. When resolved (in a release
+deployments run): replace the two customs with one and drop the stitching in `SVOverlapProcessor`, then delete this
+row.
