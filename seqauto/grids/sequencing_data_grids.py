@@ -105,8 +105,8 @@ class SequencingRunListGrid(JqGridUserRowConfig):
         # Insert second to last
         colmodels = colmodels[:-1] + vcf_extra + colmodels[-1:]
         if settings.SEQAUTO_SEQUENCING_RUN_EXTERNAL_LINKS:
-            colmodels.append({'index': 'external_links', 'name': 'external_links',
-                              'label': 'External Links', 'sortable': False, 'width': 80})
+            colmodels.append({'index': 'external_links', 'name': 'external_links', 'label': 'External Links',
+                              'formatter': 'formatExternalLinks', 'sortable': False, 'width': 80})
         return colmodels
 
     def iter_format_items(self, items):
