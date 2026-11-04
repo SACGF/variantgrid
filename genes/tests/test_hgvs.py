@@ -31,7 +31,7 @@ from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import (
     HgvsMatchTranscriptAndGenomeRefAllele,
 )
 from genes.hgvs.hgvs_converter import HGVSNonCodingTranscriptException
-from genes.hgvs.hgvs_matcher import FakeTranscriptVersion, _reset_thread_matchers
+from genes.hgvs.hgvs_matcher import FakeTranscriptVersion
 from snpdb.models import Contig, GenomeBuild, VariantCoordinate
 from variantopedia.signals.hgvs_search import _get_non_coding_c_hgvs_as_n_details
 
@@ -574,8 +574,8 @@ class TestHGVSMatcherInstance(TestCase):
     """ #2624 - a matcher's FastaFile can't be shared across threads or a fork """
 
     def setUp(self):
-        _reset_thread_matchers()
-        self.addCleanup(_reset_thread_matchers)  # the matchers made here are hollow (__init__ patched out)
+        HGVSMatcher.reset_instances()
+        self.addCleanup(HGVSMatcher.reset_instances)  # the matchers made here are hollow (__init__ patched out)
 
     def test_reused_within_a_thread(self, _init):
         genome_build = GenomeBuild.grch37()
@@ -596,5 +596,5 @@ class TestHGVSMatcherInstance(TestCase):
     def test_forked_child_starts_empty(self, _init):
         genome_build = GenomeBuild.grch37()
         parent_matcher = HGVSMatcher.instance(genome_build)
-        _reset_thread_matchers()  # what os.register_at_fork runs in the child
+        HGVSMatcher.reset_instances()  # what os.register_at_fork runs in the child
         self.assertIsNot(parent_matcher, HGVSMatcher.instance(genome_build))
