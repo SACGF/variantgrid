@@ -1,4 +1,3 @@
-import json
 from collections import defaultdict
 from typing import Optional
 
@@ -17,13 +16,9 @@ from snpdb.models import GenomeBuild
 from snpdb.models.models_user_settings import TagConfigCollection, UserSettings
 from snpdb.utils import get_tag_quick_tags, get_tag_sort_order_by_tag, get_tag_styles_and_colors
 from snpdb.variant_queries import get_variant_queryset_for_gene_symbol
+from uicore.templatetags.js_tags import jsonify_for_js
 
 register = template.Library()
-
-
-def _json_for_script(value) -> str:
-    """ Inline in a <script> block - tag and sample names are user data, so '</script>' must not end it """
-    return json.dumps(value).replace("</", "<\\/")
 
 
 def render_user_tag_styles(prefix, user_tag_style):
@@ -87,7 +82,7 @@ class VariantTagsJSNode(template.Node):
                                              "patient": patient_id,
                                              "patient_name": patient_names.get(patient_id),
                                              "resolved": resolved_date})
-        return _json_for_script(variant_tags)
+        return jsonify_for_js(variant_tags)
 
 
 @register.tag
@@ -122,7 +117,7 @@ def render_variant_tags_dict(_parser, token):
 @register.simple_tag
 def render_analysis_samples_dict(analysis):
     """ {sample_id: name} - what a tagging's sample is called on its pill's tooltip """
-    return mark_safe(_json_for_script({s.pk: str(s) for s in analysis.get_samples()}))
+    return jsonify_for_js({s.pk: str(s) for s in analysis.get_samples()})
 
 
 @register.simple_tag(takes_context=True)
@@ -130,7 +125,7 @@ def render_variant_tag_order(context, analysis=None):
     """ {tag_id: sort_order} for JS tag sorting - see sortVariantTags in grid.js """
     tag_config_collection = _analysis_tag_config_collection(analysis)
     sort_order_by_tag = get_tag_sort_order_by_tag(context["user"], tag_config_collection=tag_config_collection)
-    return mark_safe(_json_for_script(sort_order_by_tag))
+    return jsonify_for_js(sort_order_by_tag)
 
 
 @register.simple_tag(takes_context=True)
@@ -138,7 +133,7 @@ def render_variant_quick_tags(context, analysis=None):
     """ [tag_id] for the one-click (+) buttons - see VariantGridFormat.tags """
     tag_config_collection = _analysis_tag_config_collection(analysis)
     quick_tags = get_tag_quick_tags(context["user"], tag_config_collection=tag_config_collection)
-    return mark_safe(_json_for_script(quick_tags))
+    return jsonify_for_js(quick_tags)
 
 
 @register.inclusion_tag("analysis/tags/render_tag_styles_and_formatter.html", takes_context=True)

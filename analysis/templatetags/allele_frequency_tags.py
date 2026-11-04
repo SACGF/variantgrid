@@ -1,5 +1,3 @@
-import json
-
 from django.conf import settings
 from django.template import Library
 
@@ -11,7 +9,7 @@ register = Library()
 
 @register.inclusion_tag("analysis/tags/allele_frequency_tag.html")
 def allele_frequency_controls(node):
-    allele_frequency = get_allele_frequency_filter_json_for_node(node)
+    allele_frequency = get_allele_frequency_filter_data_for_node(node)
 
     return {
         "VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT": settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT,
@@ -19,11 +17,8 @@ def allele_frequency_controls(node):
     }
 
 
-def get_allele_frequency_filter_json_for_node(node):
-    json_data = None
+def get_allele_frequency_filter_data_for_node(node):
     try:
-        serializer = NodeAlleleFrequencyFilterSerializer(node.nodeallelefrequencyfilter)
-        json_data = json.dumps(serializer.data)
+        return NodeAlleleFrequencyFilterSerializer(node.nodeallelefrequencyfilter).data
     except NodeAlleleFrequencyFilter.DoesNotExist:
-        pass
-    return json_data
+        return None
