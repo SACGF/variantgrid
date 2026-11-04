@@ -11,7 +11,8 @@ VariantAnnotation.
 import operator
 from functools import reduce
 
-from django.db.models import Exists, OuterRef, Q
+from django.db.models import F, Q
+from django.db.models.lookups import In
 
 from genes.models.models_gnomad_gene_constraint import GnomADGeneConstraint
 
@@ -96,9 +97,11 @@ def gene_constraint_q(field: str, lookup: str, value: float, allow_null: bool,
     passing = constraint_rows.filter(**{f"{field}__{lookup}": value}).values("gene_symbol_id")
     q = Q(**{f"{prefix}symbol__in": passing})
     if allow_null:
-        # Not ~Q(symbol__in=...): negated across the VariantAnnotation relation that is a NOT EXISTS over the
-        # whole partition per row (35x slower on a 65k variant sample); this one Postgres hashes
-        with_value = constraint_rows.filter(gene_symbol_id=OuterRef(f"{prefix}symbol"),
-                                            **{f"{field}__isnull": False})
-        q |= ~Exists(with_value)
+        # "No value" is "not a gene with a value that fails", so the variant side stays a hashed NOT IN. The lookup
+        # is wrapped as an expression because ~Q(symbol__in=...) across the VariantAnnotation relation, or a
+        # NOT EXISTS correlated on the symbol, makes the planner scan the whole partition before joining the sample
+        # (116s vs 0.3s on a 56k variant sample)
+        failing = constraint_rows.filter(**{f"{field}__isnull": False}).exclude(gene_symbol_id__in=passing)
+        no_failing_value = ~Q(In(F(f"{prefix}symbol"), failing.values("gene_symbol_id")))
+        q |= no_failing_value | Q(**{f"{prefix}symbol__isnull": True})
     return q

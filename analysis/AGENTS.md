@@ -203,6 +203,10 @@ Gotchas:
   (`analysis/models/nodes/node_query_mixin.py:querysets_to_pk_any_array_q`), never an OR of `pk IN (subquery)` - Postgres
   can't index an OR of IN-subqueries and walks all of snpdb_variant (#1894). Plain `pk IN (<union>)` fixes count() but
   the planner misestimates the union and sorted grid pages get slower.
+- A negated filter on an annotation column - `~Q(variantannotation__symbol__in=...)`, or `~Exists` correlated on it -
+  becomes a per-row subquery, and the planner scans the whole annotation partition before joining the sample (#2600:
+  116 s vs 0.3 s). Write it as `~Q(In(F("variantannotation__symbol"), subquery))`, a hashed `NOT IN` on the joined row
+  (`annotation/effect_filters.py:gene_constraint_q`).
 - Never call `node.save()` inside a celery task — use `analysis/models/nodes/analysis_node.py:AnalysisNode.update`, a
   conditional UPDATE on (pk, version) that raises `analysis/exceptions.py:NodeOutOfDateException` if the user bumped the
   node meanwhile; `update_node_task` treats that as "exit quietly, a newer version is coming".
