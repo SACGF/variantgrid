@@ -75,7 +75,7 @@ def _item_context(item: MenuItem, active: bool) -> dict:
 
 def _menu_bar_main(active_menu) -> str:
     top_items = [{
-        'url': reverse(menu.url_name),
+        'url': reverse(menu.top_bar_url_name),
         'title': menu.title,
         'active': menu == active_menu,
         'type': 'top',

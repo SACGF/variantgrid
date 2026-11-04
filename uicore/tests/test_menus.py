@@ -25,7 +25,7 @@ class MenuRegistryTest(SimpleTestCase):
     def test_url_names_resolve(self):
         url_names = {k for k in get_resolver().reverse_dict.keys() if isinstance(k, str)}
         for menu in MENUS:
-            declared = list(menu.pages) + ([menu.url_name] if menu.url_name else [])
+            declared = list(menu.pages) + [name for name in (menu.url_name, menu.top_bar_fallback) if name]
             for item in menu.items:
                 declared.extend(item.pages)
                 if not item.href:
@@ -48,7 +48,7 @@ class MenuRegistryTest(SimpleTestCase):
         """ Shariant hides the gene pages but keeps Symbol Matching, so the Genes menu stays in the top bar """
         with _visible_except('genes', 'gene_lists', 'gene_grid', 'gene_wiki', 'canonical_transcripts'):
             genes_menu = current_menu('gene_symbol_matching')
-            self.assertTrue(genes_menu.in_top_bar)
+            self.assertEqual('gene_symbol_matching', genes_menu.top_bar_url_name)
             self.assertEqual(['gene_symbol_matching'], [item.url_name for item in genes_menu.visible_items()])
 
     def test_page_under_hidden_item_keeps_menu(self):
