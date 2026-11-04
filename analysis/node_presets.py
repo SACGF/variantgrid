@@ -2,9 +2,10 @@
 ACMG criterion presets for the Effect, Population and ClinVar node editors (#2605).
 
 A preset is a named criterion (PVS1, PP3, PM2 ...) whose values fill the editor's form client side for the user to
-adjust and save. Nothing is stored on the node, so its name, chips and method summary describe what it really
-filters on. The Effect and ClinVar cutoffs are published calibrations, the ones the Pathogenicity Thresholds page
-lists (`annotation/pathogenicity_predictions.py`), so they are set in one place. The Population (PM2) lines are lab
+adjust and save. Only its name is stored: saving the form with a preset picked names the node after it
+(`BaseNodeForm._post_clean`), as the criterion is what the node is for; its chips and method summary still describe
+what it really filters on. The Effect and ClinVar cutoffs are published calibrations, the ones the Pathogenicity
+Thresholds page lists (`annotation/pathogenicity_predictions.py`), so they are set in one place. The Population (PM2) lines are lab
 policy that varies with mode of inheritance, penetrance and severity, so they are `PopulationNodePreset` rows, seeded
 by migration and edited in Django admin. Presets look for pathogenic evidence only (keep candidates, drop benign
 evidence), which is what an analysis wants almost every time; the criteria on one node pull in different directions
@@ -39,6 +40,7 @@ from snpdb.enums import AlleleOriginFilterDefault
 @dataclass(frozen=True)
 class NodePreset:
     key: str
+    name: str  # the node's name once the preset is saved - short, as the node card fits about 9 characters a row
     label: str  # the dropdown option, leading with the criterion
     description: str  # what the preset sets and why, shown once it has been applied
     values: dict[str, Any]  # form field -> value; every other field goes back to the node's default
@@ -63,7 +65,7 @@ def damage_node_presets(node: DamageNode) -> list[NodePreset]:
                              f"mechanism for the gene - keeping genes with no constraint score. ")
     pvs1_description += ("The PTC NMD filter is left off: it only applies to frameshifts and stop gains whose new "
                          "stop was located, so set it to narrow to those.")
-    presets.append(NodePreset("pvs1", "PVS1 - null variant candidates", pvs1_description, pvs1))
+    presets.append(NodePreset("pvs1", "PVS1 - LoF", "PVS1 - null variant candidates", pvs1_description, pvs1))
 
     if pp3_tools := _pp3_tools(node):
         pp3 = {"impact_min": PathogenicityImpact.MODERATE, "impact_required": True}
@@ -72,14 +74,14 @@ def damage_node_presets(node: DamageNode) -> list[NodePreset]:
             pp3[f"{tool.raw_field}_allow_null"] = True
         cutoffs = ", ".join(f"{t.name} ≥ {t.raw_pathogenic_threshold:g}" for t in pp3_tools)
         presets.append(NodePreset(
-            "pp3", "PP3 - missense with computational support",
+            "pp3", "PP3 - in silico", "PP3 - missense with computational support",
             f"Impact MODERATE or above, required, then any ClinGen-calibrated predictor at its PP3-supporting "
             f"cutoff: {cutoffs}. A variant a tool has no score for is kept when another tool supports it.",
             pp3))
 
     if node.has_gene_constraint:
         presets.append(NodePreset(
-            "pp2", "PP2 - missense in a constrained gene",
+            "pp2", "PP2 - missense", "PP2 - missense in a constrained gene",
             f"Impact MODERATE or above, required (missense and in-frame indels), with gnomAD missense Z ≥ "
             f"{GENE_MIS_Z_CUTOFF:g}, required - the gene has fewer missense variants than expected, so missense "
             f"is a common mechanism of disease. Genes with no constraint score are dropped.",
@@ -129,13 +131,13 @@ def population_node_presets(node: PopulationNode) -> list[NodePreset]:
         label = preset.name
         if cutoffs := _population_preset_cutoffs(values):
             label += f" ({cutoffs})"
-        presets.append(NodePreset(f"population_{preset.pk}", label, description, values))
+        presets.append(NodePreset(f"population_{preset.pk}", preset.name, label, description, values))
     return presets
 
 
 def clinvar_node_presets(_node: ClinVarNode) -> list[NodePreset]:
     return [NodePreset(
-        "pp5", "PP5 - reputable source reports pathogenic",
+        "pp5", "PP5 - P/LP ≥ 2★", "PP5 - reputable source reports pathogenic",
         "Germline Pathogenic or Likely pathogenic with at least 2 review stars (multiple submitters with no "
         "conflicts, an expert panel or a practice guideline). Records with conflicting interpretations are not "
         "matched.",
