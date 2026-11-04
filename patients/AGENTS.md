@@ -13,7 +13,9 @@ Patterns here:
   The database only insists on a non-blank patient code or last name (`Patient.Meta` constraint), which the
   patient form and API report as a validation error. Neither will give a patient a code another patient the user
   can see already has (patients/models/models_patient.py:Patient.validate_patient_code_unused); the database doesn't
-  enforce that, so the CSV import and older rows can still hold duplicates, which Patient.match refuses.
+  enforce that, so the CSV import and older rows can still hold duplicates, which Patient.match refuses. A patient
+  that already shares its code can still be saved keeping it (otherwise it could never be edited, by the page or by
+  an API client); its page warns until one is changed, and an API post matching by that code is a 400 naming them.
 - A PhenotypeDescription is owned through the one-to-one on the description, named after the owner's model
   (`patient`, `cohort`), so deleting the owner deletes it and its sentences. New text deletes the description and makes
   another, and the approval (`approved_by`) goes with it. An unowned description is an SA Path request's, held by

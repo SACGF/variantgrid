@@ -1,5 +1,6 @@
 
 from django.conf import settings
+from django.contrib import messages
 from django.db.models import Prefetch, Q
 from django.http.response import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -53,6 +54,13 @@ def view_patient(request, patient_id):
             patient = form.save()
 
         add_save_message(request, valid, "Patient")
+
+    # Saving keeps a code another patient already shares, so the duplicate is flagged here to be fixed (#2518)
+    if sharing := list(Patient.filter_visible_with_patient_code(request.user, patient.patient_code, exclude_pk=patient.pk)):
+        others = ", ".join(f"Patient:{p.pk}" for p in sharing)
+        messages.add_message(request, messages.WARNING,
+                             f"This patient shares its patient code with {others} - change one of them so imports "
+                             f"and the API can tell them apart")
 
     specimens = f" ({patient.num_specimens})" if patient.num_specimens else ''
     existing_files = get_patient_attachment_file_dicts(patient)

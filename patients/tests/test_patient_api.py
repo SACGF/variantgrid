@@ -86,6 +86,21 @@ class PatientAPITest(APITestCase):
         patient_b.refresh_from_db()
         self.assertEqual("CODE-B", patient_b.patient_code)
 
+    def test_existing_duplicate_code(self):
+        """ #2518 - a patient that already shares its code can still be updated by id, but a post by that code
+            can't tell which patient it means """
+        patients = [Patient.objects.create(patient_code="DUP-CODE", last_name=name) for name in ("ONE", "TWO")]
+        for patient in patients:
+            assign_permission_to_user_and_groups(self.user, patient)
+
+        response = self.client.patch(reverse("api_patient-detail", args=[patients[0].pk]),
+                                     {"patient_code": "DUP-CODE", "first_name": "UPDATED"}, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+        response = self._create_patient(patient_code="DUP-CODE", last_name="ONE")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn(f"Patient:{patients[0].pk}, Patient:{patients[1].pk}", str(response.data["patient_code"]))
+
     def test_creates_patient_specimen_extraction(self):
         response = self._create_run()
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)

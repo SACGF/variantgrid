@@ -154,7 +154,14 @@ class ExternallyManagedModelSerializer(serializers.ModelSerializer):
             if existing:
                 return existing
         if q := self._local_reference_q(validated_data):
-            return qs.filter(q).first()
+            matches = list(qs.filter(q).order_by("pk").values_list("pk", flat=True))
+            if len(matches) > 1:
+                # Updating whichever came first would be a guess - name them so the duplicate gets fixed (#2518)
+                model = self.Meta.model
+                names = ", ".join(f"{model.__name__}:{pk}" for pk in matches)
+                raise serializers.ValidationError({model.LOCAL_REFERENCE_FIELD: f"Matches more than one record: {names}"})
+            if matches:
+                return qs.get(pk=matches[0])
         return None
 
     def _external_pk_for(self, instance, external_pk_data) -> ExternalPK:
