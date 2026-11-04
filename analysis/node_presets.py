@@ -100,6 +100,22 @@ def _population_preset_summary(values: dict[str, Any]) -> str:
     return f"Sets {summary}."
 
 
+POPULATION_COUNT_SHORT_LABELS = {"gnomad_ac_max": "AC", "gnomad_hom_alt_max": "hom", "gnomad_hemi_count_max": "hemi"}
+
+
+def _population_preset_cutoffs(values: dict[str, Any]) -> str:
+    """ The cutoffs for the dropdown option, e.g. "≤ 1%, hom ≤ 2" - generated, so renaming a row can't leave stale
+        numbers in its name """
+    parts = []
+    applies_percent = any(values.get(field) for field in PopulationNode.POPULATION_DATABASE_SHORT_LABELS)
+    if applies_percent and values["percent"] != PopulationNode.EVERYTHING:
+        parts.append(f"≤ {values['percent']:g}%")
+    for field, label in POPULATION_COUNT_SHORT_LABELS.items():
+        if (max_count := values.get(field)) is not None:
+            parts.append(f"{label} ≤ {max_count}")
+    return ", ".join(parts)
+
+
 def population_node_presets(node: PopulationNode) -> list[NodePreset]:
     presets = []
     for preset in PopulationNodePreset.objects.filter(enabled=True):
@@ -108,7 +124,10 @@ def population_node_presets(node: PopulationNode) -> list[NodePreset]:
         if not node.has_filtering_allele_frequency:  # the editor doesn't draw them, so they must not filter
             values["gnomad_fafmax_faf95_max"] = values["gnomad_fafmax_faf99_max"] = False
         description = " ".join(filter(None, [preset.description, _population_preset_summary(values)]))
-        presets.append(NodePreset(f"population_{preset.pk}", preset.name, description, values))
+        label = preset.name
+        if cutoffs := _population_preset_cutoffs(values):
+            label += f" ({cutoffs})"
+        presets.append(NodePreset(f"population_{preset.pk}", label, description, values))
     return presets
 
 

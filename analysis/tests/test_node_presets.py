@@ -127,6 +127,7 @@ class NodePresetsTest(TestCase):
         key = f"population_{row.pk}"
         presets = self._presets(PopulationNodeForm, PopulationNode(analysis=self.analysis))
         self.assertEqual([key], list(presets))
+        self.assertEqual("PM2 - X-linked (≤ 0.05%, hemi ≤ 1)", presets[key]["label"])
         self.assertIn("gnomAD hemizygous ≤ 1", presets[key]["description"])
         self.assertEqual([], presets[key]["values"]["gnomad_population"])
 
