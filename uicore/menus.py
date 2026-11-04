@@ -64,12 +64,21 @@ class Menu:
     pages: tuple[str, ...] = ()  # url names shown with this sub-menu without highlighting an item
     top_bar_condition: Optional[Callable[[], bool]] = None
     footer_template: Optional[str] = None
+    # the top bar link when url_name is hidden - otherwise hiding url_name hides the whole menu
+    top_bar_fallback: Optional[str] = None
+
+    @property
+    def top_bar_url_name(self) -> Optional[str]:
+        if not self.url_name or (self.top_bar_condition and not self.top_bar_condition()):
+            return None
+        for url_name in (self.url_name, self.top_bar_fallback):
+            if url_name and is_url_visible(url_name):
+                return url_name
+        return None
 
     @property
     def in_top_bar(self) -> bool:
-        if not self.url_name or (self.top_bar_condition and not self.top_bar_condition()):
-            return False
-        return is_url_visible(self.url_name)
+        return self.top_bar_url_name is not None
 
     def visible_items(self) -> list[MenuItem]:
         return [item for item in self.items if item.is_visible]
