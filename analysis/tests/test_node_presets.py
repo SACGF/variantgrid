@@ -143,6 +143,14 @@ class NodePresetsTest(TestCase):
         self.assertTrue(pm2.keep_internally_classified_pathogenic)
         self.assertEqual((False, False), (pm2.af_1kg, pm2.use_internal_counts))
 
+    def test_population_preset_fields_match_the_node(self):
+        """ The two models declare the shared fields separately, so a cutoff added to one must be added to the other """
+        for name in PopulationNodePreset.NODE_FIELDS:
+            preset_field = PopulationNodePreset._meta.get_field(name)
+            node_field = PopulationNode._meta.get_field(name)
+            self.assertEqual(type(node_field), type(preset_field), name)
+            self.assertEqual(node_field.null, preset_field.null, name)
+
     def test_population_editor_links_admins_to_presets(self):
         admin_url = reverse("admin:analysis_populationnodepreset_changelist")
         superuser = User.objects.create_superuser(username="test_node_presets_admin")

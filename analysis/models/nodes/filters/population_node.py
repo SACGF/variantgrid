@@ -354,6 +354,9 @@ class PopulationNodePreset(models.Model):
     gnomad_hemi_count_max = models.IntegerField(null=True, blank=True)
     keep_internally_classified_pathogenic = models.BooleanField(default=True)
 
+    # The PopulationNode fields a preset sets - the gnomAD frequency lines a PM2 policy is written in. The rest of the
+    # node (zygosity, internal counts, 1kg/UK10K/TOPMed) is deliberately not a preset's to decide. Each must be
+    # declared the same way on both models; test_node_presets checks they haven't drifted.
     NODE_FIELDS = ("percent", "gnomad_af", "gnomad_popmax_af", "gnomad_fafmax_faf95_max", "gnomad_fafmax_faf99_max",
                    "gnomad_ac_max", "gnomad_hom_alt_max", "gnomad_hemi_count_max",
                    "keep_internally_classified_pathogenic")
