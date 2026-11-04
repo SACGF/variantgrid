@@ -1,4 +1,3 @@
-import json
 import re
 import uuid
 from collections.abc import Iterable
@@ -19,6 +18,7 @@ from library.enums.log_level import LogLevel
 from library.log_utils import log_level_to_bootstrap
 from library.preview_request import PreviewData, PreviewModelMixin, preview_coordinator_icon_html
 from library.utils import diff_text, emoji_to_unicode, format_diff_text, html_id_safe, pretty_label
+from uicore.templatetags.js_tags import jsonify_for_js
 from uicore.views.ajax_form_view import LazyRender
 from variantgrid.perm_path import get_visible_url_names
 
@@ -48,8 +48,7 @@ def update_django_messages(context):
             tags = message.tags
             text = str(message)
             message_json.append({"tags": tags, "text": text})
-    message_json_string = json.dumps(message_json)
-    return SafeString(f"update_django_messages({message_json_string});")
+    return SafeString(f"update_django_messages({jsonify_for_js(message_json)});")
 
 
 # Taken from https://www.caktusgroup.com/blog/2017/05/01/building-custom-block-template-tag/

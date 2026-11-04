@@ -1,4 +1,3 @@
-import json
 import logging
 from collections import defaultdict
 
@@ -7,6 +6,7 @@ from django import template
 from analysis.models import NodeVariant
 from analysis.models.nodes.node_utils import get_rendering_dict
 from library import tag_utils
+from uicore.templatetags.js_tags import jsonify_for_js
 
 register = template.Library()
 
@@ -42,7 +42,7 @@ class AnalysisNodesTemplateNode(template.Node):
                 except Exception as e:
                     logging.error(e)
 
-            return json.dumps(nodes_array)
+            return jsonify_for_js(nodes_array)
         except template.VariableDoesNotExist:
             return ''
 
@@ -60,7 +60,7 @@ class AnalysisNodeConnectionsJSNode(template.Node):
             for node in nodes:
                 for parent in node.parents():
                     connections.append(node.get_connection_data(parent))
-            return json.dumps(connections)
+            return jsonify_for_js(connections)
         except template.VariableDoesNotExist:
             return ''
 
@@ -77,7 +77,7 @@ class NodeVariantNode(template.Node):
         node_variant_qs = NodeVariant.objects.filter(node__analysis=analysis).values_list('node_id', 'variant_id')
         for node_id, variant_id in node_variant_qs:
             node_variant[node_id][variant_id] = 1
-        return json.dumps(node_variant)
+        return jsonify_for_js(node_variant)
 
 
 @register.tag

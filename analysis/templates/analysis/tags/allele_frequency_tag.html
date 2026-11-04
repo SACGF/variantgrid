@@ -1,3 +1,4 @@
+{% load js_tags %}
 <script type="text/ignored_template" data-template="slider">
     <div class='af-slider-row'>
         <div class='slider-min slider-label'></div>
@@ -92,7 +93,7 @@
         });
         
         {% if allele_frequency %}
-        let initialAlleleFrequency = {{ allele_frequency|safe }};
+        let initialAlleleFrequency = {{ allele_frequency|jsonify }};
         setInitialAlleleFrequencyFilter(initialAlleleFrequency);
         {% endif %}
     });
