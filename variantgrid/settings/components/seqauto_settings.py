@@ -115,6 +115,9 @@ SEQAUTO_FAKE_SAMPLE_ENRICHMENT_KITS_DF = None  # Used to be able to load gake te
 #   url_pattern: %()s template formatted with SequencingRun.get_params() — supports %(sequencing_run)s,
 #                %(original_sequencing_run)s, %(flowcell_id)s, %(enrichment_kit)s, %(experiment)s
 #   min_date: optional ISO date string "YYYY-MM-DD" — runs with no date or an earlier date are skipped
+#   enrichment_kits: optional list of enrichment kit names (case-insensitive exact match); the link is only
+#                    shown for runs whose enrichment_kit name matches one (so a system with a different URL
+#                    per assay, e.g. RAVEN's /wgs/run/ pages, gets one entry per URL)
 #   exclude_enrichment_kits: optional list of enrichment kit names (case-insensitive exact match);
 #                            if the run's enrichment_kit name matches any, the link is skipped
 SEQAUTO_SEQUENCING_RUN_EXTERNAL_LINKS = []

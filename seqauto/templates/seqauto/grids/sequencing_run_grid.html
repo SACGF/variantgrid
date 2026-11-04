@@ -43,6 +43,10 @@
             }
             return value;
         },
+        // Server renders the anchors (format_html_join); the grid autoencodes cells without a formatter
+        formatExternalLinks : function(linksHtml) {
+            return linksHtml || "";
+        },
         formatSequencingRunVCF : function(vcfIds, options, rowObject) {
             if (!vcfIds) {
                 return "";
