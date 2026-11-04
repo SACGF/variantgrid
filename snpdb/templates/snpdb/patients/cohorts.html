@@ -2,12 +2,12 @@
 {% load crispy_forms_tags %}
 {% load genome_build_tags %}
 {% load datatable_tags %}
+{% load help_tags %}
 
 {% block title %}Cohorts{% endblock %}
 {% block content %}
     <div class="container">
-        <h3>Cohorts</h3>
-        <p>See Cohorts page in Help</p>
+        {% page_help page_id='patients/cohorts_help' title='Cohorts' %}
         <form id="cohort-form" method="post">
             <div class="card mb-2">
                 <div class="card-header">Create</div>

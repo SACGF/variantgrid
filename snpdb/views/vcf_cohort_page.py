@@ -133,6 +133,7 @@ def _membership_editor_context(cohort: Cohort, cohort_samples: list[Sample],
         "create_genotype_url": reverse("create_cohort_genotype", kwargs={"cohort_id": cohort.pk}),
         "candidate_samples": None,
         "family_groups": _family_groups_by_sample_id(cohort),
+        "large_rebuild_samples": settings.COHORT_GENOTYPE_REBUILD_LARGE_SAMPLES,
     }
 
     candidate_samples = []

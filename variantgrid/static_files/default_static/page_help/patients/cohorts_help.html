@@ -1,3 +1,18 @@
-<div>
-Cohorts help...
-</div>
+<p>
+A cohort is a set of samples analysed together - in a cohort node, as Duo/Trio/Quad members, or for gene counts
+and hotspots. Every uploaded VCF is already a cohort of its samples; make your own to pick samples from one or
+more files.
+</p>
+<ul>
+<li>Samples from <b>one VCF</b> make a <b>sub cohort</b>: ready instantly, and it keeps the caller's genotype at
+    every site - homozygous reference (<code>0/0</code>) is distinct from no call (<code>./.</code>).
+<li>Samples from <b>several VCFs</b> are merged into new genotype data by a background database job. A sample has
+    no record at a site its own VCF didn't call, so it is stored as <b>no call</b> there, matched by a zygosity
+    filter's "none" option and never by REF. The cohort can't tell a reference call from no coverage, which
+    matters most for inheritance filters on a parent.
+<li>Where the samples will be analysed together - a family, a case series - joint call them into one VCF from the
+    BAMs and upload that: the genotypes are then right, and there is no rebuild. A large merged cohort is one long
+    database job. See <a target="_blank"
+    href="https://variantgrid.readthedocs.io/en/latest/data/vcf_samples.html#multi-sample-vcfs">Multi-sample
+    VCFs</a> for why merging the VCF files alone is not enough.
+</ul>

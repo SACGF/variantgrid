@@ -5,5 +5,9 @@
 <li>Drag rows by the handle to set the order samples appear in.
 <li>Adds, removals and re-ordering are all applied together when you press <b>Save cohort</b>.
 <li>Tick saved samples to make a Duo, Trio or Quad analysis from them, or a new cohort of just those samples.
+<li>Samples all from one VCF save as a sub cohort, instantly. Samples from several VCFs are merged by a background
+    job, and a sample is recorded as no call (not REF) at any site its own VCF didn't call - prefer a
+    <a target="_blank" href="https://variantgrid.readthedocs.io/en/latest/data/vcf_samples.html#multi-sample-vcfs">joint
+    called VCF</a> where the samples belong together.
 <li>You can only add samples from the build you created the cohort with. See Cohorts page in help
 </ul>
