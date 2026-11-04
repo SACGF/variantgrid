@@ -242,6 +242,8 @@ class SpecimenSerializer(ExternallyManagedModelSerializer):
         fields = ("id", "patient", "reference_id", "description", "collected_by", "collection_date",
                   "received_date", "tissue_status", "external_pk")
         read_only_fields = ("id",)
+        # DRF's UniqueTogetherValidator would 400 a re-post before create() finds the row to update
+        validators = []
 
     def validate_patient(self, reference: ExternalReference) -> Patient:
         """ A specimen has nowhere to live without its patient, so an unresolvable one is a 400 rather
@@ -261,6 +263,7 @@ class ExtractionSerializer(ExternallyManagedModelSerializer):
         fields = ("id", "specimen", "reference_id", "nucleic_acid_source", "extraction_date",
                   "external_pk")
         read_only_fields = ("id",)
+        validators = []  # @see SpecimenSerializer.Meta
 
     def validate_specimen(self, reference: ExternalReference) -> Specimen:
         return resolve_or_raise(Specimen, reference, self.context["request"].user)
