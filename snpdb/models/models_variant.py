@@ -24,7 +24,7 @@ from django.db import IntegrityError, models, transaction
 from django.db.models import Exists, OuterRef, QuerySet, Value
 from django.db.models.deletion import CASCADE, DO_NOTHING
 from django.db.models.fields import TextField
-from django.db.models.functions.text import Concat
+from django.db.models.functions.text import Concat, Length
 from django.db.models.query_utils import FilteredRelation, Q
 from django.dispatch import receiver
 from django.urls.base import reverse
@@ -652,10 +652,17 @@ class Sequence(models.Model):
         Django 3 has ExclusionConstraint, Postgres contrib has BtreeGistExtension to add via migration
 
         Note: Even after the introduction of symbolic alts, there are still some really long sequences in here (~10kb)
-        due to large substitutions which we don't represent symbolically
+        due to large substitutions which we don't represent symbolically. Annotation routes variants with a long
+        explicit alt to the SV pipeline via alt__in (Sequence where Length(seq) >= N); the expression index gives
+        the planner statistics for that filter so the subplan stays hashed however many sequences there are (#2635)
     """
     seq = models.TextField()
     seq_sha256_hash = models.TextField(null=True, unique=True)
+
+    class Meta:
+        indexes = [
+            models.Index(Length("seq"), name="snpdb_sequence_seq_length_idx"),
+        ]
 
     def save(self, force_insert=False, force_update=False, using=None, update_fields=None):
         if not self.seq_sha256_hash:

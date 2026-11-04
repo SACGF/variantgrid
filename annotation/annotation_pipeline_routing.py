@@ -76,7 +76,9 @@ def _symbolic_annotated_as_small_q(structural_variant_min_size: int) -> Q:
 
 
 def _explicit_annotated_as_structural_q(explicit_structural_variant_min_size: int) -> Q:
-    # An explicit variant's end is position + len(ref) - 1, so the ref needs no join to Sequence
+    # An explicit variant's end is position + len(ref) - 1, so the ref needs no join to Sequence. The alt subquery
+    # is planned as a subplan (it sits inside an OR); Sequence's index on Length(seq) gives the planner the row
+    # estimate that keeps it hashed rather than rescanned per variant (#2635)
     q_long_ref = Q(end__gte=F("locus__position") + explicit_structural_variant_min_size - 1)
     long_alts = Sequence.objects.annotate(seq_length=Length("seq")).filter(
         seq_length__gte=explicit_structural_variant_min_size)
