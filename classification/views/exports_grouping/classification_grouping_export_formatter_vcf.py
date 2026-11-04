@@ -181,36 +181,14 @@ class ClassificationGroupingExportFormatterVCF(ClassificationGroupingExportForma
         return [self.vcf_format_details.target_system.value, self.genome_build.name]
 
     def header(self) -> list[str]:
-
-        # TODO reduce contigs to only those that are used
-        # GenomeBuildContig.objects.filter(genome_build=genome_build, contig__in=contigs).order_by('order').select_related('contig')
         genome_build_str = '37'
         if self.genome_build.is_version(38):
             genome_build_str = '38'
-        # self.queryset(genome_build=self.genome_build)
-
-        # contig_field = f'latest_allele_info__grch{genome_build_str}__variant__locus__contig'
-        # self.queryset(genome_build=self.genome_build).values_list(contig_field, flat=True).order_by(contig_field)
-
         contig_field = f'latest_allele_info__grch{genome_build_str}__variant__locus__contig'
         all_used_contig_ids = set(self.queryset(genome_build=self.genome_build).select_related(contig_field).values_list(contig_field, flat=True).order_by(contig_field).distinct())
 
         gb_contigs = GenomeBuildContig.objects.filter(genome_build=self.genome_build).order_by('order').select_related('contig')
         contigs = [gb_contig.contig for gb_contig in gb_contigs if gb_contig.contig_id in all_used_contig_ids]
-        """
-        contig_field = f'classification__allele_info__grch{genome_build_str}__variant__locus__contig'
-        contig_qs = self.classification_filter.cms_qs.values_list(contig_field, flat=True).order_by(contig_field).distinct()
-
-        if self.target_system == VCFTargetSystem.CLASSIFICATION_DUMP:
-            all_vcf_headers = ClassificationSimpleVCF.complete_header(
-                genome_build=self.genome_build,
-                contigs=contig_qs,
-                extras=[VCFHeader(settings.SITE_NAME + "_dataFilters", value=self.classification_filter.description)],
-                export_tweak=self.export_tweak
-            )
-
-        :return:
-        """
         return VCFRow.complete_header(
             genome_build=self.genome_build,
             contigs=contigs,
