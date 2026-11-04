@@ -9,6 +9,8 @@ from django.conf import settings
 
 from uicore.menus import Menu, MenuItem, is_url_visible
 
+HELP_ICON = "fas fa-question-circle"  # reference pages that explain rules or data rather than holding records
+
 
 def _seqauto_disabled() -> bool:
     return not settings.SEQAUTO_ENABLED
@@ -103,14 +105,14 @@ MENUS: tuple[Menu, ...] = (
                  pages=('classification_upload_unmapped_lab', 'classification_upload_unmapped_status')),
     ), pages=('create_classification_for_variant', 'create_classification_for_variant_tag',
               'create_classification_from_hgvs', 'internal_lab_download', 'lab_gene_classification_counts')),
-    # Symbol matching is the top bar link: Shariant hides every other Genes item and still gets the menu
-    Menu('genes', 'Genes', 'gene_symbol_matching', items=(
-        MenuItem('gene_symbol_matching', title="Symbol Matching"),
+    # Shariant hides every Genes page but Symbol Matching, which keeps the menu in its top bar
+    Menu('genes', 'Genes', 'gene_lists', top_bar_fallback='gene_symbol_matching', items=(
         MenuItem('genes', pages=('genome_build_genes',)),
         MenuItem('canonical_transcripts', pages=('view_canonical_transcript_collection',)),
         MenuItem('gene_grid', pages=('passed_gene_grid',)),
         MenuItem('gene_lists', pages=('view_gene_list',)),
         MenuItem('gene_wiki'),
+        MenuItem('gene_symbol_matching', title="Symbol Matching", icon=HELP_ICON),
     ), pages=('view_gene', 'view_gene_symbol', 'view_gene_symbol_genome_build', 'view_transcript',
               'view_transcript_version')),
     Menu('variants', 'Variants', 'variant_tags', items=(
@@ -123,12 +125,12 @@ MENUS: tuple[Menu, ...] = (
     ), pages=('view_allele', 'view_allele_compact', 'view_variant', 'view_variant_genome_build',
               'view_variant_annotation_history', 'nearby_variants_annotation_version')),
     Menu('annotation', 'Annotation', 'view_annotation_descriptions', items=(
-        MenuItem('view_annotation_descriptions', title="Descriptions",
-                 pages=('view_annotation_descriptions_genome_build',)),
         MenuItem('variant_annotation_runs', title="Pipeline Runs", admin_only=True, pages=('view_annotation_run',)),
-        MenuItem('pathogenicity_thresholds', title="Pathogenicity Thresholds"),
         MenuItem('annotation', title="Status"),
         MenuItem('annotation_versions', title="Versions"),
+        MenuItem('view_annotation_descriptions', title="Descriptions", icon=HELP_ICON,
+                 pages=('view_annotation_descriptions_genome_build',)),
+        MenuItem('pathogenicity_thresholds', title="Pathogenicity Thresholds", icon=HELP_ICON),
     ), pages=('view_citation',)),
     # Reached from the username in the navbar rather than the top bar
     Menu('settings', 'Settings', None, footer_template="uicore/menus/logout.html", items=(
