@@ -170,10 +170,12 @@ class SequencingRun(PreviewModelMixin, SeqAutoRecord):
                 min_date = datetime.strptime(min_date_str, "%Y-%m-%d").date()
                 if not date or date < min_date:
                     continue
-            excluded = cfg.get("exclude_enrichment_kits") or []
-            if excluded and enrichment_kit_name:
-                kit_name_lower = enrichment_kit_name.lower()
-                if any(ex.lower() == kit_name_lower for ex in excluded):
+            kit_name_lower = (enrichment_kit_name or "").lower()
+            if included := cfg.get("enrichment_kits"):
+                if kit_name_lower not in {kit.lower() for kit in included}:
+                    continue
+            if excluded := cfg.get("exclude_enrichment_kits"):
+                if kit_name_lower in {kit.lower() for kit in excluded}:
                     continue
             if params is None:
                 original = SequencingRun.get_original_illumina_sequencing_run(name)
