@@ -742,6 +742,9 @@ class Extraction(GuardianPermissionsMixin, ExternallyManagedModel, PreviewModelM
 
     @classmethod
     def normalize_reference_id(cls, reference_id: Optional[str]) -> Optional[str]:
+        # A blank reference is an unnamed extraction - stored as NULL, as '' would collide on unique_together
+        if not (reference_id and reference_id.strip()):
+            return None
         return normalize_specimen_reference(reference_id)
 
     def save(self, *args, **kwargs):

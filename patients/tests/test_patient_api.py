@@ -123,6 +123,16 @@ class PatientAPITest(APITestCase):
         self.assertEqual(Specimen.objects.get(reference_id="2600000001").description, "UPDATED")
         self.assertEqual(Extraction.objects.get(reference_id="2600000001C").nucleic_acid_source, NucleicAcid.RNA)
 
+    def test_re_posting_a_blank_extraction_reference_makes_another_unnamed_extraction(self):
+        """ #2641 - a blank reference_id is no reference, not a second '' that breaks unique_together """
+        self._create_patient()
+        self._create_specimen()
+        for _ in range(2):
+            response = self._create_extraction(reference_id="")
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(Extraction.objects.filter(specimen__reference_id="2600000001",
+                                                   reference_id__isnull=True).count(), 2)
+
     @override_settings(PATIENT_SPECIMEN_REFERENCE_NORMALIZER=DASHED_ACCESSION_NORMALIZER)
     def test_re_posting_in_another_systems_form_updates_the_same_row(self):
         """ The LIMS accessioned '26-000-00001C'; the sequencer's API client sends '2600000001C' """
