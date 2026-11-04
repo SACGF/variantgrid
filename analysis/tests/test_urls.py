@@ -185,6 +185,7 @@ class Test(URLTestCase):
             ('node_method_description', node_version_params, 200),
 
             ('trio_karyomapping', {"trio_id": cls.trio.pk}, 200),
+            ('trio_karyomapping_qc_tab', {"trio_id": cls.trio.pk}, 200),
 
             ('trio_wizard', {"cohort_id": cls.cohort.pk,
                              "sample1_id": cls.trio.proband.sample_id,
