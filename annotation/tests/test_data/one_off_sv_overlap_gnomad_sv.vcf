@@ -1,0 +1,16 @@
+##fileformat=VCFv4.2
+##contig=<ID=1>
+##INFO=<ID=END,Number=1,Type=Integer,Description="End">
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type">
+##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="Length">
+##INFO=<ID=AF,Number=1,Type=Float,Description="AF">
+##INFO=<ID=AC,Number=1,Type=Integer,Description="AC">
+##INFO=<ID=AN,Number=1,Type=Integer,Description="AN">
+##INFO=<ID=N_HOMALT,Number=1,Type=Integer,Description="Hom alt">
+##INFO=<ID=POPMAX_AF,Number=1,Type=Float,Description="Popmax AF">
+##INFO=<ID=AFR_AF,Number=1,Type=Float,Description="AFR AF">
+##INFO=<ID=EUR_AF,Number=1,Type=Float,Description="EUR AF">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO
+1	300000	gnomAD-SV_v2.1_DEL_1_SAME	N	<DEL>	.	PASS	END=310000;SVTYPE=DEL;SVLEN=10000;AF=0.01;AC=42;AN=4200;N_HOMALT=1;POPMAX_AF=0.02;AFR_AF=0.02;EUR_AF=0.005
+1	300000	gnomAD-SV_v2.1_DEL_1_INSIDE	N	<DEL>	.	PASS	END=302000;SVTYPE=DEL;SVLEN=2000;AF=1e-05;AC=1;AN=100000;N_HOMALT=0;POPMAX_AF=3e-05;AFR_AF=3e-05;EUR_AF=0
+1	299000	gnomAD-SV_v2.1_DEL_1_BIGGER	N	<DEL>	.	PASS	END=311000;SVTYPE=DEL;SVLEN=12000;AF=0.5;AC=2100;AN=4200;N_HOMALT=500;POPMAX_AF=0.6;AFR_AF=0.6;EUR_AF=0.4

@@ -505,7 +505,8 @@ class BulkVEPVCFAnnotationInserter:
         columns = set(columns) - set(manual_columns)
         return self.DB_FIXED_COLUMNS + manual_columns + sorted(columns)
 
-    def vep_to_db_dict(self, vep_transcript_data: TranscriptData, model_columns: Iterable[str]) -> dict:
+    def vep_to_db_dict(self, vep_transcript_data: TranscriptData, model_columns: Iterable[str],
+                       variant_coordinate: VariantCoordinate) -> dict:
         # logging.debug("vep_to_db_dict:")
         # logging.debug(vep_transcript_data)
 
@@ -528,7 +529,7 @@ class BulkVEPVCFAnnotationInserter:
         self._pick_promoter_ai_values(raw_db_data)
 
         if self.sv_overlap_processor:
-            self.sv_overlap_processor.process(raw_db_data)
+            self.sv_overlap_processor.process(raw_db_data, variant_coordinate)
 
         db_data = {}
         for c, value in raw_db_data.items():
@@ -723,8 +724,6 @@ class BulkVEPVCFAnnotationInserter:
         self._add_hgvs_g(variant_coordinate, transcript_data)
         self._add_calculated_num_predictions(transcript_data)
         self._add_spliceai_max_ds(transcript_data)
-        if self.annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
-            self._calculate_gnomad_sv_overlap_percentage(variant_coordinate, transcript_data)
 
     @staticmethod
     def _add_spliceai_max_ds(transcript_data: TranscriptData):
@@ -754,21 +753,6 @@ class BulkVEPVCFAnnotationInserter:
         """ gnomad_non_par=True means not on pseudoautosomal region on chrX, so XY count = hemizygous """
         if transcript_data.get("gnomad_non_par"):
             transcript_data["gnomad_hemi_count"] = transcript_data.get("gnomad_xy_ac")
-
-    def _calculate_gnomad_sv_overlap_percentage(self, variant_coordinate: VariantCoordinate, transcript_data: TranscriptData):
-        SV_PC_FIELD = "gnomad_sv_overlap_percent"
-
-        # These are currently coordinates that look like eg: chr17:42853981-43253980&chr17:43048298-43898190
-        if orig_gnomad_sv_overlap_percent := transcript_data.get(SV_PC_FIELD):
-            gnomad_sv_overlap_percent_list = []
-
-            for coord in orig_gnomad_sv_overlap_percent.split(VEP_SEPARATOR):
-                chrom, start, end = parse_gnomad_coord(coord)
-                of = overlap_fraction(Range(variant_coordinate.position, variant_coordinate.end),
-                                      Range(start, end))
-                gnomad_sv_overlap_percent_list.append(int(of * 100))
-
-            transcript_data[SV_PC_FIELD] = VEP_SEPARATOR.join([str(p) for p in gnomad_sv_overlap_percent_list])
 
     @staticmethod
     def _add_calculated_maxentscan(transcript_data: TranscriptData):
@@ -895,7 +879,7 @@ class BulkVEPVCFAnnotationInserter:
                 vep_transcript_data = dict(zip(self.vep_columns, vep_transcript_columns))
                 transcript_accession = self._get_transcript_accession(vep_transcript_data)
                 gene_id = self.get_gene_id(vep_transcript_data)
-                transcript_data = self.vep_to_db_dict(vep_transcript_data, self.transcript_columns)
+                transcript_data = self.vep_to_db_dict(vep_transcript_data, self.transcript_columns, variant_coordinate)
                 transcript_data.update(self.constant_data)
                 transcript_data["variant_id"] = variant_id
                 transcript_data["gene_id"] = gene_id
@@ -915,7 +899,8 @@ class BulkVEPVCFAnnotationInserter:
 
                 representative_transcript = vep_transcript_data.get(VEPColumns.PICK, False)
                 if representative_transcript:
-                    variant_data = self.vep_to_db_dict(vep_transcript_data, self.variant_only_columns)
+                    variant_data = self.vep_to_db_dict(vep_transcript_data, self.variant_only_columns,
+                                                       variant_coordinate)
                     variant_data.update(transcript_data)
                     if conservation := self.sv_conservation.get(variant_id):
                         # pyBigWig SV conservation _max columns (#1657) - the values VEP --custom bigwig
@@ -1041,9 +1026,11 @@ def empty_to_none(it):
 
 class SVOverlapProcessor:
     """
-        We use --custom (twice) rather than StructuralVariantOverlap
-        due to some issues: https://github.com/Ensembl/VEP_plugins/issues/710
-        This requires a bit of post-processing
+        gnomAD-SV is passed to VEP as --custom twice (ID and coords, as one custom can't return both -
+        https://github.com/Ensembl/ensembl-vep/issues/1645), with overlap_cutoff on the gnomAD SV's side only:
+        VEP has no two-way overlap since 116 (https://github.com/Ensembl/ensembl-vep/issues/2074). This keeps
+        the records where each SV covers at least sv_overlap_min_fraction of the other (#2589), of the same
+        type when sv_overlap_same_type, and picks the one whose frequencies the gnomad_* columns take.
     """
     def __init__(self, cvf_list: tuple[VEPColumnDef, ...], variant_annotation_version):
         sv_customs = {VEPCustom.GNOMAD_SV, VEPCustom.GNOMAD_SV_NAME}
@@ -1053,6 +1040,10 @@ class SVOverlapProcessor:
         }
         self.same_type = variant_annotation_version.sv_overlap_same_type
         self.single_value_method = variant_annotation_version.sv_overlap_single_value_method
+        # Versions from before the fraction was stored on them ran with the setting
+        self.min_fraction = variant_annotation_version.sv_overlap_min_fraction
+        if self.min_fraction is None:
+            self.min_fraction = settings.ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION
 
     def _get_required_substrings(self, variant_class: str) -> list[str]:
         required_substrings = []  # Empty means all will go through
@@ -1067,7 +1058,7 @@ class SVOverlapProcessor:
             required_substrings = EXPECTED_NAME.get(variant_class, [])
         return required_substrings
 
-    def process(self, raw_db_data: dict):
+    def process(self, raw_db_data: dict, variant_coordinate: VariantCoordinate):
         # This one should always there if any overlaps
         if 'gnomad_sv_overlap_name' not in raw_db_data:
             return
@@ -1086,6 +1077,8 @@ class SVOverlapProcessor:
             # No filtering required - all go through
             filtered_sv_records = sv_records
 
+        filtered_sv_records = self._filter_reciprocal_overlap(filtered_sv_records, variant_coordinate)
+
         if filtered_sv_records:
             chosen_record = self._pick_record(filtered_sv_records)
             # Update if not special multi-field
@@ -1102,6 +1095,21 @@ class SVOverlapProcessor:
             update_fields = dict.fromkeys(self.sv_fields)
 
         raw_db_data.update(update_fields)
+
+    def _filter_reciprocal_overlap(self, sv_records: list[dict], variant_coordinate: VariantCoordinate) -> list[dict]:
+        """ Keeps the records where our SV and the gnomAD SV each cover at least min_fraction of the other,
+            replacing gnomad_sv_overlap_percent (the coords VEP wrote, see vep_columns) with the share of our
+            SV the record covers """
+        our_range = Range(variant_coordinate.position, variant_coordinate.end)
+        kept = []
+        for r in sv_records:
+            _chrom, start, end = parse_gnomad_coord(r["gnomad_sv_overlap_coords"])
+            gnomad_range = Range(start, end)
+            our_fraction = overlap_fraction(our_range, gnomad_range)
+            if our_fraction >= self.min_fraction and overlap_fraction(gnomad_range, our_range) >= self.min_fraction:
+                r["gnomad_sv_overlap_percent"] = str(int(our_fraction * 100))
+                kept.append(r)
+        return kept
 
     def _pick_record(self, filtered_sv_records):
         if len(filtered_sv_records) == 1:

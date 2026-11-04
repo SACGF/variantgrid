@@ -177,7 +177,6 @@ class VariantAnnotationVersionColumns(DatatableConfig[VariantAnnotationVersion])
                        orderable=True, detail=True),
             RichColumn(key="sv_overlap_min_fraction", label="SV Overlap Min Fraction",
                        orderable=True, detail=True),
-            RichColumn(key="sv_overlap_reciprocal", label="SV Overlap Reciprocal", orderable=True, detail=True),
             RichColumn(key="sv_overlap_same_type", label="SV Overlap Same Type", orderable=True, detail=True),
             RichColumn(key="sv_overlap_single_value_method", label="SV Overlap Single Value",
                        orderable=True, detail=True),
