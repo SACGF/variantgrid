@@ -19,8 +19,8 @@
     {% labelled admin_only=True label="HGVS data version" value_css="text-monospace" row_css="debug-footnote" %}{{ allele_info.hgvs_converter_data_version | dash_if_empty }}{% endlabelled %}
     {% include "classification/tags/imported_allele_info_hgvs_step.html" with step=normalised_step %}
     {% include "classification/tags/imported_allele_info_hgvs_step.html" with step=liftover_step %}
-    {% labelled label=variant_coordinate_label value_css="text-monospace" %}{{ allele_info.variant_coordinate }}{% endlabelled %}
-    {% labelled label=variant_coordinate_normalized_label value_css="text-monospace" %}{{ allele_info.variant_coordinate_normalized }}{% endlabelled %}
+    {% labelled label=variant_coordinate_label value_css="text-monospace" %}<span{% if variant_coordinate_display != allele_info.variant_coordinate %} title="{{ allele_info.variant_coordinate }}"{% endif %}>{{ variant_coordinate_display|dash_if_empty }}</span>{% endlabelled %}
+    {% labelled label=variant_coordinate_normalized_label value_css="text-monospace" %}<span{% if variant_coordinate_normalized_display != allele_info.variant_coordinate_normalized %} title="{{ allele_info.variant_coordinate_normalized }}"{% endif %}>{{ variant_coordinate_normalized_display|dash_if_empty }}</span>{% endlabelled %}
 
     <hr style="border-top:1px dashed lightgrey"/>
     {% if allele_info.status != "M" %}

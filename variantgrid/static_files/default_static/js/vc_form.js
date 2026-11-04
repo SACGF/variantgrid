@@ -946,7 +946,12 @@ const VCForm = (function() {
                 if (p_dot !== -1) {
                     p_hgvs = p_hgvs.substring(p_dot);
                 }
-                appendLabelHeading('p.HGVS', $('<span>', {text: p_hgvs}));
+                const pHgvsDisplay = abbreviatePHgvsSequences(p_hgvs);
+                const pHgvsDom = $('<span>', {text: pHgvsDisplay});
+                if (pHgvsDisplay !== p_hgvs) {
+                    pHgvsDom.attr('title', p_hgvs);
+                }
+                appendLabelHeading('p.HGVS', pHgvsDom);
             }
 
             let alleleOriginBucket = this.record.allele_origin_bucket;

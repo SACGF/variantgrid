@@ -729,6 +729,17 @@ def get_base_and_reference_sequence_ids() -> dict[str, int]:
     return sequence_ids
 
 
+_LONG_COORDINATE_SEQUENCE = re.compile(r'[ACGTN]{21,}')  # longer than Sequence.abbreviate shows in full
+
+
+def abbreviate_variant_coordinate(variant_string: Optional[str]) -> Optional[str]:
+    """ A stored "chrom:pos ref>alt" with each long ref/alt shortened as Sequence.abbreviate does
+        (17:43057062 T>TTT...TAG), for display only - matches Variant.format_tuple(abbreviate=True) (#2612) """
+    if not variant_string:
+        return variant_string
+    return _LONG_COORDINATE_SEQUENCE.sub(lambda m: Sequence.abbreviate(m.group(0)), variant_string)
+
+
 class Locus(models.Model):
     """ 1 per line in a VCF file (multiple Variants with different alt alleles point to the same locus)
         There is only 1 Locus for a given chrom/position/ref per database (handled via insertion queues) """

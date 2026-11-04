@@ -6,8 +6,9 @@ p.? and p.(=). A change to the initiation codon is p.(Met1?) whatever the source
 it stops translation starting rather than substituting a residue (#1383).
 
 Entry points: canonical_p_hgvs (any string), canonical_from_sequence_variant (a biocommons p. variant),
-short_p_hgvs (canonical -> p.(G12D), no accession) and is_frameshift_in_disguise. Parsing is biocommons', so
-ranges, dups and delins read as well as single residue changes (#1383).
+short_p_hgvs (canonical -> p.(G12D), no accession, a long inserted sequence as its residue count) and
+is_frameshift_in_disguise. Parsing is biocommons', so ranges, dups and delins read as well as single residue
+changes (#1383).
 """
 import re
 from typing import Optional
@@ -33,6 +34,11 @@ _P_DOT = re.compile(r"(?:^|(?:(?P<accession>[^\s:()]+)(?:\([^)]*\))?:)|[)\s])p\.
 _LEGACY_STOP_X = re.compile(r"X(?!aa)")
 
 _parser = Parser()
+
+P_HGVS_SEQUENCE_DISPLAY_MAX_LENGTH = 20  # residues, as HGVS_SEQUENCE_DISPLAY_MAX_LENGTH is bases
+# An inserted sequence in either letter form: delinsPTIAGTLAGKLRTKLKLYGSK or delinsProThrIle...
+_LONG_INSERTED_RESIDUES = re.compile(
+    rf"ins(?:(?P<one>[A-Z*]{{{P_HGVS_SEQUENCE_DISPLAY_MAX_LENGTH + 1},}})|(?P<three>(?:[A-Z][a-z]{{2}}){{{P_HGVS_SEQUENCE_DISPLAY_MAX_LENGTH + 1},}}))")
 
 
 def _is_initiation_codon_change(posedit: PosEdit | AARefAlt) -> bool:
@@ -89,15 +95,29 @@ def canonical_p_hgvs(raw: str) -> Optional[str]:
     return _with_accession(accession, _format_posedit(posedit, _CANONICAL_CONF))
 
 
+def abbreviate_p_hgvs_sequences(p_hgvs: Optional[str]) -> Optional[str]:
+    """ An inserted sequence too long to read, in either letter form, replaced by its residue count:
+        p.(Q1756delinsPTIAG...) -> p.(Q1756delins<2,345 aa>). For display only (#2612) """
+    if not p_hgvs:
+        return p_hgvs
+
+    def residue_count(m: re.Match) -> str:
+        residues = len(m.group("one")) if m.group("one") else len(m.group("three")) // 3
+        return f"ins<{residues:,} aa>"
+
+    return _LONG_INSERTED_RESIDUES.sub(residue_count, p_hgvs)
+
+
 def short_p_hgvs(canonical: Optional[str]) -> Optional[str]:
     """ 1-letter, '*' for stop, no accession: NP_1.1:p.(Met246IlefsTer14) -> p.(M246Ifs*14).
+        A long inserted sequence becomes its residue count, the caller keeping the canonical form as the tooltip.
         Returns the input if it doesn't parse """
     _, posedit = _parse(canonical)
     if posedit is None:
         return canonical
     if isinstance(posedit, str):
         return posedit
-    return _format_posedit(posedit, _SHORT_CONF)
+    return abbreviate_p_hgvs_sequences(_format_posedit(posedit, _SHORT_CONF))
 
 
 def canonical_from_sequence_variant(variant: SequenceVariant) -> str:

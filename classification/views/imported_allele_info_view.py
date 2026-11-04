@@ -26,6 +26,7 @@ from library.django_utils.view_utils import render_ajax_view
 from library.utils import ExportRow, export_column
 from library.utils.diff_utils import MultiDiff, MultiDiffInput, MultiDiffOutput
 from snpdb.models import GenomeBuild, Lab
+from snpdb.models.models_variant import abbreviate_variant_coordinate
 from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
@@ -318,7 +319,9 @@ def view_imported_allele_info_detail(request: HttpRequest, allele_info_id: int):
         "normalised_step": normalised_step,
         "liftover_step": liftover_step,
         "variant_coordinate_label": f"Variant Coordinate (from HGVS resolution) ({allele_info.imported_genome_build_patch_version})",
+        "variant_coordinate_display": abbreviate_variant_coordinate(allele_info.variant_coordinate),
         "variant_coordinate_normalized_label": f"Variant Coordinate Normalized ({allele_info.imported_genome_build_patch_version})",
+        "variant_coordinate_normalized_display": abbreviate_variant_coordinate(allele_info.variant_coordinate_normalized),
         "validation_tags": allele_info.latest_validation.validation_tags_list if allele_info.latest_validation else None,
         "on_allele_page": request.GET.get("on_allele_page") == "true",
         "classifications": classifications

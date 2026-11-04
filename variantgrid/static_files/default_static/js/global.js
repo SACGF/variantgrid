@@ -1111,6 +1111,29 @@ function abbreviateHgvsSequences(hgvs) {
     return hgvs.replace(LONG_HGVS_SEQUENCE, (match, operation, sequence) => `${operation}<${sequence.length.toLocaleString('en')} bp>`);
 }
 
+// Matches genes/hgvs/phgvs_canonical.py:abbreviate_p_hgvs_sequences - an inserted sequence in either letter form as its residue count
+const LONG_P_HGVS_INSERTION = /ins([A-Z*]{21,}|(?:[A-Z][a-z]{2}){21,})/g;
+
+function abbreviatePHgvsSequences(pHgvs) {
+    if (!pHgvs) {
+        return pHgvs;
+    }
+    return pHgvs.replace(LONG_P_HGVS_INSERTION, (match, sequence) => {
+        const residues = /[a-z]/.test(sequence) ? sequence.length / 3 : sequence.length;
+        return `ins<${residues.toLocaleString('en')} aa>`;
+    });
+}
+
+// Matches snpdb/models/models_variant.py:abbreviate_variant_coordinate - "17:43057062 T>TTT...TAG"
+const LONG_COORDINATE_SEQUENCE = /[ACGTN]{21,}/g;
+
+function abbreviateVariantCoordinate(variantCoordinate) {
+    if (!variantCoordinate) {
+        return variantCoordinate;
+    }
+    return variantCoordinate.replace(LONG_COORDINATE_SEQUENCE, (sequence) => `${sequence.substring(0, 3)}...${sequence.substring(sequence.length - 3)}`);
+}
+
 function limitLength(text, limit) {
     if (text && text.length > limit) {
         return text.substring(0, limit) + '...';
