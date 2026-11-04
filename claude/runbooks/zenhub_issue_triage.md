@@ -75,7 +75,30 @@ Workspace **Everything Space** (`5bb3158c4b5806bc2beae448`). Pipelines, in board
 | Pending SA Path release | `Z2lkOi8vcmFwdG9yL1BpcGVsaW5lLzI1MzY2OTI` |
 | Pending variantgrid.com release | `Z2lkOi8vcmFwdG9yL1BpcGVsaW5lLzI5ODQyNjM` |
 
-## 4. After a release: which issues went out
+## 4. After VariantGrid test: cherry-pick to Shariant or back to triage
+
+When an issue in **VariantGrid test** has passed, decide where it goes next. The quick way to find the ones with a
+Shariant part is to grep the last few comments for "shariant": the testing-notes comment says either
+`Shariant testing not required` or names the Shariant branch it needs to reach.
+
+```bash
+gh issue view N -R SACGF/variantgrid --json comments --jq '.comments[-4:][].body' | grep -i -B1 -A2 shariant
+```
+
+- **Shariant needs it**: cherry-pick its commits onto the current Shariant release branch (`git branch -r | grep
+  shariant_prod`, the one with recent commits; a release branch is master at a branch point plus cherry-picks). A
+  migration in the cherry-pick usually depends on a master migration the branch lacks, so repoint its `dependencies` at
+  the branch's leaf for that app and keep the filename, then `makemigrations --check` in a worktree on the branch. Push,
+  move the issue to **Coding Complete**, add it to the open `Shariant <year> <Early|Late> *UPCOMING*` release (below),
+  and comment: the branch commit shas, one line on why Shariant needs it, and Shariant testing steps for sharianttest.
+- **Shariant doesn't need it**: close-ready once the VariantGrid test passed (section 5).
+- **Undecided**: move it back to **New Issues** so it comes up at the triage meeting.
+
+Releases are per workspace; the open ones (`releases(first: 100, state: {eq: OPEN})` on the workspace) include a
+`Shariant <year> <Early|Late> *UPCOMING*` bucket. Assign with
+`addIssuesToReleases(input: {issueIds: [...], releaseIds: [...]})`, using the ZenHub issue id from `issueByInfo`.
+
+## 5. After a release: which issues went out
 
 The usual job is: for each issue in Coding Complete, Review/QA (Shariant) and Post QA Discussion, did it make the release
 branch (e.g. `origin/shariant_prod_2025_04`), and if so can it be closed.
@@ -103,7 +126,7 @@ branch (e.g. `origin/shariant_prod_2025_04`), and if so can it be closed.
    "can we close this?"`. Humans close issues; an agent closes one only under the explicit per-run grant in
    `claude/runbooks/agent_testing.md`.
 
-## 5. Triage Coding Complete into test pipelines
+## 6. Triage Coding Complete into test pipelines
 
 Move an issue with the `id` field from `searchIssuesByPipeline` (a ZenHub id, not the GitHub number):
 
@@ -112,7 +135,7 @@ mutation($i: MoveIssueInput!) { moveIssue(input: $i) { issue { number } } }
 # variables: {"i": {"issueId": "<zenhub id>", "pipelineId": "<target pipeline id>", "position": 0}}
 ```
 
-For each issue, find its commits on `origin/master` (section 4, step 2) and send it to one of the pipelines below.
+For each issue, find its commits on `origin/master` (section 5, step 2) and send it to one of the pipelines below.
 System testers are not programmers: they test through the UI on the test server, so the comment on an issue moved to a
 test pipeline gives UI steps (which page, what to do, what should happen), not code references.
 
