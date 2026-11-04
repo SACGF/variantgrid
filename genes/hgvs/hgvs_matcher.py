@@ -1,8 +1,9 @@
 import logging
+import os
 import re
 import sys
+import threading
 from dataclasses import dataclass
-from functools import lru_cache
 from typing import Optional, Union
 
 from cdot.hgvs import (
@@ -811,12 +812,33 @@ class HGVSMatcher:
         return hgvs_variant.get_gene_symbol_if_no_transcript()
 
 
-@lru_cache(maxsize=None)
+# One set of matchers per thread, and a forked child starts with none: each holds a pysam FastaFile, and one handle
+# read from two threads or from both sides of a fork breaks for the life of the process ("failure when retrieving
+# sequence" on every fetch) - #2624
+_thread_matchers = threading.local()
+
+
+def _reset_thread_matchers():
+    global _thread_matchers
+    _thread_matchers = threading.local()
+
+
+os.register_at_fork(after_in_child=_reset_thread_matchers)
+
+
 def _cached_hgvs_matcher(genome_build: GenomeBuild, hgvs_converter_type, local_resolution: bool,
                          clingen_resolution: bool, allow_alternative_transcript_version: bool) -> HGVSMatcher:
-    return HGVSMatcher(genome_build, hgvs_converter_type=hgvs_converter_type,
-                       local_resolution=local_resolution, clingen_resolution=clingen_resolution,
-                       allow_alternative_transcript_version=allow_alternative_transcript_version)
+    matchers = getattr(_thread_matchers, "matchers", None)
+    if matchers is None:
+        matchers = _thread_matchers.matchers = {}
+    key = (genome_build, hgvs_converter_type, local_resolution, clingen_resolution,
+           allow_alternative_transcript_version)
+    if (matcher := matchers.get(key)) is None:
+        matcher = matchers[key] = HGVSMatcher(genome_build, hgvs_converter_type=hgvs_converter_type,
+                                              local_resolution=local_resolution,
+                                              clingen_resolution=clingen_resolution,
+                                              allow_alternative_transcript_version=allow_alternative_transcript_version)
+    return matcher
 
 
 def get_hgvs_variant_coordinate(hgvs_string: str, genome_build: GenomeBuild) -> VariantCoordinate:
