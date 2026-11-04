@@ -257,8 +257,8 @@ VARIANT_ZYGOSITY_COUNT_EXCLUDE_SAMPLE_NAME_REGEX = None
 PREFER_ALLELE_LINKS = False
 
 # ClinGen Allele Registry paper - https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6519371/
-# A cohort spanning this many samples from more than one VCF gets a size warning on the membership save bar:
-# the genotype rebuild is one long database INSERT (#404)
+# A cohort of this many samples from more than one VCF gets a size warning on the membership save bar: the
+# genotype rebuild is one long database INSERT. The joint-call advice is shown for any multi-VCF cohort (#404)
 COHORT_GENOTYPE_REBUILD_LARGE_SAMPLES = 50
 
 CLINGEN_ALLELE_REGISTRY_DOMAIN = "http://reg.genome.network"

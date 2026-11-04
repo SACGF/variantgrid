@@ -104,21 +104,20 @@ class CohortMembershipEditor {
                 html: `All samples come from <b>${escapeHtml(vcfName)}</b> - saved as a <b>sub cohort</b>, ready instantly.`,
             };
         }
-        const genotypeNote = "A sample has no record at a site its own VCF didn't call, so it is stored as " +
-            "<b>no call</b> there, not REF - a cohort can't tell reference from no coverage the way a " +
-            "<a target='_blank' href='https://variantgrid.readthedocs.io/en/latest/data/vcf_samples.html#multi-sample-vcfs'>joint called VCF</a> does.";
+        const rebuildNote = `Samples come from <b>${vcfIds.size} VCFs</b> - saving rebuilds the genotype data in the ` +
+            "background. A sample has no record at a site its own VCF didn't call, so it is stored as <b>no call</b> " +
+            "there, not REF - a cohort can't tell reference from no coverage the way a joint called VCF does. " +
+            "Where the samples belong together, <a target='_blank' " +
+            "href='https://variantgrid.readthedocs.io/en/latest/data/vcf_samples.html#multi-sample-vcfs'>joint call</a> " +
+            "them into one VCF and upload that instead.";
         if (members.length >= this.config.large_rebuild_samples) {
             return {
                 key: "rebuild-large",
-                html: `<i class="fas fa-exclamation-triangle"></i> <b>${members.length.toLocaleString()} samples from ${vcfIds.size} VCFs</b> - ` +
-                    "saving rebuilds the genotype data as one long database job that can take hours. " +
-                    "For a group this size, joint call the samples into one VCF and upload that instead. " + genotypeNote,
+                html: `<i class="fas fa-exclamation-triangle"></i> <b>${members.length.toLocaleString()} samples</b> - ` +
+                    "the rebuild is one long database job that can take hours. " + rebuildNote,
             };
         }
-        return {
-            key: "rebuild",
-            html: `Samples come from <b>${vcfIds.size} VCFs</b> - saving rebuilds the genotype data in the background. ` + genotypeNote,
-        };
+        return {key: "rebuild", html: rebuildNote};
     }
 
     /* Duo/Trio/Quad cascade off CohortSample, so a removal can take one with it - say so before saving */
