@@ -1,7 +1,6 @@
 """
     The biocommons hgvs library has its own testing, this is specific to our code.
 """
-import threading
 from types import SimpleNamespace
 from unittest import skip
 from unittest.mock import patch
@@ -567,34 +566,3 @@ class DjangoTranscriptDataProviderCacheTest(TestCase):
         with patch.object(DjangoTranscriptDataProvider, "TRANSCRIPT_CACHE_SIZE", 1):
             data_provider._get_transcript("NR_125398.1")
             self.assertEqual(["NR_125398.1"], list(data_provider._transcript_cache))
-
-
-@patch.object(HGVSMatcher, "__init__", return_value=None)
-class TestHGVSMatcherInstance(TestCase):
-    """ #2624 - a matcher's FastaFile can't be shared across threads or a fork """
-
-    def setUp(self):
-        HGVSMatcher.reset_instances()
-        self.addCleanup(HGVSMatcher.reset_instances)  # the matchers made here are hollow (__init__ patched out)
-
-    def test_reused_within_a_thread(self, _init):
-        genome_build = GenomeBuild.grch37()
-        self.assertIs(HGVSMatcher.instance(genome_build), HGVSMatcher.instance(genome_build))
-        self.assertIsNot(HGVSMatcher.instance(genome_build),
-                         HGVSMatcher.instance(genome_build, clingen_resolution=False))
-
-    def test_each_thread_gets_its_own(self, _init):
-        genome_build = GenomeBuild.grch37()
-        main_thread_matcher = HGVSMatcher.instance(genome_build)
-        other_thread_matchers = []
-        thread = threading.Thread(target=lambda: other_thread_matchers.append(HGVSMatcher.instance(genome_build)))
-        thread.start()
-        thread.join()
-        self.assertIsNot(main_thread_matcher, other_thread_matchers[0])
-        self.assertIs(main_thread_matcher, HGVSMatcher.instance(genome_build))
-
-    def test_forked_child_starts_empty(self, _init):
-        genome_build = GenomeBuild.grch37()
-        parent_matcher = HGVSMatcher.instance(genome_build)
-        HGVSMatcher.reset_instances()  # what os.register_at_fork runs in the child
-        self.assertIsNot(parent_matcher, HGVSMatcher.instance(genome_build))

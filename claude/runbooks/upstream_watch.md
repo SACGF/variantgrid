@@ -15,6 +15,7 @@ column (the fifth `|`-separated field), so keep the table shape.
 | Pre-112 VEP fasta | Shariant and runx1db2 moving to VEP >= 112 (Ensembl/ensembl-vep#1635 fixed in 112) | 2026-11-03 | 2027-02-03 |
 | MaveDB stripped file | every deployment running MaveDB on a VEP_plugins `release/116` checkout from 2026-09-01 (Ensembl/VEP_plugins#853) | 2026-11-03 | 2027-02-03 |
 | gnomAD SV overlap via two `--custom` | Ensembl/ensembl-vep#1989 (`coords=2`, `show_overlaps`) for #1645 | 2026-11-03 | 2027-02-03 |
+| cdot thread-local FASTA swap | SACGF/cdot#234 in a cdot release | 2026-11-04 | 2026-12-04 |
 
 ## hgvs fork
 
@@ -111,3 +112,20 @@ its coordinates (Ensembl/ensembl-vep#1645, open; the feature is Ensembl/ensembl-
 Check: `gh pr view 1989 --repo Ensembl/ensembl-vep --json state,mergedAt -q '"\(.state) \(.mergedAt)"'`. When resolved (in a release
 deployments run): replace the two customs with one and drop the stitching in `SVOverlapProcessor`, then delete this
 row.
+
+## cdot thread-local FASTA swap
+
+cdot's `GenomeFastaSeqFetcher` opens one pysam `FastaFile` per FASTA, and a handle read from two threads or from both
+sides of a fork breaks for the life of the process (#2624). `HGVSMatcher.instance` and `get_genome_babelfish` cache
+their seqfetchers per process, so `library/genomics/fasta_wrapper.py:make_contig_fastas_thread_local` swaps the values
+of their `contig_fastas` for per-thread, per-pid `ThreadLocalFastaFile` proxies
+(`genes/hgvs/biocommons_hgvs/data_provider.py:SingleBuildFastaSeqFetcher`, `snpdb/babelfish.py:GenomeFastaSequenceProvider`).
+It leans on cdot only using those values through `.fetch()`, `.filename` and `in`.
+
+Check: `gh issue view 234 --repo SACGF/cdot --json state -q .state` and the cdot release notes
+(`gh release list --repo SACGF/cdot --limit 3`).
+
+When resolved (a cdot release opens handles per thread and per process): bump cdot in `requirements.in`, recompile
+both lock files, delete the two `make_contig_fastas_thread_local` calls, `ThreadLocalFastaFile`,
+`make_contig_fastas_thread_local` and `library/tests/test_fasta_wrapper.py`'s tests of them, keep a threaded
+regression test against the matcher, and delete this row.
