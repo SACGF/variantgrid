@@ -77,7 +77,7 @@ Patterns here:
   stored at save (`auto_node_name`), so a changed `get_node_name` shows on existing nodes once they are next saved.
 - Node editor = ModelForm subclass of `analysis/forms/forms_nodes.py:BaseNodeForm` + a `NodeView` subclass in views/nodes/
   with `model` set + template `analysis/node_editors/<classname>_editor.html`.
-  `analysis/views/views_node.py:get_node_views_by_class` finds the view by `model`, so defining the class registers it;
+  `analysis/views/views_node.py:get_node_view_classes_by_class` finds the view by `model`, so defining the class registers it;
   `analysis/views/nodes/node_view.py:NodeView.form_valid` does the dirty/save/update_analysis dance for you.
 - ACMG presets on the Effect, Population and ClinVar editors (`analysis/node_presets.py`, #2605) fill the form
   client side and save nothing: `BaseNodeForm.get_preset_data` hands `node_presets.js` a complete form state per
@@ -270,6 +270,9 @@ Gotchas:
 - Changing `Analysis.VERSION_BUMP_FIELDS` (custom columns, default sort, tag config) must bump `Analysis.version`
   (`analysis/forms/forms.py:AnalysisForm`): node grids and editors are `cache_page`d under the analysis version in the
   URL (`analysis/views/views_node.py:node_view`).
+  Anything else an editor shows from outside the node and analysis stays stale for that week, so data that can change
+  under it comes from its own uncached request: gene lists through autocompletes, ACMG presets through
+  `analysis/views/views_node.py:node_presets`.
 - A worker that dies mid-LOADING perma-fails the node on the next sweep (`lease_ready_nodes`) on the assumption it OOM'd
   the box; only QUEUED nodes are re-leased, up to `analysis/tasks/node_update_tasks.py:MAX_NODE_ATTEMPTS`.
 - A hidden (`visible=False`) node with errors is never dispatched: reload and `lease_ready_nodes` set it straight to its

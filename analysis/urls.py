@@ -81,6 +81,7 @@ urlpatterns = [
 
     # Node JSON
     path('<int:analysis_id>/node/<int:node_id>/data/', views_json.node_data, name='node_data'),
+    path('<int:analysis_id>/node/<int:node_id>/presets/', views_node.node_presets, name='node_presets'),
     path('<int:analysis_id>/node/create/<node_type>/', views_json.node_create, name='node_create'),
     path('<int:analysis_id>/nodes/copy/', views_json.nodes_copy, name='nodes_copy'),
     path('<int:analysis_id>/nodes/delete/', views_json.nodes_delete, name='nodes_delete'),

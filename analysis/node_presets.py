@@ -12,8 +12,9 @@ evidence), which is what an analysis wants almost every time; the criteria on on
 
 Entry points: `damage_node_presets`, `population_node_presets` and `clinvar_node_presets`, each taking the node being
 edited (what it offers depends on the annotation version and the data imported) and returning the NodePresets its
-editor lists. `analysis/forms/forms_nodes.py:BaseNodeForm.get_preset_data` turns each into a complete form state for
-`node_presets.js`.
+editor lists. `analysis/forms/forms_nodes.py:BaseNodeForm.get_preset_data` turns each into a complete form state, and
+`analysis/views/views_node.py:node_presets` serves that to `node_presets.js` apart from the week-cached editor, so an
+admin edit to a Population preset shows the next time an editor opens.
 """
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any

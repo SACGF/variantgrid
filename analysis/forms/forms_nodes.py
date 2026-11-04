@@ -280,6 +280,10 @@ class BaseNodeForm(forms.ModelForm):
     def get_presets(self) -> list[NodePreset]:
         return []
 
+    @classmethod
+    def offers_presets(cls) -> bool:
+        return cls.get_presets is not BaseNodeForm.get_presets
+
     def get_preset_data(self) -> list[dict]:
         """ The presets as the editor's dropdown and node_presets.js take them, each with the complete form state """
         return [{"key": preset.key, "label": preset.label, "description": preset.description,

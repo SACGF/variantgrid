@@ -15,6 +15,7 @@ from analysis.models import Analysis
 from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.population_node import PopulationNode, PopulationNodePreset
+from analysis.models.nodes.filters.zygosity_node import ZygosityNode
 from annotation.enums import PathogenicityImpact
 from annotation.fake_data import get_fake_annotation_settings_dict, get_fake_annotation_version
 from annotation.models import VariantAnnotationVersion
@@ -175,6 +176,9 @@ class NodePresetsTest(TestCase):
         self.assertFalse(pp5.conflicting)
         self.assertEqual(NodeMatchInput.MATCHING_VARIANTS, pp5.node_input)
 
+    def _presets_url(self, node) -> str:
+        return reverse("node_presets", kwargs={"analysis_id": self.analysis.pk, "node_id": node.pk})
+
     def test_editors_offer_the_dropdown(self):
         client = Client()
         client.force_login(self.user)
@@ -182,4 +186,22 @@ class NodePresetsTest(TestCase):
             node = node_class.objects.create(analysis=self.analysis)
             html = client.get(self._node_url(node)).content.decode()
             self.assertIn(f'id="node-preset-{node.pk}"', html)
-            self.assertIn(label, html)
+            self.assertIn(self._presets_url(node), html)
+            labels = [p["label"] for p in client.get(self._presets_url(node)).json()]
+            self.assertTrue(any(lbl.startswith(label) for lbl in labels), f"{label} not in {labels}")
+
+    def test_admin_edit_reaches_a_cached_editor(self):
+        """ The editor HTML is cached for a week, so the presets it lists must come from the uncached endpoint """
+        client = Client()
+        client.force_login(self.user)
+        node = PopulationNode.objects.create(analysis=self.analysis)
+        client.get(self._node_url(node))  # editor now cached
+        PopulationNodePreset.objects.create(name="PM2 - edited", percent=0.5, gnomad_popmax_af=True)
+        labels = [p["label"] for p in client.get(self._presets_url(node)).json()]
+        self.assertIn("PM2 - edited (≤ 0.5%)", labels)
+
+    def test_node_without_presets_404s(self):
+        client = Client()
+        client.force_login(self.user)
+        node = ZygosityNode.objects.create(analysis=self.analysis)
+        self.assertEqual(404, client.get(self._presets_url(node)).status_code)

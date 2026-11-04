@@ -8,7 +8,8 @@ from django.contrib.auth.models import User
 from django.core.exceptions import EmptyResultSet
 from django.db.models import Count
 from django.forms.models import inlineformset_factory
-from django.http.response import HttpResponse, HttpResponseRedirect
+from django.http import Http404
+from django.http.response import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls.base import reverse
 from django.views.decorators.cache import cache_page, never_cache
@@ -49,17 +50,18 @@ from snpdb.graphs import graphcache
 from snpdb.models import VCF, Cohort, CohortSample, UserSettings, Variant
 
 
-def get_node_views_by_class():
-    node_views_by_class = {}
+def get_node_view_classes_by_class() -> dict:
+    node_view_classes_by_class = {}
     module = importlib.import_module("analysis.views.nodes")
     for _, klass in inspect.getmembers(module, inspect.isclass):
         if issubclass(klass, NodeView):
             if klass.model:
-                node_views_by_class[klass.model] = klass.as_view()
-    return node_views_by_class
+                node_view_classes_by_class[klass.model] = klass
+    return node_view_classes_by_class
 
 
-NODE_DISPATCHER = get_node_views_by_class()
+NODE_VIEW_CLASSES = get_node_view_classes_by_class()
+NODE_DISPATCHER = {model: klass.as_view() for model, klass in NODE_VIEW_CLASSES.items()}
 
 
 @cache_page(WEEK_SECS)
@@ -76,6 +78,17 @@ def node_view(request, analysis_id, analysis_version, node_id, node_version, ext
                                             kwargs={"analysis_id": analysis_id, "node_id": node_id}))
     view = NODE_DISPATCHER[node.__class__]
     return view(request, pk=node_id, version_id=node_version, extra_filters=extra_filters)
+
+
+@never_cache
+def node_presets(request, analysis_id, node_id):
+    """ The ACMG criterion presets a node's editor offers (#2605). Served apart from node_view, which is cached for a
+        week, so a preset edited in admin shows the next time an editor opens """
+    node = get_node_subclass_or_404(request.user, node_id)
+    form_class = NODE_VIEW_CLASSES[node.__class__].form_class
+    if node.analysis_id != analysis_id or not form_class.offers_presets():
+        raise Http404(f"Node {node_id} has no presets")
+    return JsonResponse(form_class(instance=node).get_preset_data(), safe=False)
 
 
 def get_node_sql(grid):
