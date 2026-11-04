@@ -45,14 +45,27 @@ function applyNodePreset(form, values) {
 }
 
 /**
- * @param {{select: string, form: string,
- *          presets: {key: string, label: string, description: string, values: Object<string, any>}[]}} options
+ * The editor is cached, so the presets come from options.url (node_presets) each time it opens. The row stays hidden
+ * when there are none, unless it carries the admin link to add some.
+ * @param {{select: string, form: string, url: string}} options
  */
 function initNodePresets(options) {
     const select = $(options.select);
+    const row = select.closest(".node-presets");
     const description = select.siblings(".node-preset-description");
+    /** @type {{key: string, label: string, description: string, values: Object<string, any>}[]} */
+    let presets = [];
+    $.getJSON(options.url, function (data) {
+        presets = data;
+        for (const preset of presets) {
+            select.append($("<option>", {value: preset.key, title: preset.description, text: preset.label}));
+        }
+        if (presets.length || $(".node-presets-admin-link", row).length) {
+            row.removeClass("d-none");
+        }
+    });
     select.on("change", function () {
-        const preset = options.presets.find(p => p.key === this.value);
+        const preset = presets.find(p => p.key === this.value);
         if (!preset) {
             return;
         }

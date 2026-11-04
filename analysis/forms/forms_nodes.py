@@ -49,12 +49,7 @@ from analysis.models.nodes.sources.pedigree_node import PedigreeNode
 from analysis.models.nodes.sources.quad_node import QuadNode
 from analysis.models.nodes.sources.sample_node import SampleNode
 from analysis.models.nodes.sources.trio_node import TrioNode
-from analysis.node_presets import (
-    NodePreset,
-    clinvar_node_presets,
-    damage_node_presets,
-    population_node_presets,
-)
+from analysis.node_presets import NodePreset, get_node_presets, has_presets
 from analysis.variant_text import resolve_variant_text
 from annotation.models import VariantAnnotation
 from annotation.pathogenicity_predictions import (
@@ -277,13 +272,14 @@ class BaseNodeForm(forms.ModelForm):
     PRESET_KEEP_FIELDS: frozenset[str] = frozenset()
     PRESET_FIELD_DEFAULTS: dict[str, Any] = {}
 
-    def get_presets(self) -> list[NodePreset]:
-        return []
+    @property
+    def has_presets(self) -> bool:
+        return has_presets(type(self.instance))
 
     def get_preset_data(self) -> list[dict]:
         """ The presets as the editor's dropdown and node_presets.js take them, each with the complete form state """
         return [{"key": preset.key, "label": preset.label, "description": preset.description,
-                 "values": self._preset_form_values(preset)} for preset in self.get_presets()]
+                 "values": self._preset_form_values(preset)} for preset in get_node_presets(self.instance)]
 
     def _preset_form_values(self, preset: NodePreset) -> dict[str, Any]:
         values = {}
@@ -527,9 +523,6 @@ class ClinVarNodeForm(SignificanceFilterFormMixin, BaseNodeForm):
         super().__init__(*args, **kwargs)
         self.fields["variation_ids"].initial = ", ".join(str(v) for v in self.instance.variation_ids)
 
-    def get_presets(self) -> list[NodePreset]:
-        return clinvar_node_presets(self.instance)
-
     def clean_variation_ids(self) -> list[int]:
         variation_ids = []
         for value in re.split(r"[,\s]+", self.cleaned_data["variation_ids"]):
@@ -695,9 +688,6 @@ class DamageNodeForm(BaseNodeForm):
                 if tool.node_label:
                     # Only where the auto label would mislead - a signed or inverted score
                     field.label = f"{tool.node_label} {tool.raw_direction.comparison}"
-
-    def get_presets(self) -> list[NodePreset]:
-        return damage_node_presets(self.instance)
 
     def get_raw_score_rows(self) -> list[dict]:
         """ Per-tool bound fields for the raw-score slider rows and their setup calls in the editor,
@@ -1136,9 +1126,6 @@ class PopulationNodeForm(BaseNodeForm):
                    'max_samples': WIDGET_INTEGER_MIN_1}
 
     PRESET_FIELD_DEFAULTS = {"gnomad_population": []}
-
-    def get_presets(self) -> list[NodePreset]:
-        return population_node_presets(self.instance)
 
     def save(self, commit=True):
         node = super().save(commit=False)

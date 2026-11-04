@@ -1,33 +1,28 @@
 {% load static %}
-{% load js_tags %}
 {% comment %}
     The ACMG criterion preset dropdown (#2605) - include at the top of a node editor's form with form_id, the form's
-    CSS selector, and presets_admin_url where the presets are rows an administrator edits. Renders nothing when the
-    form offers no presets and the user can't add any. The values come from form.get_preset_data and
+    CSS selector, and presets_admin_url where the presets are rows an administrator edits. This editor is cached, so
+    the presets themselves are fetched from node_presets when it opens: an admin edit to a preset shows straight away.
     node_presets.js fills the form; nothing is saved until the user does.
 {% endcomment %}
-{% with presets=form.get_preset_data %}
-{% if presets or presets_admin_url and user.is_superuser %}
+{% if form.has_presets %}
 <script src="{% static 'js/analysis/node_presets.js' %}"></script>
-<div class="editor-row node-presets">
+<div class="editor-row node-presets d-none">
     <label class="editor-label" for="node-preset-{{ node.pk }}">ACMG preset</label>
     <select id="node-preset-{{ node.pk }}" class="form-control form-control-sm d-inline-block w-auto">
         <option value="">Fill from a criterion...</option>
-        {% for preset in presets %}
-            <option value="{{ preset.key }}" title="{{ preset.description }}">{{ preset.label }}</option>
-        {% endfor %}
     </select>
     {% if presets_admin_url %}
         <span class="editor-help">Sets the filters below to the criterion's lines, which are lab policy configured by
             administrators - adjust, then Save
-            {% if user.is_superuser %}(<a class="hover-link" target="_blank" href="{{ presets_admin_url }}">edit presets</a>){% endif %}</span>
+            {% if user.is_superuser %}(<a class="hover-link node-presets-admin-link" target="_blank" href="{{ presets_admin_url }}">edit presets</a>){% endif %}</span>
     {% else %}
         <span class="editor-help">Sets the filters below to the criterion's published cutoffs - adjust, then Save</span>
     {% endif %}
     <div class="editor-help node-preset-description"></div>
 </div>
 <script>
-    initNodePresets({select: "#node-preset-{{ node.pk }}", form: "{{ form_id }}", presets: {{ presets|jsonify }}});
+    initNodePresets({select: "#node-preset-{{ node.pk }}", form: "{{ form_id }}",
+                     url: "{% url 'node_presets' node.get_class_name annotation_version.pk %}"});
 </script>
 {% endif %}
-{% endwith %}

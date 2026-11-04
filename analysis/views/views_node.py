@@ -8,7 +8,8 @@ from django.contrib.auth.models import User
 from django.core.exceptions import EmptyResultSet
 from django.db.models import Count
 from django.forms.models import inlineformset_factory
-from django.http.response import HttpResponse, HttpResponseRedirect
+from django.http import Http404
+from django.http.response import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls.base import reverse
 from django.views.decorators.cache import cache_page, never_cache
@@ -21,7 +22,7 @@ from analysis.exceptions import NodeOutOfDateException, NonFatalNodeError
 from analysis.forms import VCFLocusFilterForm
 from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
-from analysis.models import AnalysisNode, NodeGraphType
+from analysis.models import Analysis, AnalysisNode, NodeGraphType
 from analysis.models.nodes.node_counts import get_extra_filters_count, is_extra_filter
 from analysis.models.nodes.node_utils import cancel_node_tasks
 from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
@@ -30,12 +31,14 @@ from analysis.models.nodes.sources.cohort_node import (
     CohortNodeZygosityFilter,
     CohortNodeZygosityFiltersCollection,
 )
+from analysis.node_presets import has_presets
 from analysis.serializers import AnalysisNodeSerializer
 from analysis.views.analysis_permissions import (
     get_node_subclass_or_404,
     get_node_subclass_or_non_fatal_exception,
 )
 from analysis.views.nodes.node_view import NodeView
+from annotation.models.models_annotation_version import AnnotationVersion
 from library import pandas_utils
 from library.constants import HOUR_SECS, WEEK_SECS
 from library.django_utils import set_form_read_only
@@ -49,17 +52,19 @@ from snpdb.graphs import graphcache
 from snpdb.models import VCF, Cohort, CohortSample, UserSettings, Variant
 
 
-def get_node_views_by_class():
-    node_views_by_class = {}
+def get_node_view_classes_by_class() -> dict:
+    node_view_classes_by_class = {}
     module = importlib.import_module("analysis.views.nodes")
     for _, klass in inspect.getmembers(module, inspect.isclass):
         if issubclass(klass, NodeView):
             if klass.model:
-                node_views_by_class[klass.model] = klass.as_view()
-    return node_views_by_class
+                node_view_classes_by_class[klass.model] = klass
+    return node_view_classes_by_class
 
 
-NODE_DISPATCHER = get_node_views_by_class()
+NODE_VIEW_CLASSES = get_node_view_classes_by_class()
+NODE_VIEW_CLASSES_BY_NAME = {model.__name__: klass for model, klass in NODE_VIEW_CLASSES.items()}
+NODE_DISPATCHER = {model: klass.as_view() for model, klass in NODE_VIEW_CLASSES.items()}
 
 
 @cache_page(WEEK_SECS)
@@ -76,6 +81,21 @@ def node_view(request, analysis_id, analysis_version, node_id, node_version, ext
                                             kwargs={"analysis_id": analysis_id, "node_id": node_id}))
     view = NODE_DISPATCHER[node.__class__]
     return view(request, pk=node_id, version_id=node_version, extra_filters=extra_filters)
+
+
+@never_cache
+def node_presets(request, node_type, annotation_version_id):
+    """ The ACMG criterion presets a node type's editor offers on an annotation version (#2605). They vary only with
+        those and deployment data, not the node, and are served apart from node_view, which is cached for a week,
+        so a preset edited in admin shows the next time an editor opens """
+    node_view_class = NODE_VIEW_CLASSES_BY_NAME.get(node_type)
+    if not (node_view_class and has_presets(node_view_class.model)):
+        raise Http404(f"{node_type} has no presets")
+    annotation_version = get_object_or_404(AnnotationVersion, pk=annotation_version_id)
+    analysis = Analysis(annotation_version=annotation_version, genome_build=annotation_version.genome_build,
+                        user=request.user)
+    form = node_view_class.form_class(instance=node_view_class.model(analysis=analysis))
+    return JsonResponse(form.get_preset_data(), safe=False)
 
 
 def get_node_sql(grid):
