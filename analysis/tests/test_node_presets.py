@@ -1,7 +1,8 @@
 """
 ACMG criterion presets (#2605) fill a node editor's form client side, so what the server owns is the preset data:
 values that are legal for the form's fields and complete (every field reset, then the criterion's own cutoffs), which
-only the deployment's data (gnomAD gene constraint) and the annotation version (which predictors) vary.
+only the deployment's data (gnomAD gene constraint, the Population preset rows in admin) and the annotation version
+(which predictors) vary.
 """
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
@@ -13,11 +14,15 @@ from analysis.forms.forms_nodes import ClinVarNodeForm, DamageNodeForm, Populati
 from analysis.models import Analysis
 from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.models.nodes.filters.damage_node import DamageNode
-from analysis.models.nodes.filters.population_node import PopulationNode
+from analysis.models.nodes.filters.population_node import PopulationNode, PopulationNodePreset
 from annotation.enums import PathogenicityImpact
 from annotation.fake_data import get_fake_annotation_settings_dict, get_fake_annotation_version
 from annotation.models import VariantAnnotationVersion
-from annotation.pathogenicity_predictions import GENE_LOEUF_CUTOFF, GENE_MIS_Z_CUTOFF, TOOLS_BY_RAW_FIELD
+from annotation.pathogenicity_predictions import (
+    GENE_LOEUF_CUTOFF,
+    GENE_MIS_Z_CUTOFF,
+    TOOLS_BY_RAW_FIELD,
+)
 from genes.models import GeneSymbol, GnomADGeneConstraint
 from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.enums import AlleleOriginFilterDefault
@@ -65,6 +70,12 @@ class NodePresetsTest(TestCase):
     def _presets(self, form_class, node) -> dict[str, dict]:
         return {p["key"]: p for p in form_class(instance=node).get_preset_data()}
 
+    def _node_url(self, node) -> str:
+        return reverse("node_view", kwargs={"analysis_id": self.analysis.pk,
+                                            "analysis_version": self.analysis.version,
+                                            "node_id": node.pk, "node_version": node.version,
+                                            "extra_filters": "default"})
+
     def _save_preset(self, form_class, node, preset: dict):
         """ The browser posts the whole form, kept fields included """
         kept = {name: getattr(node, name) for name in form_class.PRESET_KEEP_FIELDS}
@@ -108,18 +119,39 @@ class NodePresetsTest(TestCase):
         self.assertEqual(["pvs1", "pp3"], list(presets))
         self.assertNotIn("gene_loeuf_max", {k for k, v in presets["pvs1"]["values"].items() if v is not None})
 
-    def test_population_pm2(self):
-        with override_settings(ANALYSIS_NODE_PRESET_PM2_MAX_PERCENT=0.05):
-            presets = self._presets(PopulationNodeForm, PopulationNode(analysis=self.analysis))
-            node = PopulationNode.objects.create(analysis=self.analysis, af_1kg=True, use_internal_counts=True)
-            pm2 = self._save_preset(PopulationNodeForm, node, presets["pm2"])
+    def test_population_presets_are_admin_rows(self):
+        PopulationNodePreset.objects.all().delete()
+        PopulationNodePreset.objects.create(name="disabled", enabled=False)
+        row = PopulationNodePreset.objects.create(name="PM2 - X-linked", percent=0.05, gnomad_popmax_af=True,
+                                                  gnomad_fafmax_faf95_max=True, gnomad_hemi_count_max=1)
+        key = f"population_{row.pk}"
+        presets = self._presets(PopulationNodeForm, PopulationNode(analysis=self.analysis))
+        self.assertEqual([key], list(presets))
+        self.assertIn("gnomAD hemizygous ≤ 1", presets[key]["description"])
+        self.assertEqual([], presets[key]["values"]["gnomad_population"])
+
+        node = PopulationNode.objects.create(analysis=self.analysis, af_1kg=True, use_internal_counts=True,
+                                             gnomad_hom_alt_max=3)
+        pm2 = self._save_preset(PopulationNodeForm, node, presets[key])
         self.assertEqual(0.05, pm2.percent)
         self.assertEqual(GroupOperation.ANY, pm2.group_operation)
         self.assertEqual((False, True), (pm2.gnomad_af, pm2.gnomad_popmax_af))
+        # Only drawn (and so only applied) where the annotation version has gnomAD filtering AF
         self.assertEqual(node.has_filtering_allele_frequency, pm2.gnomad_fafmax_faf95_max)
+        self.assertEqual((1, None), (pm2.gnomad_hemi_count_max, pm2.gnomad_hom_alt_max))
         self.assertTrue(pm2.keep_internally_classified_pathogenic)
         self.assertEqual((False, False), (pm2.af_1kg, pm2.use_internal_counts))
-        self.assertEqual([], presets["pm2"]["values"]["gnomad_population"])
+
+    def test_population_editor_links_admins_to_presets(self):
+        admin_url = reverse("admin:analysis_populationnodepreset_changelist")
+        superuser = User.objects.create_superuser(username="test_node_presets_admin")
+        assign_permission_to_user_and_groups(superuser, self.analysis)
+        node = PopulationNode.objects.create(analysis=self.analysis)
+        for user, shows_link in [(self.user, False), (superuser, True)]:
+            client = Client()
+            client.force_login(user)
+            html = client.get(self._node_url(node)).content.decode()
+            self.assertEqual(shows_link, admin_url in html)
 
     def test_clinvar_pp5(self):
         node = ClinVarNode(analysis=self.analysis, node_input=NodeMatchInput.MATCHING_VARIANTS, stars_min=0)
@@ -137,12 +169,8 @@ class NodePresetsTest(TestCase):
     def test_editors_offer_the_dropdown(self):
         client = Client()
         client.force_login(self.user)
-        for node_class, label in [(DamageNode, "PVS1"), (PopulationNode, "PM2"), (ClinVarNode, "PP5")]:
+        for node_class, label in [(DamageNode, "PVS1"), (PopulationNode, "PM2 - recessive"), (ClinVarNode, "PP5")]:
             node = node_class.objects.create(analysis=self.analysis)
-            url = reverse("node_view", kwargs={"analysis_id": self.analysis.pk,
-                                               "analysis_version": self.analysis.version,
-                                               "node_id": node.pk, "node_version": node.version,
-                                               "extra_filters": "default"})
-            html = client.get(url).content.decode()
+            html = client.get(self._node_url(node)).content.decode()
             self.assertIn(f'id="node-preset-{node.pk}"', html)
             self.assertIn(label, html)

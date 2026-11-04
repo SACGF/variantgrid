@@ -51,3 +51,10 @@ class VariantTagAdmin(ModelAdminBasics):
 @admin.register(models.VariantTagsImport)
 class VariantTagsImportAdmin(ModelAdminBasics):
     pass
+
+
+@admin.register(models.PopulationNodePreset)
+class PopulationNodePresetAdmin(ModelAdminBasics):
+    list_display = ("name", "sort_order", "enabled", "percent", "gnomad_popmax_af", "gnomad_fafmax_faf95_max",
+                    "gnomad_ac_max", "gnomad_hom_alt_max", "gnomad_hemi_count_max")
+    list_editable = ("sort_order", "enabled")

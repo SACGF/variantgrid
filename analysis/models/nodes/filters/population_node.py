@@ -29,7 +29,9 @@ class PopulationNode(AnalysisNode):
     gnomad_popmax_af = models.BooleanField(default=False)
     gnomad_fafmax_faf95_max = models.BooleanField(default=False)
     gnomad_fafmax_faf99_max = models.BooleanField(default=False)
+    gnomad_ac_max = models.IntegerField(null=True, blank=True)
     gnomad_hom_alt_max = models.IntegerField(null=True, blank=True)
+    gnomad_hemi_count_max = models.IntegerField(null=True, blank=True)
     show_gnomad_filtered = models.BooleanField(default=True)
     af_1kg = models.BooleanField(default=False)
     af_uk10k = models.BooleanField(default=False)
@@ -58,9 +60,25 @@ class PopulationNode(AnalysisNode):
         except AttributeError:
             return False
 
+    # Max count field on the node -> VariantAnnotation column it caps (a variant gnomAD doesn't count is kept)
+    GNOMAD_COUNT_MAX_FIELDS = {
+        "gnomad_ac_max": "gnomad_ac",
+        "gnomad_hom_alt_max": "gnomad_hom_alt",
+        "gnomad_hemi_count_max": "gnomad_hemi_count",
+    }
+    GNOMAD_COUNT_LABELS = {
+        "gnomad_ac_max": "gnomAD allele count",
+        "gnomad_hom_alt_max": "gnomAD hom alt",
+        "gnomad_hemi_count_max": "gnomAD hemizygous",
+    }
+
+    def _gnomad_count_maxes(self) -> dict[str, int]:
+        return {field: value for field in self.GNOMAD_COUNT_MAX_FIELDS
+                if (value := getattr(self, field)) is not None}
+
     def modifies_parents(self):
         return any([self.filtering_by_population, self.use_internal_counts,
-                    self.gnomad_hom_alt_max is not None, not self.show_gnomad_filtered])
+                    self._gnomad_count_maxes(), not self.show_gnomad_filtered])
 
     def _has_common_variants(self) -> bool:
         rare_only = (self.gnomad_af or self.gnomad_popmax_af) and self.percent <= 5
@@ -125,10 +143,11 @@ class PopulationNode(AnalysisNode):
 
                 and_q.append(reduce(group_operation, filters))
 
-        if self.gnomad_hom_alt_max is not None:
-            q_hom_alt_lt = Q(variantannotation__gnomad_hom_alt__lte=self.gnomad_hom_alt_max)
-            q_hom_alt_null = Q(variantannotation__gnomad_hom_alt__isnull=True)
-            and_q.append(q_hom_alt_lt | q_hom_alt_null)
+        for field, max_count in self._gnomad_count_maxes().items():
+            column = self.GNOMAD_COUNT_MAX_FIELDS[field]
+            q_lte = Q(**{f"variantannotation__{column}__lte": max_count})
+            q_null = Q(**{f"variantannotation__{column}__isnull": True})
+            and_q.append(q_lte | q_null)
 
         if not self.show_gnomad_filtered:
             q_gnomad_filtered = Q(variantannotation__gnomad_filtered=False)
@@ -231,8 +250,8 @@ class PopulationNode(AnalysisNode):
                 field = VariantAnnotation.get_gnomad_population_field(gnomad_pop.population)
                 filters.append(f'{field} <= {max_allele_frequency:g}')
 
-            if self.gnomad_hom_alt_max is not None:
-                filters.append(f"gnomad_hom_alt_max <= {self.gnomad_hom_alt_max}")
+            for field, max_count in self._gnomad_count_maxes().items():
+                filters.append(f"{self.GNOMAD_COUNT_MAX_FIELDS[field]} <= {max_count}")
 
             if not self.show_gnomad_filtered:
                 filters.append("Removing gnomAD filtered")
@@ -247,8 +266,8 @@ class PopulationNode(AnalysisNode):
         ops = []
         if self.filtering_by_population:
             ops.append(f"<= {self.percent:g}%")
-        if self.gnomad_hom_alt_max is not None:
-            ops.append(f"<= {self.gnomad_hom_alt_max} gnomad hom alt")
+        for field, max_count in self._gnomad_count_maxes().items():
+            ops.append(f"<= {max_count} {self.GNOMAD_COUNT_LABELS[field]}")
 
         if self.use_internal_counts:
             internal_filter_ops = []
@@ -315,6 +334,35 @@ class PopulationNode(AnalysisNode):
     @classmethod
     def get_node_class_icon(cls) -> NodeIcon:
         return NodeIcon(symbol="node-icon-population")
+
+
+class PopulationNodePreset(models.Model):
+    """ A Population node editor preset (#2605). Frequency lines for PM2 are lab policy - they depend on mode of
+        inheritance, penetrance and severity, and labs revise them - so they are rows seeded by migration and edited
+        in Django admin, rather than published calibrations held in code like the Effect node's. """
+    name = models.CharField(max_length=100, unique=True)  # the dropdown option, leading with the criterion
+    description = models.TextField(blank=True)  # why these lines - shown with a summary of what the preset sets
+    sort_order = models.IntegerField(default=0)
+    enabled = models.BooleanField(default=True)
+    percent = models.FloatField(default=PopulationNode.EVERYTHING)
+    gnomad_af = models.BooleanField(default=False)
+    gnomad_popmax_af = models.BooleanField(default=False)
+    gnomad_fafmax_faf95_max = models.BooleanField(default=False, help_text="Only applied on gnomAD v4+")
+    gnomad_fafmax_faf99_max = models.BooleanField(default=False, help_text="Only applied on gnomAD v4+")
+    gnomad_ac_max = models.IntegerField(null=True, blank=True)
+    gnomad_hom_alt_max = models.IntegerField(null=True, blank=True)
+    gnomad_hemi_count_max = models.IntegerField(null=True, blank=True)
+    keep_internally_classified_pathogenic = models.BooleanField(default=True)
+
+    NODE_FIELDS = ("percent", "gnomad_af", "gnomad_popmax_af", "gnomad_fafmax_faf95_max", "gnomad_fafmax_faf99_max",
+                   "gnomad_ac_max", "gnomad_hom_alt_max", "gnomad_hemi_count_max",
+                   "keep_internally_classified_pathogenic")
+
+    class Meta:
+        ordering = ("sort_order", "name")
+
+    def __str__(self):
+        return self.name
 
 
 class PopulationNodeGnomADPopulation(NodeAuditLogMixin, models.Model):
