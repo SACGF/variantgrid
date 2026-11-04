@@ -9,9 +9,11 @@ from datetime import UTC, date, datetime
 from unittest import mock
 
 from django.contrib.auth.models import User
+from django.contrib.messages import get_messages
 from django.db import IntegrityError, transaction
 from django.db.models import Q
-from django.test import TestCase
+from django.test import Client, TestCase
+from django.urls import reverse
 from django.utils import timezone
 from guardian.shortcuts import assign_perm
 
@@ -679,6 +681,19 @@ class TestPatientCodeUnused(TestCase):
     def test_edit_keeping_own_code_is_allowed(self):
         form = self._form(instance=self.existing, patient_code="DUP-001", last_name="RENAMED")
         self.assertTrue(form.is_valid(), form.errors)
+
+    def test_existing_duplicate_can_still_be_saved_and_is_flagged(self):
+        """ A duplicate from before the check keeps working, and its page asks for it to be fixed """
+        duplicate = Patient.objects.create(patient_code="DUP-001", last_name="DUPLICATE")
+        assign_permission_to_user_and_groups(self.user, duplicate)
+        form = self._form(instance=duplicate, patient_code="DUP-001", last_name="RENAMED")
+        self.assertTrue(form.is_valid(), form.errors)
+
+        client = Client()
+        client.force_login(self.user)
+        response = client.get(reverse("view_patient", kwargs={"patient_id": duplicate.pk}))
+        warnings = [str(m) for m in get_messages(response.wsgi_request)]
+        self.assertTrue(any(f"shares its patient code with Patient:{self.existing.pk}" in w for w in warnings), warnings)
 
     def test_code_of_a_patient_the_user_cannot_see_is_allowed(self):
         Patient.objects.create(patient_code="HIDDEN-001", last_name="HIDDEN")

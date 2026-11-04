@@ -240,18 +240,29 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         return qs.exclude(external_pk__external_manager__can_modify=False)
 
     @classmethod
-    def validate_patient_code_unused(cls, user, patient_code: Optional[str], exclude_pk=None):
-        """ Patient.match takes the code as the patient's whole identity, so a second patient the user can see
-            with the same code (ignoring surrounding whitespace) would break matching (#2518).
-            exclude_pk: the patient being edited, which keeps its own code """
+    def filter_visible_with_patient_code(cls, user, patient_code: Optional[str], exclude_pk=None) -> QuerySet:
+        """ Patients the user can see whose code is patient_code, ignoring surrounding whitespace """
         if not (patient_code and (patient_code := patient_code.strip())):
-            return
+            return cls.objects.none()
         qs = cls.filter_for_user(user).annotate(trimmed_patient_code=Trim("patient_code"))
         qs = qs.filter(trimmed_patient_code=patient_code)
         if exclude_pk is not None:
             qs = qs.exclude(pk=exclude_pk)
-        if other := qs.order_by("pk").first():
-            raise ValidationError(f"Patient code '{patient_code}' is already used by Patient:{other.pk}")
+        return qs.order_by("pk")
+
+    @classmethod
+    def validate_patient_code_unused(cls, user, patient_code: Optional[str], exclude_pk=None):
+        """ Patient.match takes the code as the patient's whole identity, so giving a patient a code another
+            patient the user can see already has would break matching (#2518).
+            exclude_pk: the patient being edited. Keeping its own code is allowed even if another patient shares
+            it - rows from before this check (or the CSV import) can, and refusing every save would leave them
+            uneditable rather than fixed; the patient page warns instead """
+        if exclude_pk is not None and patient_code:
+            stored_code = cls.objects.filter(pk=exclude_pk).values_list("patient_code", flat=True).first()
+            if stored_code and stored_code.strip() == patient_code.strip():
+                return
+        if other := cls.filter_visible_with_patient_code(user, patient_code, exclude_pk=exclude_pk).first():
+            raise ValidationError(f"Patient code '{patient_code.strip()}' is already used by Patient:{other.pk}")
 
     @classmethod
     def allow_group_permission_delete(cls) -> bool:
