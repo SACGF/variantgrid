@@ -338,9 +338,6 @@ class Analysis(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel, Previe
 
         # No point documenting all this copying
         with disable_auditlog():
-
-            # TODO: Import all the other funcs locally as deps screwed up
-
             now = timezone.now()
             analysis_id = self.pk
             analysis_copy = self

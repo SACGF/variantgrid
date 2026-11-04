@@ -397,8 +397,7 @@ class BulkVEPVCFAnnotationInserter:
         all_known = vep_columns_registry.all_variant_grid_column_ids()
         ignore_columns.update(all_known - in_scope)
 
-        for c in list(ignore_columns):
-            # FIXME, why do we convery ignore_clumns to a list here? it's a set which would work fine
+        for c in list(ignore_columns):  # copy - the loop adds to ignore_columns
             if c.endswith("_id"):
                 django_column = c.rsplit("_id", 1)[0]
                 ignore_columns.add(django_column)

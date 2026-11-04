@@ -445,7 +445,7 @@ class ClinVarExportSummary(ExportRow):
     @export_column("Latest Batch Status")
     def _batch_status(self):
         if submission := self.clinvar_export.last_submission:
-            submission.submission_batch.get_status_display()
+            return submission.submission_batch.get_status_display()
 
     @export_column("All Batch IDs")
     def _batch_ids_all(self):

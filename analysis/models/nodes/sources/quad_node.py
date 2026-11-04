@@ -76,10 +76,9 @@ class QuadAllRecessive(AllRecessiveInheritance):
 class QuadCompHet(AbstractCompHetInheritance):
     """Compound Het for Quad. Same two-pass gene logic as the Trio's CompHet.
 
-    TODO: An unaffected sibling having BOTH comp-het hits (one from mum AND one from dad)
-    in the same gene is strong evidence against pathogenicity and should be excluded.
-    This would require a third pass in the two-hit gene query. Left for a future iteration.
-    (Tracked: SACGF/variantgrid_private#1263)
+    Genes are not excluded when the unaffected sibling also carries both hits (one from each parent),
+    although that is strong evidence against pathogenicity - it would need a third pass in the two-hit
+    gene query (SACGF/variantgrid_private#1263).
     """
 
     def _mum_but_not_dad(self):

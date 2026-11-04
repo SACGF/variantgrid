@@ -1282,9 +1282,10 @@ function createModal(id, title, body) {
 function suggestionDialog() {
     let modalDialog = window.MODAL_SUGGESTION;
     if (!modalDialog) {
-        const userName = $('<span>', {text: window.CURRENT_USERNAME || ''}).html();
-        const siteName = window.SITE_NAME || 'Variant Grid';
-        // FIXME need to escape username, siteName, location etc
+        const escapeHtml = (text) => $('<span>', {text: text}).html();
+        const userName = escapeHtml(window.CURRENT_USERNAME || '');
+        const siteName = escapeHtml(window.SITE_NAME || 'Variant Grid');
+        const pageUrl = escapeHtml(window.location.href);
         const modalContent = createModalShell('suggestionModal', 'Suggestion / Bug Report');
         modalContent.find('.modal-body').html(
             `<p>Thank you for taking the time to report a bug or raise a suggestion to help us improve this product.</p>
@@ -1299,7 +1300,7 @@ function suggestionDialog() {
                 </div>
                 <div class="form-group row">
                     <label class="col-form-label col-12 col-md-3 text-md-right">URL</label>
-                    <div class="col-12 col-md-9 text-left align-self-center text-break">${window.location}</div>
+                    <div class="col-12 col-md-9 text-left align-self-center text-break">${pageUrl}</div>
                 </div>
                 <div class="form-group row">
                     <label class="col-form-label col-12 col-md-3 text-md-right" for="suggestion-subject">Subject</label>

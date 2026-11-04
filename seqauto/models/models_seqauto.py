@@ -229,10 +229,6 @@ class SampleSheet(SeqAutoRecord):
         qs = self.sequencingsample_set.filter(enrichment_kit__isnull=False)
         return EnrichmentKit.objects.filter(pk__in=qs.values_list("enrichment_kit", flat=True))
 
-    def get_version_string(self):
-        date = "TODO"
-        return f"{self.hash}/{date}"
-
     def set_as_current_sample_sheet(self, sequencing_run, created=False):
         if created:
             sequencing_run_sample_sheet_created_signal.send(sender=os.path.basename(__file__),

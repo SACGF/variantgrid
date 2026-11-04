@@ -3314,7 +3314,7 @@ body.dt-col-resizing {
   NON_CANCER = "N", "Non-Cancer Somatic"
   HAEMATOLOGY = "H", "Haematology"
   SOLID_TUMOR = "S", "Solid Tumour"
-  OTHER = "O", "Other" # FIXME Somatic Other
+  OTHER = "O", "Other"
   GERMLINE = "G", "Germline"
   UNKNOWN = "U", "Unknown"
    */

@@ -255,8 +255,6 @@ class FlagHelper:
                     'id': flag_collection.id,
                     'user_permission': permission_level.level,
                     'context': flag_collection.context_id,
-                    # TODO watching isn't currently used
-                    #'watching': flag_collection.unseen_flag_activity(user=self.user)
                 }
                 json_entry = {**json_entry, **flag_collection.extra_info}
                 flag_collections_json.append(json_entry)

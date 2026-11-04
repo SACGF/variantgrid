@@ -1,5 +1,4 @@
 import os
-from unittest import skip
 
 import cyvcf2
 from django.conf import settings
@@ -31,13 +30,6 @@ class TestVCFDetectBuild(TestCase):
         vcf_filename = os.path.join(self.TEST_DATA_DIR, "bad_contigs.vcf")
         with self.assertRaises(GenomeBuildDetectionException):
             vcf_detect_genome_build(vcf_filename)
-
-    @skip  # TODO: Issue #1974 - Proper handling of hg19 vs GRCh37
-    def test_detect_hg19(self):
-        """ hg19 - due to MT size  """
-        vcf_filename = os.path.join(self.TEST_DATA_DIR, "hg19_contigs.vcf")
-        genome_build = vcf_detect_genome_build(vcf_filename)
-        self.assertEqual("hg19", genome_build.name, "Matched hg19 genome")
 
     def test_detect_grch37(self):
         """ GRCh37 - due to MT size  """

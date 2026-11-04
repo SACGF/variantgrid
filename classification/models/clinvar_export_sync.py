@@ -247,7 +247,6 @@ class ClinVarExportSync:
                 local_key = identifiers_json.get("clinvarLocalKey")
                 if clinvar_export_submission := submission_set.filter(localKey=local_key).first():
                     clinvar_export = clinvar_export_submission.clinvar_export
-                    # TODO, do we want to do anything with the submission? e.g. around status?
 
                     if scv := identifiers_json.get("clinvarAccession"):
                         clinvar_export.scv = scv
