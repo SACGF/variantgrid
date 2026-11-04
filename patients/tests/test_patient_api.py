@@ -110,13 +110,18 @@ class PatientAPITest(APITestCase):
         self.assertEqual(extraction.specimen.patient.patient_code, "2600000001P")
         self.assertEqual(extraction.nucleic_acid_source, NucleicAcid.DNA)
 
-    def test_re_posting_the_same_payload_yields_one_row_of_each(self):
+    def test_re_posting_updates_the_existing_rows(self):
+        """ #2641 - a re-post is an update, not a unique-together 400 """
         self._create_run()
-        self._create_run()
+        responses = [self._create_patient(first_name="UPDATED"),
+                     self._create_specimen(description="UPDATED"),
+                     self._create_extraction(nucleic_acid_source=NucleicAcid.RNA)]
+        for response in responses:
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
 
-        self.assertEqual(Patient.objects.filter(patient_code="2600000001P").count(), 1)
-        self.assertEqual(Specimen.objects.filter(reference_id="2600000001").count(), 1)
-        self.assertEqual(Extraction.objects.filter(reference_id="2600000001C").count(), 1)
+        self.assertEqual(Patient.objects.get(patient_code="2600000001P").first_name, "UPDATED")
+        self.assertEqual(Specimen.objects.get(reference_id="2600000001").description, "UPDATED")
+        self.assertEqual(Extraction.objects.get(reference_id="2600000001C").nucleic_acid_source, NucleicAcid.RNA)
 
     @override_settings(PATIENT_SPECIMEN_REFERENCE_NORMALIZER=DASHED_ACCESSION_NORMALIZER)
     def test_re_posting_in_another_systems_form_updates_the_same_row(self):
