@@ -103,7 +103,9 @@ MENUS: tuple[Menu, ...] = (
                  pages=('classification_upload_unmapped_lab', 'classification_upload_unmapped_status')),
     ), pages=('create_classification_for_variant', 'create_classification_for_variant_tag',
               'create_classification_from_hgvs', 'internal_lab_download', 'lab_gene_classification_counts')),
-    Menu('genes', 'Genes', 'gene_lists', items=(
+    # Symbol matching is the top bar link: Shariant hides every other Genes item and still gets the menu
+    Menu('genes', 'Genes', 'gene_symbol_matching', items=(
+        MenuItem('gene_symbol_matching', title="Symbol Matching"),
         MenuItem('genes', pages=('genome_build_genes',)),
         MenuItem('canonical_transcripts', pages=('view_canonical_transcript_collection',)),
         MenuItem('gene_grid', pages=('passed_gene_grid',)),

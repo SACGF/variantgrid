@@ -44,6 +44,13 @@ class MenuRegistryTest(SimpleTestCase):
             self.assertEqual(current_menu('liftover_runs').key, 'settings')
             self.assertEqual(current_menu('view_liftover_run').key, 'settings')
 
+    def test_genes_menu_survives_hiding_every_other_item(self):
+        """ Shariant hides the gene pages but keeps Symbol Matching, so the Genes menu stays in the top bar """
+        with _visible_except('genes', 'gene_lists', 'gene_grid', 'gene_wiki', 'canonical_transcripts'):
+            genes_menu = current_menu('gene_symbol_matching')
+            self.assertTrue(genes_menu.in_top_bar)
+            self.assertEqual(['gene_symbol_matching'], [item.url_name for item in genes_menu.visible_items()])
+
     def test_page_under_hidden_item_keeps_menu(self):
         """ A superuser can reach a page whose item this deployment hides - it still gets its menu """
         with _visible_except('clinvar_key_summary'):

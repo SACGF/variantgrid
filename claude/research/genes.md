@@ -89,7 +89,9 @@ and an alias counts only when it names one gene - otherwise each name comes back
 naming the candidates. An approved symbol always outranks an alias redirect because HGNC's `alias_symbol` synonyms
 are frequently another gene's approved symbol (AURKAIP1 lists AIP). `genes/gene_matching.py:GeneSymbolMatcher`
 memoises these for an import and records the alias followed on the `GeneListGeneSymbol`; an ambiguous alias is left
-unmatched and named in the gene list's `error_message`.
+unmatched and named in the gene list's `error_message`. The user-facing statement of these rules is the Genes menu's
+Symbol Matching page (`genes/gene_symbol_matching.py`), which resolves worked examples and a typed name live and names
+the rule that decided each.
 
 A symbol does not name a gene; it names a gene *in a release*. The same symbol has pointed at different Ensembl and
 RefSeq ids over time (and TAZ became TAFAZZIN between builds), so `genes/gene_matching.py:ReleaseGeneMatcher` writes

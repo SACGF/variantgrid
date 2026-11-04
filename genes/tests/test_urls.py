@@ -146,6 +146,7 @@ class Test(URLTestCase):
         URL_NAMES_AND_KWARGS = [
             ("genes", {}, 200),
             ("gene_lists", {}, 200),
+            ("gene_symbol_matching", {}, 200),
             ("qc_coverage", {}, 200),
             ("gene_grid", {}, 200),
             ("canonical_transcripts", {}, 200),
