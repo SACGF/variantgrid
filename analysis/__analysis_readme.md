@@ -34,7 +34,10 @@ MANE Select value. Outside repeat region is a restriction (ANDed), offered where
 
 The Effect, Population and ClinVar editors offer an ACMG preset dropdown (`analysis/node_presets.py`, #2605) that
 fills the form with one criterion's cutoffs for the user to adjust and save: PVS1 (impact HIGH, LOEUF), PP3 (any
-ClinGen-calibrated predictor at its supporting cutoff), PP2 (missense Z), PM2 (gnomAD popmax and filtering AF at
-`ANALYSIS_NODE_PRESET_PM2_MAX_PERCENT`) and PP5 (ClinVar P/LP at two or more stars). Each preset is one criterion
+ClinGen-calibrated predictor at its supporting cutoff), PP2 (missense Z), PM2 and PP5 (ClinVar P/LP at two or more
+stars). The PM2 lines depend on mode of inheritance, penetrance and severity and are lab policy, so they are
+admin-edited `PopulationNodePreset` rows - seeded as dominant severe early onset (gnomAD allele count ≤ 1), dominant
+adult onset (popmax / FAF95 ≤ 0.01%), recessive (≤ 1% and hom alt ≤ 2) and X-linked (≤ 0.01% and hemizygous ≤ 1) -
+and the editor links superusers to them. Each preset is one criterion
 because the criteria on a node pull in different directions (PM2 vs BA1, PVS1 vs PP3), and they look for pathogenic
 evidence only. Nothing is stored on the node, so its name and chips describe what it filters on.

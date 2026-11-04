@@ -41,7 +41,8 @@
 </style>
 <form id="population" method="post" action="{{ request.path }}">
     {% csrf_token %}
-    {% include "analysis/node_editors/_node_presets.html" with form_id="form#population" %}
+    {% url 'admin:analysis_populationnodepreset_changelist' as presets_admin_url %}
+    {% include "analysis/node_editors/_node_presets.html" with form_id="form#population" presets_admin_url=presets_admin_url %}
     <div class="editor-row">
         <span class="editor-label">Max frequency</span>
         {{ form.percent }} % in
@@ -87,8 +88,11 @@
         </div>
     </div>
     <div class="editor-row">
-        <label class="editor-label" for="{{ form.gnomad_hom_alt_max.id_for_label }}">gnomAD hom alt max</label>
-        {{ form.gnomad_hom_alt_max }}
+        <span class="editor-label">gnomAD max count</span>
+        <label for="{{ form.gnomad_ac_max.id_for_label }}">Alleles {{ form.gnomad_ac_max }}</label>
+        <label for="{{ form.gnomad_hom_alt_max.id_for_label }}">Hom alt {{ form.gnomad_hom_alt_max }}</label>
+        <label for="{{ form.gnomad_hemi_count_max.id_for_label }}">Hemizygous {{ form.gnomad_hemi_count_max }}</label>
+        <span class="editor-help">blank for no limit; variants gnomAD has no count for are kept</span>
     </div>
     <div class="editor-row">
         <span class="editor-label">Options</span>

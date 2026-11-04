@@ -1128,9 +1128,11 @@ class PopulationNodeForm(BaseNodeForm):
         model = PopulationNode
         fields = ('percent', 'group_operation', 'gnomad_af', 'gnomad_popmax_af',
                   'gnomad_fafmax_faf95_max', 'gnomad_fafmax_faf99_max', 'af_1kg', 'af_uk10k', 'topmed_af',
-                  'gnomad_hom_alt_max', 'show_gnomad_filtered', 'zygosity', 'use_internal_counts', 'max_samples',
+                  'gnomad_ac_max', 'gnomad_hom_alt_max', 'gnomad_hemi_count_max', 'show_gnomad_filtered', 'zygosity', 'use_internal_counts', 'max_samples',
                   'internal_percent', 'keep_internally_classified_pathogenic')
-        widgets = {'gnomad_hom_alt_max': WIDGET_INTEGER_MIN_0,
+        widgets = {'gnomad_ac_max': WIDGET_INTEGER_MIN_0,
+                   'gnomad_hom_alt_max': WIDGET_INTEGER_MIN_0,
+                   'gnomad_hemi_count_max': WIDGET_INTEGER_MIN_0,
                    'max_samples': WIDGET_INTEGER_MIN_1}
 
     PRESET_FIELD_DEFAULTS = {"gnomad_population": []}

@@ -97,6 +97,11 @@ class TestPopulationNodeModifiesParents(AnalysisSetupMixin, TestCase):
         node = self._node(gnomad_hom_alt_max=5)
         self.assertTrue(node.modifies_parents())
 
+    def test_gnomad_hemi_count_max_zero_filters_hemi_count(self):
+        node = self._node(gnomad_hemi_count_max=0)
+        self.assertTrue(node.modifies_parents())
+        self.assertIn("variantannotation__gnomad_hemi_count__lte", str(node._get_node_q()))
+
 
 # ---------------------------------------------------------------------------
 # PopulationNode group operation Q structure

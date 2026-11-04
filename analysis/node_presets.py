@@ -3,10 +3,12 @@ ACMG criterion presets for the Effect, Population and ClinVar node editors (#260
 
 A preset is a named criterion (PVS1, PP3, PM2 ...) whose values fill the editor's form client side for the user to
 adjust and save. Nothing is stored on the node, so its name, chips and method summary describe what it really
-filters on, and the cutoffs are the ones the Pathogenicity Thresholds page lists
-(`annotation/pathogenicity_predictions.py`), so they are set in one place. Presets look for pathogenic evidence only
-(keep candidates, drop benign evidence), which is what an analysis wants almost every time; the criteria on one node
-pull in different directions (PM2 vs BA1, PVS1 vs PP3), so each preset is one criterion.
+filters on. The Effect and ClinVar cutoffs are published calibrations, the ones the Pathogenicity Thresholds page
+lists (`annotation/pathogenicity_predictions.py`), so they are set in one place. The Population (PM2) lines are lab
+policy that varies with mode of inheritance, penetrance and severity, so they are `PopulationNodePreset` rows, seeded
+by migration and edited in Django admin. Presets look for pathogenic evidence only (keep candidates, drop benign
+evidence), which is what an analysis wants almost every time; the criteria on one node pull in different directions
+(PM2 vs BA1, PVS1 vs PP3), so each preset is one criterion.
 
 Entry points: `damage_node_presets`, `population_node_presets` and `clinvar_node_presets`, each taking the node being
 edited (what it offers depends on the annotation version and the data imported) and returning the NodePresets its
@@ -16,9 +18,8 @@ editor lists. `analysis/forms/forms_nodes.py:BaseNodeForm.get_preset_data` turns
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from django.conf import settings
-
 from analysis.enums import GroupOperation
+from analysis.models.nodes.filters.population_node import PopulationNode, PopulationNodePreset
 from annotation.enums import PathogenicityImpact
 from annotation.pathogenicity_predictions import (
     GENE_LOEUF_CUTOFF,
@@ -31,7 +32,6 @@ from snpdb.enums import AlleleOriginFilterDefault
 if TYPE_CHECKING:
     from analysis.models.nodes.filters.clinvar_node import ClinVarNode
     from analysis.models.nodes.filters.damage_node import DamageNode
-    from analysis.models.nodes.filters.population_node import PopulationNode
 
 
 @dataclass(frozen=True)
@@ -86,20 +86,49 @@ def damage_node_presets(node: "DamageNode") -> list[NodePreset]:
     return presets
 
 
-def population_node_presets(node: "PopulationNode") -> list[NodePreset]:
-    max_percent = settings.ANALYSIS_NODE_PRESET_PM2_MAX_PERCENT
-    values = {"percent": max_percent, "group_operation": GroupOperation.ANY,
-              "gnomad_af": False, "gnomad_popmax_af": True,
-              "keep_internally_classified_pathogenic": True}
-    databases = "gnomAD popmax"
-    if node.has_filtering_allele_frequency:
-        values["gnomad_fafmax_faf95_max"] = True
-        databases += " and filtering AF (95%)"
-    return [NodePreset(
-        "pm2", "PM2 - absent or rare in population databases",
-        f"{databases} at or below {max_percent:g}%, the dominant-disease line of this deployment (recessive genes "
-        f"allow more). Variants this database has classified (likely) pathogenic are kept whatever their frequency.",
-        values)]
+def _population_preset_summary(values: dict[str, Any]) -> str:
+    databases = [label for field, label in PopulationNode.POPULATION_DATABASE_SHORT_LABELS.items() if values.get(field)]
+    parts = []
+    if databases and values["percent"] != PopulationNode.EVERYTHING:
+        parts.append(f"{' and '.join(databases)} ≤ {values['percent']:g}%")
+    for field, label in PopulationNode.GNOMAD_COUNT_LABELS.items():
+        if (max_count := values.get(field)) is not None:
+            parts.append(f"{label} ≤ {max_count}")
+    summary = "; ".join(parts) or "no population filter"
+    if values["keep_internally_classified_pathogenic"]:
+        summary += ", keeping variants this database has classified (likely) pathogenic"
+    return f"Sets {summary}."
+
+
+POPULATION_COUNT_SHORT_LABELS = {"gnomad_ac_max": "AC", "gnomad_hom_alt_max": "hom", "gnomad_hemi_count_max": "hemi"}
+
+
+def _population_preset_cutoffs(values: dict[str, Any]) -> str:
+    """ The cutoffs for the dropdown option, e.g. "≤ 1%, hom ≤ 2" - generated, so renaming a row can't leave stale
+        numbers in its name """
+    parts = []
+    applies_percent = any(values.get(field) for field in PopulationNode.POPULATION_DATABASE_SHORT_LABELS)
+    if applies_percent and values["percent"] != PopulationNode.EVERYTHING:
+        parts.append(f"≤ {values['percent']:g}%")
+    for field, label in POPULATION_COUNT_SHORT_LABELS.items():
+        if (max_count := values.get(field)) is not None:
+            parts.append(f"{label} ≤ {max_count}")
+    return ", ".join(parts)
+
+
+def population_node_presets(node: PopulationNode) -> list[NodePreset]:
+    presets = []
+    for preset in PopulationNodePreset.objects.filter(enabled=True):
+        values = {field: getattr(preset, field) for field in PopulationNodePreset.NODE_FIELDS}
+        values["group_operation"] = GroupOperation.ANY
+        if not node.has_filtering_allele_frequency:  # the editor doesn't draw them, so they must not filter
+            values["gnomad_fafmax_faf95_max"] = values["gnomad_fafmax_faf99_max"] = False
+        description = " ".join(filter(None, [preset.description, _population_preset_summary(values)]))
+        label = preset.name
+        if cutoffs := _population_preset_cutoffs(values):
+            label += f" ({cutoffs})"
+        presets.append(NodePreset(f"population_{preset.pk}", label, description, values))
+    return presets
 
 
 def clinvar_node_presets(_node: "ClinVarNode") -> list[NodePreset]:

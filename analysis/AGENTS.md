@@ -84,8 +84,9 @@ Patterns here:
   preset (every field back to the model default, then the criterion's cutoffs), so a filter the node already had
   can't quietly AND itself in. A form-only field names its reset value in `PRESET_FIELD_DEFAULTS`, a field a
   preset must leave alone goes in `PRESET_KEEP_FIELDS`, and an editor control the generic fill can't drive (the
-  Effect node's sliders) registers `nodeEditorHooks.applyPresetField`. The PM2 cutoff is
-  `ANALYSIS_NODE_PRESET_PM2_MAX_PERCENT`, a lab policy; every other cutoff is the Pathogenicity Thresholds page's.
+  Effect node's sliders) registers `nodeEditorHooks.applyPresetField`. The Population presets are lab policy,
+  `PopulationNodePreset` rows (one per mode of inheritance, seeded in `analysis/migrations/0011_population_node_presets.py`)
+  edited in Django admin; every other cutoff is the Pathogenicity Thresholds page's.
 - The sample / patient / specimen / extraction page's Classify & Report tab is `analysis/classify_report.py` +
   `analysis/views/views_classify_report.py` (it lives here because it is built on VariantTag - analysis may import
   classification, never the other way round). Above sample level a case is whatever
