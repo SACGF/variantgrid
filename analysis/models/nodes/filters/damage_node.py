@@ -329,10 +329,14 @@ class DamageNode(AnalysisNode):
     def _applies_outside_repeat_region(self) -> bool:
         return self.outside_repeat_region and self.has_repeat_masker()
 
-    def _plugin_column_backfilled(self, column: str) -> bool:
-        """ False where the column is one the version is still waiting on a backfill for - the filter is skipped
-            (and get_warnings says so) rather than treating a not-yet-imported null as "not damaging" """
+    def _filter_column_applied(self, column: str) -> bool:
+        """ False where the column is licence-restricted data the version withholds (the editor hides its slider, so a
+            saved threshold can't be seen or changed - #2571) or one the version is still waiting on a backfill for.
+            The filter is skipped (and get_warnings says so) rather than filtering on data the user can't see, or
+            treating a not-yet-imported null as "not damaging" """
         vav = self.analysis.annotation_version.variant_annotation_version
+        if column in vav.withheld_licence_restricted_columns:
+            return False
         return column not in _PLUGIN_BACKFILL_COLUMNS or vav.backfilled_utr_avi_splicevault
 
     def modifies_parents(self):
@@ -396,13 +400,19 @@ class DamageNode(AnalysisNode):
         if self.utr_high_impact:
             set_filters.append(("High-impact 5' UTR", "utr_annotator_annotation"))
         for name, column in set_filters:
-            if column not in vav.visible_columns:
+            if column in vav.withheld_licence_restricted_columns:
+                warnings.append(
+                    f"{name} filter is NOT being applied on this VariantAnnotationVersion: {column} is "
+                    "licence-restricted data this version doesn't offer (not annotated with it, or its licence "
+                    "rules out a use this deployment makes)."
+                )
+            elif column not in vav.visible_columns:
                 warnings.append(
                     f"{name} filter has no data on this VariantAnnotationVersion: "
                     f"{column} is not populated on {vav.genome_build} / VEP {vav.vep} / "
                     f"columns_version {vav.columns_version}."
                 )
-            elif not self._plugin_column_backfilled(column):
+            elif not self._filter_column_applied(column):
                 warnings.append(
                     f"{name} filter is NOT being applied on this VariantAnnotationVersion: {column} has not "
                     "been backfilled for variants annotated before the plugin was switched on."
@@ -503,7 +513,7 @@ class DamageNode(AnalysisNode):
                     if self.splice_required and self.splice_allow_null:
                         splicing_q_list.append(Q(**{f"variantannotation__{ds}__isnull": True}))
 
-        if self.alphagenome_splicing_min is not None and self._plugin_column_backfilled("alphagenome_splicing"):
+        if self.alphagenome_splicing_min is not None and self._filter_column_applied("alphagenome_splicing"):
             splicing_q_list.append(Q(variantannotation__alphagenome_splicing__gte=self.alphagenome_splicing_min))
             if self.splice_required and self.splice_allow_null:
                 splicing_q_list.append(Q(variantannotation__alphagenome_splicing__isnull=True))
@@ -553,7 +563,7 @@ class DamageNode(AnalysisNode):
             if self.columns_version >= 4:
                 for tool in TOOLS:
                     raw_field = tool.raw_field
-                    if not raw_field or not self._plugin_column_backfilled(raw_field):
+                    if not raw_field or not self._filter_column_applied(raw_field):
                         continue
                     if threshold := getattr(self, tool.node_threshold_field):
                         q_raw = self._raw_score_q(tool, threshold)
@@ -610,7 +620,7 @@ class DamageNode(AnalysisNode):
                 else:
                     or_filters.append(q_aloft)
 
-            if self.splicevault_out_of_frame and self._plugin_column_backfilled("splicevault_out_of_frame_events"):
+            if self.splicevault_out_of_frame and self._filter_column_applied("splicevault_out_of_frame_events"):
                 top_event_only = self.splicevault_out_of_frame == SpliceVaultOutOfFrame.TOP
                 q_splicevault = splicevault_out_of_frame_q(top_event_only)
                 if self.splicevault_out_of_frame_required:
@@ -620,7 +630,7 @@ class DamageNode(AnalysisNode):
                 else:
                     or_filters.append(q_splicevault)
 
-            if self.utr_high_impact and self._plugin_column_backfilled("utr_annotator_annotation"):
+            if self.utr_high_impact and self._filter_column_applied("utr_annotator_annotation"):
                 q_utr = utr_high_impact_q(out_of_frame_only=self.utr_high_impact == UTRHighImpact.OUT_OF_FRAME)
                 if self.utr_high_impact_required:
                     if self.utr_high_impact_allow_null:
