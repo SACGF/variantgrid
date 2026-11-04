@@ -120,6 +120,14 @@
     color: #8a5f1a;
 }
 
+#cohort-membership .mode-line.mode-rebuild-large {
+    color: #8a5f1a;
+}
+
+#cohort-membership .mode-line.mode-rebuild-large b {
+    color: #b04434;
+}
+
 #cohort-membership .mode-line.mode-empty b {
     color: #b04434;
 }
