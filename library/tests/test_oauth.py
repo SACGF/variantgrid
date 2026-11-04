@@ -1,5 +1,6 @@
+import json
 import time
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.test import SimpleTestCase
 from oauthlib.oauth2 import InvalidGrantError
@@ -81,3 +82,18 @@ class ServerAuthTokenTest(SimpleTestCase):
         self._get_after_expiry()
         self.assertEqual(self.fetch_token.call_count, 2)
         self.assertEqual(self._sent_access_token(mock_get), "token2")
+
+
+class ServerAuthTokenRequestTest(SimpleTestCase):
+    """ The HTTP request fetch_token builds is mocked at OAuth2Session.request, so the body is what Keycloak would see """
+
+    def test_token_request_asks_for_openid_scope(self):
+        token = json.dumps({"access_token": "token1", "token_type": "Bearer", "scope": "openid profile email"})
+        server_auth = ServerAuth(username="user", password="password", host="https://shariant.example.com",
+                                 oauth_url="https://keycloak.example.com/token", client_id="client")
+        with patch.object(OAuth2Session, "request", autospec=True, return_value=Mock(text=token)) as request:
+            auth = server_auth.auth
+        body = request.call_args.kwargs["data"]
+        self.assertEqual(body["scope"], "openid")
+        self.assertEqual(body["client_id"], "client")
+        self.assertEqual(auth._client.access_token, "token1")

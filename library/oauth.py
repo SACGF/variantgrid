@@ -88,18 +88,18 @@ class ServerAuth:
         return None
 
     def _fetch_token(self, session: OAuth2Session):
+        # Keycloak's userinfo endpoint needs the "openid" scope in the token, or the other VariantGrid answers 403.
+        # The scope goes on this call, not the LegacyApplicationClient: oauthlib before 4.0 ignores it there.
         # include_client_id sends client_id in the request body (public client) - without
         # it, requests_oauthlib fabricates a Basic auth header with an empty client_secret,
         # which Keycloak rejects with invalid_client
         session.fetch_token(token_url=self.oauth_url, username=self.username, password=self.password,
-                            auth=self._app_auth, include_client_id=True, timeout=MINUTE_SECS)
+                            auth=self._app_auth, include_client_id=True, scope="openid", timeout=MINUTE_SECS)
 
     @cached_property
     def _oauth_session(self) -> OAuth2Session:
         self._check_scheme(self.oauth_url)
-        # scope must be set on the oauthlib client (not OAuth2Session) for it to be
-        # included in the token request body - Keycloak requires "openid"
-        session = OAuth2Session(client=LegacyApplicationClient(client_id=self.client_id, scope="openid"),
+        session = OAuth2Session(client=LegacyApplicationClient(client_id=self.client_id),
                                 auto_refresh_kwargs={"client_id": self.client_id})
         self._fetch_token(session)
         return session
