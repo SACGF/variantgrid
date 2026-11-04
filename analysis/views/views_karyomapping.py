@@ -1,8 +1,8 @@
 """
 Karyomapping for a trio (#1754). trio_karyomapping_qc_tab is the trio page's ajax-loaded "Karyomapping QC" tab: the
 genome-wide relatedness summary and per-chromosome phase graph, its counts calculated (queued) only when the tab is
-opened. trio_karyomapping / trio_karyomapping_gene_csv pick a gene and flanks, see the proband's phasing variants by
-bin as a Plotly scatter and download them as CSV.
+opened, which re-fetches itself (Auto-refresh header) until they finish. trio_karyomapping / trio_karyomapping_gene_csv
+pick a gene and flanks, see the proband's phasing variants by bin as a Plotly scatter and download them as CSV.
 """
 import csv
 from collections import defaultdict
@@ -21,6 +21,9 @@ from patients.enums import Zygosity
 from snpdb.enums import ImportStatus
 from snpdb.models import Trio
 from snpdb.models.models_variant import Variant
+
+KARYOMAPPING_QC_PENDING_STATUSES = (ImportStatus.CREATED, ImportStatus.IMPORTING)
+KARYOMAPPING_QC_REFRESH_MS = 5000
 
 
 def _get_trio(request, trio_id) -> Trio:
@@ -87,8 +90,11 @@ def _get_genome_karyomapping_qc_context(trio: Trio) -> dict:
 
 def trio_karyomapping_qc_tab(request, trio_id):
     trio = _get_trio(request, trio_id)
-    return render(request, 'analysis/karyomapping/trio_karyomapping_qc_tab.html',
-                  _get_genome_karyomapping_qc_context(trio))
+    context = _get_genome_karyomapping_qc_context(trio)
+    response = render(request, 'analysis/karyomapping/trio_karyomapping_qc_tab.html', context)
+    if context["genome_karyomapping_counts"].import_status in KARYOMAPPING_QC_PENDING_STATUSES:
+        response['Auto-refresh'] = str(KARYOMAPPING_QC_REFRESH_MS)  # loadAjaxBlock re-fetches the tab
+    return response
 
 
 def trio_karyomapping(request, trio_id):

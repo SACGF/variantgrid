@@ -75,6 +75,7 @@ class TrioKaryomappingViewTest(TestCase):
 
         response = self.client.get(reverse("trio_karyomapping_qc_tab", kwargs={"trio_id": self.trio.pk}))
         self.assertContains(response, "karyomapping-qc-graph")
+        self.assertNotIn("Auto-refresh", response)
 
     def test_qc_tab_queues_missing_counts(self):
         """ The trio page only links the tab - opening the tab is what queues the (slow) count """
@@ -85,7 +86,8 @@ class TrioKaryomappingViewTest(TestCase):
         self.assertFalse(GenomeKaryomappingCounts.objects.filter(trio=self.trio).exists())
 
         response, callbacks = self._qc_tab_callbacks()
-        self.assertContains(response, "reload the page once they have been calculated")
+        self.assertContains(response, "Calculating karyomapping counts")
+        self.assertIn("Auto-refresh", response)  # the tab polls until the count finishes
         self.assertEqual(len(callbacks), 1)
 
         _, callbacks = self._qc_tab_callbacks()
@@ -105,12 +107,13 @@ class TrioKaryomappingViewTest(TestCase):
 
         response, callbacks = self._qc_tab_callbacks()
         self.assertContains(response, "could not be calculated")
+        self.assertNotIn("Auto-refresh", response)  # polling must not drive the error retries
         self.assertEqual(callbacks, [])  # too soon to retry
 
         counts_qs = GenomeKaryomappingCounts.objects.filter(trio=self.trio)
         counts_qs.update(modified=timezone.now() - GenomeKaryomappingCounts.ERROR_RETRY_AFTER)
         response, callbacks = self._qc_tab_callbacks()
-        self.assertContains(response, "reload the page once they have been calculated")
+        self.assertContains(response, "Calculating karyomapping counts")
         self.assertEqual(len(callbacks), 1)
         _, callbacks = self._qc_tab_callbacks()
         self.assertEqual(callbacks, [])  # requeued once
