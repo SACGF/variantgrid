@@ -1066,20 +1066,62 @@ TableFormat.deleteRow = function(data, type, row) {
     }).prop('outerHTML');
 };
 
-$(document).on('click', '.dt-delete-row', function() {
-    if (!confirm('Are you sure you want to delete this?')) {
-        return;
+const DT_DELETE_CONFIRM_MS = 200;
+
+/* Delete asks Yes / No beside the button (or, in a row-actions menu, below the item) rather than in a
+   browser confirm() popup, sliding open like the delete box on a settings page's permissions tab.
+   It stays until one is clicked. Clicks are kept from bubbling so a row-actions menu stays open */
+function openDeleteRowConfirm(trigger) {
+    const inMenu = trigger.closest('.dropdown-menu').length > 0;
+    const confirmBox = $(inMenu ? '<div>' : '<span>', {
+        class: inMenu ? 'dt-delete-confirm px-4 py-1 text-nowrap' : 'dt-delete-confirm ml-1 text-nowrap',
+        html: [
+            $('<span>', {class: 'mr-1', text: 'Delete?'}),
+            $('<button>', {type: 'button', class: 'btn btn-sm btn-danger dt-delete-confirm-yes', text: 'Yes'}),
+            $('<button>', {type: 'button', class: 'btn btn-sm btn-outline-secondary ml-1 dt-delete-confirm-no', text: 'No'}),
+        ]
+    }).data('trigger', trigger).hide().insertAfter(trigger);
+    if (inMenu) {
+        confirmBox.slideDown(DT_DELETE_CONFIRM_MS);
+    } else {
+        confirmBox.animate({width: 'show', opacity: 'show'}, DT_DELETE_CONFIRM_MS);
     }
-    const btn = $(this);
-    const url = btn.data('url');
+}
+
+function closeDeleteRowConfirm(confirmBox) {
+    if (confirmBox.is('div')) {
+        confirmBox.slideUp(DT_DELETE_CONFIRM_MS, () => confirmBox.remove());
+    } else {
+        confirmBox.animate({width: 'hide', opacity: 'hide'}, DT_DELETE_CONFIRM_MS, () => confirmBox.remove());
+    }
+}
+
+$(document).on('click', '.dt-delete-row', function(event) {
+    event.stopPropagation();
+    const trigger = $(this);
+    if (!trigger.next('.dt-delete-confirm').length) {
+        openDeleteRowConfirm(trigger);
+    }
+});
+
+$(document).on('click', '.dt-delete-confirm-no', function(event) {
+    event.stopPropagation();
+    closeDeleteRowConfirm($(this).closest('.dt-delete-confirm'));
+});
+
+$(document).on('click', '.dt-delete-confirm-yes', function(event) {
+    event.stopPropagation();
+    const confirmBox = $(this).closest('.dt-delete-confirm');
+    confirmBox.find('button').prop('disabled', true);
     $.ajax({
         type: 'POST',
-        url: url,
+        url: confirmBox.data('trigger').data('url'),
         headers: {'X-CSRFToken': Cookies.get('csrftoken')},
         success: function() {
-            btn.closest('table').DataTable().ajax.reload(null, false);
+            confirmBox.closest('table').DataTable().ajax.reload(null, false);
         },
         error: function(xhr) {
+            closeDeleteRowConfirm(confirmBox);
             alert('Error: ' + (xhr.responseText || 'Failed to delete'));
         }
     });
