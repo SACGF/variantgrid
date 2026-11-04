@@ -22,7 +22,7 @@ from analysis.exceptions import NodeOutOfDateException, NonFatalNodeError
 from analysis.forms import VCFLocusFilterForm
 from analysis.graphs.column_boxplot_graph import ColumnBoxplotGraph
 from analysis.grids import VariantGrid
-from analysis.models import AnalysisNode, NodeGraphType
+from analysis.models import Analysis, AnalysisNode, NodeGraphType
 from analysis.models.nodes.node_counts import get_extra_filters_count, is_extra_filter
 from analysis.models.nodes.node_utils import cancel_node_tasks
 from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
@@ -37,6 +37,7 @@ from analysis.views.analysis_permissions import (
     get_node_subclass_or_non_fatal_exception,
 )
 from analysis.views.nodes.node_view import NodeView
+from annotation.models.models_annotation_version import AnnotationVersion
 from library import pandas_utils
 from library.constants import HOUR_SECS, WEEK_SECS
 from library.django_utils import set_form_read_only
@@ -61,6 +62,7 @@ def get_node_view_classes_by_class() -> dict:
 
 
 NODE_VIEW_CLASSES = get_node_view_classes_by_class()
+NODE_VIEW_CLASSES_BY_NAME = {model.__name__: klass for model, klass in NODE_VIEW_CLASSES.items()}
 NODE_DISPATCHER = {model: klass.as_view() for model, klass in NODE_VIEW_CLASSES.items()}
 
 
@@ -81,14 +83,18 @@ def node_view(request, analysis_id, analysis_version, node_id, node_version, ext
 
 
 @never_cache
-def node_presets(request, analysis_id, node_id):
-    """ The ACMG criterion presets a node's editor offers (#2605). Served apart from node_view, which is cached for a
-        week, so a preset edited in admin shows the next time an editor opens """
-    node = get_node_subclass_or_404(request.user, node_id)
-    form_class = NODE_VIEW_CLASSES[node.__class__].form_class
-    if node.analysis_id != analysis_id or not form_class.offers_presets():
-        raise Http404(f"Node {node_id} has no presets")
-    return JsonResponse(form_class(instance=node).get_preset_data(), safe=False)
+def node_presets(request, node_type, annotation_version_id):
+    """ The ACMG criterion presets a node type's editor offers on an annotation version (#2605). They vary only with
+        those and deployment data, not the node, and are served apart from node_view, which is cached for a week,
+        so a preset edited in admin shows the next time an editor opens """
+    node_view_class = NODE_VIEW_CLASSES_BY_NAME.get(node_type)
+    if not (node_view_class and node_view_class.form_class.HAS_PRESETS):
+        raise Http404(f"{node_type} has no presets")
+    annotation_version = get_object_or_404(AnnotationVersion, pk=annotation_version_id)
+    analysis = Analysis(annotation_version=annotation_version, genome_build=annotation_version.genome_build,
+                        user=request.user)
+    form = node_view_class.form_class(instance=node_view_class.model(analysis=analysis))
+    return JsonResponse(form.get_preset_data(), safe=False)
 
 
 def get_node_sql(grid):

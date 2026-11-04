@@ -177,7 +177,8 @@ class NodePresetsTest(TestCase):
         self.assertEqual(NodeMatchInput.MATCHING_VARIANTS, pp5.node_input)
 
     def _presets_url(self, node) -> str:
-        return reverse("node_presets", kwargs={"analysis_id": self.analysis.pk, "node_id": node.pk})
+        return reverse("node_presets", kwargs={"node_type": node.get_class_name(),
+                                               "annotation_version_id": self.analysis.annotation_version_id})
 
     def test_editors_offer_the_dropdown(self):
         client = Client()
@@ -200,8 +201,7 @@ class NodePresetsTest(TestCase):
         labels = [p["label"] for p in client.get(self._presets_url(node)).json()]
         self.assertIn("PM2 - edited (≤ 0.5%)", labels)
 
-    def test_node_without_presets_404s(self):
+    def test_node_type_without_presets_404s(self):
         client = Client()
         client.force_login(self.user)
-        node = ZygosityNode.objects.create(analysis=self.analysis)
-        self.assertEqual(404, client.get(self._presets_url(node)).status_code)
+        self.assertEqual(404, client.get(self._presets_url(ZygosityNode(analysis=self.analysis))).status_code)

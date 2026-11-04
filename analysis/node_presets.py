@@ -10,11 +10,11 @@ by migration and edited in Django admin. Presets look for pathogenic evidence on
 evidence), which is what an analysis wants almost every time; the criteria on one node pull in different directions
 (PM2 vs BA1, PVS1 vs PP3), so each preset is one criterion.
 
-Entry points: `damage_node_presets`, `population_node_presets` and `clinvar_node_presets`, each taking the node being
-edited (what it offers depends on the annotation version and the data imported) and returning the NodePresets its
-editor lists. `analysis/forms/forms_nodes.py:BaseNodeForm.get_preset_data` turns each into a complete form state, and
-`analysis/views/views_node.py:node_presets` serves that to `node_presets.js` apart from the week-cached editor, so an
-admin edit to a Population preset shows the next time an editor opens.
+Entry points: `damage_node_presets`, `population_node_presets` and `clinvar_node_presets`, each taking a node and
+returning the NodePresets its editor lists. That node is unsaved, on an unsaved Analysis carrying only the annotation
+version: what a preset offers may depend on that and on the data imported, never on a node's own settings. `analysis/forms/forms_nodes.py:BaseNodeForm.get_preset_data` turns each into a complete form state, and
+`analysis/views/views_node.py:node_presets` serves that per node type and annotation version to `node_presets.js`, apart
+from the week-cached editor, so an admin edit to a Population preset shows the next time an editor opens.
 """
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any

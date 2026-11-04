@@ -274,15 +274,12 @@ class BaseNodeForm(forms.ModelForm):
     # ACMG criterion presets (#2605, analysis/node_presets.py). Applying one resets every form field to the node's
     # default then sets the preset's own, so a leftover filter can't quietly AND itself in. A field that isn't a
     # model field names its reset value here; one the preset should leave alone goes in PRESET_KEEP_FIELDS.
+    HAS_PRESETS = False  # True where get_presets is overridden - the editor draws the dropdown and fetches them
     PRESET_KEEP_FIELDS: frozenset[str] = frozenset()
     PRESET_FIELD_DEFAULTS: dict[str, Any] = {}
 
     def get_presets(self) -> list[NodePreset]:
         return []
-
-    @classmethod
-    def offers_presets(cls) -> bool:
-        return cls.get_presets is not BaseNodeForm.get_presets
 
     def get_preset_data(self) -> list[dict]:
         """ The presets as the editor's dropdown and node_presets.js take them, each with the complete form state """
@@ -531,6 +528,8 @@ class ClinVarNodeForm(SignificanceFilterFormMixin, BaseNodeForm):
         super().__init__(*args, **kwargs)
         self.fields["variation_ids"].initial = ", ".join(str(v) for v in self.instance.variation_ids)
 
+    HAS_PRESETS = True
+
     def get_presets(self) -> list[NodePreset]:
         return clinvar_node_presets(self.instance)
 
@@ -699,6 +698,8 @@ class DamageNodeForm(BaseNodeForm):
                 if tool.node_label:
                     # Only where the auto label would mislead - a signed or inverted score
                     field.label = f"{tool.node_label} {tool.raw_direction.comparison}"
+
+    HAS_PRESETS = True
 
     def get_presets(self) -> list[NodePreset]:
         return damage_node_presets(self.instance)
@@ -1140,6 +1141,8 @@ class PopulationNodeForm(BaseNodeForm):
                    'max_samples': WIDGET_INTEGER_MIN_1}
 
     PRESET_FIELD_DEFAULTS = {"gnomad_population": []}
+
+    HAS_PRESETS = True
 
     def get_presets(self) -> list[NodePreset]:
         return population_node_presets(self.instance)
