@@ -43,13 +43,14 @@ class OAuthConnector:
         # TODO, this should be @lazy (rather than a manual implementation of @lazy)
         if not self._auth:
             if self.oauth_url:
-                # scope must be set on the oauthlib client (not OAuth2Session) for it to be
-                # included in the token request body - Keycloak requires "openid"
-                oauth = OAuth2Session(client=LegacyApplicationClient(client_id=self.client_id, scope="openid"))
+                oauth = OAuth2Session(client=LegacyApplicationClient(client_id=self.client_id))
+                # Keycloak's userinfo endpoint needs the "openid" scope in the token, or Shariant answers 403. The
+                # scope goes on this call: oauthlib 3.1.0 ignores one set on the LegacyApplicationClient.
                 # include_client_id sends client_id in the request body (public client) - without
                 # it, requests_oauthlib sends a Basic auth header with an empty client_secret,
                 # which Keycloak rejects with invalid_client
-                token = oauth.fetch_token(token_url=self.oauth_url, username=self.username, password=self.password, include_client_id=True)
+                token = oauth.fetch_token(token_url=self.oauth_url, username=self.username, password=self.password,
+                                          include_client_id=True, scope="openid")
                 self._auth = OAuth2(client_id=self.client_id, token=token)
             else:
                 # fall back to basic auth
