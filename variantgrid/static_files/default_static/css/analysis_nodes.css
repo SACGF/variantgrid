@@ -325,13 +325,32 @@ button.add-analysis-variable-button {
 }
 
 .design-a-node .node-name {
+	display: block;
+	color: #24292f;
+	font-weight: 600;
+}
+
+/* One per name line (renderNodeName), each clamped on its own so line 2 always shows - the hover title has it all */
+.design-a-node .node-name-line {
 	display: -webkit-box;
-	-webkit-line-clamp: 3;
+	-webkit-line-clamp: 2;
 	-webkit-box-orient: vertical;
 	overflow: hidden;
 	overflow-wrap: anywhere;
-	color: #24292f;
-	font-weight: 600;
+}
+
+/* Line 2 on is the mode or a filter, lighter under the thing the node reads */
+.design-a-node .node-name-line + .node-name-line {
+	font-size: 9px;
+	font-weight: 400;
+}
+
+.design-a-node .node-name-line:only-child {
+	-webkit-line-clamp: 3;
+}
+
+.design-a-node .node-name-line:nth-child(n+3) {
+	-webkit-line-clamp: 1;
 }
 
 .design-a-node .node-chips {

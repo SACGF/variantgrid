@@ -769,11 +769,11 @@ function addAnalysisVariableButton(nodeId, field, readOnly) {
     if (existingNodeContainer.length === 0) {
         existingNodeContainer = $("<div />").addClass("left").addClass(NODE_CONTAINER_CLASS).attr("node-id", nodeId);
         $(".node-overlay", node).addClass("variable-node");
-        let nodeName = $(".node-name", node).text();
+        let nodeName = node.data("nodeName");
         if (!nodeName) {
             nodeName = node.attr("node_class") + ": " + nodeId;
         }
-        const nodeTitle = $("<div />").append($("<b/>").html(nodeName));
+        const nodeTitle = $("<div />").append($("<b/>").text(nodeName));
         existingNodeContainer.append(nodeTitle);
         $("#insert-analysis-variables-before-here", avContainer).before(existingNodeContainer);
     }
