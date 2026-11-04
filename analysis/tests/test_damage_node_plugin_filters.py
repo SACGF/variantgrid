@@ -23,8 +23,10 @@ PLUGIN_FILTERS = {"avi_phred_min": 20, "alphagenome_splicing_min": 0.5,
                   "splicevault_out_of_frame": SpliceVaultOutOfFrame.ALL, "utr_high_impact": UTRHighImpact.ANY_FRAME}
 
 
+# The fake version has no AlphaGenome pin, so it would withhold that column: the tests say which columns are offered
 @override_settings(**get_fake_annotation_settings_dict(columns_version=2))
 @patch.object(VariantAnnotationVersion, "visible_columns", PLUGIN_COLUMNS)
+@patch.object(VariantAnnotationVersion, "withheld_licence_restricted_columns", frozenset())
 class DamageNodePluginFiltersTest(TestCase):
     @classmethod
     def setUpTestData(cls):
