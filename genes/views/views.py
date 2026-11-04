@@ -393,6 +393,7 @@ def gene_symbol_matching(request):
         "examples": examples,
         "alias_sources": alias_sources,
         "hgnc_import": HGNCImport.objects.order_by("-pk").first(),
+        "gene_level_enabled": settings.VARIANT_GENE_LEVEL_ENABLED,
     }
     return render(request, "genes/gene_symbol_matching.html", context)
 

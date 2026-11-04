@@ -7,7 +7,7 @@
         <h3>Gene Symbol Matching</h3>
 
         <p>
-            Wherever you write a gene name - a classification's gene symbol, a gene list, a filter box - it is matched
+            Wherever you write a gene name - a classification's gene symbol,{% if url_name_visible.gene_lists %} a gene list,{% endif %} a filter box - it is matched
             to a gene by the same rule, so a name means the same gene everywhere. The rule follows HGNC, the committee
             that names human genes:
         </p>
@@ -95,7 +95,9 @@
                 <li>Gene lists, whether typed, pasted, uploaded or from PanelApp: the <i>alias</i> column shows the alias a
                     name was matched through, and an ambiguous alias is left unmatched with its candidates in the error message.</li>
             {% endif %}
-            <li>Gene level classifications: fusions (ROS1;GOPC) and whole-gene copy number calls name their genes the same way.</li>
+            {% if gene_level_enabled %}
+                <li>Gene level classifications: fusions (ROS1;GOPC) and whole-gene copy number calls name their genes the same way.</li>
+            {% endif %}
         </ul>
 
         {% if url_name_visible.gene_lists %}
