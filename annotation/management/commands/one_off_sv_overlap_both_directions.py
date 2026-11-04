@@ -10,6 +10,7 @@ leaves its row as it was and is reported. One transaction per version; --dry-run
 Registered as a deploy-time ManualOperation (annotation/migrations/0013_sv_overlap_both_directions.py).
 """
 import logging
+import os
 from dataclasses import dataclass, field
 
 import cyvcf2
@@ -138,10 +139,14 @@ def repair_version(vav: VariantAnnotationVersion, dry_run: bool) -> VersionRepai
     if refill_names := {r.refill_from for r in repairs if r.refill_from}:
         try:
             vcf_path = VEPConfig(vav.genome_build)["gnomad_sv"]
-            gnomad_records = read_gnomad_sv_records(vcf_path, refill_names, set(single_columns.values()))
         except KeyError:
-            logging.warning("%s: no gnomad_sv configured for %s, rows needing a refill are left as they were",
-                            vav, vav.genome_build)
+            vcf_path = None
+        if vcf_path and os.path.exists(vcf_path):
+            gnomad_records = read_gnomad_sv_records(vcf_path, refill_names, set(single_columns.values()))
+        else:
+            # A build that isn't enabled here has no annotation data downloaded
+            logging.warning("%s: no gnomad_sv file for %s (%s), rows needing a refill are left as they were",
+                            vav, vav.genome_build, vcf_path or "not configured")
 
     with transaction.atomic():
         for repair in repairs:
