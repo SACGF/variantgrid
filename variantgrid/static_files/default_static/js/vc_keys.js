@@ -186,8 +186,8 @@ const EKey = (function() {
             } else if (this.value_type === 'T') {
                 this.safeHtml(val, element);
                 element.removeClass('blank');
-            } else if (this.value_type === 'F' && EKey.HGVS_KEYS.has(this.key)) {
-                const display = abbreviateHgvsSequences(val);
+            } else if (this.value_type === 'F' && EKey.SEQUENCE_ABBREVIATORS[this.key]) {
+                const display = EKey.SEQUENCE_ABBREVIATORS[this.key](val);
                 element.text(display);
                 if (display !== val) {
                     element.attr('title', val);
@@ -245,7 +245,13 @@ const EKey = (function() {
     
 })();
 
-EKey.HGVS_KEYS = new Set(['c_hgvs', 'g_hgvs']);
+// Keys whose value can spell out a long sequence: shown shortened, the full value as the tooltip (#2612)
+EKey.SEQUENCE_ABBREVIATORS = {
+    c_hgvs: abbreviateHgvsSequences,
+    g_hgvs: abbreviateHgvsSequences,
+    p_hgvs: abbreviatePHgvsSequences,
+    variant_coordinate: abbreviateVariantCoordinate,
+};
 EKey.HTML_WHITE_LIST = new Set(['BR','B','I','OL','UL','LI','U','SUP','SUB','SPAN','DIV','P','STRONG','EM']);
 
 // UNSPECIFIED STRENGTH HANDLING
