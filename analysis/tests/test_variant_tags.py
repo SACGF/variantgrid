@@ -489,18 +489,17 @@ class TestVariantTagsDict(TestCase):
         self.assertEqual({e["resolved"] for e in entries}, {None})
 
     def test_a_resolved_tagging_carries_its_date(self):
-        entries = self._render()[str(self.done_variant.pk)]
-        self.assertEqual(entries, [{"id": self.done_tagging.pk, "tag": self.tag.pk, "sample": None,
-                                    "patient": None, "patient_name": None,
-                                    "resolved": localtime(self.resolved_at).date().isoformat()}])
+        (entry,) = self._render()[str(self.done_variant.pk)]
+        self.assertEqual(entry["id"], self.done_tagging.pk)
+        self.assertEqual(entry["resolved"], localtime(self.resolved_at).date().isoformat())
 
     def test_a_withdrawn_classification_puts_the_todo_back(self):
         classification = self._classification(self.withdrawn_variant, withdrawn=True)
         tagging = self._tag_variant(self.withdrawn_variant, resolved=self.resolved_at,
                                     classification=classification)
-        entries = self._render()[str(self.withdrawn_variant.pk)]
-        self.assertEqual(entries, [{"id": tagging.pk, "tag": self.tag.pk, "sample": None, "patient": None,
-                                    "patient_name": None, "resolved": None}])
+        (entry,) = self._render()[str(self.withdrawn_variant.pk)]
+        self.assertEqual(entry["id"], tagging.pk)
+        self.assertIsNone(entry["resolved"])
 
     def test_analysis_samples_names_every_sample_a_pill_can_be_about(self):
         template = Template("{% load tag_config_tags %}{% render_analysis_samples_dict analysis %}")

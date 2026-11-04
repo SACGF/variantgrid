@@ -73,8 +73,13 @@ class TestGeneListAPI(TestCase):
         return self.client.post(url, data={"modifications": json.dumps(modifications)})
 
     def test_modify_delete_only(self):
+        for symbol in ("RUNX1", "GATA2"):
+            gene_symbol = GeneSymbol.objects.get_or_create(symbol=symbol)[0]
+            self.gene_list.genelistgenesymbol_set.create(gene_symbol=gene_symbol, original_name=symbol)
         response = self._modify({"delete": ["RUNX1"]})
         self.assertEqual(200, response.status_code)
+        self.assertEqual({"num_added": 0, "num_deleted": 1}, response.json())
+        self.assertEqual(["GATA2"], list(self.gene_list.get_gene_names()))
 
     def test_modify_unknown_symbol_is_bad_request(self):
         response = self._modify({"add": ["RUNX1", "NOT_A_GENE_SYMBOL"]})

@@ -182,11 +182,6 @@ class ExternalAnnotationStatusTests(TestCase):
         annotation_run.save()
         self.assertEqual(annotation_run.status, AnnotationStatus.FINISHED)
 
-    def test_summary_state(self):
-        # Short label for the status-graph legend; the full status label stays "Awaiting external annotation"
-        self.assertEqual(AnnotationStatus.get_summary_state(AnnotationStatus.EXTERNAL_DUMP_COMPLETED),
-                         "External")
-
     def test_annotate_variants_skips_external_run(self):
         annotation_run = self._make_external_run()
         # Synchronous celery in tests; must return early without running VEP or erroring

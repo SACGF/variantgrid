@@ -4,6 +4,10 @@ Tests for the representative Variant column and the Classifications column (vari
 The renderers are client side, so what's tested here is what the server has to get right for them:
 the members riding along hidden, the columns, the genomic sort and the expanded row.
 """
+import os
+import re
+
+from django.conf import settings
 from django.test.client import Client
 from django.urls.base import reverse
 from django.utils.html import escape
@@ -18,8 +22,11 @@ from classification.models.classification import Classification
 from genes.models import GeneSymbol
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from library.django_utils import FakeRequest
+from library.django_utils.django_partition import temporary_db_table
+from snpdb.enums import CohortGenotypeCollectionType
 from snpdb.grid_columns.grid_sample_columns import get_available_format_columns
 from snpdb.models import (
+    CohortGenotype,
     CompositeColumnMember,
     Country,
     CustomColumnsCollection,
@@ -27,6 +34,7 @@ from snpdb.models import (
     Organization,
     UserSettings,
 )
+from snpdb.models.models_cohort import CohortGenotypeCollection
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 from snpdb.views.datatable_view import CellData, datatable_definition, datatable_response
 
@@ -99,18 +107,19 @@ class RepresentativeVariantColumnTest(GridExportTestCase):
             self.assertEqual(self.grid._render_json_cell(cell, columns[path]), value, path)
 
     def test_composite_columns_carry_their_renderers(self):
-        columns = self._columns_by_name()
-        for name, client_renderer in [
-                ("classifications", "VariantGridFormat.classifications"),
-                ("consequence_impact", "VariantGridFormat.impactConsequence"),
-                ("gnomad", "VariantGridFormat.gnomad"),
-                ("spliceai", "VariantGridFormat.spliceai"),
-                ("maxentscan", "VariantGridFormat.maxentscan"),
-                ("mastermind", "VariantGridFormat.mastermind"),
-                ("aloft", "VariantGridFormat.aloft"),
-                ("predictions", "VariantGridFormat.predictions"),
-                ("db_zygosity", "VariantGridFormat.dbZygosityCounts")]:
-            self.assertEqual(columns[name].client_renderer, client_renderer, name)
+        """ A client_renderer is resolved by name in the browser (resolveFunctionName), so every
+            VariantGridFormat renderer a column names has to be defined in variantgrid_formats.js """
+        formats_js = os.path.join(settings.BASE_DIR, "variantgrid", "static_files", "default_static", "js",
+                                  "variantgrid_formats.js")
+        with open(formats_js, encoding="utf-8") as f:
+            defined = set(re.findall(r"^VariantGridFormat\.(\w+)\s*=", f.read(), flags=re.MULTILINE))
+
+        prefix = "VariantGridFormat."
+        renderers = {rc.name: rc.client_renderer.removeprefix(prefix) for rc in self.grid.enabled_columns
+                     if rc.client_renderer and rc.client_renderer.startswith(prefix)}
+        self.assertIn("spliceai", renderers)  # a composite: drawn entirely client side
+        for name, renderer in renderers.items():
+            self.assertIn(renderer, defined, name)
 
     def test_composite_sort_menus_name_columns_in_the_grid(self):
         """ An entry naming a column this grid doesn't carry is dropped client side, so the menu has
@@ -156,13 +165,21 @@ class RepresentativeVariantColumnTest(GridExportTestCase):
             self.assertFalse(columns[f"sample_{sample_pk}_samples_{partner}"].visible, partner)
 
     def test_packed_genotype_columns_sort_on_their_own_value(self):
-        """ A sample column's value is packed into the cohort's array/string, so sorting annotates
-            this sample's value out of it """
-        sample_pk = self.sample.pk
-        for column in ["samples_zygosity", "samples_read_depth"]:
-            qs = self._order_by_column(f"sample_{sample_pk}_{column}")
-            self.assertIn(VariantGrid.GENOTYPE_SORT_ALIAS_PREFIX, str(qs.query), column)
-            list(qs[:1])  # ...and it has to be a query the database will run
+        """ A sample column's value is packed into the cohort's array, so sorting annotates this sample's
+            value out of it. The mother's depths run the other way, so sorting on hers would reverse it """
+        cgc = CohortGenotypeCollection.objects.get(cohort=self.cohort, cohort_version=self.cohort.version,
+                                                   collection_type=CohortGenotypeCollectionType.UNCOMMON)
+        shallow, deep, middle = self.variants[:3]
+        proband_depths = {shallow: 10, middle: 20, deep: 30}
+        with temporary_db_table(CohortGenotype, cgc.get_partition_table()):
+            for variant, depth in proband_depths.items():
+                CohortGenotype.objects.filter(collection=cgc, variant=variant).update(
+                    samples_read_depth=[depth, 100 - depth, 0])
+
+        qs = self._order_by_column(f"sample_{self.sample.pk}_samples_read_depth")
+        depth_variant_pks = {v.pk for v in proband_depths}
+        ordered_pks = [pk for pk in qs.values_list("pk", flat=True) if pk in depth_variant_pks]
+        self.assertEqual(ordered_pks, [shallow.pk, middle.pk, deep.pk])
 
     def test_two_line_rows_is_a_user_setting(self):
         self.assertEqual(["variantgrid-datatable"], self.grid.get_table_classes())

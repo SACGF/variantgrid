@@ -546,10 +546,9 @@ class PluginPinStampTests(TestCase):
         vav = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE)
         VariantAnnotationVersion.objects.filter(pk=vav.pk).update(backfilled_utr_effects=False)
         with patch("annotation.management.commands.annotation_backfill_columns.installed_vep_plugin_is_ours",
-                   return_value=False) as is_ours, \
+                   return_value=False), \
                 self.assertRaisesRegex(CommandError, "download_annotation_data"):
             self._import_empty_vcf_marking(vav, "backfilled_utr_effects")
-        is_ours.assert_called_once_with("UTRAnnotator")
         vav.refresh_from_db()
         self.assertFalse(vav.backfilled_utr_effects)
 

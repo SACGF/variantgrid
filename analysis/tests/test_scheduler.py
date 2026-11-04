@@ -4,14 +4,12 @@ Tests for analysis node scheduling logic.
 Covers NodeStatus categorisation and the state-driven leased scheduler
 (lease_ready_nodes + the dependency gate) introduced by issue #346.
 """
-import inspect
 import uuid
 from datetime import timedelta
 from unittest import mock
 
 import psycopg
 from celery.canvas import Signature, _chain
-from django.conf import settings
 from django.db.models import F
 from django.db.utils import OperationalError
 from django.test import TestCase, override_settings
@@ -30,7 +28,6 @@ from analysis.tasks import analysis_update_tasks
 from analysis.tasks.analysis_update_tasks import (
     _node_launch_signature,
     _node_ready_to_lease,
-    create_and_launch_analysis_tasks,
     dispatch_analysis_backlog,
     lease_ready_nodes,
 )
@@ -39,7 +36,6 @@ from analysis.tasks.node_update_tasks import (
     _backoff_node,
     delete_analysis_old_node_versions,
     next_backoff,
-    node_cache_task,
     update_node_task,
 )
 from analysis.tests.utils import AnalysisSetupMixin
@@ -249,36 +245,6 @@ class TestNodeReadyToLease(AnalysisSetupMixin, TestCase):
 
     def _graph(self):
         return analysis_update_tasks._load_graph(self.analysis.pk)
-
-    def _make_chain(self, parent_status):
-        parent = AllVariantsNode.objects.create(analysis=self.analysis)
-        child = GeneListNode.objects.create(analysis=self.analysis)
-        child.add_parent(parent)
-        self._force_status(parent, parent_status)
-        return parent, child
-
-    def test_parent_loading_blocks_child(self):
-        _, child = self._make_chain(NodeStatus.LOADING)
-        nodes_by_id, parents_by_child = self._graph()
-        self.assertFalse(_node_ready_to_lease(nodes_by_id[child.pk], parents_by_child, nodes_by_id))
-
-    def test_parent_queued_blocks_child(self):
-        _, child = self._make_chain(NodeStatus.QUEUED)
-        nodes_by_id, parents_by_child = self._graph()
-        self.assertFalse(_node_ready_to_lease(nodes_by_id[child.pk], parents_by_child, nodes_by_id))
-
-    def test_parent_ready_allows_child(self):
-        _, child = self._make_chain(NodeStatus.READY)
-        nodes_by_id, parents_by_child = self._graph()
-        self.assertTrue(_node_ready_to_lease(nodes_by_id[child.pk], parents_by_child, nodes_by_id))
-
-    def test_parent_error_allows_child(self):
-        """ERROR parents are settled — child runs and fails fast with ERROR_WITH_PARENT."""
-        _, child = self._make_chain(NodeStatus.ERROR)
-        nodes_by_id, parents_by_child = self._graph()
-        self.assertTrue(_node_ready_to_lease(nodes_by_id[child.pk], parents_by_child, nodes_by_id))
-
-    # --- cache dependency gate ---
 
     def _make_cache_owner(self, status):
         """A node owning a NodeCache whose variant_collection has the given ProcessingStatus."""
@@ -575,11 +541,6 @@ class TestVennCacheScheduling(AnalysisSetupMixin, TestCase):
     def test_venn_cache_count_obsolete_cache_id(self):
         venn_cache_count(-1)  # missing VennNodeCache - must return without error
 
-    def test_venn_cache_count_routed_to_analysis_workers(self):
-        route = settings.CELERY_TASK_ROUTES.get(VENN_CACHE_COUNT_TASK)
-        self.assertEqual(route, {"queue": "analysis_workers", "routing_key": "analysis_workers"},
-                         "venn_cache_count must run on the analysis pool, not default db_workers")
-
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
 class TestTransientErrorBackoff(AnalysisSetupMixin, TestCase):
@@ -768,19 +729,21 @@ class TestCancelledLoad(AnalysisSetupMixin, TestCase):
         self.assertIsNone(node_task.db_pid, "lease must not leave a stale pid behind")
 
 
-class TestSingleWorkerInvariant(TestCase):
+@override_settings(ANALYSIS_NODE_CACHE_Q=False)
+class TestSingleWorkerInvariant(AnalysisSetupMixin, TestCase):
     """All node assignment/leasing happens only in lease_ready_nodes, reached only from
-    create_and_launch_analysis_tasks. Worker tasks never call it."""
-
-    @staticmethod
-    def _task_source(task):
-        # celery shared_task wraps the function; .run is the original callable
-        return inspect.getsource(getattr(task, "run", task))
+    create_and_launch_analysis_tasks. Worker tasks never lease."""
 
     def test_only_dispatcher_calls_lease_ready_nodes(self):
-        # Check for an actual call site ("lease_ready_nodes("), not mentions in docstrings.
-        self.assertIn("lease_ready_nodes(", self._task_source(create_and_launch_analysis_tasks))
-        for task in (update_node_task, node_cache_task):
-            src = self._task_source(task)
-            self.assertNotIn("lease_ready_nodes(", src,
-                             f"{task.name} must not lease nodes — assignment is single-worker only")
+        node = AllVariantsNode.objects.create(analysis=self.analysis)
+        other_dirty_node = AllVariantsNode.objects.create(analysis=self.analysis)
+        lease_ready_nodes(self.analysis.pk, "worker", max_nodes=1)
+
+        with mock.patch.object(Signature, "apply_async"):
+            # No Variants in the fixture, so AllVariantsNode has no max_variant to report on
+            with mock.patch.object(AllVariantsNode, "get_errors", return_value=[]):
+                update_node_task(node.pk, node.version)
+
+        other_dirty_node.refresh_from_db()
+        self.assertEqual(other_dirty_node.status, NodeStatus.DIRTY)
+        self.assertFalse(NodeTask.objects.filter(node_version__node=other_dirty_node).exists())

@@ -10,7 +10,7 @@ from annotation.fake_data import get_fake_annotation_version
 from library.genomics.vcf_enums import UNDECLARED_FILTERS_INFO, VCFSymbolicAllele
 from library.utils import sha256sum_str
 from snpdb.enums import ImportSource
-from snpdb.models import Sequence
+from snpdb.models import Sequence, VCFFilter
 from upload.enums import ModifiedImportedVariantOperation, UploadedFileTypes
 from upload.models import (
     FileUpload,
@@ -279,9 +279,15 @@ class TestVCFProcessors(TestCase):
         self.assertNotIn(UNDECLARED_FILTERS_INFO, info_json)
 
     def test_genotype_processor_undeclared_filter(self):
-        """VCF with a FILTER value not declared in the header should not crash the processor.
-        The processor must auto-create a VCFFilter record for the undeclared code.
-        """
+        """ A FILTER value the header doesn't declare gets its own VCFFilter record, and the record
+            is stored against that code """
         vcf_filename = os.path.join(self.TEST_DATA_DIR, "undeclared_filter.vcf")
-        self._test_genotype_processor(vcf_filename, BulkGenotypeVCFProcessor)
+        vcf_reader = cyvcf2.VCF(vcf_filename)
+        upload_step, uploaded_vcf = self._create_fake_upload_step_and_vcf(vcf_filename, vcf_reader)
+        processor = BulkGenotypeVCFProcessor(upload_step, uploaded_vcf.vcf.cohort.cohort_genotype_collection,
+                                             uploaded_vcf, None)
+        processor.process_entry(next(iter(vcf_reader)))
+
+        vcf_filter = VCFFilter.objects.get(vcf=uploaded_vcf.vcf, filter_id="UNDECLARED_FILTER")
+        self.assertEqual(processor.locus_filters, [vcf_filter.filter_code])
 

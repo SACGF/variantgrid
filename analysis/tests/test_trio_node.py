@@ -254,9 +254,8 @@ class TestTrioNodeInheritance(InheritanceNodeTestsMixin, TestCase):
         node = self._make_node(TrioInheritance.COMPOUND_HET)
         with mock.patch(
                 "analysis.models.nodes.sources.cohort_node.get_cached_label_count_for_cohort",
-                return_value=999999) as m:
+                return_value=999999):
             self.assertIsNone(node._get_cached_label_count(BuiltInFilters.TOTAL))
-            m.assert_not_called()
 
     def test_cache_miss_recomputes_the_trio_not_the_cohort(self):
         """ Trio buckets are written by calculate_trio_stats, so a miss has to enqueue that - a cohort

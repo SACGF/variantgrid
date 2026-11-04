@@ -508,15 +508,25 @@ class TestVEP(TestCase):
     maxDiff = None
 
     def test_parse_vep_version(self):
-        LINES = [
-            '##VEP="v97" time="2019-08-12 22:39:56" cache="/data/annotation/VEP/vep_cache/homo_sapiens/97_GRCh38" ensembl=97.378db18 ensembl-variation=97.26a059c ensembl-io=97.dc917e1 ensembl-funcgen=97.24f4d3c 1000genomes="phase3" COSMIC="88" ClinVar="201904" ESP="V2-SSA137" HGMD-PUBLIC="20184" assembly="GRCh38.p12" dbSNP="151" gencode="GENCODE 31" genebuild="2014-07" gnomAD="r2.1" polyphen="2.2.2" regbuild="1.0" sift="sift5.2.2"',
-            '##VEP="v97" time="2019-08-08 13:51:20" cache="/media/dlawrence/SpinningIron/reference/VEP/vep_cache/homo_sapiens/97_GRCh37" ensembl=97 ensembl-funcgen=97 ensembl-variation=97 ensembl-io=97 1000genomes="phase3" COSMIC="86" ClinVar="201810" ESP="20141103" HGMD-PUBLIC="20174" assembly="GRCh37.p13" dbSNP="151" gencode="GENCODE 19" genebuild="2011-04" gnomAD="r2.1" polyphen="2.2.2" regbuild="1.0" sift="sift5.2.2"'
-        ]
-        for line in LINES:
-            try:
-                vep_parse_version_line(line)
-            except Exception:
-                self.fail(f"vep_parse_version_line died on line: {line}")
+        """ Quoted values keep their spaces, unquoted ones keep their '.' and '-', and an Ensembl header
+            (no refseq= field) still yields the refseq key the version kwargs read """
+        grch38_line = '##VEP="v97" time="2019-08-12 22:39:56" cache="/data/annotation/VEP/vep_cache/homo_sapiens/97_GRCh38" ensembl=97.378db18 ensembl-variation=97.26a059c ensembl-io=97.dc917e1 ensembl-funcgen=97.24f4d3c 1000genomes="phase3" COSMIC="88" ClinVar="201904" ESP="V2-SSA137" HGMD-PUBLIC="20184" assembly="GRCh38.p12" dbSNP="151" gencode="GENCODE 31" genebuild="2014-07" gnomAD="r2.1" polyphen="2.2.2" regbuild="1.0" sift="sift5.2.2"'
+        grch37_line = '##VEP="v97" time="2019-08-08 13:51:20" cache="/media/dlawrence/SpinningIron/reference/VEP/vep_cache/homo_sapiens/97_GRCh37" ensembl=97 ensembl-funcgen=97 ensembl-variation=97 ensembl-io=97 1000genomes="phase3" COSMIC="86" ClinVar="201810" ESP="20141103" HGMD-PUBLIC="20174" assembly="GRCh37.p13" dbSNP="151" gencode="GENCODE 19" genebuild="2011-04" gnomAD="r2.1" polyphen="2.2.2" regbuild="1.0" sift="sift5.2.2"'
+
+        grch38 = vep_parse_version_line(grch38_line)
+        self.assertEqual(grch38["VEP"], "v97")
+        self.assertEqual(grch38["time"], "2019-08-12 22:39:56")
+        self.assertEqual(grch38["gencode"], "GENCODE 31")
+        self.assertEqual(grch38["ensembl"], "97.378db18")
+        self.assertEqual(grch38["ensembl-funcgen"], "97.24f4d3c")
+        self.assertEqual(grch38["assembly"], "GRCh38.p12")
+        self.assertEqual(grch38["gnomAD"], "r2.1")
+        self.assertEqual(grch38["refseq"], "")
+
+        grch37 = vep_parse_version_line(grch37_line)
+        self.assertEqual(grch37["assembly"], "GRCh37.p13")
+        self.assertEqual(grch37["ensembl"], "97")
+        self.assertEqual(grch37["ESP"], "20141103")
 
     def test_open_targets_l2g_score_na(self):
         """ OpenTargets emits "NA" for missing and &-joins multiple GWAS entries (e.g. "NA&NA").

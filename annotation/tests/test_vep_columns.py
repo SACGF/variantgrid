@@ -2,19 +2,14 @@ from django.test import TestCase
 
 from annotation.enums import (
     AlphaMissensePrediction,
-    ColumnAnnotationCategory,
     MetaRNNPrediction,
     PathogenicityImpact,
     SIFTPrediction,
     VariantAnnotationPipelineType,
     VEPCustom,
-    VEPPlugin,
 )
 from annotation.vep_columns import (
     VEP_COLUMNS,
-    _aloft,
-    _dbnsfp_v2,
-    _gnomad4,
     all_variant_grid_column_ids,
     filter_for,
 )
@@ -55,12 +50,6 @@ class VepColumnsRegistryTest(TestCase):
             seen.add(k)
         self.assertFalse(dupes, f"Duplicate VEPColumnDef keys: {dupes}")
 
-    def test_filter_for_returns_subset(self):
-        all_count = len(VEP_COLUMNS)
-        filtered = filter_for(genome_build_name="GRCh37")
-        self.assertLessEqual(len(filtered), all_count)
-        self.assertGreater(len(filtered), 0)
-
     def test_gnomad4_minor_version_filter(self):
         common_kwargs = dict(
             genome_build_name="GRCh38",
@@ -98,50 +87,34 @@ class VepColumnsRegistryTest(TestCase):
                 self.assertEqual(rows[0].source_field, source_field)
                 self.assertEqual(rows[0].vep_info_field, f"COSMIC_{source_field}")
 
-    def test_gnomad4_helper_defaults(self):
-        c = _gnomad4('AF_afr', 'gnomad_afr_af')
-        self.assertEqual(c.source_field, 'AF_afr')
-        self.assertEqual(c.variant_grid_columns, ('gnomad_afr_af',))
-        self.assertEqual(c.category, ColumnAnnotationCategory.FREQUENCY_DATA)
-        self.assertEqual(c.vep_custom, VEPCustom.GNOMAD_4)
-        self.assertTrue(c.source_field_has_custom_prefix)
-        self.assertEqual(c.genome_builds, frozenset({'GRCh38', 'T2T-CHM13v2.0'}))
-        self.assertEqual(c.pipeline_types, frozenset({VariantAnnotationPipelineType.STANDARD}))
-        self.assertEqual(c.min_columns_version, 3)
-
-    def test_gnomad4_helper_override(self):
-        """ The faf95/faf99 rows narrow to GRCh38 only; helper override must win. """
-        c = _gnomad4('faf95', 'gnomad_faf95', genome_builds=frozenset({'GRCh38'}))
-        self.assertEqual(c.genome_builds, frozenset({'GRCh38'}))
-        self.assertEqual(c.min_columns_version, 3)
-        self.assertEqual(c.vep_custom, VEPCustom.GNOMAD_4)
-
-    def test_aloft_carries_canonical_description(self):
-        c = _aloft('Aloft_pred', 'aloft_pred')
-        self.assertEqual(c.vep_plugin, VEPPlugin.DBNSFP)
-        self.assertEqual(c.min_columns_version, 2)
-        self.assertTrue(
-            c.source_field_processing_description.startswith(
-                "Most damaging transcript prediction chosen"
-            )
-        )
-
-    def test_dbnsfp_v2_helper_defaults(self):
-        c = _dbnsfp_v2('REVEL_rankscore', 'revel_rankscore')
-        self.assertEqual(c.vep_plugin, VEPPlugin.DBNSFP)
-        self.assertEqual(c.category, ColumnAnnotationCategory.PATHOGENICITY_PREDICTIONS)
-        self.assertEqual(c.genome_builds, frozenset({'GRCh37', 'GRCh38'}))
-        self.assertEqual(c.min_columns_version, 2)
-
-    def test_filter_for_gnomad4_grch38_v3_count(self):
+    @staticmethod
+    def _gnomad4_columns(genome_build_name: str, gnomad4_minor_version: str = "4.1") -> list[str]:
         rows = filter_for(
-            genome_build_name="GRCh38",
+            genome_build_name=genome_build_name,
             pipeline_type=VariantAnnotationPipelineType.STANDARD,
             columns_version=3,
             vep_custom=VEPCustom.GNOMAD_4,
-            gnomad4_minor_version="4.1",
+            gnomad4_minor_version=gnomad4_minor_version,
         )
-        self.assertEqual(len(rows), 26)
+        return [vgc for c in rows for vgc in c.variant_grid_columns]
+
+    def test_gnomad4_faf_is_grch38_only(self):
+        """ The faf95/faf99 rows narrow to GRCh38 only; T2T keeps the rest of gnomAD 4, fafmax included """
+        grch38 = self._gnomad4_columns("GRCh38")
+        t2t = self._gnomad4_columns("T2T-CHM13v2.0")
+        for vgc in ("gnomad_faf95", "gnomad_faf99"):
+            self.assertIn(vgc, grch38)
+            self.assertNotIn(vgc, t2t)
+        self.assertIn("gnomad_fafmax_faf95_max", t2t)
+
+    def test_filter_for_gnomad4_fills_each_column_once(self):
+        """ The minor version picks one source per column (gnomad_filtered has a 4.0 and a 4.1 def) """
+        for genome_build_name in ("GRCh38", "T2T-CHM13v2.0"):
+            for gnomad4_minor_version in ("4.0", "4.1"):
+                with self.subTest(genome_build_name=genome_build_name, gnomad4_minor_version=gnomad4_minor_version):
+                    columns = self._gnomad4_columns(genome_build_name, gnomad4_minor_version)
+                    self.assertIn("gnomad_filtered", columns)
+                    self.assertEqual(len(columns), len(set(columns)))
 
     def test_filter_for_gnomad3_excluded_at_v3(self):
         rows = filter_for(

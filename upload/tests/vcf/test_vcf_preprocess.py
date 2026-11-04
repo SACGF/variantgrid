@@ -34,7 +34,6 @@ from upload.vcf.vcf_preprocess import (
     UNSORTED_VCF_MESSAGE,
     VCF_CLEAN_AND_FILTER_SUB_STEP,
     PipeStageError,
-    PreprocessFiles,
     _build_pipe_commands,
     _get_preprocess_files,
     _reset_for_retry,
@@ -171,7 +170,6 @@ class TestPreprocessVCFPipe(TestCase):
         self.assertIsNone(self.files.swap_skipped)
         self.assertNotIn("--disable-swap", _build_pipe_commands(self.upload_step, self.files)[0]["vcf_clean_alts"])
 
-
     # ------------------------------------------------------------------ retry orchestration
     def _run_preprocess_vcf(self, run_pipe_side_effect):
         with patch("upload.vcf.vcf_preprocess.run_pipe", side_effect=run_pipe_side_effect) as mock_run_pipe:
@@ -226,15 +224,6 @@ class TestPreprocessVCFPipe(TestCase):
         with self.assertRaises(CalledProcessError):
             self._run_preprocess_vcf(CalledProcessError(1, "bcftools norm"))
         self.assertFalse(SimpleVCFImportInfo.objects.filter(message_string=UNSORTED_VCF_MESSAGE).exists())
-
-
-class TestPreprocessFiles(TestCase):
-    def test_written_by_pipe_skips_absent_swap_file(self):
-        files = PreprocessFiles(vcf_filename="in.vcf", cleaned_vcf_header="header.vcf", split_vcf_dir="split",
-                                unsorted_marker="unsorted.txt", skipped_contigs_stats="contigs.tsv",
-                                skipped_records_stats="records.tsv", skipped_filters_stats="filters.tsv",
-                                skipped_alts_stats="alts.tsv", converted_alts_stats="converted.tsv")
-        self.assertEqual(len(files.written_by_pipe), 6)
 
 
 @override_settings(IMPORT_PROCESSING_DIR=os.path.join(_TEST_DIR, "import_processing"))

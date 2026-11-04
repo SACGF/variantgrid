@@ -15,7 +15,6 @@ from snpdb.liftover import (
     _get_build_liftover_dicts,
     _liftover_using_dest_variant_coordinate,
     _liftover_using_existing_contig,
-    _liftover_using_source_variant_coordinate,
     _run_liftover_using_same_contig,
     allele_can_attempt_liftover,
 )
@@ -73,21 +72,6 @@ class TestLiftover(TestCase):
         result = list(_liftover_using_dest_variant_coordinate(self.allele, GenomeBuild.grch38()))[0]
         conversion_tool, variant_coordinate_38, _error_message = result
         self.assertEqual(conversion_tool, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
-        self.assertEqual(variant_coordinate_38, self.expected_vc_38)
-
-    def _liftover_using_source_variant_coordinate(self):
-        result = list(_liftover_using_source_variant_coordinate(self.allele,
-                                                                source_genome_build=GenomeBuild.grch37(),
-                                                                dest_genome_build=GenomeBuild.grch38()))[0]
-        conversion_tool, variant_coordinate_37, _error_message = result
-        self.assertEqual(conversion_tool, AlleleConversionTool.BCFTOOLS_LIFTOVER)
-        self.assertEqual(variant_coordinate_37, self.expected_vc_37)
-
-        result = list(_liftover_using_source_variant_coordinate(self.allele,
-                                                                source_genome_build=GenomeBuild.grch38(),
-                                                                dest_genome_build=GenomeBuild.grch37()))[0]
-        conversion_tool, variant_coordinate_38, _error_message = result
-        self.assertEqual(conversion_tool, AlleleConversionTool.BCFTOOLS_LIFTOVER)
         self.assertEqual(variant_coordinate_38, self.expected_vc_38)
 
     def test_retry_conversion_tools_overrides_failed_set(self):

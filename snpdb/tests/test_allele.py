@@ -8,26 +8,8 @@ from snpdb.models.models_clingen_allele import ClinGenAllele
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
 
 
-class AlleleTestCase(TestCase):
-
-    def setUp(self):
-        pass
-
-    def tearDown(self):
-        pass
-
-    def test_allele_merge(self):
-        allele_1 = Allele.objects.create()
-        allele_2 = Allele.objects.create()
-
-        allele_1.merge(AlleleConversionTool.BCFTOOLS_LIFTOVER, allele_2)
-
-
 class AlleleMergeEdgeCasesTestCase(TestCase):
-    """
-    Existing test_allele_merge only checks the happy path doesn't crash.
-    These tests cover the ClinGen rejection branch and verify data integrity.
-    """
+    """ Allele.merge's ClinGen rejection branch, and the data a merge moves or leaves behind. """
 
     _clingen_counter = 0
 
