@@ -1,8 +1,8 @@
 """
 The page frame (#2007): everything around a page's content that depends on who is asking - the top bar and side bar,
 username, avatar title, inbox count, site messages, Django messages and the Rollbar person. A page body carries none
-of it; global.js fetches it from uicore/views/page_frame_view.py:page_frame after the page loads, so the same body can
-serve every user (#695).
+of it; uicore/page/base.html requests it from uicore/views/page_frame_view.py:page_frame as the page starts loading, so
+the same body can serve every user (#695).
 
 The menus depend only on the url name and the MenuRole, never on the individual user, so menu_html is memoised per
 process (the registry and settings change only on restart). The rest is per user and built per request.

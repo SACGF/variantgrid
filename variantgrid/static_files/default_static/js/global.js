@@ -650,11 +650,12 @@ function globalSetup() {
     $.fn.selector = { split: function() { return ""; }};
 })(jQuery);
 
-/* The menus and the rest of the per-user page frame (uicore/page_frame.py), requested while the page is still loading
-   and filled in once it is ready - the page body itself is the same for every user. */
-function loadPageFrame(frameUrl, urlName) {
-    const frameRequest = $.getJSON(frameUrl, {url_name: urlName});
-    $(() => frameRequest.done(applyPageFrame));
+/* The menus and the rest of the per-user page frame (uicore/page_frame.py) - the page body itself is the same for
+   every user. base.html starts the request in its first script tag, before the stylesheets and libraries download,
+   and calls this once the frame's placeholders are in the DOM, so the menus appear as soon as the response lands
+   rather than after the page's other scripts have loaded and run. */
+function loadPageFrame(frameRequest) {
+    frameRequest.then(applyPageFrame);
 }
 
 function applyPageFrame(frame) {
