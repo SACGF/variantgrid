@@ -1,6 +1,6 @@
 """
-The page frame endpoint (#2007): JSON of uicore/page_frame.py:PageFrame for the page whose url name is passed, fetched
-by global.js:loadPageFrame on every page that extends uicore/page/base.html.
+The page frame endpoint (#2007): JSON of uicore/page_frame.py:PageFrame for the page whose url name is passed, requested
+by the first script tag of uicore/page/base.html and applied by global.js:loadPageFrame.
 """
 from dataclasses import asdict
 
