@@ -54,7 +54,8 @@ Patterns here:
   ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE, so each version keeps its own) is STANDARD and dumped to VEP as its sequence,
   anything else symbolic is the SV pipeline, an explicit variant whose ref or alt reaches
   explicit_structural_variant_min_size is the SV pipeline (dumped as its sequence; null on VAVs made before #1708, so
-  they never move one). Branch on the run's pipeline_type, never on variant.is_symbolic.
+  they never move one; its alt__in Length(seq) subquery relies on snpdb_sequence's expression index on length(seq)
+  to stay a hashed subplan, #2635). Branch on the run's pipeline_type, never on variant.is_symbolic.
 - AnnotationRun.status is recomputed from its timestamp/error fields on every save
   (annotation/models/models_annotation_run.py:AnnotationRun.get_status): set dump_start / annotation_end / upload_end, never status.
   Lifecycle: annotation_scheduler makes AnnotationRangeLocks + runs on scheduling_single_worker →
