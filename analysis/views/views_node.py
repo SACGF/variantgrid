@@ -31,6 +31,7 @@ from analysis.models.nodes.sources.cohort_node import (
     CohortNodeZygosityFilter,
     CohortNodeZygosityFiltersCollection,
 )
+from analysis.node_presets import has_presets
 from analysis.serializers import AnalysisNodeSerializer
 from analysis.views.analysis_permissions import (
     get_node_subclass_or_404,
@@ -88,7 +89,7 @@ def node_presets(request, node_type, annotation_version_id):
         those and deployment data, not the node, and are served apart from node_view, which is cached for a week,
         so a preset edited in admin shows the next time an editor opens """
     node_view_class = NODE_VIEW_CLASSES_BY_NAME.get(node_type)
-    if not (node_view_class and node_view_class.form_class.HAS_PRESETS):
+    if not (node_view_class and has_presets(node_view_class.model)):
         raise Http404(f"{node_type} has no presets")
     annotation_version = get_object_or_404(AnnotationVersion, pk=annotation_version_id)
     analysis = Analysis(annotation_version=annotation_version, genome_build=annotation_version.genome_build,

@@ -10,16 +10,21 @@ by migration and edited in Django admin. Presets look for pathogenic evidence on
 evidence), which is what an analysis wants almost every time; the criteria on one node pull in different directions
 (PM2 vs BA1, PVS1 vs PP3), so each preset is one criterion.
 
-Entry points: `damage_node_presets`, `population_node_presets` and `clinvar_node_presets`, each taking a node and
-returning the NodePresets its editor lists. That node is unsaved, on an unsaved Analysis carrying only the annotation
+Entry points: `NODE_PRESETS` maps each node class with presets to its function (`damage_node_presets`,
+`population_node_presets`, `clinvar_node_presets`), which takes a node and returns the NodePresets its editor lists;
+`has_presets` and `get_node_presets` read it. That node is unsaved, on an unsaved Analysis carrying only the annotation
 version: what a preset offers may depend on that and on the data imported, never on a node's own settings. `analysis/forms/forms_nodes.py:BaseNodeForm.get_preset_data` turns each into a complete form state, and
 `analysis/views/views_node.py:node_presets` serves that per node type and annotation version to `node_presets.js`, apart
 from the week-cached editor, so an admin edit to a Population preset shows the next time an editor opens.
 """
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from analysis.enums import GroupOperation
+from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.filters.clinvar_node import ClinVarNode
+from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.population_node import PopulationNode, PopulationNodePreset
 from annotation.enums import PathogenicityImpact
 from annotation.pathogenicity_predictions import (
@@ -30,10 +35,6 @@ from annotation.pathogenicity_predictions import (
 )
 from snpdb.enums import AlleleOriginFilterDefault
 
-if TYPE_CHECKING:
-    from analysis.models.nodes.filters.clinvar_node import ClinVarNode
-    from analysis.models.nodes.filters.damage_node import DamageNode
-
 
 @dataclass(frozen=True)
 class NodePreset:
@@ -43,7 +44,7 @@ class NodePreset:
     values: dict[str, Any]  # form field -> value; every other field goes back to the node's default
 
 
-def _pp3_tools(node: "DamageNode") -> list[PathogenicityTool]:
+def _pp3_tools(node: DamageNode) -> list[PathogenicityTool]:
     """ Tools this annotation version scores whose cutoff is ClinGen's PP3-supporting line. A tool that runs the
         other way (popEVE) or is signed (PromoterAI) has no such cutoff, so a higher=worse check is enough """
     return [t for t in node.get_raw_score_tools()
@@ -51,7 +52,7 @@ def _pp3_tools(node: "DamageNode") -> list[PathogenicityTool]:
             and t.raw_direction == RawScoreDirection.HIGHER]
 
 
-def damage_node_presets(node: "DamageNode") -> list[NodePreset]:
+def damage_node_presets(node: DamageNode) -> list[NodePreset]:
     presets = []
 
     pvs1 = {"impact_min": PathogenicityImpact.HIGH, "impact_required": True}
@@ -132,7 +133,7 @@ def population_node_presets(node: PopulationNode) -> list[NodePreset]:
     return presets
 
 
-def clinvar_node_presets(_node: "ClinVarNode") -> list[NodePreset]:
+def clinvar_node_presets(_node: ClinVarNode) -> list[NodePreset]:
     return [NodePreset(
         "pp5", "PP5 - reputable source reports pathogenic",
         "Germline Pathogenic or Likely pathogenic with at least 2 review stars (multiple submitters with no "
@@ -142,3 +143,18 @@ def clinvar_node_presets(_node: "ClinVarNode") -> list[NodePreset]:
          "germline_pathogenic": True, "germline_likely_pathogenic": True, "germline_uncertain": False,
          "germline_likely_benign": False, "germline_benign": False, "germline_other": False,
          "stars_min": 2, "conflicting": False})]
+
+
+NODE_PRESETS: dict[type[AnalysisNode], Callable[[Any], list[NodePreset]]] = {
+    DamageNode: damage_node_presets,
+    PopulationNode: population_node_presets,
+    ClinVarNode: clinvar_node_presets,
+}
+
+
+def has_presets(node_class: type[AnalysisNode]) -> bool:
+    return node_class in NODE_PRESETS
+
+
+def get_node_presets(node: AnalysisNode) -> list[NodePreset]:
+    return NODE_PRESETS[type(node)](node)
