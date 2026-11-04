@@ -13,8 +13,9 @@
         <span class="text-danger">Karyomapping counts could not be calculated - they are retried when this tab is
             viewed after {% timestamp genome_karyomapping_counts.retry_after %}</span>
     {% elif not calculated %}
-        <span class="text-muted">Karyomapping counts: {{ genome_karyomapping_counts.get_import_status_display }}
-            - reload the page once they have been calculated.</span>
+        <span class="text-muted"><i class="fas fa-spinner fa-spin"></i>
+            Calculating karyomapping counts ({{ genome_karyomapping_counts.get_import_status_display }}) - they are
+            shown here once ready.</span>
     {% else %}
         <p>{{ genome_karyomapping_counts.relatedness_summary }}</p>
         <p class="text-muted small">
