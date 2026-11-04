@@ -103,6 +103,7 @@ MENUS: tuple[Menu, ...] = (
         MenuItem('classification_grouping_export_config', title="Export NEW"),
         MenuItem('classification_upload_unmapped', title="Upload",
                  pages=('classification_upload_unmapped_lab', 'classification_upload_unmapped_status')),
+        MenuItem('evidence_keys', title="Evidence Keys", icon=HELP_ICON),
     ), pages=('create_classification_for_variant', 'create_classification_for_variant_tag',
               'create_classification_from_hgvs', 'internal_lab_download', 'lab_gene_classification_counts')),
     # Shariant hides every Genes page but Symbol Matching, which keeps the menu in its top bar
