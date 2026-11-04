@@ -56,6 +56,11 @@ class PatientForm(forms.ModelForm):
 
         super().__init__(*args, **kwargs)
 
+    def clean_patient_code(self):
+        patient_code = self.cleaned_data["patient_code"]
+        Patient.validate_patient_code_unused(self.user, patient_code, exclude_pk=self.instance.pk)
+        return patient_code
+
     def clean(self):
         cleaned_data = super().clean()
         if cleaned_data.get("date_of_death") and cleaned_data.get("deceased") is False:

@@ -651,6 +651,40 @@ class TestPatientIdentityConstraint(TestCase):
         self.assertEqual(["A patient needs a patient code or last name"], form.non_field_errors())
 
 
+class TestPatientCodeUnused(TestCase):
+    """ #2518 - a patient code another patient the user can see already has is refused """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.user = User.objects.create_user("form_code_user", password="x")
+        cls.existing = Patient.objects.create(patient_code="DUP-001 ", last_name="EXISTING")
+        assign_permission_to_user_and_groups(cls.user, cls.existing)
+
+    def _form(self, instance=None, **data):
+        form_data = {"last_name": "OTHER", "sex": Sex.UNKNOWN, "population": [], **data}
+        return PatientForm(data=form_data, instance=instance, user=self.user)
+
+    def test_create_with_a_visible_code_is_refused(self):
+        form = self._form(patient_code=" DUP-001")
+        self.assertFalse(form.is_valid())
+        self.assertEqual([f"Patient code 'DUP-001' is already used by Patient:{self.existing.pk}"],
+                         form.errors["patient_code"])
+
+    def test_edit_to_another_patients_code_is_refused(self):
+        patient = Patient.objects.create(patient_code="DUP-002", last_name="OTHER")
+        assign_permission_to_user_and_groups(self.user, patient)
+        self.assertFalse(self._form(instance=patient, patient_code="DUP-001").is_valid())
+
+    def test_edit_keeping_own_code_is_allowed(self):
+        form = self._form(instance=self.existing, patient_code="DUP-001", last_name="RENAMED")
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_code_of_a_patient_the_user_cannot_see_is_allowed(self):
+        Patient.objects.create(patient_code="HIDDEN-001", last_name="HIDDEN")
+        self.assertTrue(self._form(patient_code="HIDDEN-001").is_valid())
+
+
 # ---------------------------------------------------------------------------
 # Patient.code — issue #230 de-identified display label fallthrough
 # ---------------------------------------------------------------------------

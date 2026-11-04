@@ -132,6 +132,9 @@ class ExternallyManagedModelSerializer(serializers.ModelSerializer):
     def _post_create(self, instance, user):
         """ Anything a brand new row needs beyond being saved """
 
+    def _validate_for_user(self, instance, user):
+        """ A rule on the row as it will be saved that depends on what the user can see """
+
     @staticmethod
     def _save(instance):
         """ A model constraint the request breaks (eg a patient with no code or last name) is a 400,
@@ -182,6 +185,7 @@ class ExternallyManagedModelSerializer(serializers.ModelSerializer):
                     setattr(instance, field, value)
             if external_pk_data:
                 instance.external_pk = self._external_pk_for(instance, external_pk_data)
+            self._validate_for_user(instance, user)
             self._save(instance)
             if created:
                 self._post_create(instance, user)
@@ -196,6 +200,7 @@ class ExternallyManagedModelSerializer(serializers.ModelSerializer):
                 instance.external_pk = self._external_pk_for(instance, external_pk_data)
             for field, value in validated_data.items():
                 setattr(instance, field, value)
+            self._validate_for_user(instance, user)
             self._save(instance)
         return instance
 
@@ -211,6 +216,12 @@ class PatientSerializer(ExternallyManagedModelSerializer):
         if patient_code := validated_data.get("patient_code"):
             return Q(patient_code=patient_code)
         return None
+
+    def _validate_for_user(self, instance, user):
+        try:
+            Patient.validate_patient_code_unused(user, instance.patient_code, exclude_pk=instance.pk)
+        except DjangoValidationError as e:
+            raise serializers.ValidationError({"patient_code": e.messages}) from e
 
     def _post_create(self, instance, user):
         assign_permission_to_user_and_groups(user, instance)

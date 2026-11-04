@@ -17,11 +17,11 @@ import nameparser
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import models, transaction
 from django.db.models import Case, F, Q, QuerySet, TextField, Value, When
 from django.db.models.deletion import CASCADE, SET_NULL
-from django.db.models.functions import Concat
+from django.db.models.functions import Concat, Trim
 from django.dispatch.dispatcher import Signal, receiver
 from django.urls.base import reverse
 from django.utils import timezone
@@ -238,6 +238,20 @@ class Patient(GuardianPermissionsMixin, HasPhenotypeDescriptionMixin, Externally
         """ Batch can_write - a record an external manager owns is read only here """
         qs = super().filter_writable_for_user(user, pks=pks)
         return qs.exclude(external_pk__external_manager__can_modify=False)
+
+    @classmethod
+    def validate_patient_code_unused(cls, user, patient_code: Optional[str], exclude_pk=None):
+        """ Patient.match takes the code as the patient's whole identity, so a second patient the user can see
+            with the same code (ignoring surrounding whitespace) would break matching (#2518).
+            exclude_pk: the patient being edited, which keeps its own code """
+        if not (patient_code and (patient_code := patient_code.strip())):
+            return
+        qs = cls.filter_for_user(user).annotate(trimmed_patient_code=Trim("patient_code"))
+        qs = qs.filter(trimmed_patient_code=patient_code)
+        if exclude_pk is not None:
+            qs = qs.exclude(pk=exclude_pk)
+        if other := qs.order_by("pk").first():
+            raise ValidationError(f"Patient code '{patient_code}' is already used by Patient:{other.pk}")
 
     @classmethod
     def allow_group_permission_delete(cls) -> bool:

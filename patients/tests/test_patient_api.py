@@ -69,6 +69,23 @@ class PatientAPITest(APITestCase):
         patient.refresh_from_db()
         self.assertEqual("2600000001P", patient.patient_code)
 
+    def test_code_of_another_visible_patient_is_rejected(self):
+        """ #2518 - on create (an ExternalPK naming one patient with another's code) and on PATCH """
+        external_pk = {"code": "H12345", "external_type": "HelixID", "external_manager": "HELIX"}
+        self._create_patient(patient_code="CODE-A")
+        self._create_patient(patient_code="CODE-B", external_pk=external_pk)
+        patient_b = Patient.objects.get(patient_code="CODE-B")
+
+        response = self._create_patient(patient_code="CODE-A", external_pk=external_pk)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        self.assertIn("patient_code", response.data)
+
+        response = self.client.patch(reverse("api_patient-detail", args=[patient_b.pk]), {"patient_code": "CODE-A"},
+                                     format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        patient_b.refresh_from_db()
+        self.assertEqual("CODE-B", patient_b.patient_code)
+
     def test_creates_patient_specimen_extraction(self):
         response = self._create_run()
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
