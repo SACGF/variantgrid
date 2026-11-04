@@ -206,6 +206,7 @@ urlpatterns = [
     # karyomapping
     path('trio/karyomapping/<int:trio_id>/', views_karyomapping.trio_karyomapping, name='trio_karyomapping'),
     path('trio/karyomapping/<int:trio_id>/csv/', views_karyomapping.trio_karyomapping_gene_csv, name='trio_karyomapping_gene_csv'),
+    path('trio/karyomapping/<int:trio_id>/qc/', views_karyomapping.trio_karyomapping_qc_tab, name='trio_karyomapping_qc_tab'),
 
     # Candidates / Reanalysis
     path('candidate_search/<int:pk>', views_candidate_search.view_candidate_search_run, name='view_candidate_search_run'),

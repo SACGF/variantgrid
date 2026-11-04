@@ -73,23 +73,27 @@ class TrioKaryomappingViewTest(TestCase):
         (contig_counts,) = genome_counts.get_contig_counts()
         self.assertEqual(contig_counts.get_phase_percents(), (100, 0))
 
-        response = self.client.get(reverse("view_trio", kwargs={"pk": self.trio.pk}))
+        response = self.client.get(reverse("trio_karyomapping_qc_tab", kwargs={"trio_id": self.trio.pk}))
         self.assertContains(response, "karyomapping-qc-graph")
 
-    def test_trio_page_queues_missing_counts(self):
-        GenomeKaryomappingCounts.objects.filter(trio=self.trio).delete()
+    def test_qc_tab_queues_missing_counts(self):
+        """ The trio page only links the tab - opening the tab is what queues the (slow) count """
         with self.captureOnCommitCallbacks() as callbacks:
             response = self.client.get(reverse("view_trio", kwargs={"pk": self.trio.pk}))
+        self.assertContains(response, reverse("trio_karyomapping_qc_tab", kwargs={"trio_id": self.trio.pk}))
+        self.assertEqual(callbacks, [])
+        self.assertFalse(GenomeKaryomappingCounts.objects.filter(trio=self.trio).exists())
+
+        response, callbacks = self._qc_tab_callbacks()
         self.assertContains(response, "reload the page once they have been calculated")
         self.assertEqual(len(callbacks), 1)
 
-        with self.captureOnCommitCallbacks() as callbacks:
-            self.client.get(reverse("view_trio", kwargs={"pk": self.trio.pk}))
+        _, callbacks = self._qc_tab_callbacks()
         self.assertEqual(callbacks, [])  # already queued
 
-    def _view_trio_callbacks(self):
+    def _qc_tab_callbacks(self):
         with self.captureOnCommitCallbacks() as callbacks:
-            response = self.client.get(reverse("view_trio", kwargs={"pk": self.trio.pk}))
+            response = self.client.get(reverse("trio_karyomapping_qc_tab", kwargs={"trio_id": self.trio.pk}))
         return response, callbacks
 
     def test_failed_count_shown_then_retried(self):
@@ -99,27 +103,27 @@ class TrioKaryomappingViewTest(TestCase):
         genome_counts = GenomeKaryomappingCounts.objects.get(trio=self.trio)
         self.assertEqual(genome_counts.import_status, ImportStatus.ERROR)
 
-        response, callbacks = self._view_trio_callbacks()
+        response, callbacks = self._qc_tab_callbacks()
         self.assertContains(response, "could not be calculated")
         self.assertEqual(callbacks, [])  # too soon to retry
 
         counts_qs = GenomeKaryomappingCounts.objects.filter(trio=self.trio)
         counts_qs.update(modified=timezone.now() - GenomeKaryomappingCounts.ERROR_RETRY_AFTER)
-        response, callbacks = self._view_trio_callbacks()
+        response, callbacks = self._qc_tab_callbacks()
         self.assertContains(response, "reload the page once they have been calculated")
         self.assertEqual(len(callbacks), 1)
-        _, callbacks = self._view_trio_callbacks()
+        _, callbacks = self._qc_tab_callbacks()
         self.assertEqual(callbacks, [])  # requeued once
 
     def test_retries_back_off_then_give_up(self):
         counts_qs = GenomeKaryomappingCounts.objects.filter(trio=self.trio)
         GenomeKaryomappingCounts.objects.create(trio=self.trio, import_status=ImportStatus.ERROR, retries=1)
         counts_qs.update(modified=timezone.now() - GenomeKaryomappingCounts.ERROR_RETRY_AFTER)
-        _, callbacks = self._view_trio_callbacks()
+        _, callbacks = self._qc_tab_callbacks()
         self.assertEqual(callbacks, [])  # second retry waits twice as long
 
         counts_qs.update(retries=GenomeKaryomappingCounts.MAX_RETRIES, modified=timezone.now())
-        response, callbacks = self._view_trio_callbacks()  # the last retry failed: given up straight away
+        response, callbacks = self._qc_tab_callbacks()  # the last retry failed: given up straight away
         self.assertContains(response, "no longer retried automatically")
         self.assertEqual(callbacks, [])
 
@@ -127,10 +131,10 @@ class TrioKaryomappingViewTest(TestCase):
         create_genome_karyomapping_for_trio(self.trio.pk)
         counts_qs = GenomeKaryomappingCounts.objects.filter(trio=self.trio)
         counts_qs.update(import_status=ImportStatus.IMPORTING)
-        _, callbacks = self._view_trio_callbacks()
+        _, callbacks = self._qc_tab_callbacks()
         self.assertEqual(callbacks, [])  # still running
 
         counts_qs.update(modified=timezone.now() - GenomeKaryomappingCounts.PENDING_RETRY_AFTER)
-        _, callbacks = self._view_trio_callbacks()
+        _, callbacks = self._qc_tab_callbacks()
         self.assertEqual(len(callbacks), 1)
         self.assertEqual(counts_qs.get().retries, 1)

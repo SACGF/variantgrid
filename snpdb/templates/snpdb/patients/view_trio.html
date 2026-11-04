@@ -3,7 +3,6 @@
 {% load ui_utils %}
 {% load related_data_tags %}
 {% load related_analyses_tags %}
-{% load karyomapping_tags %}
 
 {% block title %}Trio {{ trio }}{% endblock %}
 
@@ -50,6 +49,7 @@
     <div id="trio-tabs">
         <ul class="nav nav-tabs mb-4" role="tablist">
             <li class="nav-item"><a id='details-tab' class="nav-link show active" data-toggle="tab" role="tab" href="#details">Details</a></li>
+            <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#trio-karyomapping-qc" data-href="{% url 'trio_karyomapping_qc_tab' trio.pk %}">Karyomapping QC</a></li>
             {% if has_write_permission %}
             <li class="nav-item"><a class="nav-link" data-toggle="tab" role="tab" href="#trio-permissions" data-href="{% url 'group_permissions' 'snpdb.models.Trio' trio.pk %}">Sharing / Permissions</a></li>
             {% endif %}
@@ -70,8 +70,8 @@
                         </div>
                     </div>
                 </div>
-                {% trio_karyomapping_qc trio %}
             </div>
+            <div class="tab-pane" role="tabpanel" id="trio-karyomapping-qc"></div>
             {% if has_write_permission %}
             <div class="tab-pane" role="tabpanel" id="trio-permissions"></div>
             {% endif %}

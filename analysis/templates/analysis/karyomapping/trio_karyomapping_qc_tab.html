@@ -1,6 +1,6 @@
 {% load static %}
 {% load js_tags %}
-<div class="card mb-3" id="trio-karyomapping-qc">
+<div class="card mb-3">
     <div class="card-header">
         Karyomapping QC
         <a class="float-right" href="{% url 'trio_karyomapping' trio.pk %}">Per-gene karyomapping</a>
@@ -10,7 +10,7 @@
         <span class="text-danger">Karyomapping counts could not be calculated after
             {{ genome_karyomapping_counts.retries }} retries, and are no longer retried automatically.</span>
     {% elif genome_karyomapping_counts.import_status == 'E' %}
-        <span class="text-danger">Karyomapping counts could not be calculated - they are retried when this page is
+        <span class="text-danger">Karyomapping counts could not be calculated - they are retried when this tab is
             viewed after {% timestamp genome_karyomapping_counts.retry_after %}</span>
     {% elif not calculated %}
         <span class="text-muted">Karyomapping counts: {{ genome_karyomapping_counts.get_import_status_display }}

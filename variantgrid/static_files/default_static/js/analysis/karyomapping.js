@@ -1,5 +1,5 @@
 // @ts-check
-// analysis/templates/analysis/karyomapping/trio_karyomapping.html, analysis/templates/analysis/tags/trio_karyomapping_qc.html
+// analysis/templates/analysis/karyomapping/trio_karyomapping.html, analysis/templates/analysis/karyomapping/trio_karyomapping_qc_tab.html
 function reverseArray(array) {
     return array.slice().reverse();
 }
