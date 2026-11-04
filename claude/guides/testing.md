@@ -70,6 +70,7 @@ one implementation. `snpdb/tests/test_create_fake_data.py` runs `create_fake_dat
 - `snpdb/tests/utils/vcf_testing_utils.py:create_mock_allele(variant, genome_build)` → `Allele` linked via a `VariantAllele` (origin IMPORTED_TO_DATABASE, tool DBSNP).
 - `snpdb/tests/utils/vcf_testing_utils.py:slowly_create_loci_and_variants_for_vcf(genome_build, vcf_filename, get_variant_id_from_info=False)` → None; inserts every record of a VCF as Loci/Variants (first ALT only, honours SVLEN); `get_variant_id_from_info` pins pks from `INFO/variant_id`.
 - `annotation/fake_data.py:create_fake_variants(genome_build)` → None; loads `annotation/tests/test_data/test_columns_version1_<build>.vep_annotated.vcf` (4 records) via the function above, pks from INFO. Pick one with `Variant.objects.filter(Variant.get_no_reference_q()).first()`.
+- `genes/tests/gene_symbol_test_utils.py:create_gene_symbol_alias_fixture()` → the HGNC / GeneSymbol / GeneSymbolAlias rows behind `GeneSymbol.resolve_names`' test table: SEPT2 (rename that is also SEPTIN6's alias), ACPP → ACP3, AIP vs AURKAIP1, the ambiguous SEPTX, a mixed-case alias, an alias of a retired symbol.
 - `genes/tests/gene_fusion_test_utils.py:create_gene_fusion(gene_a, gene_b, directionality_known=True, resolver=None)` → `GeneFusion` (plus its gene-level `Variant`), built the way the VCF insert pipeline would; needs the gene symbols to resolve.
 
 ### VCF, samples, cohorts, trios

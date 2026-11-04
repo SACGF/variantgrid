@@ -1,0 +1,111 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_utils %}
+{% block title %}Gene Symbol Matching{% endblock title %}
+
+{% block content %}
+    <div class="container">
+        <h3>Gene Symbol Matching</h3>
+
+        <p>
+            Wherever you write a gene name - a classification's gene symbol, a gene list, a filter box - it is matched
+            to a gene by the same rule, so a name means the same gene everywhere. The rule follows HGNC, the committee
+            that names human genes:
+        </p>
+        <ol>
+            <li>A name that is a <b>current HGNC symbol</b> is taken as written, even if another gene lists it as an alias.</li>
+            <li>A <b>previous symbol</b> - a gene HGNC has renamed - is matched to the gene's current symbol. A rename
+                outranks an alias: SEPT2 is SEPTIN2's previous symbol and also one of SEPTIN6's aliases, so it is SEPTIN2.</li>
+            <li>An <b>alias</b> - an informal name HGNC or NCBI records for a gene - is matched only when it names a
+                single gene. An alias shared by several genes is <b>ambiguous</b> and is not matched; the message
+                names the candidate genes so you can write the one you mean.</li>
+        </ol>
+        <p class="text-muted">
+            Names are matched regardless of case and surrounding whitespace. A symbol in this database with no HGNC
+            record (an old Ensembl or RefSeq name) is kept as written, unless HGNC lists it as a previous symbol of a
+            current gene, in which case the rename applies.
+        </p>
+
+        <h4 class="mt-4">Try a name</h4>
+        <form method="get" class="form-inline mb-3">
+            <input type="text" class="form-control mr-2" name="name" value="{{ typed_name }}" placeholder="eg SEPT2" aria-label="Gene name">
+            <button type="submit" class="btn btn-primary">Match</button>
+        </form>
+        {% if typed %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    {% include "genes/tags/gene_name_explanation.html" with explanation=typed %}
+                </div>
+            </div>
+        {% endif %}
+
+        <h4 class="mt-4">Examples</h4>
+        <p class="text-muted">Resolved live against this database's HGNC data, so each shows what you would get today.</p>
+        <div class="card">
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Result</th>
+                            <th>Why</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for explanation, why in examples %}
+                            <tr>
+                                <th class="text-monospace">{{ explanation.name }}</th>
+                                <td>{% include "genes/tags/gene_name_explanation.html" with explanation=explanation compact=True %}</td>
+                                <td>{{ why }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <h4 class="mt-4">Where the aliases come from</h4>
+        <p>
+            {% if hgnc_import %}
+                HGNC data was imported {{ hgnc_import.created|date:"j F Y" }}: every previous symbol and alias symbol
+                HGNC records becomes an alias here.
+            {% else %}
+                No HGNC data has been imported, so only symbols already in this database match.
+            {% endif %}
+            NCBI aliases come with the RefSeq gene annotation. A gene's symbol page lists its aliases.
+        </p>
+        <table class="table table-sm w-auto">
+            <thead><tr><th>Source</th><th class="text-right">Aliases</th></tr></thead>
+            <tbody>
+                {% for source, count in alias_sources %}
+                    <tr><td>{{ source }}</td><td class="text-right text-monospace">{{ count }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <h4 class="mt-4">Where the rule is applied</h4>
+        <ul>
+            <li>A classification's gene symbol: the symbol of its matched c.HGVS, then the one the lab submitted, each
+                taken to its current name. This is the symbol shown on the record and used for grouping, overlaps and exports.</li>
+            {% if url_name_visible.classification_export %}
+                <li>The classification export filter and the classification grid's gene symbol filter: an old name or alias
+                    finds the records under the current symbol; an ambiguous alias is reported.</li>
+            {% endif %}
+            <li>Condition matching and gene-disease relations, when a gene is named.</li>
+            {% if url_name_visible.gene_lists %}
+                <li>Gene lists, whether typed, pasted, uploaded or from PanelApp: the <i>alias</i> column shows the alias a
+                    name was matched through, and an ambiguous alias is left unmatched with its candidates in the error message.</li>
+            {% endif %}
+            <li>Gene level classifications: fusions (ROS1;GOPC) and whole-gene copy number calls name their genes the same way.</li>
+        </ul>
+
+        {% if url_name_visible.gene_lists %}
+            <h4 class="mt-4">From symbol to gene ID</h4>
+            <p>
+                A gene list symbol then has to become Ensembl or RefSeq gene IDs for each gene annotation release, since a
+                release's own symbols can lag HGNC. That step matches on the release's symbols and takes at most one alias
+                hop in either direction, so two unrelated genes that happen to share an alias string (MT-TS2 and PDCD2 both
+                have "RP8") are never linked. The gene list grid's <i>match info</i> shows which hop was taken.
+            </p>
+        {% endif %}
+    </div>
+{% endblock content %}

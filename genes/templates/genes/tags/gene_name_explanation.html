@@ -1,0 +1,15 @@
+{% comment %}How one gene name resolved: explanation is a genes.gene_symbol_matching.GeneNameExplanation; compact=True
+drops the leading name for use in a table row{% endcomment %}
+{% if not compact %}<span class="text-monospace">{{ explanation.name }}</span>: {% endif %}
+{% if explanation.matched %}
+    <a class="hover-link text-monospace" href="{% url 'view_gene_symbol' explanation.gene_symbol_id %}">{{ explanation.gene_symbol_id }}</a>
+    {% if explanation.hgnc %}<span class="text-muted">- {{ explanation.hgnc.approved_name }}</span>{% endif %}
+{% elif explanation.candidates %}
+    <span class="text-danger">not matched</span> - ambiguous alias of
+    {% for candidate in explanation.candidates %}<a class="hover-link text-monospace" href="{% url 'view_gene_symbol' candidate %}">{{ candidate }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}
+{% else %}
+    <span class="text-danger">not matched</span>
+{% endif %}
+<div class="text-muted small">
+    {{ explanation.rule.value }}{% if explanation.alias %} ({{ explanation.alias.get_source_display }} alias){% endif %}
+</div>

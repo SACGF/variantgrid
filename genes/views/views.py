@@ -7,7 +7,6 @@ from django.conf import settings
 from django.contrib import messages
 from django.db.models.aggregates import Count
 from django.http import Http404
-from django.http.response import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -20,6 +19,7 @@ from annotation.models.models_annotation_version import AnnotationVersion
 from classification.views.exports import ClassificationExportFormatterCSV
 from classification.views.exports.classification_export_filter import ClassificationFilter
 from classification.views.exports.classification_export_formatter_csv import FormatDetailsCSV
+from genes.enums import GeneSymbolAliasSource
 from genes.forms import (
     GeneAnnotationReleaseGenomeBuildForm,
     GeneListForm,
@@ -28,6 +28,7 @@ from genes.forms import (
     UserGeneListForm,
 )
 from genes.gene_matching import GeneSymbolMatcher
+from genes.gene_symbol_matching import GENE_NAME_EXAMPLES, explain_gene_names
 from genes.gene_symbol_view_info import GeneSymbolViewInfo
 from genes.graphs.gene_list_chromosome_graph import GeneListChromosomeGraph
 from genes.hgvs import HGVSMatcher
@@ -38,6 +39,8 @@ from genes.models import (
     GeneList,
     GeneListCategory,
     GeneSymbol,
+    GeneSymbolAlias,
+    HGNCImport,
     NoTranscript,
     SampleGeneList,
     Transcript,
@@ -48,6 +51,7 @@ from genes.serializers import SampleGeneListSerializer
 from library.constants import WEEK_SECS
 from library.django_utils import add_save_message, get_field_counts
 from library.utils import LazyAttribute, full_class_name
+from library.utils.text_utils import clean_string
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.graphs import graphcache
 from snpdb.models import Sample
@@ -367,6 +371,30 @@ def gene_symbol_info_tab(request, gene_symbol, tool_tips):
         ]
     )
     return render(request, 'genes/gene_symbol_info_tab.html', context=context)
+
+
+def gene_symbol_matching(request):
+    """ Reference page (#2637) for how a gene name a user writes becomes a gene: the rules of GeneSymbol.resolve_names
+        shown over worked examples resolved against this database, a name the user typed (?name=), where the
+        aliases come from, and where the rule is applied """
+    typed_name = clean_string(request.GET.get("name", ""))
+    names = [example_name for example_name, _why in GENE_NAME_EXAMPLES]
+    if typed_name:
+        names.append(typed_name)
+    explanations = explain_gene_names(names)
+    examples = [(explanations[example_name], why) for example_name, why in GENE_NAME_EXAMPLES]
+
+    alias_source_counts = get_field_counts(GeneSymbolAlias.objects.all(), "source")
+    alias_sources = [(GeneSymbolAliasSource(source).label, count)
+                     for source, count in sorted(alias_source_counts.items(), key=lambda sc: -sc[1])]
+    context = {
+        "typed_name": typed_name,
+        "typed": explanations.get(typed_name),
+        "examples": examples,
+        "alias_sources": alias_sources,
+        "hgnc_import": HGNCImport.objects.order_by("-pk").first(),
+    }
+    return render(request, "genes/gene_symbol_matching.html", context)
 
 
 def gene_lists(request):
