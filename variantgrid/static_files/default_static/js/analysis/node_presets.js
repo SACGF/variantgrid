@@ -69,7 +69,9 @@ function initNodePresets(options) {
         if (!preset) {
             return;
         }
-        applyNodePreset($(options.form), preset.values);
+        const form = $(options.form);
+        applyNodePreset(form, preset.values);
+        $("input[name='preset']", form).val(preset.key); // saving names the node after it (#2605)
         description.text(preset.description);
         this.value = ""; // the dropdown is an action - what the form now holds is what the node will filter on
     });

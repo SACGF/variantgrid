@@ -219,10 +219,14 @@ class AncestorSampleSourceMixin(forms.Form):
 
 class BaseNodeForm(forms.ModelForm):
     editor = None  # the user saving the node, when NodeView has set it
+    PRESET_FIELD = "preset"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._restrict_choices_to_analysis_user()
+        if self.has_presets:
+            # The key of the preset picked from the dropdown, set by node_presets.js
+            self.fields[self.PRESET_FIELD] = forms.CharField(required=False, widget=HiddenInput())
         if ignorable_fields := self.instance.get_ignorable_error_fields():
             label = f"Ignore {', '.join(ignorable_fields)} errors"
             self.fields["ignore_field_errors"] = forms.BooleanField(required=False, label=label,
@@ -261,6 +265,12 @@ class BaseNodeForm(forms.ModelForm):
         super()._post_clean()
         if "ignore_field_errors" in self.cleaned_data:
             self.instance.ignore_field_errors = self.cleaned_data["ignore_field_errors"]
+        if preset_key := self.cleaned_data.get(self.PRESET_FIELD):
+            presets_by_key = {preset.key: preset for preset in get_node_presets(self.instance)}
+            if preset := presets_by_key.get(preset_key):
+                # The criterion is what the node is for, so it names the node rather than the generated cutoffs
+                self.instance.name = preset.name
+                self.instance.auto_node_name = False
         for field, errors in self.instance.get_field_errors().items():
             if field in self.fields:
                 for error in errors:
@@ -284,7 +294,7 @@ class BaseNodeForm(forms.ModelForm):
     def _preset_form_values(self, preset: NodePreset) -> dict[str, Any]:
         values = {}
         for name in self.fields:
-            if name in self.PRESET_KEEP_FIELDS:
+            if name in self.PRESET_KEEP_FIELDS or name == self.PRESET_FIELD:
                 continue
             if name in self.PRESET_FIELD_DEFAULTS:
                 values[name] = self.PRESET_FIELD_DEFAULTS[name]

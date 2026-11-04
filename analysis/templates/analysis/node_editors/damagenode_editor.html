@@ -98,7 +98,7 @@
 	<form id="damage-filter" method="post" action="{{ request.path }}">
         {% csrf_token %}
         {% for hidden in form.hidden_fields %}
-            {{ hidden }}
+            {% if hidden.name != form.PRESET_FIELD %}{{ hidden }}{% endif %}{# _node_presets.html renders it #}
         {% endfor %}
 
 		{{ form.non_field_errors }}

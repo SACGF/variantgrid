@@ -40,4 +40,5 @@ admin-edited `PopulationNodePreset` rows - seeded as dominant severe early onset
 adult onset (popmax / FAF95 ≤ 0.01%), recessive (≤ 1% and hom alt ≤ 2) and X-linked (≤ 0.01% and hemizygous ≤ 1) -
 and the editor links superusers to them. Each preset is one criterion
 because the criteria on a node pull in different directions (PM2 vs BA1, PVS1 vs PP3), and they look for pathogenic
-evidence only. Nothing is stored on the node, so its name and chips describe what it filters on.
+evidence only. Saving with a preset picked names the node after the criterion ("PM2 - recessive"), with auto
+name off; its chips still describe what it filters on.

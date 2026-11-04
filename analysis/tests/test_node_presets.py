@@ -77,10 +77,13 @@ class NodePresetsTest(TestCase):
                                             "node_id": node.pk, "node_version": node.version,
                                             "extra_filters": "default"})
 
-    def _save_preset(self, form_class, node, preset: dict):
-        """ The browser posts the whole form, kept fields included """
+    def _save_preset(self, form_class, node, preset: dict, posted_key=None):
+        """ The browser posts the whole form, kept fields included, with the picked preset's key """
         kept = {name: getattr(node, name) for name in form_class.PRESET_KEEP_FIELDS}
-        form = form_class(data=_post_data(preset["values"] | kept), instance=node)
+        data = _post_data(preset["values"] | kept)
+        if posted_key is not None:
+            data[form_class.PRESET_FIELD] = posted_key
+        form = form_class(data=data, instance=node)
         self.assertTrue(form.is_valid(), f"{preset['key']}: {form.errors}")
         return form.save(commit=False)
 
@@ -188,6 +191,7 @@ class NodePresetsTest(TestCase):
             html = client.get(self._node_url(node)).content.decode()
             self.assertIn(f'id="node-preset-{node.pk}"', html)
             self.assertIn(self._presets_url(node), html)
+            self.assertEqual(1, html.count('name="preset"'), node_class)  # inside the form the editor posts
             labels = [p["label"] for p in client.get(self._presets_url(node)).json()]
             self.assertTrue(any(lbl.startswith(label) for lbl in labels), f"{label} not in {labels}")
 
@@ -205,3 +209,26 @@ class NodePresetsTest(TestCase):
         client = Client()
         client.force_login(self.user)
         self.assertEqual(404, client.get(self._presets_url(ZygosityNode(analysis=self.analysis))).status_code)
+
+    def test_saving_a_preset_names_the_node(self):
+        recessive_key = f"population_{PopulationNodePreset.objects.get(name='PM2 - recessive').pk}"
+        for form_class, node_class, key, name in [
+            (DamageNodeForm, DamageNode, "pvs1", "PVS1 - LoF"),
+            (PopulationNodeForm, PopulationNode, recessive_key, "PM2 - recessive"),
+            (ClinVarNodeForm, ClinVarNode, "pp5", "PP5 - P/LP ≥ 2★"),
+        ]:
+            node = node_class.objects.create(analysis=self.analysis)
+            saved = self._save_preset(form_class, node, self._presets(form_class, node)[key], posted_key=key)
+            saved.save()
+            saved.refresh_from_db()
+            self.assertEqual((name, False), (saved.name, saved.auto_node_name))
+
+    def test_saving_without_a_known_preset_keeps_the_name(self):
+        auto_node = DamageNode.objects.create(analysis=self.analysis)
+        manual_node = DamageNode.objects.create(analysis=self.analysis, name="my filter", auto_node_name=False)
+        presets = self._presets(DamageNodeForm, auto_node)
+        for node, posted_key in [(auto_node, "pm9"), (auto_node, ""), (manual_node, None)]:
+            saved = self._save_preset(DamageNodeForm, node, presets["pvs1"], posted_key=posted_key)
+            self.assertNotEqual("PVS1 - LoF", saved.name)
+            self.assertEqual(node is auto_node, saved.auto_node_name)
+        self.assertEqual("my filter", saved.name)

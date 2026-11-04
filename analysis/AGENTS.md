@@ -80,8 +80,9 @@ Patterns here:
   `analysis/views/views_node.py:get_node_view_classes_by_class` finds the view by `model`, so defining the class registers it;
   `analysis/views/nodes/node_view.py:NodeView.form_valid` does the dirty/save/update_analysis dance for you.
 - ACMG presets on the Effect, Population and ClinVar editors (`analysis/node_presets.py`, #2605) fill the form
-  client side and save nothing: `BaseNodeForm.get_preset_data` hands `node_presets.js` a complete form state per
-  preset (every field back to the model default, then the criterion's cutoffs), so a filter the node already had
+  client side; the only thing saved is the node's name - the hidden `preset` field carries the picked key, and
+  `BaseNodeForm._post_clean` names the node `NodePreset.name` with auto name off. `BaseNodeForm.get_preset_data`
+  hands `node_presets.js` a complete form state per preset (every field back to the model default, then the criterion's cutoffs), so a filter the node already had
   can't quietly AND itself in. A form-only field names its reset value in `PRESET_FIELD_DEFAULTS`, a field a
   preset must leave alone goes in `PRESET_KEEP_FIELDS`, and an editor control the generic fill can't drive (the
   Effect node's sliders) registers `nodeEditorHooks.applyPresetField`. The Population presets are lab policy,
