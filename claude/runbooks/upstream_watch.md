@@ -16,6 +16,16 @@ column (the fifth `|`-separated field), so keep the table shape.
 | MaveDB stripped file | every deployment running MaveDB on a VEP_plugins `release/116` checkout from 2026-09-01 (Ensembl/VEP_plugins#853) | 2026-11-03 | 2027-02-03 |
 | gnomAD SV overlap via two `--custom` | Ensembl/ensembl-vep#1989 (`coords=2`, `show_overlaps`) for #1645 | 2026-11-03 | 2027-02-03 |
 | cdot thread-local FASTA swap | SACGF/cdot#234 in a cdot release | 2026-11-04 | 2026-12-04 |
+| uv cooldown exceptions | the 7-day cooldown passing the pinned cutoffs in `uv.toml` | 2026-11-04 | 2026-11-06 |
+
+## uv cooldown exceptions
+
+`uv.toml` names packages whose security fix was less than seven days old when it was needed, each with a fixed
+cutoff date that admits it. The entry freezes that package at the cutoff, so it comes out once the default cooldown
+has passed the date: pypdf after 2026-11-05.
+
+Check: `grep exclude-newer-package uv.toml` against today's date. When resolved: delete the expired entries, recompile
+both requirements files (root `AGENTS.md`, Python packages), and delete this row when none are left.
 
 ## hgvs fork
 

@@ -45,7 +45,7 @@ matplotlib
 mozilla_django_oidc
 nameparser
 nh3
-nltk>=3.10.0
+nltk>=3.10.4  # WekaClassifier model-path advisory
 numpy
 oauthlib>=4.0.0
 openpyxl  # pandas read_excel (SA Pathology somatic xlsx import)
@@ -55,7 +55,7 @@ pillow>=13.0.0
 pronto>=2.4.7
 psycopg[binary]
 pyBigWig>=0.3.22
-pypdf>=6.21.2  # long-runtime / memory advisories up to GHSA-6c7f-9265-g8fw; inside the cooldown, see uv.toml
+pypdf>=6.21.4  # long-runtime / memory / infinite-loop advisories; inside the cooldown, see uv.toml
 pysam
 python_dateutil
 redis
