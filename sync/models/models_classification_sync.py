@@ -39,9 +39,11 @@ class ClassificationModificationSyncRecord(TimeStampedModel):
     @property
     def remote_url(self) -> Optional[str]:
         """ URL of the record on the destination server, None if we don't know where it landed """
-        if self.success:
+        meta = self.meta or {}
+        # a withdrawal the remote held below all users deletes it there, though the response still carries its pk
+        if self.success and not meta.get("deleted"):
             # the v2 API response nests the remote record's pk under "meta"
-            remote_pk = ((self.meta or {}).get("meta") or {}).get("id")
+            remote_pk = (meta.get("meta") or {}).get("id")
             # the pk comes from the remote server, so don't let it add anything but a path segment to the link
             if remote_pk and _REMOTE_PK_PATTERN.fullmatch(str(remote_pk)):
                 host = self.run.destination.sync_details["host"]

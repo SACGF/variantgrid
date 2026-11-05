@@ -71,12 +71,15 @@ class ClassificationSyncStatusTestCase(TestCase):
         vc.save()
         return vc
 
-    def _create_sync_record(self, vc: Classification, remote_pk: int = 999):
+    def _create_sync_record(self, vc: Classification, remote_pk: int = 999, deleted: bool = False):
         sync_run = SyncRun.objects.create(destination=self.sync_destination, status=SyncStatus.SUCCESS)
+        meta = {"meta": {"id": remote_pk}}
+        if deleted:
+            meta["deleted"] = True
         return ClassificationModificationSyncRecord.objects.create(
             run=sync_run,
             classification_modification=vc.last_published_version,
-            meta={"meta": {"id": remote_pk}}
+            meta=meta
         )
 
     def _only_status(self, vc: Classification):
@@ -97,6 +100,16 @@ class ClassificationSyncStatusTestCase(TestCase):
     def test_synced_with_unsafe_remote_pk_has_no_link(self):
         vc = self._create_classification()
         self._create_sync_record(vc, remote_pk="//evil.example.com/x")
+
+        status = self._only_status(vc)
+        self.assertEqual(status.state, ClassificationSyncState.SYNCED)
+        self.assertIsNone(status.remote_url)
+
+    def test_withdrawn_and_deleted_on_remote_has_no_link(self):
+        vc = self._create_classification()
+        self._create_sync_record(vc, remote_pk=1234)
+        vc.set_withdrawn(user=self.user, withdraw=True)
+        self._create_sync_record(vc, remote_pk=1234, deleted=True)
 
         status = self._only_status(vc)
         self.assertEqual(status.state, ClassificationSyncState.SYNCED)
