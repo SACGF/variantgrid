@@ -232,7 +232,10 @@ and one more thing to update when refactoring. A test earns its keep when it cov
 a calculation, a rule that's easy to get wrong later. The most common thing to throw away is a test of framework behaviour
 rather than ours - that `blank=True` makes a field optional, that a `disabled` form field ignores POSTed data, that
 `order_fields` orders fields. Django is already tested. If the test would still pass with our logic deleted, or it only
-restates a field declaration, drop it.
+restates a field declaration, drop it. The other test to throw away is the change-detector - one that asserts what the
+code currently does (the text of a generated Q, which private helper was called, a value copied from the first run)
+rather than what it is supposed to do; `claude/guides/testing.md#change-detector-tests` shows the five forms found in
+this repo and the behaviour-level test to write instead.
 
 ### Verifying pages
 Run `vg page <url> --queries` before and after a template or view change; a rising query count is an N+1.

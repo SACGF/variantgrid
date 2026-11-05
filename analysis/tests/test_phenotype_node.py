@@ -15,29 +15,68 @@ from analysis.models import (
     PhenotypeNode,
     TrioNode,
 )
-from analysis.tests.utils import AnalysisSetupMixin
-from annotation.fake_data import get_fake_annotation_version
+from analysis.tests.utils import AnalysisSetupMixin, create_annotated_variants, node_keeps
+from annotation.fake_data import create_fake_variant_annotation, get_fake_annotation_version
+from annotation.models.models import VariantAnnotation
+from genes.enums import AnnotationConsortium, HGNCStatus
+from genes.fake_data import create_fake_transcript_version
+from genes.models.models_gene import HGNC, Gene, HGNCImport, UniProt
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import Patient
+from patients.models.models_phenotype import (
+    PhenotypeDescription,
+    TextPhenotype,
+    TextPhenotypeMatch,
+    TextPhenotypeSentence,
+)
 from snpdb.fake_data import create_fake_cohort, create_fake_trio
 from snpdb.models import Cohort, GenomeBuild
+from snpdb.models.models_cached_web_resource import CachedWebResource
+from snpdb.models.models_variant import Variant
+from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
-TEXT_COLUMNS = [
-    "variantannotation__gene__summary",
-    "variantannotation__gene__geneannotation__omim_terms",
-    "variantannotation__transcript_version__gene_version__hgnc__uniprot__function",
-    "variantannotation__gene__geneannotation__hpo_terms",
-]
-
-COHORT_TERM = "MONDO:0000001"
+# In the test ontology this HPO term reaches these genes through OMIM (ontology/tests/test_ontology.py)
+COHORT_TERM = "HP:0001507"
+COHORT_TERM_GENES = {"BCKDHA", "MEN1"}
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
 class TestPhenotypeNodeText(AnalysisSetupMixin, TestCase):
     """ Free text is matched against gene descriptions as well as the ontology terms """
 
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        vav = cls.analysis.annotation_version.variant_annotation_version
+        transcript_version = create_fake_transcript_version(cls.grch37)
+        uniprot = UniProt.objects.create(accession="TESTPHENO1",
+                                         cached_web_resource=CachedWebResource.objects.create(name="test_phenotype"),
+                                         function="Channel whose loss causes epilepsy.")
+        gene_version = transcript_version.gene_version
+        gene_version.hgnc = HGNC.objects.create(gene_symbol=gene_version.gene_symbol,
+                                                hgnc_import=HGNCImport.objects.create(), status=HGNCStatus.APPROVED,
+                                                approved_name="RUNX family transcription factor 1",
+                                                alias_symbols="", uniprot=uniprot)
+        gene_version.save()
+
+        rows = {}
+        for i, (name, gene_summary, variant_transcript_version) in enumerate([
+                ("summary_epilepsy", "Mutations cause childhood epilepsy.", None),
+                ("uniprot_epilepsy", None, transcript_version),
+                ("summary_ataxia", "Mutations cause spinocerebellar ataxia.", None),
+                ("unrelated", "Required for kidney development.", None)]):
+            gene = None
+            if gene_summary:
+                gene = Gene.objects.create(identifier=f"TEST_PHENOTYPE_{i}",
+                                           annotation_consortium=AnnotationConsortium.REFSEQ, summary=gene_summary)
+            rows[name] = {"gene": gene, "transcript_version": variant_transcript_version}
+        cls.variants = create_annotated_variants(vav, rows)
+
     def _node(self, text_phenotype=None) -> PhenotypeNode:
         return PhenotypeNode.objects.create(analysis=self.analysis, text_phenotype=text_phenotype)
+
+    def _filtered(self, node: PhenotypeNode) -> set[str]:
+        return node_keeps(node, self.variants)
 
     def test_no_terms_or_text_does_not_modify_parents(self):
         self.assertFalse(self._node().modifies_parents())
@@ -46,14 +85,11 @@ class TestPhenotypeNodeText(AnalysisSetupMixin, TestCase):
         self.assertTrue(self._node("epilepsy").modifies_parents())
 
     def test_text_searches_every_description_column(self):
-        q_str = str(self._node("epilepsy")._get_node_q())
-        for column in TEXT_COLUMNS:
-            self.assertIn(f"{column}__icontains", q_str)
+        self.assertEqual({"summary_epilepsy", "uniprot_epilepsy"}, self._filtered(self._node("epilepsy")))
 
     def test_each_word_is_searched_separately(self):
-        q_str = str(self._node("epilepsy ataxia")._get_node_q())
-        self.assertIn("epilepsy", q_str)
-        self.assertIn("ataxia", q_str)
+        self.assertEqual({"summary_epilepsy", "uniprot_epilepsy", "summary_ataxia"},
+                         self._filtered(self._node("epilepsy ataxia")))
 
     def test_node_name_shows_the_text(self):
         self.assertIn("epilepsy", self._node("epilepsy").get_node_name())
@@ -97,14 +133,17 @@ class TestPhenotypeNodeSource(AnalysisSetupMixin, TestCase):
     # ── The source decides whose terms are read ──────────────────────────────
 
     def test_terms_and_genes_come_from_the_cohort(self):
+        description = PhenotypeDescription.objects.create(cohort=self.cohort, original_text=self.cohort.phenotype)
+        text_phenotype = TextPhenotype.objects.create(text=self.cohort.phenotype)
+        TextPhenotypeSentence.objects.create(phenotype_description=description, text_phenotype=text_phenotype,
+                                             sentence_offset=0)
+        TextPhenotypeMatch.objects.create(text_phenotype=text_phenotype, ontology_term_id=COHORT_TERM,
+                                          offset_start=0, offset_end=len(self.cohort.phenotype))
+
         node = self._phenotype_node(self._cohort_node(), accordion_panel=PhenotypeNode.PANEL_SOURCE)
-        node.cohort = self.cohort
-        with patch.object(Cohort, "get_ontology_term_ids", return_value=[COHORT_TERM]) as term_ids, \
-                patch.object(Cohort, "get_gene_symbols") as gene_symbols:
-            self.assertEqual(node.get_ontology_term_ids(), [COHORT_TERM])
-            node.get_gene_symbols_qs()
-        self.assertTrue(term_ids.called)
-        self.assertTrue(gene_symbols.called)
+        self.assertEqual(node.cohort, self.cohort)
+        self.assertEqual([COHORT_TERM], list(node.get_ontology_term_ids()))
+        self.assertEqual(COHORT_TERM_GENES, set(node.get_gene_symbols_qs().values_list("symbol", flat=True)))
 
     def test_node_name_names_the_cohort(self):
         node = self._phenotype_node(self._cohort_node(), accordion_panel=PhenotypeNode.PANEL_SOURCE)

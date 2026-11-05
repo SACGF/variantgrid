@@ -3,14 +3,18 @@ Tests for analysis node filters where a count of 0 is a real user choice rather
 than "unset" - these all used to be lost to truthiness checks.
 """
 
+from django.conf import settings
 from django.test import TestCase, override_settings
 
 from analysis.enums import GroupOperation
 from analysis.models import AllVariantsNode, Analysis
 from analysis.models.nodes.filters.population_node import PopulationNode
 from analysis.models.nodes.sources.sample_node import SampleNode
-from analysis.tests.utils import AnalysisSetupMixin
+from analysis.tests.utils import AnalysisSetupMixin, create_annotated_variants, node_keeps
 from snpdb.fake_data import create_fake_cohort
+from snpdb.models.models_cohort import CohortGenotype
+from snpdb.models.models_zygosity_counts import VariantZygosityCount, VariantZygosityCountCollection
+from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 # ---------------------------------------------------------------------------
 # AbstractZygosityCountNode - max_count=0
@@ -26,34 +30,20 @@ class TestZygosityCountZero(AnalysisSetupMixin, TestCase):
         return node
 
     def test_max_count_zero_produces_lte_filter(self):
-        """max_count=0 must generate a col__lte=0 filter."""
+        """ The counts come from the global germline collection """
+        vzcc = VariantZygosityCountCollection.objects.get_or_create(
+            name=settings.VARIANT_ZYGOSITY_GLOBAL_COLLECTION)[0]
+        variants = {}
+        for i, (name, het_count) in enumerate([("seen_nowhere", 0), ("seen_once", 1)]):
+            variant = slowly_create_test_variant("1", 1000 + i * 100, "A", "T", self.grch37)
+            VariantZygosityCount.objects.create(variant=variant, collection=vzcc, ref_count=2, het_count=het_count,
+                                                hom_count=0)
+            variants[variant.pk] = name
+
         node = self._node_with_max_zero()
-        arg_q_dict = node.get_zygosity_count_arg_q_dict()
-
-        all_q_strs = [
-            str(q)
-            for q_dict in arg_q_dict.values()
-            for q in q_dict.values()
-        ]
-        self.assertTrue(
-            any("__lte" in s for s in all_q_strs),
-            f"max_count=0 produced no __lte filter. Got Q strings: {all_q_strs}",
-        )
-
-    def test_max_count_zero_differs_from_no_max(self):
-        """max_count=0 and max_count=None must produce different Q dicts."""
-        node_zero = self._node_with_max_zero()
-        node_none = AllVariantsNode(analysis=self.analysis)
-        # max_het_or_hom_count defaults to None (nullable field)
-
-        q_zero = str(node_zero.get_zygosity_count_arg_q_dict())
-        q_none = str(node_none.get_zygosity_count_arg_q_dict())
-
-        self.assertNotEqual(
-            q_zero,
-            q_none,
-            "max_count=0 and max_count=None produce identical Q dicts",
-        )
+        node.save()
+        filtered_pks = node.get_queryset().filter(pk__in=variants).values_list("pk", flat=True)
+        self.assertEqual({"seen_nowhere"}, {variants[pk] for pk in filtered_pks})
 
     def test_description_shows_max_zero(self):
         """_get_zygosity_count_description() must include '0' when max_count=0."""
@@ -74,20 +64,31 @@ class TestPopulationNodeModifiesParents(AnalysisSetupMixin, TestCase):
     never applied to the queryset.
     """
 
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        vav = cls.analysis.annotation_version.variant_annotation_version
+        cls.variants = create_annotated_variants(vav, {
+            name: {"gnomad_hom_alt": count, "gnomad_hemi_count": count}
+            for name, count in [("none", 0), ("one", 1), ("not_in_gnomad", None)]
+        })
+
     def _node(self, **kwargs):
         """Return an unsaved PopulationNode with 100% (no population AF filter) by default."""
-        defaults = dict(percent=PopulationNode.EVERYTHING, show_gnomad_filtered=True)
+        defaults = {"percent": PopulationNode.EVERYTHING, "show_gnomad_filtered": True}
         defaults.update(kwargs)
         return PopulationNode(analysis=self.analysis, **defaults)
+
+    def _filtered(self, node) -> set[str]:
+        return node_keeps(node, self.variants)
 
     def test_gnomad_hom_alt_max_zero_modifies_parents(self):
         node = self._node(gnomad_hom_alt_max=0)
         self.assertTrue(node.modifies_parents())
 
-    def test_gnomad_hom_alt_max_zero_q_filter_is_not_none(self):
+    def test_gnomad_hom_alt_max_zero_removes_hom_alt_carriers(self):
         node = self._node(gnomad_hom_alt_max=0)
-        self.assertIsNotNone(node._get_node_q(),
-                             "_get_node_q() returned None for gnomad_hom_alt_max=0")
+        self.assertEqual({"none", "not_in_gnomad"}, self._filtered(node))
 
     def test_gnomad_hom_alt_max_none_does_not_modify_alone(self):
         node = self._node(gnomad_hom_alt_max=None)
@@ -100,7 +101,7 @@ class TestPopulationNodeModifiesParents(AnalysisSetupMixin, TestCase):
     def test_gnomad_hemi_count_max_zero_filters_hemi_count(self):
         node = self._node(gnomad_hemi_count_max=0)
         self.assertTrue(node.modifies_parents())
-        self.assertIn("variantannotation__gnomad_hemi_count__lte", str(node._get_node_q()))
+        self.assertEqual({"none", "not_in_gnomad"}, self._filtered(node))
 
 
 # ---------------------------------------------------------------------------
@@ -112,22 +113,27 @@ class TestPopulationNodeGroupOperationQ(AnalysisSetupMixin, TestCase):
     """
     PopulationNode uses *inverted* operators for ANY/ALL (see comment in source):
 
-        OPERATIONS = {
-            GroupOperation.ALL: operator.or_,   # inverted
-            GroupOperation.ANY: operator.and_,  # inverted
-        }
+      ANY (strict)  — remove if above cutoff in ANY database
+      ALL (lenient) — remove only if above cutoff in ALL databases
 
-    Semantics:
-      ANY (strict)  — remove if above cutoff in ANY database → AND all per-db filters.
-      ALL (lenient) — remove only if above cutoff in ALL databases → OR per-db filters.
-
-    These tests pin the observable Q structure so the inversion isn't "corrected" away.
+    These tests pin which variants each keeps, so the inversion isn't "corrected" away.
     """
+    RARE = 0.001
+    COMMON = 0.05
 
-    def _pop_node_q(self, group_operation):
-        """Create a saved node using gnomad_af + af_1kg + af_uk10k at 1% and return _get_node_q().
-        Must be saved so that self.populationnodegnomadpopulation_set.all() can run.
-        """
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        vav = cls.analysis.annotation_version.variant_annotation_version
+        cls.variants = create_annotated_variants(vav, {
+            name: {"gnomad_af": gnomad_af, "af_1kg": other_af, "af_uk10k": other_af}
+            for name, gnomad_af, other_af in [("rare_everywhere", cls.RARE, cls.RARE),
+                                              ("common_in_gnomad_only", cls.COMMON, cls.RARE),
+                                              ("common_everywhere", cls.COMMON, cls.COMMON)]
+        })
+
+    def _filtered(self, group_operation) -> set[str]:
+        """ gnomad_af + af_1kg + af_uk10k at 1%. Saved so populationnodegnomadpopulation_set.all() can run """
         node = PopulationNode.objects.create(
             analysis=self.analysis,
             percent=1.0,
@@ -138,27 +144,15 @@ class TestPopulationNodeGroupOperationQ(AnalysisSetupMixin, TestCase):
             af_uk10k=True,
             topmed_af=False,
         )
-        return node._get_node_q()
+        return node_keeps(node, self.variants)
 
     def test_any_group_operation_combines_with_and(self):
-        """GroupOperation.ANY → AND of per-db filters (all must pass → strict)."""
-        q = self._pop_node_q(GroupOperation.ANY)
-        self.assertIsNotNone(q)
-        q_str = str(q)
-        self.assertTrue(
-            q_str.startswith("(AND:"),
-            f"ANY mode should combine filters with AND, got: {q_str!r}",
-        )
+        """ GroupOperation.ANY - common in one database is enough to remove it """
+        self.assertEqual({"rare_everywhere"}, self._filtered(GroupOperation.ANY))
 
     def test_all_group_operation_combines_with_or(self):
-        """GroupOperation.ALL → OR of per-db filters (any can pass → lenient)."""
-        q = self._pop_node_q(GroupOperation.ALL)
-        self.assertIsNotNone(q)
-        q_str = str(q)
-        self.assertTrue(
-            q_str.startswith("(OR:"),
-            f"ALL mode should combine filters with OR, got: {q_str!r}",
-        )
+        """ GroupOperation.ALL - only removed when common in every database """
+        self.assertEqual({"rare_everywhere", "common_in_gnomad_only"}, self._filtered(GroupOperation.ALL))
 
 
 # ---------------------------------------------------------------------------
@@ -215,21 +209,34 @@ class TestSampleNodeThresholdColumns(AnalysisSetupMixin, TestCase):
     def _node(self, **kwargs):
         return SampleNode(analysis=self.analysis, sample=self.sample, **kwargs)
 
-    def _phred_likelihood_in_query(self, node) -> bool:
-        arg_q_dict = node._get_sample_arg_q_dict(self.sample)
-        return any("phred_likelihood" in str(q)
-                   for q_dict in arg_q_dict.values() for q in q_dict.values())
+    def _genotype(self, position: int, proband_pl) -> int:
+        """ A het proband call - proband_pl of None is a caller that reports no PL at all """
+        variant = slowly_create_test_variant("1", position, "A", "T", self.grch37)
+        CohortGenotype.objects.create(
+            collection=self.cohort.cohort_genotype_collection, variant=variant, ref_count=2, het_count=1,
+            samples_zygosity="ERR", samples_allele_depth=[20] * 3, samples_allele_frequency=[0.5] * 3,
+            samples_read_depth=[30] * 3, samples_genotype_quality=[30] * 3,
+            samples_phred_likelihood=None if proband_pl is None else [proband_pl, 0, 0])
+        return variant.pk
+
+    @staticmethod
+    def _filtered_pks(node, pks) -> set[int]:
+        node.save()
+        return set(node.get_queryset().filter(pk__in=pks).values_list("pk", flat=True))
 
     def test_max_pl_left_out_when_vcf_has_no_pl(self):
+        no_pl_pk = self._genotype(1000, None)
         node = self._node(max_pl=0)
-        self.assertFalse(self._phred_likelihood_in_query(node))
+        self.assertEqual({no_pl_pk}, self._filtered_pks(node, [no_pl_pk]))
         self.assertFalse(node._has_filters_that_affect_label_counts())
 
     def test_max_pl_filters_when_vcf_has_pl(self):
         self.sample.vcf.phred_likelihood_field = "PL"
         self.sample.vcf.save()
+        pl_0_pk = self._genotype(1000, 0)
+        pl_30_pk = self._genotype(1100, 30)
         node = self._node(max_pl=0)
-        self.assertTrue(self._phred_likelihood_in_query(node))
+        self.assertEqual({pl_0_pk}, self._filtered_pks(node, [pl_0_pk, pl_30_pk]))
         self.assertTrue(node._has_filters_that_affect_label_counts())
 
     def test_min_ad_filters_when_vcf_has_ad(self):
