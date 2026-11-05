@@ -23,6 +23,10 @@ Patterns here:
   `_get_arg_q_dict_from_parents_and_node` only when the node combines parents itself
   (`analysis/models/nodes/filters/venn_node.py:VennNode`). A pass-through node returns False from `modifies_parents` to
   reuse the parent's counts and cache (`analysis/models/nodes/filters/gene_list_node.py:GeneListNode.modifies_parents`).
+- A count badge (a `BuiltInFilters` label) is a node configuration, declared in that node class's
+  `COUNT_LABEL_FIELDS`: `analysis/models/nodes/analysis_node.py:AnalysisNode.count_label_node` builds it - the badge's
+  count is its Q, the badge click drops it - and `AnalysisNode.matches_count_label` lets a node configured that way
+  reuse its parent's count. `BuiltInFilterNode` is `disabled`, kept only for existing rows.
 - Editing a node: set `queryset_dirty = True`, `save()`, then `analysis/models/nodes/node_utils.py:update_analysis`.
   `analysis/models/nodes/analysis_node.py:AnalysisNode._save` bumps `version`, sets DIRTY, cascades the bump to every
   descendant and creates the NodeVersion row. Everything version-scoped (Redis Q cache keyed on NodeVersion pk, NodeCache,

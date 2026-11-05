@@ -52,8 +52,8 @@ def check_annotation_versions() -> dict:
 def check_gene_annotation_versions() -> dict:
     """ Saving a GeneAnnotationVersion points a new AnnotationVersion at it, so a gene_annotation run
         that died before writing its records leaves an empty version live. Gene level filters (eg the
-        OMIM built in filter) then match nothing at all rather than failing, @see
-        analysis.models.nodes.node_counts.get_omim_q """
+        OMIM count and Effect node filter) then match nothing at all rather than failing, @see
+        analysis.models.nodes.filters.damage_node.get_omim_q """
     gene_annotation_checks = {}
     for genome_build in GenomeBuild.builds_with_annotation():
         build_ga = {"valid": True}

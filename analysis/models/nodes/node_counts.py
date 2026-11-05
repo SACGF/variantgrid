@@ -1,29 +1,16 @@
-import logging
 from typing import Optional
 
 from django.db.models import Count
 from django.db.models.query_utils import Q
 
 from analysis.exceptions import NonFatalNodeError
-from annotation.enums import ClinVarOncogenicity, Pathogenicity, PathogenicityImpact
-from annotation.models import AnnotationVersion, GeneAnnotation
-from classification.models import Classification
-from snpdb.enums import BuiltInFilters, ClinicalSignificance, SomaticClinicalSignificance, TagFilter
+from snpdb.enums import BuiltInFilters, TagFilter
 from snpdb.models import Tag, Variant
 from snpdb.models.models_user_settings import AbstractNodeCountSettings
 from snpdb.utils import get_tag_styles_and_colors
 
 # Tags the user hasn't given a colour still need a visible legend swatch
 DEFAULT_TAG_NODE_COUNT_COLOR = "#888888"
-
-
-def get_omim_q(annotation_version: AnnotationVersion) -> Q:
-    """ Genes with OMIM terms, as a subquery against the small GeneAnnotation table - going through
-        'variantannotation__gene__geneannotation' joins the huge VariantAnnotation table through Gene """
-    gene_annotation_qs = GeneAnnotation.objects.filter(omim_terms__isnull=False)
-    if gene_annotation_version_id := annotation_version.gene_annotation_version_id:
-        gene_annotation_qs = gene_annotation_qs.filter(version_id=gene_annotation_version_id)
-    return Q(variantannotation__gene__in=gene_annotation_qs.values_list("gene_id", flat=True))
 
 
 def get_analysis_tagged_variant_ids(analysis, tag_ids: list[str]) -> list[int]:
@@ -40,37 +27,12 @@ def is_extra_filter(extra_filters) -> bool:
     return bool(TagFilter.get_tag_ids(extra_filters)) or extra_filters in dict(BuiltInFilters.FILTER_CHOICES)
 
 
-def get_extra_filters_q(analysis, extra_filters) -> Q:
-    if tag_ids := TagFilter.get_tag_ids(extra_filters):
-        return Q(pk__in=get_analysis_tagged_variant_ids(analysis, tag_ids))
-
-    user = analysis.user
-    annotation_version = analysis.annotation_version
-    if extra_filters == BuiltInFilters.CLINVAR:
-        # ClinVar's 3 classification axes - a variant is significant if any of them says so
-        q = Q(clinvar__highest_pathogenicity__gte=Pathogenicity.LIKELY_PATHOGENIC) \
-            | Q(clinvar__somatic_tier__in=SomaticClinicalSignificance.TIER_1_AND_2_VALUES) \
-            | Q(clinvar__highest_oncogenicity__gte=ClinVarOncogenicity.LIKELY_ONCOGENIC)
-    elif extra_filters == BuiltInFilters.OMIM:
-        q = get_omim_q(annotation_version)
-    elif extra_filters in [BuiltInFilters.CLASSIFIED, BuiltInFilters.CLASSIFIED_PATHOGENIC,
-                           BuiltInFilters.CLASSIFIED_TIER_1_2]:
-        clinical_significance_list = None
-        somatic_clinical_significance_list = None
-        if extra_filters == BuiltInFilters.CLASSIFIED_PATHOGENIC:
-            clinical_significance_list = [ClinicalSignificance.LIKELY_PATHOGENIC, ClinicalSignificance.PATHOGENIC]
-        elif extra_filters == BuiltInFilters.CLASSIFIED_TIER_1_2:
-            somatic_clinical_significance_list = SomaticClinicalSignificance.TIER_1_AND_2_VALUES
-        q = Classification.objects.published_variant_q(user, annotation_version.genome_build, clinical_significance_list,
-                                                         somatic_clinical_significance_list=somatic_clinical_significance_list)
-    elif extra_filters == BuiltInFilters.IMPACT_HIGH_OR_MODERATE:
-        q = Q(variantannotation__impact__in=(PathogenicityImpact.HIGH, PathogenicityImpact.MODERATE))
-    elif extra_filters == BuiltInFilters.COSMIC:
-        q = Q(variantannotation__cosmic_id__isnull=False)
-    else:
-        logging.warning("get_extra_filters_q, unknown filter '%s'", extra_filters)
-        q = Q(pk__isnull=False)  # No op
-    return q
+def get_label_q(node, label) -> Q:
+    """ A tag label's analysis-scoped tagged variants, otherwise the filter of the node the count label
+        is configured as @see AnalysisNode.count_label_node """
+    if tag_ids := TagFilter.get_tag_ids(label):
+        return Q(pk__in=get_analysis_tagged_variant_ids(node.analysis, tag_ids))
+    return node.count_label_q(node.analysis, label)
 
 
 def get_node_extra_filters_q(node, extra_filters) -> Optional[Q]:
@@ -82,7 +44,7 @@ def get_node_extra_filters_q(node, extra_filters) -> Optional[Q]:
     if tag_ids := TagFilter.get_tag_ids(extra_filters):
         if (node_tag_q := node.get_extra_filters_tag_q(tag_ids)) is not None:
             return node_tag_q
-    return get_extra_filters_q(node.analysis, extra_filters)
+    return get_label_q(node, extra_filters)
 
 
 def get_extra_filters_count(node, extra_filters) -> Optional[int]:
@@ -98,7 +60,7 @@ def get_extra_filters_count(node, extra_filters) -> Optional[int]:
             return count
     if tag_ids:
         # Tags narrow the node to a handful of variants, so counting them exactly here is cheap
-        q = node_tag_q if node_tag_q is not None else get_extra_filters_q(node.analysis, extra_filters)
+        q = node_tag_q if node_tag_q is not None else get_label_q(node, extra_filters)
         try:
             return node.get_queryset().filter(q).count()
         except NonFatalNodeError:
@@ -150,8 +112,7 @@ def get_node_counts_mine_and_available(analysis):
 
 
 def get_node_counts_and_labels_dict(node, counts_to_get):
-    qs = node.get_queryset()
-    return _aggregate_node_counts(qs, node.analysis, counts_to_get)
+    return _aggregate_node_counts(node, counts_to_get)
 
 
 def get_tagged_variant_ids_by_label(analysis, tag_labels) -> dict[str, list[int]]:
@@ -176,15 +137,15 @@ def get_tag_node_counts_dict(node, tagged_variant_ids_by_label: dict[str, list[i
                                 for label, variant_ids in tagged_variant_ids_by_label.items()})
 
 
-def _aggregate_node_counts(qs, analysis, counts_to_get) -> dict[str, int]:
+def _aggregate_node_counts(node, counts_to_get) -> dict[str, int]:
     q_by_label = {}
     for count_type in counts_to_get:
         if count_type == BuiltInFilters.TOTAL:
             q = None
         else:
-            q = get_extra_filters_q(analysis, count_type)
+            q = get_label_q(node, count_type)
         q_by_label[count_type] = q
-    return _count_by_label(qs, q_by_label)
+    return _count_by_label(node.get_queryset(), q_by_label)
 
 
 def _count_by_label(qs, q_by_label: dict[str, Optional[Q]]) -> dict[str, int]:

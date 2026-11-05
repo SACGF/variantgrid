@@ -99,6 +99,18 @@ class ClinVarNodeQTest(AnalysisSetupMixin, TestCase):
                            somatic_tier_4=False)
         self.assertEqual({"tier_3"}, self._filtered(node))
 
+    def test_narrowed_axes_match_a_record_either_one_keeps(self):
+        node = ClinVarNode(analysis=self.analysis, germline_uncertain=False, germline_likely_benign=False,
+                           germline_benign=False, germline_other=False, oncogenicity_uncertain=False,
+                           oncogenicity_likely_benign=False, oncogenicity_benign=False)
+        self.assertEqual({"pathogenic", "likely_pathogenic", "oncogenic", "likely_oncogenic"}, self._filtered(node))
+
+    def test_axis_with_every_pill_on_adds_nothing_to_the_or(self):
+        """ Germline P/LP with somatic untouched is still germline P/LP, not 'or any somatic record' """
+        node = ClinVarNode(analysis=self.analysis, germline_uncertain=False, germline_likely_benign=False,
+                           germline_benign=False, germline_other=False)
+        self.assertEqual({"pathogenic", "likely_pathogenic"}, self._filtered(node))
+
     def test_allele_origin_gates_the_rows(self):
         """ Germline only - the somatic pills stop applying without being retouched """
         node = ClinVarNode(analysis=self.analysis, allele_origin=AlleleOriginFilterDefault.GERMLINE,

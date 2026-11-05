@@ -13,7 +13,7 @@ from analysis.models import Analysis, TagNode, VariantTag
 from analysis.models.nodes.filters.zygosity_node import ZygosityNode
 from analysis.models.nodes.node_counts import (
     get_extra_filters_count,
-    get_extra_filters_q,
+    get_label_q,
     get_node_counts_mine_and_available,
     get_node_extra_filters_q,
 )
@@ -190,7 +190,7 @@ class TestTagNodeCountValues(TagNodeCountTestCase):
 
 class TestTagExtraFiltersQ(TagNodeCountTestCase):
     def _filtered_variant_pks(self) -> set:
-        q = get_extra_filters_q(self.analysis, self.tag_label)
+        q = get_label_q(self._sample_node(), self.tag_label)
         return set(Variant.objects.filter(q).values_list("pk", flat=True))
 
     def test_filters_to_variants_tagged_in_this_analysis(self):
@@ -252,7 +252,7 @@ class TestMultiTagExtraFilters(TagNodeCountTestCase):
     def test_multi_tag_filter_is_the_union_of_its_tags(self):
         self._tag_variant(self.variants[0])
         self._tag_variant(self.variants[1], tag=self.other_tag)
-        q = get_extra_filters_q(self.analysis, self.both_tags_label)
+        q = get_label_q(self._sample_node(), self.both_tags_label)
         self.assertEqual({self.variants[0].pk, self.variants[1].pk},
                          set(Variant.objects.filter(q).values_list("pk", flat=True)))
 

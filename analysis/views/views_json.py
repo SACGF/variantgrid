@@ -34,7 +34,6 @@ from analysis.models.models_analysis import Analysis
 from analysis.models.nodes import node_utils
 from analysis.models.nodes.analysis_node import AnalysisDag, AnalysisEdge, AnalysisNode
 from analysis.models.nodes.filter_child import create_filter_child_node
-from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.models.nodes.filters.selected_in_parent_node import NodeVariant, SelectedInParentNode
 from analysis.models.nodes.filters.venn_node import VennNode
 from analysis.models.nodes.node_samples_mixin import NodeProband
@@ -410,11 +409,11 @@ def create_extra_filter_child(request, analysis_id, node_id, extra_filters):
         # Re-load so the node name picks up the tags - TagNode.tag_ids is cached from the create() above
         filter_node = TagNode.objects.get(pk=tag_node.pk)
     else:
-        filter_node = BuiltInFilterNode.objects.create(analysis=node.analysis,
-                                                       built_in_filter=extra_filters,
-                                                       x=x,
-                                                       y=y,
-                                                       ready=False)
+        filter_node = AnalysisNode.count_label_node(node.analysis, extra_filters)
+        filter_node.x = x
+        filter_node.y = y
+        filter_node.ready = False
+        filter_node.save()
     filter_node.add_parent(node)
     filter_node.save()
 

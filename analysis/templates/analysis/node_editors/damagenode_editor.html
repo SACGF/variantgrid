@@ -533,6 +533,20 @@
             {% endif %}
 
             <tr>
+                <th title="Has a COSMIC id (from VEP's Existing_variation) - unlike COSMIC count, which needs the licensed COSMIC data">In COSMIC</th>
+                <td>{{ form.in_cosmic.errors }} {{ form.in_cosmic }}</td>
+                <td class="collapse filter-required">{{ form.in_cosmic_required }}</td>
+                <td class="collapse filter-required"> <!-- in_cosmic is non-nullable --> </td>
+            </tr>
+
+            <tr>
+                <th title="The variant's gene has OMIM phenotypes">OMIM phenotype</th>
+                <td>{{ form.omim_phenotype.errors }} {{ form.omim_phenotype }}</td>
+                <td class="collapse filter-required">{{ form.omim_phenotype_required }}</td>
+                <td class="collapse filter-required"> <!-- omim_phenotype is non-nullable --> </td>
+            </tr>
+
+            <tr>
                 <th>{{ form.protein_domain.label }}</th>
                 <td>{{ form.protein_domain.errors }} {{ form.protein_domain }}</td>
                 <td class="collapse filter-required">{{ form.protein_domain_required }}</td>

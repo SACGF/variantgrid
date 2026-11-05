@@ -17,11 +17,12 @@ class NodeGraphType(models.Model):
         return self.name
 
 
-def get_node_types_hash():
-    """ hash by get_node_class_label() """
+def get_node_types_hash(include_disabled=False):
+    """ hash by get_node_class_label() - a disabled class still has rows from before it was, but
+        is never offered for a new node """
     subclasses = {}
     for sc in get_subclasses(AnalysisNode):
-        if sc.disabled or sc._meta.abstract:
+        if sc._meta.abstract or (sc.disabled and not include_disabled):
             continue
 
         label = sc.get_node_class_label()
@@ -34,8 +35,9 @@ def get_node_types_hash_by_class_name():
 
 
 def get_node_class_choices() -> list[tuple[str, str]]:
-    """ (class name, label) sorted by label """
-    return sorted(((node_class.__name__, label) for label, node_class in get_node_types_hash().items()),
+    """ (class name, label) sorted by label - every class, as this labels and filters existing nodes """
+    return sorted(((node_class.__name__, label)
+                   for label, node_class in get_node_types_hash(include_disabled=True).items()),
                   key=lambda choice: choice[1])
 
 

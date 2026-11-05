@@ -13,7 +13,7 @@ from auditlog.registry import auditlog
 from celery.canvas import Signature
 from django.conf import settings
 from django.db import connection, models, transaction
-from django.db.models import QuerySet, Subquery
+from django.db.models import Q, QuerySet, Subquery
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.utils import timezone
 from model_utils.managers import InheritanceIterable, InheritanceManager, InheritanceQuerySet
@@ -39,6 +39,7 @@ from analysis.models.nodes.node_version import NodeCache, NodeTask, NodeVersion
 from library.constants import MINUTE_SECS
 from library.django_utils.django_postgres import get_backend_pid
 from library.django_utils.model_utils import get_model_content_type_dict
+from library.utils.class_utils import get_subclasses
 from snpdb.enums import BuiltInFilters
 from snpdb.models import AlleleSource, Variant, Wiki
 from snpdb.views.datatable_view import RichColumn
@@ -55,6 +56,17 @@ def _phase_seconds(phase_start: float) -> float:
 
 def _default_position():
     return 10 + random() * 50
+
+
+@cache
+def _count_label_node_classes() -> dict[str, tuple[type['AnalysisNode'], dict]]:
+    """ Count label -> (node class, fields) from each class's own COUNT_LABEL_FIELDS. Found at call time as the
+        concrete nodes import this module """
+    node_classes = {}
+    for node_class in get_subclasses(AnalysisNode):
+        for label, fields in node_class.__dict__.get("COUNT_LABEL_FIELDS", {}).items():
+            node_classes[label] = (node_class, fields)
+    return node_classes
 
 
 @cache
@@ -169,6 +181,9 @@ class AnalysisNode(NodeSamplesMixin, NodeQueryMixin, NodeDisplayMixin, NodeError
     max_inputs = 1
     uses_parent_queryset = True
     disabled = False
+    # Count label -> the field values (the rest at their model defaults) that make this node class that
+    # count badge's filter. Each label is declared on one class @see count_label_node
+    COUNT_LABEL_FIELDS: dict[str, dict] = {}
 
     UPDATE_TASK = "analysis.tasks.node_update_tasks.update_node_task"
     NODE_CACHE_TASK = "analysis.tasks.node_update_tasks.node_cache_task"
@@ -413,6 +428,30 @@ class AnalysisNode(NodeSamplesMixin, NodeQueryMixin, NodeDisplayMixin, NodeError
                 pass
         return None
 
+    @staticmethod
+    def count_label_node(analysis, label: str) -> 'AnalysisNode':
+        """ The unsaved node, configured as declared in its class's COUNT_LABEL_FIELDS, that a count badge
+            (a BuiltInFilters label other than TOTAL) counts and that clicking the badge drops """
+        try:
+            node_class, fields = _count_label_node_classes()[label]
+        except KeyError as ke:
+            raise ValueError(f"No node class declares count label '{label}'") from ke
+        return node_class(analysis=analysis, **fields)
+
+    @staticmethod
+    def count_label_q(analysis, label: str) -> Optional[Q]:
+        return AnalysisNode.count_label_node(analysis, label)._get_node_q()
+
+    def matches_count_label(self) -> Optional[str]:
+        """ The count label whose node this one is configured as - every field of the subclass equal """
+        node_class = type(self)
+        own_fields = [f for f in node_class._meta.local_concrete_fields if not f.primary_key]
+        for label in node_class.COUNT_LABEL_FIELDS:
+            label_node = self.count_label_node(self.analysis, label)
+            if all(getattr(self, f.attname) == getattr(label_node, f.attname) for f in own_fields):
+                return label
+        return None
+
     def _get_cached_label_count(self, label) -> Optional[int]:
         """ Override for optimisation.
             Returning None means we need to run the SQL to get the count """
@@ -443,6 +482,11 @@ class AnalysisNode(NodeSamplesMixin, NodeQueryMixin, NodeDisplayMixin, NodeError
                     if len(parent_non_zero_label_counts) == 1:
                         # logging.info("Single parent, no modification, using that")
                         return parent_non_zero_label_counts[0]
+
+                # Configured as a count badge's node - the parent has already counted it
+                matched_label = self.matches_count_label()
+                if matched_label is not None and label in (matched_label, BuiltInFilters.TOTAL):
+                    return self.get_single_parent().node_version.counts.get(matched_label)
         except Exception as e:
             logging.warning("Trouble getting cached %s count: %s", label, e)
 
