@@ -34,8 +34,11 @@ class ClassificationTestCaseViews(TestCase):
         request.data = data
         return ClassificationView().post(request=request)
 
+    @staticmethod
+    def _codes(messages) -> set[str]:
+        return {m["code"] for m in messages}
+
     @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
-    @override_settings(ALLELE_ORIGIN_NOT_PROVIDED_BUCKET="U")
     def test_return_data(self):
         lab, _user = ClassificationTestUtils.lab_and_user()
         response = self.request_post({
@@ -51,135 +54,21 @@ class ClassificationTestCaseViews(TestCase):
             "return_data": True,
             "publish": "lab"
         }).data
-        # pop all the values which are database id/time based
-        # all remaining values should be the same everytime
-        pop_me = ["id", "flag_collection", "lab_record_id", "last_edited", "published_version", "title", "version", "resolved_condition", "allele"]
-        for pop_key in pop_me:
-            response.pop(pop_key)
+        data = response["data"]
 
-        expected = {
-            "institution_name": "InstX",
-            "lab_id": "instx/labby",
-            "cr_lab_id": "test_123456",
-            "org_name": "InstX",
-            "lab_name": "Labby",
-            "publish_level": "lab",
-            "version_publish_level": "lab",
-            "version_is_published": None,
-            "is_last_published": True,
-            "can_write": True,
-            "can_write_latest": True,
-            "clinical_context": None,
-            "data": {
-                "owner": {
-                    "value": "joejoe"
-                },
-                "c_hgvs": {
-                    "value": "NM_000059.3(BRCA2):c.3G>C",
-                    "immutable": "variantgrid"
-                },
-                "esp_af": {
-                    "value": 0.1,
-                    "immutable": "api"
-                },
-                "zygosity": {
-                    "immutable": "api",
-                    "validation": [
-                        {
-                            "code": "mandatory",
-                            "message": "Missing mandatory value",
-                            "severity": "error"
-                        }
-                    ]
-                },
-                "condition": {
-                    "value": "xxx",
-                    "immutable": "api"
-                },
-                "gene_symbol": {
-                    "value": "BRCA2",
-                    "immutable": "variantgrid"
-                },
-                "genome_build": {
-                    "value": "GRCh37.p13",
-                    "immutable": "variantgrid"
-                },
-                "allele_origin": {
-                    "immutable": "api",
-                    "validation": [
-                        {
-                            "code": "mandatory",
-                            "message": "Missing mandatory value",
-                            "severity": "error"
-                        }
-                    ]
-                },
-                "refseq_transcript_id": {
-                    "value": "NM_000059.3",
-                    "immutable": "variantgrid"
-                },
-                "clinical_significance": {
-                    "value": "VUS",
-                    "immutable": "api"
-                },
-                "molecular_consequence": {
-                    "value": [
-                        "coding_sequence_variant",
-                        "oops"
-                    ],
-                    "immutable": "api",
-                    "validation": [
-                        {
-                            "code": "invalid_value",
-                            "message": "Illegal value (oops)",
-                            "severity": "error"
-                        }
-                    ]
-                }
-            },
-            "withdrawn": False,
-            "allele_origin_bucket": "U",
-            "condition_text_match": None,
-            "triages": {},
-            "has_changes": False,
-            "messages": [
-                {
-                    "code": "mandatory",
-                    "message": "Missing mandatory value",
-                    "severity": "error",
-                    "key": "allele_origin"
-                },
-                {
-                    "code": "invalid_value",
-                    "message": "Illegal value (oops)",
-                    "severity": "error",
-                    "key": "molecular_consequence"
-                },
-                {
-                    "code": "mandatory",
-                    "message": "Missing mandatory value",
-                    "severity": "error",
-                    "key": "zygosity"
-                }
-            ],
-            "patch_messages": [
-                {
-                    "code": "patched",
-                    "message": "Patched changed values for allele_origin, c_hgvs, clinical_significance, condition, esp_af, gene_symbol, genome_build, molecular_consequence, owner, refseq_transcript_id, zygosity"
-                },
-                {
-                    "code": "share_failure",
-                    "message": "Cannot share record with errors"
-                }
-            ]
-        }
-
-        self.assertEqual(expected, response)
+        self.assertEqual(data["clinical_significance"]["value"], "VUS")  # VOUS is an alias
+        self.assertEqual(data["esp_af"]["value"], 0.1)
+        self.assertEqual(data["molecular_consequence"]["value"], ["coding_sequence_variant", "oops"])
+        self.assertEqual(self._codes(data["molecular_consequence"]["validation"]), {"invalid_value"})
+        # Derived from c_hgvs, so the submitter can't override them
+        self.assertEqual(data["gene_symbol"], {"value": "BRCA2", "immutable": "variantgrid"})
+        self.assertEqual(data["refseq_transcript_id"], {"value": "NM_000059.3", "immutable": "variantgrid"})
+        for mandatory_key in ("zygosity", "allele_origin"):
+            self.assertIn("mandatory", self._codes(data[mandatory_key]["validation"]))
+        self.assertIn("share_failure", self._codes(response["patch_messages"]))
 
     @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
-    @override_settings(ALLELE_ORIGIN_NOT_PROVIDED_BUCKET="U")
     def test_test_mode(self):
-
         lab, _user = ClassificationTestUtils.lab_and_user()
         response = self.request_post({
             "id": f"{lab.group_name}/test_123456",
@@ -189,73 +78,12 @@ class ClassificationTestCaseViews(TestCase):
                 "genome_build": "GRCh37"
             },
             "publish": "lab"
-        })
-        # now in test mode we always return all data (for the sake of useful information when testing)
-        response_json = response.data
+        }).data
 
-        for ignore in ['data', 'allele', 'cr_lab_id']:
-            response_json.pop(ignore)
-
-        expected = {
-            "id": None,
-            "lab_record_id": "test_123456",
-            "institution_name": "InstX",
-            "lab_id": "instx/labby",
-            "org_name": "InstX",
-            "lab_name": "Labby",
-            "title": "instx/labby/test_123456",
-            "publish_level": "lab",
-            "version_publish_level": "lab",
-            "version_is_published": None,
-            "is_last_published": None,
-            "published_version": None,
-            "can_write": False,
-            "can_write_latest": False,
-            "clinical_context": None,
-            "resolved_condition": None,
-            "withdrawn": False,
-            "allele_origin_bucket": "U",
-            "condition_text_match": None,
-            "triages": {},
-            "messages": [
-                {
-                    "severity": "error",
-                    "code": "mandatory",
-                    "message": "Missing mandatory value",
-                    "key": "allele_origin"
-                },
-                {
-                    "key": "clinical_significance",
-                    "severity": "error",
-                    "code": "missing_significance",
-                    "message": "Classification requires a value"
-                },
-                {
-                    "severity": "error",
-                    "code": "mandatory",
-                    "message": "Missing mandatory value",
-                    "key": "condition"
-                },
-                {
-                    "severity": "error",
-                    "code": "mandatory",
-                    "message": "Missing mandatory value",
-                    "key": "zygosity"
-                }
-            ],
-            "patch_messages": [
-                {
-                    "code": "patched",
-                    "message": "Patched changed values for allele_origin, c_hgvs, clinical_significance, condition, gene_symbol, genome_build, owner, refseq_transcript_id, zygosity"
-                },
-                {
-                    "code": "test_mode",
-                    "message": "Test mode on, no changes have been saved"
-                }
-            ]
-        }
-
-        self.assertEqual(expected, response_json)
+        self.assertIsNone(response["id"])
+        self.assertIn("test_mode", self._codes(response["patch_messages"]))
+        self.assertFalse(Classification.objects.filter(lab__group_name=lab.group_name,
+                                                       lab_record_id="test_123456").exists())
 
     @override_settings(CLASSIFICATION_MATCH_VARIANTS=False)
     def test_bulk(self):

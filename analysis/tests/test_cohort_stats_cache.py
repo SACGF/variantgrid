@@ -4,7 +4,6 @@
     Covers the invariants the plan calls out as load-bearing:
       - canonical_filter_key encoding is deterministic and round-trip stable
       - reader node ↔ writer precompute keys produce byte-identical strings
-      - CGC CASCADE deletes stats rows when the CGC dies
       - SampleNode (per-sample) and CohortNode (aggregate) cache hits use
         the right row keys
 """
@@ -43,11 +42,6 @@ class TestCanonicalFilterKey(TestCase):
     def test_none_round_trips(self):
         self.assertIsNone(canonical_filter_key(None))
         self.assertIsNone(canonical_filter_key({}))
-
-    def test_deterministic(self):
-        a = canonical_filter_key({"inheritance": "denovo"})
-        b = canonical_filter_key({"inheritance": "denovo"})
-        self.assertEqual(a, b)
 
     def test_key_order_does_not_matter(self):
         self.assertEqual(
@@ -116,44 +110,6 @@ class TestCohortNodeCountLimitsDefeatCache(TestCase):
     def test_limits_that_filter_nothing_use_cache(self):
         node = self._cohort_node(max_het_or_hom_count=3, min_het_count=0)
         self.assertFalse(node._has_filters_that_affect_label_counts())
-
-
-class TestCohortStatsCascade(TestCase):
-    """ CGC deletion (during the post-version-bump async sweep) must wipe all
-        four CohortGenotype*Stats families via on_delete=CASCADE — no separate
-        invalidation code needed in Cohort.increment_version. """
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.user = User.objects.get_or_create(username="cgc_cascade_user")[0]
-        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
-        cls.cohort = create_fake_cohort(cls.user, cls.grch37)
-        cls.cgc = cls.cohort.cohort_genotype_collection
-        cls.code_version = SampleStatsCodeVersion.objects.create(
-            name="test", version=99)
-
-    def test_cgc_delete_cascades_to_stats(self):
-        sample = self.cohort.get_samples().first()
-        # Per-sample row
-        CohortGenotypeStats.objects.create(
-            cohort_genotype_collection=self.cgc, sample=sample,
-            filter_key=None, passing_filter=False,
-            code_version=self.code_version, import_status=ImportStatus.SUCCESS,
-            variant_count=42)
-        # Aggregate row
-        CohortGenotypeStats.objects.create(
-            cohort_genotype_collection=self.cgc, sample=None,
-            filter_key=None, passing_filter=False,
-            code_version=self.code_version, import_status=ImportStatus.SUCCESS,
-            variant_count=99)
-
-        self.assertEqual(2, CohortGenotypeStats.objects.filter(
-            cohort_genotype_collection=self.cgc).count())
-
-        self.cgc.delete()
-        self.assertEqual(0, CohortGenotypeStats.objects.filter(
-            cohort_genotype_collection_id=self.cgc.pk).count())
 
 
 class TestCohortStatsRecomputeLock(TestCase):

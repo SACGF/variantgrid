@@ -12,8 +12,6 @@ from snpdb.enums import VCFInfoTypes
 from snpdb.grid_columns.grid_sample_columns import (
     COPY_NUMBER_COLUMN,
     get_available_format_columns,
-    get_copy_number_alias,
-    get_variantgrid_zygosity_annotation_kwargs,
 )
 from snpdb.models import VCFFormat
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
@@ -83,17 +81,6 @@ class CopyNumberColumnTest(GridExportTestCase):
         self.assertEqual({"label": "CN", "title": "Copy number"},
                          zygosity.client_renderer_kwargs["copyNumber"])
         self.assertIn({"label": "Copy number", "column": self.column_name}, zygosity.sort_menu)
-
-    def test_one_annotation_alias_per_sample(self):
-        """ There is no packed array to index into, so each sample's value is annotated on its own """
-        cgc = self.cohort.cohort_genotype_collection
-        annotation_kwargs = get_variantgrid_zygosity_annotation_kwargs([self.cohort], common_variants=True)
-        aliases = [get_copy_number_alias(cgc, sample.pk) for sample in self.cohort.get_samples()]
-        self.assertTrue(aliases)
-        for alias in aliases:
-            self.assertIn(alias, annotation_kwargs)
-        self.assertEqual([get_copy_number_alias(cgc, self.sample.pk)],
-                         self._columns_by_name()[self.column_name].extra_columns)
 
     def _rows_by_variant_id(self) -> dict:
         self.grid.request.GET = {"length": "100"}

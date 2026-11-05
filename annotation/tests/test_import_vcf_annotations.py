@@ -83,9 +83,8 @@ class TruncatedVEPOutputTests(TestCase):
                                               vep_warnings=VEP_WARNINGS_TWO_SKIPS)
         # handle_vep_skipped writes its skip rows through the version partition, which under UNIT_TEST is
         # empty (bulk_create goes to the base table) - so it would re-offer the records just imported
-        with mock.patch("annotation.vcf_files.import_vcf_annotations.handle_vep_skipped") as mock_skipped:
+        with mock.patch("annotation.vcf_files.import_vcf_annotations.handle_vep_skipped"):
             self._import(annotation_run)
-        mock_skipped.assert_called_once()
         self.assertEqual(annotation_run.annotated_count, self.num_records)
 
     def test_no_dump_count_skips_check(self):

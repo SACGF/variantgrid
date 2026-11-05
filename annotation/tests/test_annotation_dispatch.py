@@ -254,19 +254,20 @@ class AnnotationDispatchTestCase(TestCase):
 
     def test_merge_only_fires_when_backlog_exceeds_capacity(self):
         for i in range(3):
-            self._make_lock(i, i, count=100)  # 3 dispatchable runs
-        # capacity >= dispatchable -> no merge
-        with mock.patch.object(annotation_scheduler_task, "merge_pending_range_locks") as merge:
-            self._dispatch(slots=10)
-        merge.assert_not_called()
+            self._make_lock(i, i, count=100)  # 3 adjacent dispatchable runs that a merge would combine
+        launch = self._dispatch(slots=10)
+        self.assertEqual(launch.call_count, 3)
+        self.assertEqual(AnnotationRangeLock.objects.filter(version=self.vav).count(), 3)
 
     def test_merge_fires_when_backlog_exceeds_capacity(self):
         for i in range(3):
-            self._make_lock(i, i, count=100)  # 3 dispatchable runs
-        with mock.patch.object(annotation_scheduler_task, "merge_pending_range_locks",
-                               return_value=0) as merge:
-            self._dispatch(slots=1)
-        merge.assert_called_once()
+            self._make_lock(i, i, count=100)
+        launch = self._dispatch(slots=1)
+        self.assertEqual(launch.call_count, 1)
+        (survivor,) = AnnotationRangeLock.objects.filter(version=self.vav)
+        self.assertEqual(survivor.count, 300)
+        self.assertEqual(survivor.min_variant_id, self.variants[0].pk)
+        self.assertEqual(survivor.max_variant_id, self.variants[2].pk)
 
     # ------------------------------------------------------------------ merge mechanics
     def test_merge_combines_adjacent_pending_locks(self):
@@ -980,14 +981,17 @@ class AnnotationDispatchTestCase(TestCase):
         self.assertIsNone(blocked_created.lease_expires)
 
     def test_scheduler_makes_no_range_locks_for_blocked_vav(self):
+        """ The class's variants are unannotated, so the same scheduler run makes a lock once unblocked """
         self.vav.latch_vep_version_mismatch("mismatch")
-        with mock.patch.object(annotation_scheduler_task, "_handle_variant_annotation_version",
-                               return_value=None) as handle, \
-                mock.patch.object(dispatch_annotation_runs, "si") as dispatch_kick:
+        with mock.patch.object(dispatch_annotation_runs, "si") as dispatch_kick:
             annotation_scheduler_task.annotation_scheduler()
-        handled_pks = {c.args[0].pk for c in handle.call_args_list}
-        self.assertNotIn(self.vav.pk, handled_pks)
+        self.assertFalse(AnnotationRangeLock.objects.filter(version=self.vav).exists())
         dispatch_kick.assert_any_call(self.vav.pk)  # import lane still drains
+
+        self.vav.clear_vep_version_mismatch()
+        with mock.patch.object(dispatch_annotation_runs, "si"):
+            annotation_scheduler_task.annotation_scheduler()
+        self.assertTrue(AnnotationRangeLock.objects.filter(version=self.vav).exists())
 
     def _annotate_with_vep_mismatch(self, annotation_run, report_message):
         with mock.patch.object(vep_pipeline, "vep_check_command_line_version_match",

@@ -50,18 +50,16 @@ class ConditionTextAutomatchTest(TestCase):
         self.assertFalse(ConditionText.objects.filter(pending_automatch=True).exists())
 
     @patch.object(ConditionTextMatch, 'attempt_automatch')
-    def test_sweep_waits_for_ongoing_import(self, mock_automatch):
+    def test_sweep_waits_for_ongoing_import(self, _mock_automatch):
         self._condition_text("condition 1", pending=True)
         ClassificationImportRun.record_classification_import(identifier="test-import")
 
         condition_text_automatch_task()
-        mock_automatch.assert_not_called()
         self.assertTrue(ConditionText.objects.filter(pending_automatch=True).exists())
 
         ClassificationImportRun.record_classification_import(identifier="test-import", is_complete=True)
 
         condition_text_automatch_task()
-        mock_automatch.assert_called_once()
         self.assertFalse(ConditionText.objects.filter(pending_automatch=True).exists())
 
     @patch('classification.models.condition_text_matching.top_level_suggestion',

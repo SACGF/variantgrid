@@ -17,12 +17,10 @@ class TranscriptVersionCoordinatesTest(TestCase):
         cls.contig = cls.transcript_version.contig
 
     def test_get_coordinates(self):
+        """ RUNX1 ENST00000300305.7 in genes.fake_data: chr21, minus strand, exons spanning 34787800-35049344 """
         coordinates = self.transcript_version.get_coordinates()
-        self.assertIsNotNone(coordinates)
         self.assertEqual(self.contig, coordinates.contig)
-        self.assertEqual(self.contig.name, coordinates.chrom)
-        self.assertEqual(self.transcript_version.strand, coordinates.strand)
-        self.assertIn(coordinates.chrom, coordinates.coordinates)
+        self.assertEqual("21:34787800-35049344 (-)", coordinates.coordinates)
 
     def test_get_coordinates_none_for_missing_build(self):
         """ A transcript with no cdot data for a build returns None rather than raising """

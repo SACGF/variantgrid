@@ -4,8 +4,12 @@ from django.test import RequestFactory, TestCase
 from django.urls.base import resolve, reverse
 
 from annotation.fake_data import get_fake_annotation_version
-from genes.fake_data import create_fake_transcript_version
+from annotation.models import GeneAnnotation
+from genes.enums import AnnotationConsortium
+from genes.fake_data import create_fake_gene_version, create_fake_transcript_version
 from genes.grids import GenesColumns
+from genes.models import ReleaseGeneVersion
+from library.django_utils.django_partition import temporary_db_table
 from snpdb.models import GenomeBuild
 
 
@@ -28,9 +32,22 @@ class GenesDatatableTests(TestCase):
         return GenesColumns(request)
 
     def test_is_null_column_filter(self):
-        config = self._config(column="gene_version__gene__geneannotation__omim_terms", is_null="true")
-        sql = str(config.filter_queryset(config.get_initial_queryset()).query)
-        self.assertIn("omim_terms", sql)
+        annotation_version = get_fake_annotation_version(self.genome_build)
+        gene_annotation_version = annotation_version.gene_annotation_version
+        for gene_id, symbol, omim_terms in [("ENSG90000000001", "WITH_OMIM", "OMIM:123456"),
+                                            ("ENSG90000000002", "NO_OMIM", None)]:
+            gene_version = create_fake_gene_version(self.genome_build, gene_id, symbol, AnnotationConsortium.ENSEMBL)
+            ReleaseGeneVersion.objects.create(release=gene_annotation_version.gene_annotation_release,
+                                              gene_version=gene_version)
+            with temporary_db_table(GeneAnnotation, gene_annotation_version.get_partition_table()):
+                GeneAnnotation.objects.create(version=gene_annotation_version, gene=gene_version.gene,
+                                              omim_terms=omim_terms)
+
+        for is_null, expected_symbol in [("true", "NO_OMIM"), ("false", "WITH_OMIM")]:
+            with self.subTest(is_null=is_null):
+                config = self._config(column="gene_version__gene__geneannotation__omim_terms", is_null=is_null)
+                qs = config.filter_queryset(config.get_initial_queryset())
+                self.assertEqual({expected_symbol}, set(qs.values_list("gene_version__gene_symbol", flat=True)))
 
     def test_unknown_column_refused(self):
         config = self._config(column="gene_version__gene__geneannotation__omim_terms; DROP TABLE")

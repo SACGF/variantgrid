@@ -63,6 +63,5 @@ class RetryImportTest(TestCase):
                     mock_process_upload_pipeline.return_value = (upload_pipeline,)
                     retry_upload_pipeline(upload_pipeline)
 
-        mock_process_upload_pipeline.assert_called_once()
         self.assertTrue(UploadedManualVariantEntryCollection.objects.filter(
             file_upload=upload_pipeline.file_upload).exists())

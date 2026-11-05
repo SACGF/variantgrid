@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest import mock
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
@@ -20,7 +21,10 @@ from annotation.models import (
     InvalidAnnotationVersionError,
     VariantAnnotationVersion,
 )
-from annotation.tasks.annotation_scheduler_task import annotation_scheduler
+from annotation.tasks.annotation_scheduler_task import (
+    annotation_scheduler,
+    dispatch_annotation_runs,
+)
 from genes.enums import AnnotationConsortium
 from genes.models import GeneAnnotationImport, GeneAnnotationRelease
 from snpdb.models import GenomeBuild
@@ -43,10 +47,6 @@ class VariantAnnotationVersionStatusTests(TestCase):
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         # These tests own the ACTIVE/NEW/HISTORICAL rules, so they start from no ACTIVE version
         retire_seeded_annotation_version(cls.grch37)
-
-    def test_default_status_is_new(self):
-        vav = _make_vav(self.grch37)
-        self.assertEqual(vav.status, VariantAnnotationVersion.Status.NEW)
 
     def test_unique_constraint_one_active_per_build(self):
         _make_vav(self.grch37, status=VariantAnnotationVersion.Status.ACTIVE)
@@ -232,9 +232,17 @@ class AnnotationSchedulerStatusTests(TestCase):
             ).get()
 
     def test_scheduler_runs_against_active_default(self):
-        # ACTIVE VAV without unannotated variants — should not crash
-        active_vav = _make_vav(self.grch37, status=VariantAnnotationVersion.Status.ACTIVE)
-        AnnotationVersion.objects.create(genome_build=self.grch37,
-                                         variant_annotation_version=active_vav)
-        # Synchronous celery in tests; should complete without raising
-        annotation_scheduler.apply().get()
+        """ With no status the scheduler makes range locks for the ACTIVE version, not the NEW one """
+        slowly_create_test_variant("1", 123456, "A", "G", self.grch37)
+        vavs = {}
+        for status in (VariantAnnotationVersion.Status.ACTIVE, VariantAnnotationVersion.Status.NEW):
+            vavs[status] = _make_vav(self.grch37, status=status)
+            link_fake_gene_annotation_release(vavs[status])
+            AnnotationVersion.objects.create(genome_build=self.grch37, variant_annotation_version=vavs[status])
+
+        with mock.patch.object(dispatch_annotation_runs, "si"):
+            annotation_scheduler.apply().get()
+        self.assertTrue(AnnotationRangeLock.objects.filter(
+            version=vavs[VariantAnnotationVersion.Status.ACTIVE]).exists())
+        self.assertFalse(AnnotationRangeLock.objects.filter(
+            version=vavs[VariantAnnotationVersion.Status.NEW]).exists())

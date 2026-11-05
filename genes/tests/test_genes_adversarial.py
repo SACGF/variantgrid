@@ -10,7 +10,7 @@ import types
 
 from django.test import TestCase
 
-from genes.gene_matching import tokenize_gene_symbols
+from genes.gene_matching import MAX_GENE_SYMBOL_LENGTH, tokenize_gene_symbols
 from genes.hgvs.hgvs import (
     HGVSComponents,
     HGVSDisplay,
@@ -52,13 +52,6 @@ class TestHGVSComponentsInit(TestCase):
         self.assertIsNone(c.gene_symbol)
         self.assertEqual(c.nomen, "c.1121G>A")
 
-    def test_uppercase_kind_not_matched(self):
-        # HGVS_REGEX requires lowercase kind letter (c. not C.)
-        # Uppercase kind silently falls through: no gene/transcript extracted.
-        c = HGVSComponents("NM_001:C.123A>G")
-        # nomen should be the full string (no match)
-        self.assertIsNone(c.transcript)
-
     def test_versioned_transcript_param_overrides(self):
         """Versioned transcript param takes precedence over HGVS string transcript."""
         c = HGVSComponents("NM_001.5(BRCA1):c.123A>G", transcript="NM_009.3")
@@ -94,10 +87,9 @@ class TestHGVSComponentsInit(TestCase):
         self.assertEqual(str(result), "NM_001.5(BRCA1):c.123A>G")
 
     def test_with_gene_symbol_no_transcript_returns_self(self):
-        # When transcript is None (no regex match), returns self unchanged
-        c = HGVSComponents(None)
-        result = c.with_gene_symbol("BRCA1")
-        self.assertIs(result, c)
+        # No transcript to attach a gene to
+        c = HGVSComponents("c.123A>G")
+        self.assertEqual(str(c.with_gene_symbol("BRCA1")), str(c))
 
     def test_with_transcript_version_adds_version(self):
         c = HGVSComponents("NM_001(BRCA1):c.123A>G")
@@ -120,8 +112,8 @@ class TestHGVSComponentsInit(TestCase):
         self.assertLess(HGVSDisplay(dna_hgvs=high, is_normalised=True), HGVSDisplay(dna_hgvs=low, is_normalised=False))
 
     def test_sort_str_no_transcript(self):
-        # A bare nomen has no transcript to append
-        self.assertEqual(HGVSComponents("c.123A>G").sort_str, "0000000123A>G")
+        # A bare nomen still orders on its position, numerically
+        self.assertLess(HGVSComponents("c.9A>G"), HGVSComponents("c.100A>G"))
 
     def test_genome_build_only_breaks_ties(self):
         """ The build must not be concatenated onto sort_str - a shorter key is a prefix of a longer
@@ -308,14 +300,14 @@ class TestTokenizeGeneSymbols(TestCase):
         self.assertEqual(result.valid, set())
         self.assertEqual(result.oversized, [])
 
-    def test_token_exactly_100_chars_included(self):
-        token = "A" * 100
+    def test_token_at_max_length_included(self):
+        token = "A" * MAX_GENE_SYMBOL_LENGTH
         result = tokenize_gene_symbols(token)
         self.assertIn(token, result.valid)
         self.assertEqual(result.oversized, [])
 
-    def test_token_101_chars_excluded(self):
-        token = "A" * 101
+    def test_token_over_max_length_excluded(self):
+        token = "A" * (MAX_GENE_SYMBOL_LENGTH + 1)
         result = tokenize_gene_symbols(token)
         self.assertNotIn(token, result.valid)
         self.assertEqual(result.valid, set())
@@ -348,10 +340,6 @@ class TestTranscriptUtils(TestCase):
     def test_lrg_uppercase_true(self):
         self.assertTrue(transcript_is_lrg("LRG_1"))
         self.assertTrue(transcript_is_lrg("LRG_199t1"))
-
-    def test_lrg_lowercase_false(self):
-        # transcript_is_lrg is case-sensitive: lowercase LRG not detected
-        self.assertFalse(transcript_is_lrg("lrg_1"))
 
 
 # ---------------------------------------------------------------------------

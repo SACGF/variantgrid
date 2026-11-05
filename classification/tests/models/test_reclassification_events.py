@@ -1,7 +1,10 @@
+import os
+import re
 from datetime import date, datetime, timezone
 
+from django.conf import settings
 from django.contrib.auth.models import User
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils.timezone import localdate
 
@@ -262,16 +265,18 @@ class ReclassificationEventTestCase(TestCase):
         self.assertIsNotNone(ReclassificationEventBuildState.instance().last_run)
 
 
-class ClinicalSignificanceCssClassTestCase(TestCase):
+class ClinicalSignificanceCssClassTestCase(SimpleTestCase):
 
     def test_css_class_matches_the_stylesheet_suffixes(self):
-        self.assertEqual("cs-b", ClinicalSignificance.css_class(ClinicalSignificance.BENIGN))
-        self.assertEqual("cs-lb", ClinicalSignificance.css_class(ClinicalSignificance.LIKELY_BENIGN))
-        self.assertEqual("cs-vus", ClinicalSignificance.css_class(ClinicalSignificance.VUS))
-        self.assertEqual("cs-lp", ClinicalSignificance.css_class(ClinicalSignificance.LIKELY_PATHOGENIC))
-        self.assertEqual("cs-p", ClinicalSignificance.css_class(ClinicalSignificance.PATHOGENIC))
-        self.assertEqual("cs-o", ClinicalSignificance.css_class(ClinicalSignificance.OTHER))
-        self.assertEqual("cs-none", ClinicalSignificance.css_class(None))
+        """ Every class css_class hands a template has a .cs-* rule to colour it """
+        stylesheet = os.path.join(settings.BASE_DIR, "variantgrid", "static_files", "default_static", "css",
+                                  "global", "_classification.scss")
+        with open(stylesheet, encoding="utf-8") as f:
+            selectors = set(re.findall(r"\.(cs-[\w-]+)", f.read()))
+
+        for clinical_significance in [value for value, _ in ClinicalSignificance.CHOICES] + [None]:
+            with self.subTest(clinical_significance=clinical_significance):
+                self.assertIn(ClinicalSignificance.css_class(clinical_significance), selectors)
 
 
 class ReclassificationAnalyticsViewTestCase(TestCase):

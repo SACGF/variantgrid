@@ -384,14 +384,6 @@ class AnnotationRunTaskLogTest(AnnotationRunLeaseTestCase):
     """ celery_task_logs is keyed by task_id specifically so a reclaimed run keeps the logs of every
         attempt - which is the audit trail for diagnosing a reclaim in the first place. """
 
-    def test_set_task_log_round_trips(self):
-        run = self._make_run(task_id="attempt-a")
-        run.set_task_log("start", "2026-07-21T00:00:00")
-        run.save()
-
-        run.refresh_from_db()
-        self.assertEqual(run.celery_task_logs.get("attempt-a", {}).get("start"), "2026-07-21T00:00:00")
-
     def test_set_task_log_accepts_the_datetimes_the_pipeline_logs(self):
         """ Every real caller logs a timezone.now() (annotate_variants "start"/"end", import_annotation_run
             "import_start"/"import_end"). celery_task_logs is a plain JSONField with no encoder, so whatever

@@ -177,64 +177,39 @@ class TestDamageNodeSpliceAIQ(TestCase):
         cls.analysis = Analysis(genome_build=cls.grch37)
         cls.analysis.set_defaults_and_save(user)
 
-    def test_splice_min_filters_on_spliceai_max_ds(self):
-        node = DamageNode(analysis=self.analysis, splice_min=0.5)
-        q_str = str(node._get_node_q())
-        self.assertIn("variantannotation__spliceai_max_ds__gte", q_str)
-        self.assertNotIn("variantannotation__spliceai_pred_ds_ag__gte", q_str)
-        self.assertNotIn("variantannotation__spliceai_pred_ds_al__gte", q_str)
-        self.assertNotIn("variantannotation__spliceai_pred_ds_dg__gte", q_str)
-        self.assertNotIn("variantannotation__spliceai_pred_ds_dl__gte", q_str)
-
-    def test_splice_required_with_allow_null_includes_isnull(self):
-        node = DamageNode(
-            analysis=self.analysis,
-            splice_min=0.5,
-            splice_required=True,
-            splice_allow_null=True,
-        )
-        q_str = str(node._get_node_q())
-        self.assertIn("variantannotation__spliceai_max_ds__isnull", q_str)
-
-    def test_splice_required_without_allow_null_excludes_isnull(self):
-        node = DamageNode(
-            analysis=self.analysis,
-            splice_min=0.5,
-            splice_required=True,
-            splice_allow_null=False,
-        )
-        q_str = str(node._get_node_q())
-        self.assertNotIn("variantannotation__spliceai_max_ds__isnull", q_str)
-
-    def test_splice_min_returns_expected_rows(self):
+    def _high_low_null_variants(self):
+        """ Variants annotated with spliceai_max_ds 0.9, 0.1 and None, keyed by those names. dbscSNV scores
+            are below any threshold so SpliceAI decides the splicing filter """
         create_fake_variants(self.grch37)
         vav = self.analysis.annotation_version.variant_annotation_version
-
         variants = list(Variant.objects.filter(Variant.get_no_reference_q())[:3])
-        self.assertGreaterEqual(len(variants), 3)
+        self.assertEqual(len(variants), 3)
 
-        v_high = variants[0]
-        v_low = variants[1]
-        v_null = variants[2]
+        variants_by_name = {}
+        for (name, max_ds), variant in zip({"high": 0.9, "low": 0.1, "null": None}.items(), variants):
+            va = create_fake_variant_annotation(variant, vav)
+            va.spliceai_max_ds = max_ds
+            va.dbscsnv_ada_score = va.dbscsnv_rf_score = 0.0
+            va.save()
+            variants_by_name[name] = variant
+        return variants_by_name
 
-        va_high = create_fake_variant_annotation(v_high, vav)
-        va_high.spliceai_max_ds = 0.9
-        va_high.save()
+    def _matching_names(self, node, variants_by_name) -> set[str]:
+        name_by_pk = {v.pk: name for name, v in variants_by_name.items()}
+        matched_pks = Variant.objects.filter(node._get_node_q()).filter(pk__in=name_by_pk)
+        return {name_by_pk[pk] for pk in matched_pks.values_list("pk", flat=True)}
 
-        va_low = create_fake_variant_annotation(v_low, vav)
-        va_low.spliceai_max_ds = 0.1
-        va_low.save()
+    def test_splice_required_with_allow_null_includes_isnull(self):
+        variants_by_name = self._high_low_null_variants()
+        node = DamageNode(analysis=self.analysis, splice_min=0.5, splice_required=True, splice_allow_null=True)
+        self.assertEqual(self._matching_names(node, variants_by_name), {"high", "null"})
 
-        va_null = create_fake_variant_annotation(v_null, vav)
-        va_null.spliceai_max_ds = None
-        va_null.save()
+    def test_splice_required_without_allow_null_excludes_isnull(self):
+        variants_by_name = self._high_low_null_variants()
+        node = DamageNode(analysis=self.analysis, splice_min=0.5, splice_required=True, splice_allow_null=False)
+        self.assertEqual(self._matching_names(node, variants_by_name), {"high"})
 
+    def test_splice_min_returns_expected_rows(self):
+        variants_by_name = self._high_low_null_variants()
         node = DamageNode(analysis=self.analysis, splice_min=0.5)
-        q = node._get_node_q()
-        matched_ids = set(
-            Variant.objects.filter(q).filter(pk__in=[v_high.pk, v_low.pk, v_null.pk])
-                .values_list("pk", flat=True)
-        )
-        self.assertIn(v_high.pk, matched_ids)
-        self.assertNotIn(v_low.pk, matched_ids)
-        self.assertNotIn(v_null.pk, matched_ids)
+        self.assertEqual(self._matching_names(node, variants_by_name), {"high"})

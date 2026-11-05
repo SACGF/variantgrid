@@ -73,7 +73,9 @@ class TestVCFUtils(TestCase):
         with tempfile.NamedTemporaryFile(delete=True) as temp_file:
             write_vcf_from_variant_coordinates(temp_file.name, variant_coordinates=variant_coordinates,
                                                vcf_ids=vcf_ids)
-            vcf_to_variant_coordinates_and_records(temp_file.name)
+            (out_vc, out_record), = vcf_to_variant_coordinates_and_records(temp_file.name)
+            self.assertEqual(out_vc, variant_coordinates[0])
+            self.assertEqual(out_record.ID, "42")
 
     def test_write_vcf_sort_coordinates(self):
         """ Make sure that if you have out of order coordinates they are sorted, and IDs still match """

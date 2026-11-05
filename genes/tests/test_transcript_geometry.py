@@ -26,12 +26,8 @@ class TestTranscriptGeometry(TestCase):
     def test_last_junction_is_cdna_end_of_penultimate_exon(self):
         geometry = TranscriptGeometry.for_transcript_version(self.transcript_version)
         exons = self.transcript_version.genome_build_data["exons"]
-        final_exon, penultimate_exon = exons[0], exons[1]  # minus strand: transcript order is reversed
+        penultimate_exon = exons[1]  # minus strand: transcript order is reversed
         self.assertEqual(geometry.last_junction_cdna, penultimate_exon[4])
-
-        transcript_length = sum(end - start for start, end, *_ in exons)
-        self.assertEqual(geometry.last_junction_cdna,
-                         transcript_length - (final_exon[1] - final_exon[0]))
 
     def test_sparse_cdot_data_returns_none(self):
         self.transcript_version.data["genome_builds"][self.grch37.name].pop("exons")

@@ -1,3 +1,4 @@
+import inspect
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
@@ -13,6 +14,7 @@ from annotation.fake_data import create_fake_variants, get_fake_annotation_versi
 from library.django_utils.unittest_utils import prevent_request_warnings
 from snpdb.enums import AlleleOriginBucket
 from snpdb.forms import CreateTagForm
+from snpdb.liftover import create_liftover_pipelines
 from snpdb.models import GenomeBuild, Tag, TagConfig, TagConfigCollection, Variant, VariantAllele
 from snpdb.tag_operations import (
     TagOperation,
@@ -313,8 +315,9 @@ class LinkAllelesCommandTest(TestCase):
         allele = create_mock_allele(self.variant_tag.variant, self.grch37)
         self._link_alleles()
         self.assertEqual(self.variant_tag.allele, allele)
-        allele_qs = mock_create_liftover_pipelines.call_args.args[1]
-        self.assertEqual(list(allele_qs), [allele])
+        call = mock_create_liftover_pipelines.call_args
+        liftover_args = inspect.signature(create_liftover_pipelines).bind(*call.args, **call.kwargs).arguments
+        self.assertEqual(list(liftover_args["alleles"]), [allele])
 
     @override_settings(CLINGEN_ALLELE_REGISTRY_LOGIN="test_login")
     def test_creates_allele_from_clingen(self, _mock_create_liftover_pipelines):

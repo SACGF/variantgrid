@@ -36,9 +36,13 @@ from annotation.tasks.annotation_scheduler_task import (
     subdivide_annotation_run_range,
 )
 from genes.enums import AnnotationConsortium
+from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.utils import execute_cmd
-from snpdb.models import GenomeBuild
-from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from snpdb.models import GenomeBuild, VariantCoordinate
+from snpdb.tests.utils.vcf_testing_utils import (
+    slowly_create_test_variant,
+    slowly_create_test_variant_from_coordinate,
+)
 
 ANNOTSV = VariantAnnotationPipelineType.ANNOTSV
 STANDARD = VariantAnnotationPipelineType.STANDARD
@@ -215,16 +219,23 @@ class AnnotSVPipelineTestCase(TestCase):
         self.assertFalse(AnnotationRun.objects.filter(annotation_range_lock=lock,
                                                       pipeline_type=ANNOTSV).exists())
 
-    @override_settings(ANNOTATION_VEP_SV_MAX_SIZE=1000)
+    @override_settings(ANNOTATION_VEP_SV_MAX_SIZE=10_000)
     def test_annotsv_does_not_inherit_veps_sv_size_cap(self):
         """ AnnotSV was fed the VEP dump, so it never saw SVs above ANNOTATION_VEP_SV_MAX_SIZE - the ones
             its ACMG ranking is for. Its own dump applies no such cap. """
-        lock = self._make_lock()
+        small_sv, large_sv = [
+            slowly_create_test_variant_from_coordinate(
+                VariantCoordinate(chrom="1", position=200000, ref="A", alt=VCFSymbolicAllele.DEL, svlen=svlen),
+                self.grch37)
+            for svlen in (-5_000, -50_000)  # both above the version's structural_variant_min_size
+        ]
+        lock = AnnotationRangeLock.objects.create(version=self.vav, min_variant=small_sv, max_variant=large_sv,
+                                                  count=2)
         sv_run, annotsv_run = self._make_runs(lock)
-        # VEPRunner adds the abs_svlen annotation solely to apply the cap
-        self.assertIn("abs_svlen", get_runner(STRUCTURAL).get_variants_qs(sv_run).query.annotations)
-        self.assertNotIn("abs_svlen", get_runner(ANNOTSV).get_variants_qs(annotsv_run).query.annotations)
-
+        sv_variant_ids = set(get_runner(STRUCTURAL).get_variants_qs(sv_run).values_list("pk", flat=True))
+        annotsv_variant_ids = set(get_runner(ANNOTSV).get_variants_qs(annotsv_run).values_list("pk", flat=True))
+        self.assertEqual(sv_variant_ids, {small_sv.pk})
+        self.assertEqual(annotsv_variant_ids, {small_sv.pk, large_sv.pk})
 
     def test_merge_leaves_a_superseded_run_alone(self):
         """ A merge reopens empty-finished runs so the larger range gets re-counted, but a run left

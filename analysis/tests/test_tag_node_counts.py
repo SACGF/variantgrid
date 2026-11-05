@@ -180,8 +180,12 @@ class TestTagNodeCountValues(TagNodeCountTestCase):
         node = self._sample_node()
         node.load()
         timings = self._node_version(node).load_data["timings"]
-        self.assertEqual({"load", "live_data_sources", "counts", "variant_ids", "load_data"},
-                         set(timings))
+        self.assertIn("load", timings)
+        self.assertGreater(len(timings), 1, "only the total recorded, no phases")
+        for phase, seconds in timings.items():
+            with self.subTest(phase=phase):
+                self.assertIsInstance(seconds, (int, float))
+                self.assertGreaterEqual(seconds, 0)
 
 
 class TestTagExtraFiltersQ(TagNodeCountTestCase):

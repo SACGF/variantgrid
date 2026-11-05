@@ -4,14 +4,13 @@ Tests for GeneCoverageCollection archive helpers.
 @see https://github.com/SACGF/variantgrid/issues/1536
 """
 
-import os
 import tempfile
-from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
+from eventlog.models import Event
 from genes.archive import archive_gene_coverage_collection
 from genes.models import GeneCoverageCollection, GeneSymbol
 from library.django_utils.data_archive_mixin import DataArchivedError
@@ -39,18 +38,21 @@ class GCCArchiveTests(TestCase):
             archive_gene_coverage_collection(gcc, self.user, reason="test")
 
     def test_archive_idempotent(self):
-        with tempfile.NamedTemporaryFile(suffix=".tsv", delete=False) as f:
-            f.write(b"placeholder\n")
-            tmp_path = f.name
-        try:
-            gcc = self._make_gcc(path=tmp_path)
-            gcc.data_archived_date = timezone.now()
+        """ Archiving an archived collection keeps the first archive's record and logs nothing """
+        with tempfile.NamedTemporaryFile(suffix=".tsv") as f:
+            gcc = self._make_gcc(path=f.name)
+            archived_date = timezone.now()
+            gcc.data_archived_date = archived_date
+            gcc.data_archived_by = self.user
+            gcc.data_archive_reason = "first"
             gcc.save()
-            with patch.object(GeneCoverageCollection, "delete_related_objects") as m:
-                archive_gene_coverage_collection(gcc, self.user, reason="noop")
-            m.assert_not_called()
-        finally:
-            os.unlink(tmp_path)
+            other_user = User.objects.create_user(username="gcc_other_user")
+            archive_gene_coverage_collection(gcc, other_user, reason="second")
+
+        gcc.refresh_from_db()
+        self.assertEqual((archived_date, self.user, "first"),
+                         (gcc.data_archived_date, gcc.data_archived_by, gcc.data_archive_reason))
+        self.assertFalse(Event.objects.filter(name="gene_coverage_collection_archived").exists())
 
     def test_get_uncovered_gene_symbols_raises_when_archived(self):
         """ Read entry point raises DataArchivedError when the GCC is archived. """
