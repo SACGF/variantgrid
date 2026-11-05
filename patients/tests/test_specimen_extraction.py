@@ -51,8 +51,7 @@ def _make_row(**overrides):
 
 
 class TestSpecimenExtraction(TestCase):
-    """ One specimen, a DNA arm and an RNA arm - the TSO 500 shape that Specimen.nucleic_acid_source
-        used to force into two unrelated specimens """
+    """ One specimen, a DNA arm and an RNA arm - the TSO 500 shape """
 
     @classmethod
     def setUpTestData(cls):

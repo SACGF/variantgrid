@@ -395,9 +395,9 @@ def import_annotation_run(annotation_run_id):
         # A completed upload outranks any stale error - reclaim may have failed the run out while this
         # task sat queued, and get_status() tests error_exception first.
         annotation_run.error_exception = None
-        # The run is only truly complete once imported (moved here from annotate_variants). #1649
+        # The run is only truly complete once imported. #1649
         # #1670: annotation_run is carried so the cleanup receiver can reclaim this run's output now that
-        # its rows are committed. Existing receivers take **kwargs, so the extra key is transparent.
+        # its rows are committed.
         annotation_run_complete_signal.send(sender=os.path.basename(__file__),
                                             variant_annotation_version=annotation_run.annotation_range_lock.version,
                                             pipeline_type=annotation_run.pipeline_type,
@@ -493,7 +493,7 @@ def annotation_run_retry(annotation_run: AnnotationRun, upload_only=False) -> An
             reset_annotation_run_for_retry.si(annotation_run.pk),
         ]
 
-    # #1649: retry no longer launches annotate_variants inline - it hands back to the single-authority
+    # #1649: retry hands back to the single-authority
     # dispatcher (preserving lease/reclaim/attempt-cap), which launches the right lane by status.
     tasks.append(_dispatch_trigger_sig(annotation_range_lock.version_id))
     task = chain(tasks)

@@ -53,7 +53,7 @@ class TestClassificationImportPipelines(TestCase):
                          [UploadedFileTypes.VCF_INSERT_VARIANTS_ONLY])
 
     def test_gene_level_runs_its_own_pipeline(self):
-        """ Both pipelines link back to the one ClassificationImport - it used to be a OneToOne """
+        """ Both pipelines link back to the one ClassificationImport """
         ordinary = VariantCoordinate.from_explicit_no_svlen("1", 169519049, "T", "C")
         pipelines = self._run([ordinary, self._gene_level_coordinate()])
 

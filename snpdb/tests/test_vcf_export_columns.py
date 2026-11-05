@@ -14,7 +14,7 @@ class TestVCFExportColumns(TestCase):
         self.assertEqual(len(info_ids), len(set(info_ids)))
 
     def test_columns_unique(self):
-        # Preserves the old OneToOne(VariantGridColumn) guarantee - one info row per column
+        # One info row per column
         columns = [c.column for c in COLUMN_VCF_INFO]
         self.assertEqual(len(columns), len(set(columns)))
 
@@ -40,7 +40,6 @@ class TestVCFExportColumns(TestCase):
 
     def test_consumer_skips_absent_columns(self):
         # A def whose grid column isn't present on this deployment is simply skipped
-        # (matching the old CASCADE-delete behaviour).
         af_1kg_def = next(c for c in COLUMN_VCF_INFO if c.info_id == "AF_1KG")
         variant_column = VariantGridColumn.objects.get(pk=af_1kg_def.column).variant_column
         VariantGridColumn.objects.filter(pk=af_1kg_def.column).delete()

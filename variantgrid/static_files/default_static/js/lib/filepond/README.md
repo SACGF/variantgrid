@@ -20,6 +20,3 @@ table, then delete the old folder.
 
 `filepond-overrides.css` (next to this README) is our own — local styling
 on top of FilePond — and is not versioned.
-
-Replaces the previous `django-jfu` + blueimp/jQuery-File-Upload stack
-(issue #1566).

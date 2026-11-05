@@ -1187,7 +1187,7 @@ function escapeHtml(text) {
     });
 }
 
-// Minimal chainable SVG element builder - replaces the d3 v2 subset we used.
+// Minimal chainable SVG element builder.
 // jQuery can't do this: SVG elements need createElementNS to render.
 const SVG_NS = "http://www.w3.org/2000/svg";
 

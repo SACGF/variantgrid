@@ -116,7 +116,7 @@ deployment. When resolved: stop generating `.stripped` files (keep accepting the
 
 `annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:SVOverlapProcessor` runs the gnomAD SV file as two
 `--custom` entries and stitches them back together, because `--custom` cannot return both the matched record's ID and
-its coordinates (Ensembl/ensembl-vep#1645, open; the feature is Ensembl/ensembl-vep#1989). The StructuralVariantOverlap INV bug that first ruled the plugin out
+its coordinates (Ensembl/ensembl-vep#1645, open; the feature is Ensembl/ensembl-vep#1989). The StructuralVariantOverlap INV bug
 (Ensembl/VEP_plugins#710) is fixed from VEP 114.
 
 Check: `gh pr view 1989 --repo Ensembl/ensembl-vep --json state,mergedAt -q '"\(.state) \(.mergedAt)"'`. When resolved (in a release

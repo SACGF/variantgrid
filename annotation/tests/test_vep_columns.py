@@ -159,7 +159,7 @@ class VepColumnsRegistryTest(TestCase):
         }
         self.assertEqual(set(formatters), expected_keys)
 
-        # Behaviour spot-checks across every formatter family, matching the old inserter dict.
+        # Behaviour spot-checks across every formatter family.
         self.assertEqual(formatters["af_1kg"]("0.6764&0.2433"), 0.6764)           # pick highest float
         self.assertEqual(formatters["cosmic_count"]("3&10"), 10)                  # pick highest int
         self.assertEqual(formatters["denovo_db_case_count"]("1&2&3"), 6)          # sum int
