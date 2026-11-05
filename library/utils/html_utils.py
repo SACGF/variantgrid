@@ -103,8 +103,7 @@ def html_to_text(html_str: str, preserve_lines: bool = False) -> Optional[str]:
             text = ''
             for elem in element.recursiveChildGenerator():
                 if isinstance(elem, str):
-                    # why did we used to add a space after a text snippet?
-                    text += elem  # .strip() + " "
+                    text += elem
                 elif elem.name == 'br':
                     text += '\n'
             return text.strip()

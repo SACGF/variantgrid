@@ -40,4 +40,4 @@ apt-get install -y sassc
 # Stuff required to install on shariant server, might just be moving dependencies
 apt-get install -y pkg-config
 
-# Installing Python now done elsewhere so you can do in virtual env
+# Python is installed separately, so it can go in a virtual env

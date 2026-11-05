@@ -479,20 +479,6 @@ const Flags = (function () {
                         }
                         label.appendTo(statusButtons);
                     }
-
-                    /*
-                    // old code for providing drop down if too many options
-                    } else {
-                        let select = $('<select>', {name: 'flag-res'}).appendTo(content);
-                        for (let resolution of resolutions) {
-                            let opt = $('<option>', {value: resolution.id, text: resolution.label}).appendTo(select);
-                            if (resolution.id == newRes) {
-                                opt.attr('selected', true);
-                            }
-                        }
-                    }
-
-                     */
                 }
                 
                 const canDoSomething = resolutions.length > 1 || commentsEnabled;

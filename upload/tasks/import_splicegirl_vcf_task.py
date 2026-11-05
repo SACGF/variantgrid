@@ -11,7 +11,7 @@ What the file is recognised by is its '##source=SpliceGirl' header line, the sam
 
 Every record is kept with its FILTER, not just the PASS calls: scientists differ on whether they work
 from the filtered or unfiltered set, so the analysis filters decide. The CombinedVariantOutput's
-'[Splice Variants]' is the PASS records on EGFR, MET and AR, and is no longer a variant source
+'[Splice Variants]' is the PASS records on EGFR, MET and AR, and is not imported as variants
 (@see seqauto.tasks.import_dragen_tso500_combined_variant_output_task).
 
 The record names no gene. It comes from the SpliceEvent row at the junction's coordinates, else the

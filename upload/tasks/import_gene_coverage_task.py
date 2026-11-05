@@ -56,7 +56,7 @@ class ImportGeneCoverageTask(ImportTask):
         return sample
 
     def process_items(self, file_upload):
-        # This was originally written for RUNX1
+        # Defaults for a file uploaded without a sequencing record
         genome_build = GenomeBuild.legacy_build()
         enrichment_kit = None
 

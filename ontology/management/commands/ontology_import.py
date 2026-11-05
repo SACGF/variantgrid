@@ -463,7 +463,7 @@ def load_biomart(filename: str, force: bool):
             term_id=f"OMIM:{mim_accession_id}",
             name=name,
             definition=None,
-            primary_source=False,  # primary source is now the OMIM file if it's available
+            primary_source=False,  # the OMIM file is the primary source when available
             aliases=aliases
         )
 

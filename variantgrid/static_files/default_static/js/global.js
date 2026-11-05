@@ -38,11 +38,8 @@ function tweakAjax() {
         }
         // only relevant when using ODIC https://mozilla-django-oidc.readthedocs.io/en/stable/xhr.html
         if (jqxhr.status === 403 && jqxhr.getResponseHeader('refresh_url')) {
-                // shouldn't happen anymore if avoid sending cookie refresh on ajax call
-                alert('Session has timed out, refreshing');
-                //document.location.href = jqxhr.headers.get("refresh_url");
-                location.reload();
-            //}
+            alert('Session has timed out, refreshing');
+            location.reload();
         }
         console.log(`Ajax error: ${thrownError}`);
         console.log(event);
@@ -554,10 +551,11 @@ $(document).on("ajaxStart", () => {
 });
 
 $(document).on("ajaxStop", () => {
-    // give 100ms timeout before reducing ajaxCount, in case there's some JavaScript to run & animate etc when it finished
+    // short buffer before reducing ajaxCount, in case there's some JavaScript to run & animate etc when it finishes
+    // (spinners and modals have their own timeouts)
     window.setTimeout(
         () => {alterAjaxCount(-1, "ajaxEnd");},
-        200); // timeout was 350, but now we have timeout on spinners and modals, so can put a small buffer on this
+        200);
 });
 
 function loadAjaxBlock(dom, url) {

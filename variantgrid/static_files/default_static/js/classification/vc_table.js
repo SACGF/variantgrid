@@ -148,7 +148,7 @@ VCTable.format_hgvs = (parts) => {
             ]}));
         }
         cDom.append($('<span>', {text: ":", class: 'colon'}));
-        // used to be display:inline-block; but that doesn't underline
+        // not display:inline-block, as that doesn't underline
         const nomenDisplay = abbreviateHgvsSequences(cNomen);
         const nomenDom = $('<span>', {class:'c-hgvs-nomen', text: limitLength(nomenDisplay, 100)});
         if (nomenDisplay !== cNomen) {

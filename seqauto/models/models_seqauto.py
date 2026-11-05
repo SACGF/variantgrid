@@ -717,13 +717,9 @@ class JointCalledVCF(SeqAutoRecord):
 
 
 class QC(SeqAutoRecord):
-    """ This holds together all of the other QC objects
+    """ This holds together all of the other QC objects, which hang off it
 
-        Historically, we regarded "QC" as the exec stats file, then we needed to load a whole bunch of QC so those
-        became new models that hung off "QC" which is just used to group things
-
-        So because of this, QC is dependent on "path". Probably the "right" thing to do is to change QC to not be a
-        SeqAuto object, as it's not actually a real object, just a way to link models.
+        It is a SeqAutoRecord (so has a "path") but isn't a real object, just a way to link models.
 
         TODO: Make this not a SeqAutoRecord. Perhaps make this unique_together w/bam+vcf?
     """
@@ -885,7 +881,7 @@ class ExecSummaryReferenceRange(models.Model):
     percent_20x = DecimalRangeField(null=True)
     percent_10x = DecimalRangeField(null=True)
     mean_coverage_across_genes = DecimalRangeField()
-    # We used to have a reference range for mean coverage, now we can have either that or a set limit (one must be set)
+    # Mean coverage across kit is either a reference range or a set limit (one must be set)
     mean_coverage_across_kit = DecimalRangeField(null=True)
     min_mean_coverage_across_kit = models.IntegerField(null=True)
     min_percent_20x_kit = models.IntegerField(null=True)

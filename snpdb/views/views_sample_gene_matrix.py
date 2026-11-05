@@ -43,8 +43,7 @@ def sample_gene_matrix(request, variant_annotation_version, samples, gene_list,
         genes = gene_list.get_genes(variant_annotation_version.gene_annotation_release)
         gene_symbols = set(gene_list.get_gene_names())
     else:
-        # This was originally designed around a gene list, but now we need to support no gene list (only when uses
-        # variant classifications)
+        # No gene list (used with variant classifications): take the genes of the counted variants
         genes = []
         gene_symbols = []
         qs = gene_count_variant_queryset(gene_count_type, variant_annotation_version)

@@ -275,7 +275,8 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
 
 
 def create_fake_gene_list(*args, **kwargs):
-    """  Originally FakeGeneList had abstract=True but with Django 3.2 got "Abstract models cannot be instantiated" """
+    """ An unsaved GeneList with no URL. A patched instance rather than an abstract subclass, as Django won't
+        instantiate an abstract model """
 
     def get_absolute_url(self):
         return None

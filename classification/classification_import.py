@@ -65,9 +65,7 @@ def process_classification_import(classification_import: ClassificationImport, i
     variant_coordinates_by_hash: dict[VariantHash, VariantCoordinate] = {}
     allele_info_by_hash: dict[VariantHash, list[ImportedAlleleInfo]] = defaultdict(list)
 
-    # WARNING: previously only matched if the allele_info had no matched_variant
-    # (not sure we even have to filter on status of processing, as it shouldn't be part of a classificationImport
-    # if it doesn't want to be rematched)
+    # Rematches every PROCESSING allele info, whether or not it already has a matched variant
     no_variant_qs = classification_import.importedalleleinfo_set.filter(status=ImportedAlleleInfoStatus.PROCESSING)
     allele_info: ImportedAlleleInfo
     for allele_info in no_variant_qs:

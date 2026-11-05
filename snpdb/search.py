@@ -312,11 +312,7 @@ class SearchResult:
 
     @property
     def error_severity(self) -> Optional[LogLevel]:
-        # I originally looked through messages to get max severity but many
-        # messages on ok results have been set to ERROR
-        # severity_list = [m.severity for m in self.messages]
-        # if severity_list:
-        #    ms = max(severity_list, key=log_level_to_int)
+        # From the preview, not the messages: many messages on ok results are set to ERROR
         ms = None
         if self.preview.is_error:
             ms = LogLevel.ERROR

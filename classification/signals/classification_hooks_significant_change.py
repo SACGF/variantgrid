@@ -126,7 +126,7 @@ def clinical_significance_change_check(
         **kwargs):  # pylint: disable=unused-argument
     """
     Closes unshared flag
-    Used to handle pending changes, but that is now done with triage states isntead of flags on individual classifications
+    Pending changes are handled by triage states, not flags on individual classifications
     """
 
     # TODO move this into classification_hooks_share_flags

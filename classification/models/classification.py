@@ -277,12 +277,6 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
     sample = models.ForeignKey(Sample, null=True, blank=True, on_delete=SET_NULL)
     """ The sample (if any) this classification is linked to """
 
-    # classification_import = models.ForeignKey(ClassificationImport, null=True, on_delete=CASCADE)
-    """
-    provide a value here to later match this record to a variant
-    classification_import has been removed and moved to allele_info
-    """
-
     user = models.ForeignKey(User, on_delete=PROTECT)
     """ The owner of the classification, is somewhat redundant to the evidence_key classified_by, not heavily used """
 

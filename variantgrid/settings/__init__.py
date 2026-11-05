@@ -1,7 +1,6 @@
 """
-    This works similar to how Django Split settings works, except PyDev
-    didn't properly handle split_settings.include and so had undefined variables
-    (hence I import via direct code below)
+    This works similar to how Django Split settings works, but imports via direct code below,
+    as PyDev doesn't handle split_settings.include and reports undefined variables
 
     See https://code.djangoproject.com/wiki/SplitSettings for a discussion of techniques
 """
@@ -16,13 +15,7 @@ DEFAULT_DJANGO_SETTINGS = "variantgrid.settings"
 
 django_settings_module = os.environ.get("DJANGO_SETTINGS_MODULE")
 if django_settings_module == DEFAULT_DJANGO_SETTINGS:
-    # Default settings, so do defaults then hostname-based .
-    """
-    (defaults are now loaded at the top of each setting file)
-    from variantgrid.settings.components.default_settings import *
-    from variantgrid.settings.components.celery_settings import *
-    from variantgrid.settings.components.seqauto_settings import *
-    """
+    # Default settings, so load the hostname-based file (each one imports the defaults at its top)
     flattened_hostname = socket.gethostname().lower().split('.')[0].replace('-', '')
 
     # can't start with a number

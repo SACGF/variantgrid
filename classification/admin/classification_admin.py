@@ -613,9 +613,6 @@ class ClinicalContextAdmin(ModelAdminBasics):
     def has_add_permission(self, request):
         return False
 
-    # note recalculate status has been removed as ClinicalContext calculations have been removed
-    # in favor of Overlaps
-
 
 class EvidenceKeySectionFilter(admin.SimpleListFilter):
     title = 'Section Filter'

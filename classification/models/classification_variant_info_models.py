@@ -75,10 +75,9 @@ from snpdb.models import Allele, GenomeBuild, GenomeBuildPatchVersion, Variant, 
 from snpdb.models.models import CodeVersion, CodeVersionMixin
 
 """
-Now we have
 Classifications
 - have a genome_build, c.hgvs when first created
-- attempt to avoid referring to classification.allele now, instead classification.allele_info.allele
+- refer to classification.allele_info.allele rather than classification.allele
 
 ImportedAlleleInfo
 - shared between classifications that have the same genome_build, c.hgvs
@@ -1189,8 +1188,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         """ returns if a valid variant_coordinate could be derived """
 
         # TODO, support variant_coordinate being provided
-        # Code used to check to see if transcript was supported here
-        # but it's better to do that in the validation step
+        # Whether the transcript is supported is checked in the validation step
         cvc = self.calculate_variant_coordinate()
         self.message = cvc.message
         self.hgvs_converter_version = cvc.hgvs_converter_version

@@ -38,7 +38,7 @@ def url_scheme_problem(url: str, allow_http: bool = False) -> Optional[str]:
 
 class ServerAuth:
     """
-    Previously called OAuth but handles a URL to a server with:
+    Handles a URL to a server with:
     BASIC_AUTH
     OAUTH and
     OAUTH where you need BASIC_AUTH first

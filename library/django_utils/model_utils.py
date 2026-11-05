@@ -33,7 +33,7 @@ class ModelUtilsMixin:
 
 class ArrayLength(models.Func):
     """
-    Can annotate with array length now e.g.
+    Annotate with array length e.g.
     MyModel.objects.all().annotate(field_len=ArrayLength('field')).order_by('field_len')
     """
     function = 'CARDINALITY'
