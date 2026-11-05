@@ -81,13 +81,13 @@ function showKaryomappingQCGraph(selector, contigQC) {
         customdata: contigQC.map(c => [c[parent.key + '_in_phase'], c[parent.key + '_out_of_phase']]),
         hovertemplate: parent.name + ' %{x}: %{y:.1f}% in phase (%{customdata[0]} in / %{customdata[1]} out)<extra></extra>',
         name: parent.name,
-        type: 'scatter',
-        mode: 'lines+markers',
-        line: {color: parent.color},
+        type: 'bar',
+        marker: {color: parent.color},
     }));
 
     const layout = {
         title: {text: 'Proband in phase with each parent, per chromosome'},
+        barmode: 'group',
         xaxis: {type: 'category', title: {text: 'Chromosome'}},
         yaxis: {range: [0, 100], title: {text: '% of parent het sites in phase'}},
         shapes: [{
