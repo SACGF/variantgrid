@@ -12,6 +12,7 @@ from typing import Optional
 from dateutil.tz import gettz
 from django.conf import settings
 from django.contrib import admin, messages
+from django.contrib.admin.utils import unquote
 from django.db import models
 from django.db.models import AutoField, DateTimeField, ForeignKey, Model
 from django.forms import Widget
@@ -268,12 +269,7 @@ class ModelAdminBasics(admin.ModelAdmin):
     def single_page_action(self, request, object_id):
         # called by the change template when choosing a single action
         action_name = request.POST.get("action")
-        if isinstance(object_id, str):
-            # really tried to find the proper way to decode the object_id
-            # but just left doing this sub, I'm sure this will fail for other IDs with harder to escape values
-            object_id = object_id.replace("_5F", "_")
-            object_id = object_id.replace("_3A", ":")
-
+        object_id = unquote(object_id)
         action = self.get_action(action_name)
         response = action[0](self, request, self.model.objects.filter(pk=object_id))
         if not response:

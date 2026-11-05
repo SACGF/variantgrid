@@ -433,8 +433,8 @@ class AnnotationDispatchTestCase(TestCase):
         self.assertEqual(sv_run.leased_by, "worker")  # not ours to clear
 
     def test_count_task_skips_run_with_no_range_lock(self):
-        # #1647: the lock can be cleared after the task is kicked (reset_annotation_states, or a
-        # retry-created run awaiting its lock). The count task must skip it rather than crash.
+        # #1647: the lock can be cleared after the task is kicked (reset_annotation_states). The count
+        # task must skip it rather than crash.
         run = self._make_lock(0, 0, count=100, pipeline_types=(STRUCTURAL,),
                               counted=False).annotationrun_set.first()
         AnnotationRun.objects.filter(pk=run.pk).update(annotation_range_lock=None)
