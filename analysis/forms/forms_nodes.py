@@ -21,7 +21,7 @@ from django.http import Http404
 from django.utils.text import slugify
 
 from analysis import models
-from analysis.enums import AnalysisTemplateType, NodeMatchInput, StructuralFilter
+from analysis.enums import AnalysisTemplateType, NodeMatchInput
 from analysis.models import Analysis, AnalysisNode, MOINode
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
 from analysis.models.nodes.filters.clinvar_node import ClinVarNode
@@ -70,7 +70,6 @@ from genes.custom_text_gene_list import create_custom_text_gene_list
 from genes.models import CustomTextGeneList, GeneList, GeneListCategory, PanelAppPanel
 from library.django_utils.autocomplete_utils import ListSelect2, ModelSelect2, ModelSelect2Multiple
 from library.forms import NumberInput, StarsWidget
-from library.genomics.vcf_enums import VARIANT_CLASS_GROUPS
 from library.utils import sha256sum_str
 from ontology.models import OntologyTerm
 from patients.enums import GnomADPopulation, SampleSourceLevel
@@ -80,6 +79,7 @@ from snpdb.enums import AlleleOriginFilterDefault
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin
 from snpdb.models import Cohort, Lab, Sample, Tag, VCFFilter
 from snpdb.models.models_genome import Contig
+from snpdb.variant_filters import get_all_variant_types, get_variant_type_label
 from uicore.widgets.date_widget import NativeDateInput
 
 # Can use this for ModelForm.exclude to only use node specific fields
@@ -643,13 +643,9 @@ class ConservationNodeForm(BaseNodeForm):
 
 
 class DamageNodeForm(BaseNodeForm):
-    # Choices follow VARIANT_CLASS_GROUPS order so the sub-widgets slice up into groups
-    variant_class = forms.MultipleChoiceField(
-        required=False, label="Variant type", widget=forms.CheckboxSelectMultiple,
-        choices=[(vc.value, vc.label) for group in VARIANT_CLASS_GROUPS.values() for vc in group])
-    # Beside the classes rather than in them - a symbolic alt is a different question from VEP's class
-    structural = forms.ChoiceField(required=False, label="Structural", choices=StructuralFilter.choices,
-                                   widget=forms.RadioSelect)
+    # The All Variants grid's types - a deployment without symbolic alts or gene-level variants offers fewer
+    variant_types = forms.MultipleChoiceField(required=False, label="Variant type",
+                                              widget=forms.CheckboxSelectMultiple, choices=[])
 
     class Meta:
         model = DamageNode
@@ -683,6 +679,7 @@ class DamageNodeForm(BaseNodeForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["variant_types"].choices = [(vt, get_variant_type_label(vt)) for vt in get_all_variant_types()]
         self.fields["damage_predictions_min"].widget.attrs["max"] = self.instance.num_prediction_fields
         # Columns v4 raw-score sliders driven by the per-tool table. data-* threshold attrs drive the
         # calibrated ClinGen colour bands and value colouring in damagenode_editor.html (omitted when None).
@@ -742,16 +739,6 @@ class DamageNodeForm(BaseNodeForm):
             "required_field": self[f"{tool.pred_field}_required"],
             "allow_null_field": self[f"{tool.pred_field}_allow_null"],
         } for tool in self.instance.get_pred_tools()]
-
-    def clean_structural(self):
-        """ The radio always posts a value, but an empty one would read as a filter rather than none """
-        return self.cleaned_data.get("structural") or StructuralFilter.ANY
-
-    def get_variant_class_groups(self) -> list[tuple[str, list]]:
-        """ (group name, sub-widgets) for the grouped checkboxes in the editor """
-        subwidgets_by_value = {sw.data["value"]: sw for sw in self["variant_class"]}
-        return [(group_name, [subwidgets_by_value[vc.value] for vc in variant_classes])
-                for group_name, variant_classes in VARIANT_CLASS_GROUPS.items()]
 
 
 class FilterNodeForm(BaseNodeForm):

@@ -2,7 +2,7 @@
 analysis' enums: analysis and template types, NodeStatus (the load lifecycle, with LOADING / CLAIMABLE /
 ERROR sets the scheduler reads), the inheritance modes and sample roles for Trio, Quad and Duo nodes, set
 and group operations, tag-node modes and tag locations, node error sources, the candidate search types
-and statuses, and the damage node's ALoFT, PTC NMD and structural filter options. Stored codes: add values, never
+and statuses, and the damage node's ALoFT and PTC NMD filter options. Stored codes: add values, never
 renumber.
 """
 import operator
@@ -252,14 +252,6 @@ class ALoFTPredictionOptions(models.TextChoices):
     DAMAGING = "a", "Recessive / Dominant"
     RECESSIVE = ALoFTPrediction.RECESSIVE, "Recessive"
     DOMINANT = ALoFTPrediction.DOMINANT, "Dominant"
-
-
-class StructuralFilter(models.TextChoices):
-    """ Whether to keep only, or drop, the rows stored as a symbolic alt with an SVLEN - SVs, CNVs
-        and the gene-level events. @see Variant.get_symbolic_q """
-    ANY = 'A', "Any"
-    ONLY = 'O', "Structural only"
-    EXCLUDE = 'E', "Exclude structural"
 
 
 class PTCNMDFilter(models.TextChoices):

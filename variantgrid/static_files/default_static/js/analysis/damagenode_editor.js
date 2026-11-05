@@ -13,32 +13,6 @@ function toggleRequiredFilter(show) {
     }
 }
 
-function setupVariantClassGroups() {
-    // Group checkboxes are unnamed - they drive the individual (named) checkboxes that get submitted
-    $(".variant-class-group").each(function() {
-        const groupCheckbox = $(this);
-        updateVariantClassGroup(groupCheckbox);
-        groupCheckbox.change(function() {
-            variantClassGroupCheckboxes(groupCheckbox).prop("checked", groupCheckbox.prop("checked"));
-        });
-        variantClassGroupCheckboxes(groupCheckbox).change(function() {
-            updateVariantClassGroup(groupCheckbox);
-        });
-    });
-}
-
-function variantClassGroupCheckboxes(groupCheckbox) {
-    return $("#variant-class-individual").find(".variant-class-group-classes[data-group='" +
-             groupCheckbox.data("group") + "'] input[type=checkbox]");
-}
-
-function updateVariantClassGroup(groupCheckbox) {
-    const boxes = variantClassGroupCheckboxes(groupCheckbox);
-    const numChecked = boxes.filter(":checked").length;
-    groupCheckbox.prop("checked", numChecked > 0 && numChecked === boxes.length);
-    groupCheckbox.prop("indeterminate", numChecked > 0 && numChecked < boxes.length);
-}
-
 function showIndividualPathogenicPredictions(columnsVersion) {
     // From v4 the rankscores share this class but are split into their own legacy group, so the
     // main toggle reveals only the non-rankscore (raw-score) rows; rankscores use showRankscores().
@@ -176,7 +150,6 @@ function initDamageNodeEditor(options) {
 
     $(document).ready(function() {
         ajaxForm($("form#damage-filter"));
-        setupVariantClassGroups();
 
         const slidersByField = {};
         for (const s of options.sliders) {
@@ -212,10 +185,6 @@ function initDamageNodeEditor(options) {
             event.preventDefault();
             showRequiredFilter = !showRequiredFilter;
             toggleRequiredFilter(showRequiredFilter);
-        });
-        $("#toggle-variant-classes").click(function (event) {
-            event.preventDefault();
-            $("#variant-class-individual").toggle();
         });
         $("#show-individual-pathogenic-prediction a").click(function (event) {
             event.preventDefault();

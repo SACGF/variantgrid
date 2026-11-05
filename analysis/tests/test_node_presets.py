@@ -115,7 +115,7 @@ class NodePresetsTest(TestCase):
         values = self._presets(DamageNodeForm, node)["pvs1"]["values"]
         self.assertIsNone(values["revel_score_min"])
         self.assertFalse(values["splice_required"])
-        self.assertEqual([], values["variant_class"])
+        self.assertEqual([], values["variant_types"])
 
     def test_effect_presets_without_gene_constraint(self):
         GnomADGeneConstraint.objects.all().delete()

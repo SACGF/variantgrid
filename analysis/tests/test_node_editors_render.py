@@ -12,8 +12,8 @@ from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.intersection_node import IntersectionNode
 from analysis.tests.utils import AnalysisSetupMixin
 from analysis.views.views_node import NODE_DISPATCHER
-from library.genomics.vcf_enums import VariantClass
 from library.guardian_utils import assign_permission_to_user_and_groups
+from snpdb.variant_filters import VariantType
 
 
 class _FormSubmitDataParser(HTMLParser):
@@ -83,14 +83,13 @@ class NodeEditorRenderTest(AnalysisSetupMixin, TestCase):
                 node = node_class.objects.create(analysis=self.analysis)
                 self._get_editor(node)
 
-    def test_damage_node_variant_class_groups(self):
-        node = DamageNode.objects.create(analysis=self.analysis, variant_class=[VariantClass.SNV])
-        response = self._get_editor(node)
-        content = response.content.decode()
-        for group_name in ("SNV", "Indel", "Copy number", "Rearrangement", "Fusion", "Other"):
-            self.assertIn(group_name, content)
+    def test_damage_node_variant_types(self):
+        node = DamageNode.objects.create(analysis=self.analysis, variant_types=[VariantType.SNV])
+        content = self._get_editor(node).content.decode()
+        for label in ("SNV", "Indel", "Complex sub", "DEL", "Fusion"):
+            self.assertIn(label, content)
         # The checkbox for the node's stored value comes back ticked
-        self.assertIn(f'value="{VariantClass.SNV.value}" id="id_variant_class_0" checked>', content)
+        self.assertIn(f'value="{VariantType.SNV}" id="id_variant_types_0" checked>', content)
 
     def test_intersection_node_variant_text(self):
         node = IntersectionNode.objects.create(analysis=self.analysis,

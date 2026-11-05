@@ -13,11 +13,10 @@ from analysis.enums import (
     ALoFTPredictionOptions,
     PTCNMDFilter,
     SpliceVaultOutOfFrame,
-    StructuralFilter,
     UTRHighImpact,
 )
 from analysis.models.nodes.analysis_node import AnalysisNode
-from analysis.models.nodes.node_display import NodeChip, NodeIcon, grouped_chips
+from analysis.models.nodes.node_display import NodeChip, NodeIcon
 from annotation.effect_filters import (
     gene_constraint_q,
     splicevault_out_of_frame_q,
@@ -42,9 +41,8 @@ from annotation.pathogenicity_predictions import (
     RawScoreDirection,
 )
 from genes.models.models_gnomad_gene_constraint import GnomADGeneConstraint
-from library.genomics.vcf_enums import VARIANT_CLASS_GROUPS, VariantClass
 from snpdb.enums import BuiltInFilters
-from snpdb.models.models_variant import Variant
+from snpdb.variant_filters import get_all_variant_types, get_variant_type_label, get_variant_types_q
 
 
 class _ColumnFilter(NamedTuple):
@@ -100,15 +98,11 @@ class DamageNode(AnalysisNode):
         BuiltInFilters.OMIM: {"omim_phenotype": True},
     }
 
-    # A type restriction restricts - it goes in and_filters rather than the scoring OR pool,
-    # so it has no _required flag. Empty means every type.
-    variant_class = ArrayField(models.CharField(max_length=2, choices=VariantClass.choices),
-                               default=list, blank=True)
-    variant_class_exclude = models.BooleanField(default=False)
-    # Orthogonal to variant_class, which is VEP's: VEP calls a 1 Mb <DEL> and a 1 bp deletion the
-    # same class, so "just the SVs/CNVs" is a question the class filter cannot answer
-    structural = models.CharField(max_length=1, choices=StructuralFilter.choices,
-                                  default=StructuralFilter.ANY)
+    # The All Variants grid's variant types (snpdb.variant_filters), read off the stored alt rather than VEP's
+    # variant_class, which calls a 1 Mb <DEL> and a 1 bp deletion the same thing (#2674). A type restriction
+    # restricts - it goes in and_filters rather than the scoring OR pool, so it has no _required flag.
+    # Empty, or every type, means no restriction.
+    variant_types = ArrayField(models.CharField(max_length=20), default=list, blank=True)
 
     impact_min = models.CharField(max_length=1, choices=PathogenicityImpact.CHOICES, null=True, blank=True)
     impact_required = models.BooleanField(default=False)
@@ -303,7 +297,7 @@ class DamageNode(AnalysisNode):
     gene_mis_z_required = models.BooleanField(default=False)
     gene_mis_z_allow_null = models.BooleanField(default=True)
 
-    # PM4's "non-repeat region" - a restriction like variant_class, so it has no _required flag
+    # PM4's "non-repeat region" - a restriction like variant_types, so it has no _required flag
     outside_repeat_region = models.BooleanField(default=False)
 
     def get_raw_score_tools(self) -> list[PathogenicityTool]:
@@ -374,8 +368,8 @@ class DamageNode(AnalysisNode):
 
     def modifies_parents(self):
         all_versions = [self.impact_min, self.splice_min, self.cosmic_count_min, self.damage_predictions_min,
-                        self.in_cosmic, self.omim_phenotype, self.protein_domain, self.published, self.variant_class,
-                        self.structural != StructuralFilter.ANY, bool(self._gene_constraint_filters()),
+                        self.in_cosmic, self.omim_phenotype, self.protein_domain, self.published,
+                        self._restricts_variant_types(), bool(self._gene_constraint_filters()),
                         self._applies_outside_repeat_region()]
         return any(all_versions) or any(cf.is_set(self) for cf in self._column_filters())
 
@@ -493,22 +487,20 @@ class DamageNode(AnalysisNode):
     def _get_node_q_hash(self) -> str:
         return str(self._get_node_q())
 
+    def _restricts_variant_types(self) -> bool:
+        """ Neither nothing nor everything is ticked """
+        return bool(self.variant_types) and not set(self.variant_types) >= set(get_all_variant_types())
+
+    def _variant_types_q(self) -> Optional[Q]:
+        """ None when the node keeps every type """
+        return get_variant_types_q(self.variant_types, all_variant_types=get_all_variant_types())
+
     def _get_node_q(self) -> Optional[Q]:
         or_filters = []
         and_filters = []
 
-        if self.variant_class:
-            q_variant_class = Q(variantannotation__variant_class__in=self.variant_class)
-            if self.variant_class_exclude:
-                # Negated subquery so variants without annotation aren't silently dropped
-                q_variant_class = ~q_variant_class
-            and_filters.append(q_variant_class)
-
-        if self.structural != StructuralFilter.ANY:
-            q_structural = Variant.get_symbolic_q()
-            if self.structural == StructuralFilter.EXCLUDE:
-                q_structural = ~q_structural
-            and_filters.append(q_structural)
+        if (q_variant_types := self._variant_types_q()) is not None:
+            and_filters.append(q_variant_types)
 
         if self.impact_min is not None:
             q_impact = PathogenicityImpact.get_q(self.impact_min)
@@ -794,8 +786,10 @@ class DamageNode(AnalysisNode):
 
     def get_node_chips(self) -> list[NodeChip]:
         chips = super().get_node_chips()
-        chips += grouped_chips(self.variant_class or [], VARIANT_CLASS_GROUPS, dict(VariantClass.choices),
-                               "Variant type", exclude=self.variant_class_exclude, icon="fa-solid fa-shapes")
+        if self._restricts_variant_types():
+            labels = [get_variant_type_label(vt) for vt in get_all_variant_types() if vt in self.variant_types]
+            chips.append(NodeChip(text=", ".join(labels), icon="fa-solid fa-shapes",
+                                  title=f"Variant type: {', '.join(labels)}"))
         splice_titles = []
         if self.splice_min is not None:
             splice_titles.append(f"Splicing prediction score >= {self.splice_min}")
@@ -808,8 +802,6 @@ class DamageNode(AnalysisNode):
                                   title=f"SpliceVault: {SpliceVaultOutOfFrame(self.splicevault_out_of_frame).label}"))
         if self.utr_high_impact:
             chips.append(NodeChip(text="5' UTR", title=f"{UTRHighImpact(self.utr_high_impact).label} (UTRAnnotator)"))
-        if self.structural != StructuralFilter.ANY:
-            chips.append(NodeChip(text="SV", title=StructuralFilter(self.structural).label))
         chips += self._score_chips()
         if self.cosmic_count_min is not None:
             chips.append(self._filter_chip("COSMIC", f"COSMIC count ≥ {self.cosmic_count_min}",
