@@ -10,25 +10,25 @@ from django.test import TestCase, override_settings
 from analysis.enums import PTCNMDFilter
 from analysis.models import Analysis
 from analysis.models.nodes.filters.damage_node import DamageNode
-from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
+from analysis.tests.utils import create_annotated_variants, node_keeps
+from annotation.enums import NMDEscapeStatus
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_annotation_version,
 )
-from annotation.models import AnnotationRun, VariantAnnotationVersion
-from annotation.models.models import VariantAnnotation
+from annotation.models import VariantAnnotationVersion
 from genes.models.models_gene import GeneSymbol
 from genes.models.models_gnomad_gene_constraint import GnomADGeneConstraint
-from library.django_utils.django_partition import temporary_db_table
 from snpdb.models.models_cached_web_resource import CachedWebResource
 from snpdb.models.models_genome import GenomeBuild
-from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 
 class _ColumnsVersion5Mixin:
     """ columns_version is a derived property on AnalysisNode (reads through the VAV), so forcing
-        the VAV is the only way to flip a node into its v5 code path. """
+        the VAV is the only way to flip a node into its v5 code path. ROWS are the VariantAnnotation
+        columns of named variants to filter with a node. """
     COLUMNS_VERSION = 5
+    ROWS: dict[str, dict] = {}
 
     @classmethod
     def setUpTestData(cls):
@@ -42,9 +42,27 @@ class _ColumnsVersion5Mixin:
         cls.analysis = Analysis(genome_build=cls.grch37)
         cls.analysis.set_defaults_and_save(user)
 
+        cls.variants = create_annotated_variants(vav, cls.ROWS)
+
+    def _filtered(self, node: DamageNode) -> set[str]:
+        return node_keeps(node, self.variants)
+
+
+FRAMESHIFT = "frameshift_variant"
+
 
 @override_settings(**get_fake_annotation_settings_dict(columns_version=2))
 class TestDamageNodeV5(_ColumnsVersion5Mixin, TestCase):
+    ROWS = {
+        "escaping": {"consequence": FRAMESHIFT, "nmd_escape_status": NMDEscapeStatus.ESCAPING,
+                     "alphamissense_score": 0.1},
+        "predicted_nmd": {"consequence": FRAMESHIFT, "nmd_escape_status": NMDEscapeStatus.PREDICTED_NMD,
+                          "alphamissense_score": 0.9},
+        "not_applicable": {"nmd_escape_status": NMDEscapeStatus.NOT_APPLICABLE, "alphamissense_score": 0.9},
+        "escaping_alphamissense": {"consequence": FRAMESHIFT, "nmd_escape_status": NMDEscapeStatus.ESCAPING,
+                                   "alphamissense_score": 0.9},
+        "not_calculated": {},
+    }
 
     def test_raw_score_modifies_parents(self):
         node = DamageNode(analysis=self.analysis, alphamissense_score_min=0.5)
@@ -61,25 +79,21 @@ class TestDamageNodeV5(_ColumnsVersion5Mixin, TestCase):
         # Categorical LoF flag, not a per-tool pathogenicity prediction
         self.assertFalse(node.has_individual_pathogenic_predictions())
 
-    def test_ptc_nmd_emits_q(self):
+    def test_ptc_nmd_escaping_keeps_only_escaping(self):
         node = DamageNode(analysis=self.analysis, ptc_nmd=PTCNMDFilter.ESCAPING)
-        q_str = str(node._get_node_q())
-        self.assertIn("variantannotation__nmd_escape_status", q_str)
-        self.assertNotIn("PREDICTED_NMD", q_str)
+        self.assertEqual({"escaping", "escaping_alphamissense"}, self._filtered(node))
 
     def test_ptc_nmd_required_is_and_filter(self):
+        """ Required, it drops a variant the OR pool (AlphaMissense) would keep, and the pool still applies """
         node = DamageNode(analysis=self.analysis, ptc_nmd=PTCNMDFilter.ESCAPING, ptc_nmd_required=True,
                           alphamissense_score_min=0.5)
-        q_str = str(node._get_node_q())
-        self.assertIn("variantannotation__nmd_escape_status", q_str)
         self.assertTrue(node.has_required())
+        self.assertEqual({"escaping_alphamissense"}, self._filtered(node))
 
     def test_ptc_nmd_escaping_or_predicted_keeps_nmd_predicted(self):
         """ #2596 - a frameshift predicted to undergo NMD is kept, not just the escaping ones """
         node = DamageNode(analysis=self.analysis, ptc_nmd=PTCNMDFilter.ESCAPING_OR_PREDICTED)
-        q_str = str(node._get_node_q())
-        self.assertIn("PREDICTED_NMD", q_str)
-        self.assertIn("ESCAPING", q_str)
+        self.assertEqual({"escaping", "predicted_nmd", "escaping_alphamissense"}, self._filtered(node))
 
     def test_tool_not_annotated_on_build_does_not_modify_parents(self):
         """ EVE is GRCh38 only, so a value left on a GRCh37 node filters nothing (#2345) """
@@ -129,11 +143,13 @@ class TestDamageNodeV6InheritsV5(_ColumnsVersion5Mixin, TestCase):
 @override_settings(**get_fake_annotation_settings_dict(columns_version=2))
 class TestDamageNodeV4IgnoresV5Fields(_ColumnsVersion5Mixin, TestCase):
     COLUMNS_VERSION = 4
+    ROWS = {"escaping": {"nmd_escape_status": NMDEscapeStatus.ESCAPING},
+            "predicted_nmd": {"nmd_escape_status": NMDEscapeStatus.PREDICTED_NMD}}
 
-    def test_v4_does_not_emit_ptc_q(self):
+    def test_v4_ignores_ptc_nmd(self):
         node = DamageNode(analysis=self.analysis, ptc_nmd=PTCNMDFilter.ESCAPING)
-        q_str = str(node._get_node_q() or "")
-        self.assertNotIn("nmd_escape_status", q_str)
+        self.assertFalse(node.modifies_parents())
+        self.assertEqual({"escaping", "predicted_nmd"}, self._filtered(node))
 
     @override_settings(ANNOTATION_SHOW_LEGACY_RANKSCORES=True)
     def test_v4_still_honours_legacy_rankscore_setting(self):
@@ -150,22 +166,16 @@ class TestDamageNodeGeneConstraintAndRepeat(_ColumnsVersion5Mixin, TestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         vav = cls.analysis.annotation_version.variant_annotation_version
-        annotation_run = AnnotationRun.objects.create()
         cached_web_resource = CachedWebResource.objects.create(name="test_gnomad_gene_constraint")
-        partition_table = vav.get_partition_table(
-            base_table_name=VariantAnnotationVersion.REPRESENTATIVE_TRANSCRIPT_ANNOTATION)
-        cls.variants = {}
-        for i, (name, symbol, repeat_masker) in enumerate([("constrained", "CONSTRAINED1", None),
-                                                          ("tolerant", "TOLERANT1", None),
-                                                          ("no_constraint_row", "NOROW1", None),
-                                                          ("intergenic", None, None),
-                                                          ("repeat", "CONSTRAINED1", "AluY")]):
-            variant = slowly_create_test_variant("1", 1000 + i * 100, "A", "T", cls.grch37)
-            with temporary_db_table(VariantAnnotation, partition_table):
-                VariantAnnotation.objects.create(version=vav, variant=variant, annotation_run=annotation_run,
-                                                 symbol=symbol, repeat_masker=repeat_masker,
-                                                 predictions_num_pathogenic=0, predictions_num_benign=0)
-            cls.variants[name] = variant
+        cls.variants = create_annotated_variants(vav, {
+            name: {"symbol": symbol, "repeat_masker": repeat_masker,
+                   "predictions_num_pathogenic": 0, "predictions_num_benign": 0}
+            for name, symbol, repeat_masker in [("constrained", "CONSTRAINED1", None),
+                                                ("tolerant", "TOLERANT1", None),
+                                                ("no_constraint_row", "NOROW1", None),
+                                                ("intergenic", None, None),
+                                                ("repeat", "CONSTRAINED1", "AluY")]
+        })
 
         # (symbol, mane_select, LOEUF, missense Z) - TOLERANT1's non-MANE transcript is constrained, its gene isn't
         for symbol, mane_select, loeuf, mis_z in [("CONSTRAINED1", True, 0.2, 4.0),
@@ -174,13 +184,6 @@ class TestDamageNodeGeneConstraintAndRepeat(_ColumnsVersion5Mixin, TestCase):
             gene_symbol = GeneSymbol.objects.get_or_create(symbol=symbol)[0]
             GnomADGeneConstraint.objects.create(gene_symbol=gene_symbol, cached_web_resource=cached_web_resource,
                                                 mane_select=mane_select, lof_oe_ci_upper=loeuf, mis_z_score=mis_z)
-
-    def _filtered(self, node: DamageNode) -> set[str]:
-        q = node._get_node_q()
-        pk_names = {v.pk: name for name, v in self.variants.items()}
-        qs = get_variant_queryset_for_annotation_version(self.analysis.annotation_version)
-        qs = qs.filter(pk__in=pk_names).filter(q)
-        return {pk_names[pk] for pk in qs.values_list("pk", flat=True)}
 
     def test_loeuf_uses_mane_select_row(self):
         node = DamageNode(analysis=self.analysis, gene_loeuf_max=0.6)

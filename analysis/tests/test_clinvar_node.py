@@ -1,12 +1,14 @@
-from django.db.models import Q
 from django.test import TestCase
 
 from analysis.enums import NodeMatchInput
 from analysis.forms.forms_nodes import ClinVarNodeForm
 from analysis.models.nodes.filters.clinvar_node import ClinVarNode
-from analysis.tests.utils import AnalysisSetupMixin
+from analysis.tests.utils import AnalysisSetupMixin, node_keeps
 from annotation.enums import ClinVarOncogenicity, ClinVarReviewStatus, Pathogenicity
+from annotation.models.models_clinvar import ClinVar
+from library.django_utils.django_partition import temporary_db_table
 from snpdb.enums import AlleleOriginFilterDefault, SomaticClinicalSignificance
+from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 
 class ClinVarNodeInputTest(AnalysisSetupMixin, TestCase):
@@ -21,83 +23,102 @@ class ClinVarNodeInputTest(AnalysisSetupMixin, TestCase):
             self.assertEqual((node.min_inputs, node.max_inputs), (1, 1))
             self.assertFalse(node.is_source)
 
-    def test_bare_node_is_has_a_clinvar_record(self):
-        node = ClinVarNode(analysis=self.analysis)
-        self.assertEqual(node._get_node_q(), Q(clinvar__isnull=False))
-
-    def test_not_matching_negates_the_whole_match(self):
-        """ 'Not in ClinVar' - the negation wraps everything the node matched """
-        matching = ClinVarNode(analysis=self.analysis, germline_benign=False)
-        not_matching = ClinVarNode(analysis=self.analysis, germline_benign=False,
-                                   node_input=NodeMatchInput.PARENT_NOT_MATCHING)
-        self.assertEqual(not_matching._get_node_q(), ~matching._get_node_q())
-
 
 class ClinVarNodeQTest(AnalysisSetupMixin, TestCase):
-    HAS_RECORD = Q(clinvar__isnull=False)
+    """ Which of a set of named ClinVar records each node setting keeps - one record per value on each axis,
+        each with the review status a stars test needs, plus a variant ClinVar has no record for """
+    S = ClinVarReviewStatus.CRITERIA_PROVIDED_SINGLE_SUBMITTER  # 1 star
+    E = ClinVarReviewStatus.REVIEWED_BY_EXPERT_PANEL  # 3 stars
+    N = ClinVarReviewStatus.NO_ASSERTION_PROVIDED  # 0 stars
+    RECORDS = {
+        "pathogenic": {"highest_pathogenicity": Pathogenicity.PATHOGENIC, "review_status": E},
+        "likely_pathogenic": {"highest_pathogenicity": Pathogenicity.LIKELY_PATHOGENIC, "review_status": S},
+        "vus": {"highest_pathogenicity": Pathogenicity.UNCERTAIN, "review_status": S},
+        "likely_benign": {"highest_pathogenicity": Pathogenicity.LIKELY_BENIGN, "review_status": S},
+        "benign": {"highest_pathogenicity": Pathogenicity.BENIGN, "review_status": S},
+        "tier_1": {"somatic_tier": SomaticClinicalSignificance.TIER_1, "somatic_review_status": E},
+        # 1 star on its germline axis only
+        "tier_1_or_2": {"somatic_tier": SomaticClinicalSignificance.TIER_1_OR_2, "somatic_review_status": N,
+                        "review_status": S},
+        "tier_3": {"somatic_tier": SomaticClinicalSignificance.TIER_3, "somatic_review_status": S},
+        "oncogenic": {"highest_oncogenicity": ClinVarOncogenicity.ONCOGENIC, "oncogenic_review_status": E},
+        "likely_oncogenic": {"highest_oncogenicity": ClinVarOncogenicity.LIKELY_ONCOGENIC,
+                             "oncogenic_review_status": S},
+        "oncogenicity_uncertain": {"highest_oncogenicity": ClinVarOncogenicity.UNCERTAIN,
+                                   "oncogenic_review_status": S},
+    }
+    NO_GERMLINE_CALL = {"tier_1", "tier_1_or_2", "tier_3", "oncogenic", "likely_oncogenic", "oncogenicity_uncertain"}
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        clinvar_version = cls.analysis.annotation_version.clinvar_version
+        cls.variants = {"no_record": slowly_create_test_variant("1", 1000, "A", "T", cls.grch37)}
+        with temporary_db_table(ClinVar, clinvar_version.get_partition_table()):
+            for i, (name, fields) in enumerate(cls.RECORDS.items(), start=1):
+                variant = slowly_create_test_variant("1", 1000 + i * 100, "A", "T", cls.grch37)
+                ClinVar.objects.create(version=clinvar_version, variant=variant,
+                                       clinvar_variation_id=i, clinvar_allele_id=i, **fields)
+                cls.variants[name] = variant
+
+    def _filtered(self, node: ClinVarNode) -> set[str]:
+        return node_keeps(node, self.variants)
+
+    def test_bare_node_is_has_a_clinvar_record(self):
+        self.assertEqual(set(self.RECORDS), self._filtered(ClinVarNode(analysis=self.analysis)))
+
+    def test_not_matching_negates_the_whole_match(self):
+        """ 'Not in ClinVar' - everything the matching node drops, including variants ClinVar has no record for """
+        not_matching = ClinVarNode(analysis=self.analysis, germline_benign=False,
+                                   node_input=NodeMatchInput.PARENT_NOT_MATCHING)
+        self.assertEqual({"benign", "no_record"}, self._filtered(not_matching))
 
     def test_deselecting_one_pill_filters_the_row(self):
         node = ClinVarNode(analysis=self.analysis, germline_benign=False, germline_likely_benign=False,
                            germline_other=False)
-        expected = self.HAS_RECORD & Q(clinvar__highest_pathogenicity__in=[Pathogenicity.PATHOGENIC,
-                                                                          Pathogenicity.LIKELY_PATHOGENIC,
-                                                                          Pathogenicity.UNCERTAIN])
-        self.assertEqual(node._get_node_q(), expected)
+        self.assertEqual({"pathogenic", "likely_pathogenic", "vus"}, self._filtered(node))
 
     def test_germline_catch_all_pill_selects_no_call(self):
         node = ClinVarNode(analysis=self.analysis, germline_pathogenic=False, germline_likely_pathogenic=False,
                            germline_uncertain=False, germline_likely_benign=False, germline_benign=False)
-        self.assertEqual(node._get_node_q(), self.HAS_RECORD & Q(clinvar__highest_pathogenicity__in=[0]))
+        self.assertEqual(self.NO_GERMLINE_CALL, self._filtered(node))
 
     def test_oncogenicity_subset(self):
         node = ClinVarNode(analysis=self.analysis, oncogenicity_uncertain=False,
                            oncogenicity_likely_benign=False, oncogenicity_benign=False)
-        expected = self.HAS_RECORD & Q(clinvar__highest_oncogenicity__in=[ClinVarOncogenicity.ONCOGENIC,
-                                                                          ClinVarOncogenicity.LIKELY_ONCOGENIC])
-        self.assertEqual(node._get_node_q(), expected)
+        self.assertEqual({"oncogenic", "likely_oncogenic"}, self._filtered(node))
 
     def test_somatic_tier_1_pulls_in_tier_1_or_2(self):
         """ Tier I/II records might be either, so they match when Tier I or II is selected """
         node = ClinVarNode(analysis=self.analysis, somatic_tier_2=False, somatic_tier_3=False,
                            somatic_tier_4=False)
-        expected = self.HAS_RECORD & Q(clinvar__somatic_tier__in=[SomaticClinicalSignificance.TIER_1,
-                                                                  SomaticClinicalSignificance.TIER_1_OR_2])
-        self.assertEqual(node._get_node_q(), expected)
+        self.assertEqual({"tier_1", "tier_1_or_2"}, self._filtered(node))
 
     def test_somatic_tier_3_does_not_pull_in_tier_1_or_2(self):
         node = ClinVarNode(analysis=self.analysis, somatic_tier_1=False, somatic_tier_2=False,
                            somatic_tier_4=False)
-        expected = self.HAS_RECORD & Q(clinvar__somatic_tier__in=[SomaticClinicalSignificance.TIER_3])
-        self.assertEqual(node._get_node_q(), expected)
+        self.assertEqual({"tier_3"}, self._filtered(node))
 
     def test_allele_origin_gates_the_rows(self):
         """ Germline only - the somatic pills stop applying without being retouched """
         node = ClinVarNode(analysis=self.analysis, allele_origin=AlleleOriginFilterDefault.GERMLINE,
                            somatic_tier_1=False)
-        self.assertEqual(node._get_node_q(), self.HAS_RECORD)
+        self.assertEqual(set(self.RECORDS), self._filtered(node))
 
     def test_stars_alone_read_all_3_axes(self):
         """ Matches ClinVar.is_expert_panel_or_greater taking the max across the axes """
         node = ClinVarNode(analysis=self.analysis, stars_min=3)
-        review_statuses = ClinVarReviewStatus.statuses_gte_stars(3)
-        expected = self.HAS_RECORD & (Q(clinvar__review_status__in=review_statuses)
-                                      | Q(clinvar__somatic_review_status__in=review_statuses)
-                                      | Q(clinvar__oncogenic_review_status__in=review_statuses))
-        self.assertEqual(node._get_node_q(), expected)
+        self.assertEqual({"pathogenic", "tier_1", "oncogenic"}, self._filtered(node))
 
     def test_stars_read_the_axis_being_filtered(self):
         node = ClinVarNode(analysis=self.analysis, stars_min=1, somatic_tier_2=False, somatic_tier_3=False,
                            somatic_tier_4=False)
-        review_statuses = ClinVarReviewStatus.statuses_gte_stars(1)
-        expected = self.HAS_RECORD \
-            & Q(clinvar__somatic_tier__in=[SomaticClinicalSignificance.TIER_1,
-                                           SomaticClinicalSignificance.TIER_1_OR_2]) \
-            & Q(clinvar__somatic_review_status__in=review_statuses)
-        self.assertEqual(node._get_node_q(), expected)
+        self.assertEqual({"tier_1"}, self._filtered(node))
 
     def test_variation_ids(self):
-        node = ClinVarNode(analysis=self.analysis, variation_ids=[12345])
-        self.assertEqual(node._get_node_q(), self.HAS_RECORD & Q(clinvar__clinvar_variation_id__in=[12345]))
+        vus_variation_id = list(self.RECORDS).index("vus") + 1
+        node = ClinVarNode(analysis=self.analysis, variation_ids=[vus_variation_id])
+        self.assertEqual({"vus"}, self._filtered(node))
 
 
 class ClinVarNodeChipsTest(AnalysisSetupMixin, TestCase):

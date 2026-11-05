@@ -15,6 +15,7 @@ from django.urls.base import reverse
 from analysis.forms.forms_nodes import DamageNodeForm
 from analysis.models import Analysis
 from analysis.models.nodes.filters.damage_node import DamageNode
+from analysis.tests.utils import create_annotated_variants, node_keeps
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
     get_fake_annotation_version,
@@ -80,6 +81,30 @@ class _RawScoreSliderMixin:
 class TestPluginSlidersOffered(_RawScoreSliderMixin, TestCase):
     """ GRCh38 / columns_version 5 / VEP 116 - the only combination populating all four """
 
+    ROWS = {
+        "eve_0.8": {"eve_score": 0.8},
+        "eve_0.5": {"eve_score": 0.5},
+        "eve_null": {},
+        "eve_pathogenic": {"eve_class": "Pathogenic"},
+        "eve_benign": {"eve_class": "Benign"},
+        "popeve_-5": {"popeve_score": -5.0},
+        "popeve_-3": {"popeve_score": -3.0},
+        "popeve_-1": {"popeve_score": -1.0},
+        "popeve_null": {},
+        **{f"promoter_ai_{score}": {"promoter_ai_score": score} for score in (0.8, -0.8, 0.5, -0.5, 0.2, -0.2)},
+        "protvar_2.5": {"protvar_stability": 2.5},
+        "protvar_1.0": {"protvar_stability": 1.0},
+    }
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        vav = cls.analysis.annotation_version.variant_annotation_version
+        cls.variants = create_annotated_variants(vav, cls.ROWS)
+
+    def _filtered(self, node: DamageNode, among: set[str]) -> set[str]:
+        return node_keeps(node, self.variants, among)
+
     def test_all_tools_offered(self):
         self.assertEqual(self._raw_fields(), DBNSFP_RAW_FIELDS | PROTVAR | GRCH38_VEP116)
 
@@ -90,39 +115,36 @@ class TestPluginSlidersOffered(_RawScoreSliderMixin, TestCase):
         node = DamageNode(analysis=self.analysis, eve_score_min=0.7)
         self.assertTrue(node.modifies_parents())
         self.assertTrue(node.has_individual_pathogenic_predictions())
-        self.assertIn("variantannotation__eve_score__gte", str(node._get_node_q()))
+        self.assertEqual({"eve_0.8"}, self._filtered(node, {"eve_0.8", "eve_0.5", "eve_null"}))
 
     def test_eve_required_allows_null(self):
         node = DamageNode(analysis=self.analysis, eve_score_min=0.7, eve_score_required=True,
                           eve_score_allow_null=True)
         self.assertTrue(node.has_required())
-        self.assertIn("variantannotation__eve_score__isnull", str(node._get_node_q()))
+        self.assertEqual({"eve_0.8", "eve_null"}, self._filtered(node, {"eve_0.8", "eve_0.5", "eve_null"}))
 
     def test_eve_class_filters_on_the_word(self):
         node = DamageNode(analysis=self.analysis, eve_class="Pathogenic")
         self.assertTrue(node.modifies_parents())
-        q_str = str(node._get_node_q())
-        self.assertIn("variantannotation__eve_class", q_str)
-        self.assertIn("Pathogenic", q_str)
+        self.assertEqual({"eve_pathogenic"}, self._filtered(node, {"eve_pathogenic", "eve_benign", "eve_null"}))
 
     def test_popeve_keeps_scores_at_or_below(self):
         """ popEVE runs the other way to every dbNSFP score - more negative is more damaging """
         node = DamageNode(analysis=self.analysis, popeve_score_max=-3.0)
-        q_str = str(node._get_node_q())
-        self.assertIn("variantannotation__popeve_score__lte", q_str)
-        self.assertNotIn("variantannotation__popeve_score__gte", q_str)
+        among = {"popeve_-5", "popeve_-3", "popeve_-1", "popeve_null"}
+        self.assertEqual({"popeve_-5", "popeve_-3"}, self._filtered(node, among))
 
     def test_promoter_ai_matches_either_sign(self):
         """ Signed score - a strong drop in expression is as interesting as a strong rise """
         node = DamageNode(analysis=self.analysis, promoter_ai_score_min=0.5)
-        q_str = str(node._get_node_q())
-        self.assertIn("variantannotation__promoter_ai_score__gte", q_str)
-        self.assertIn("variantannotation__promoter_ai_score__lte", q_str)
-        self.assertIn("-0.5", q_str)
+        among = {"promoter_ai_0.8", "promoter_ai_-0.8", "promoter_ai_0.5", "promoter_ai_-0.5",
+                 "promoter_ai_0.2", "promoter_ai_-0.2"}
+        self.assertEqual({"promoter_ai_0.8", "promoter_ai_-0.8", "promoter_ai_0.5", "promoter_ai_-0.5"},
+                         self._filtered(node, among))
 
     def test_protvar_stability_keeps_destabilising(self):
         node = DamageNode(analysis=self.analysis, protvar_stability_min=2.0)
-        self.assertIn("variantannotation__protvar_stability__gte", str(node._get_node_q()))
+        self.assertEqual({"protvar_2.5"}, self._filtered(node, {"protvar_2.5", "protvar_1.0"}))
 
     def test_plugin_tools_stay_out_of_the_damage_count(self):
         """ None are ClinGen-calibrated, so predictions_num_pathogenic is unchanged - no re-annotation """

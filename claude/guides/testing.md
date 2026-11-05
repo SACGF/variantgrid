@@ -116,6 +116,8 @@ one implementation. `snpdb/tests/test_create_fake_data.py` runs `create_fake_dat
 ### Analyses, nodes, tags
 - `analysis/tests/utils.py:AnalysisSetupMixin` → mix into a `TestCase`: its `setUpTestData` sets `cls.grch37`, calls `get_fake_annotation_version`, and saves `cls.analysis` for a per-class user. Extend, then add samples/nodes.
 - By hand: `analysis = Analysis(genome_build=grch37); analysis.set_defaults_and_save(user)` (needs an `AnnotationVersion` for the build). Nodes are plain creates, `SampleNode.objects.create(analysis=analysis, sample=sample)`, `TrioNode.objects.create(analysis=..., trio=..., inheritance=...)`; chain with `child.add_parent(parent)` then `child.save()` (see `_create_child_node` in `analysis/tests/test_models.py`).
+- `analysis/tests/utils.py:create_annotated_variants(vav, rows: dict[str, dict])` → `{name: Variant}`, an SNV per name with a `VariantAnnotation` row holding those columns in `vav`'s partition (the table node querysets read); `analysis/tests/utils.py:annotate_variants(vav, {name: (variant, columns)})` does the same for variants you built yourself (SVs, indels).
+- `analysis/tests/utils.py:node_keeps(node, variants_by_name, among=None)` → the names whose variants pass `node._get_node_q()` through the analysis's versioned queryset; a `None` Q keeps them all. Assert on this, not on the `Q`.
 - `analysis/tests/inheritance_node_mixin.py:InheritanceNodeTestsMixin` → shared inheritance-mode assertions for `TrioNode` / `QuadNode`; subclass sets `INHERITANCE`, `NODE_CLASS`, `REQUIRE_PARENT_ZYGOSITY`, `SHARED_ZYGOSITIES` and calls `cls.create_shared_variants(cgc)`. `DuoNode` has its own `analysis/tests/test_duo_node.py` - one parent means a different mode set and a `parent`-keyed zygosity table.
 - Tags: `Tag.objects.get_or_create(pk="artefact")[0]` then `VariantTag.objects.create(genome_build=, analysis=, variant=, tag=, user=)` (`analysis/tests/test_variant_tags.py`). `analysis/fake_data/variant_tags.py:FakeVariantTags` is the `create_fake_data tags` step for dev boxes.
 - `snpdb/tests/utils/tag_testing_utils.py:create_classify_queue_tag(tag_id="ToDo", bucket=AlleleOriginBucket.UNKNOWN)` → a live `Tag` with `requires_classification` set, for anything about the classify queue: the to-do lists, the "New Classification" buttons, tag resolution. The default bucket is "Both"; pass `AlleleOriginBucket.SOMATIC` for the somatic path. Name the tag for the property under test rather than reaching for the seeded `RequiresClassification` tag.
@@ -142,6 +144,66 @@ class Test(URLTestCase):
 - `prevent_request_warnings` decorates a test that expects 404/405 so `django.request` stays quiet.
 - Query budgets: wrap the call in `CaptureQueriesContext(connection)` and assert on `production_query_count(ctx.captured_queries)`, which drops savepoints and reads of `PRODUCTION_CACHED_TABLES` (GenomeBuild, GeneSymbol, FlagType, ResolvedVariantInfo, Allele, Organization, Lab - their managers cache in production but not under `UNIT_TEST`). Raw `assertNumQueries` over-counts by exactly those.
 - `VG_QUERY_PROFILE=/path.jsonl manage.py test ...` swaps in `QueryProfilingClient`: one JSON line per GET with status, query count, ms and duplicated (N+1) SQL. Add `VG_QUERY_TRACE=<regex>` to log a stack trace to `<path>.trace` for each matching statement.
+
+## Change-detector tests
+
+A test earns its keep by checking what the code is *supposed* to do (`AGENTS.md`, Testing). The failure mode to
+watch for in a test written alongside the code it tests - which is how most tests here were written - is the
+change-detector (Google's name for it: testing.googleblog.com, "Change-Detector Tests Considered Harmful"): it
+asserts what the code *currently does*, so it fails on any equivalent rewrite and passes on any bug that keeps the
+old shape. The question to ask of each assertion is "what bug would this catch?". Five forms turn up in this repo,
+with the test that shows each and the behaviour-level version beside it:
+
+- **Asserting on the generated query instead of what it returns.** The analysis node-filter tests are where this
+  lives: build a node, call `_get_node_q()`, then `assertIn("__lte", str(q))`, check `q.connector`, or compare with
+  a hand-built `Q(...)` that mirrors the code (`analysis/tests/test_clinvar_node.py:ClinVarNodeQTest.test_somatic_tier_1_pulls_in_tier_1_or_2`).
+  Reorder an `&` or swap `__in` for `__range` and it fails; invert a bound, drop NULL rows through a `~Q` across a
+  join, or search a two-word phrase as one string (`analysis/tests/test_phenotype_node.py:TestPhenotypeNodeText.test_each_word_is_searched_separately`
+  passes on exactly that) and it still passes. The version that catches the bug builds a few named variants on both
+  sides of the rule and asserts which names the node keeps -
+  `analysis/tests/utils.py:create_annotated_variants` builds them and `analysis/tests/utils.py:node_keeps` answers,
+  and `analysis/tests/test_classifications_node.py:ClassificationsNodeFilterTest.test_somatic_tier_subset_includes_tier_1_or_2_records`
+  is the same tier rule as the ClinVar one above, tested on records. For a SpliceAI node the pair sits in one class:
+  `annotation/tests/test_spliceai.py:TestDamageNodeSpliceAIQ.test_splice_min_returns_expected_rows` against the
+  `str(q)` tests above it.
+- **Mocking an in-app collaborator and asserting it was called.** `assert_called_once()` / `assert_not_called()` /
+  `call_args` on a method of the unit under test or of another function in the same app pins the call graph, not the
+  outcome: `annotation/tests/test_annotation_dispatch.py:AnnotationDispatchTestCase.test_scheduler_makes_no_range_locks_for_blocked_vav`
+  is named for the locks but never looks at one, and `analysis/tests/test_venn_node.py:TestVennNode.test_difference_only_skips_the_side_it_subtracts`
+  asserts only which private helper got which node. Mock at the real boundary - Celery `.delay`/`apply_async`/`si`,
+  a subprocess, HTTP, disk, `time` - and assert the rows, statuses or files that result. The same dispatch file
+  shows the difference: its `dispatch_annotation_runs.si` assertion is the Celery boundary and stays.
+- **Copying the implementation into the test.** The expected value is computed the same way the code computes it,
+  so a wrong formula is wrong in both places: `genes/tests/test_transcript_geometry.py:TestTranscriptGeometry.test_last_junction_is_cdna_end_of_penultimate_exon`
+  recomputes `transcript_length - final_exon_length` (its first assertion, the penultimate exon's own cDNA end, is
+  the independent oracle). The same shape as a table: `annotation/tests/test_vep_columns.py:VepColumnsRegistryTest.test_gnomad4_helper_defaults`
+  restates a private helper's dict literal key by key. Test through the public entry point (`filter_for(...)` for a
+  build and columns version) against a fact the code doesn't own.
+- **A literal with no rule behind it.** A count (`len(rows) == 26` in
+  `annotation/tests/test_vep_columns.py:VepColumnsRegistryTest.test_filter_for_gnomad4_grch38_v3_count`), a set of
+  phase names, or a whole response dict with the volatile keys popped
+  (`classification/tests/views/test_classification_view.py:ClassificationTestCaseViews.test_return_data`, ~120 lines
+  that nothing in the test explains) - all copied from the first run. Every legitimate addition breaks it and a
+  wrong row in place of a right one passes. Assert the properties the input was chosen to exercise: these keys are
+  present, that alias was normalised, this field is `immutable`, no gnomAD 3 rows at columns version 3. Where the
+  point is "saves nothing" (`...test_test_mode`), assert the row doesn't exist, not sixty keys of JSON.
+- **Pinning a limitation or a declaration.** `genes/tests/test_genes_adversarial.py:TestTranscriptUtils.test_lrg_lowercase_false`
+  asserts that lowercase `lrg_` isn't detected - current behaviour, not a requirement, so a fix fails it. A default
+  (`annotation/tests/test_variant_annotation_version_status.py:VariantAnnotationVersionStatusTests.test_default_status_is_new`),
+  an `on_delete=CASCADE` (`analysis/tests/test_cohort_stats_cache.py:TestCohortStatsCascade.test_cgc_delete_cascades_to_stats`),
+  a `CELERY_TASK_ROUTES` entry: Django applies those, and the test restates the field. A test with no assertion at
+  all ("doesn't crash": `annotation/tests/test_clinvar_xml_parser.py:TestClinVarXmlParser.test_parsing_17662`) is the
+  same thing with the declaration left out.
+
+An exact expected value is not a snapshot when it is traceable to something the code doesn't own: a checked-in
+VCF/VEP/AnnotSV fixture, an HGVS or ClinVar standard, an issue number, or a derivation written in the test -
+`annotation/tests/test_ptc.py:TestAddCalculatedPTC.test_frameshift_upstream_of_last_junction_predicts_nmd` works the
+NMD arithmetic in its docstring, so every number traces to the GATA2 geometry. Two other shapes that survive any
+rewrite: a property (`genes/tests/test_hgvs_corpus.py:HGVSCorpusTests.test_sorting_is_a_total_order` - sort forwards
+and sort reversed input must agree; `analysis/tests/test_explicit_pk_substitution.py:TestExplicitPkSubstitution.test_merge_node_equivalent_with_gate_on_vs_off` -
+the optimisation on and off give the same pks) and a relative budget
+(`classification/tests/views/test_query_scaling.py:ClassificationDatatableScalingTest.test_datatable_query_count_flat_with_more_rows` -
+queries don't grow from 2 rows to 10, rather than an exact number).
 
 ## External services in tests
 

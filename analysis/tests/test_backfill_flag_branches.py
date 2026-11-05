@@ -11,7 +11,9 @@ from django.test import TestCase, override_settings
 from analysis.enums import PTCNMDFilter
 from analysis.models.nodes.filters.conservation_node import ConservationNode
 from analysis.models.nodes.filters.damage_node import DamageNode
-from analysis.tests.utils import AnalysisSetupMixin
+from analysis.tests.utils import AnalysisSetupMixin, create_annotated_variants, node_keeps
+from annotation.enums import NMDEscapeStatus
+from annotation.models.models import VariantAnnotation
 
 
 class _BackfillFlagMixin(AnalysisSetupMixin):
@@ -33,81 +35,81 @@ class _BackfillFlagMixin(AnalysisSetupMixin):
         return vav
 
 
+class _AnnotatedVariantsMixin(_BackfillFlagMixin):
+    """ A variant per ANNOTATIONS entry, its VariantAnnotation row holding those columns """
+    ANNOTATIONS: dict[str, dict] = {}
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        vav = cls.analysis.annotation_version.variant_annotation_version
+        cls.variants = create_annotated_variants(vav, cls.ANNOTATIONS)
+
+    def _filtered(self, node: DamageNode) -> set[str]:
+        return node_keeps(node, self.variants)
+
+
+def _spliceai(ag=0.0, al=0.0, dg=0.0, dl=0.0) -> dict:
+    # dbscsnv is in the same OR, so give it a score below every splice_min used here
+    return {"spliceai_pred_ds_ag": ag, "spliceai_pred_ds_al": al,
+            "spliceai_pred_ds_dg": dg, "spliceai_pred_ds_dl": dl,
+            "spliceai_max_ds": max(ag, al, dg, dl), "dbscsnv_ada_score": 0.0, "dbscsnv_rf_score": 0.0}
+
+
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
-class TestDamageNodeSpliceAIBackfillFlag(_BackfillFlagMixin, TestCase):
+class TestDamageNodeSpliceAIBackfillFlag(_AnnotatedVariantsMixin, TestCase):
+    ANNOTATIONS = {
+        "acceptor_gain": _spliceai(ag=0.6),
+        "donor_loss_only": _spliceai(dl=0.6),
+        "low": _spliceai(ag=0.2, al=0.2, dg=0.2, dl=0.2),
+        "no_spliceai": {"dbscsnv_ada_score": 0.0, "dbscsnv_rf_score": 0.0},
+    }
+
+    def _unbackfilled(self):
+        """ A partition annotated before spliceai_max_ds existed has it null on every row """
+        self._set_vav_flag(backfilled_spliceai_max_ds=False)
+        VariantAnnotation.objects.filter(variant__in=self.variants.values()).update(spliceai_max_ds=None)
 
     def test_backfilled_emits_single_max_ds_q(self):
-        """backfilled_spliceai_max_ds=True → use the optimised spliceai_max_ds column."""
         self._set_vav_flag(backfilled_spliceai_max_ds=True)
         node = DamageNode(analysis=self.analysis, splice_min=0.5)
-        q_str = str(node._get_node_q())
-        self.assertIn("variantannotation__spliceai_max_ds__gte", q_str)
-        self.assertNotIn("variantannotation__spliceai_pred_ds_ag", q_str)
-        self.assertNotIn("variantannotation__spliceai_pred_ds_al", q_str)
-        self.assertNotIn("variantannotation__spliceai_pred_ds_dg", q_str)
-        self.assertNotIn("variantannotation__spliceai_pred_ds_dl", q_str)
+        self.assertEqual({"acceptor_gain", "donor_loss_only"}, self._filtered(node))
 
     def test_unbackfilled_emits_per_field_ds_qs(self):
-        """backfilled_spliceai_max_ds=False → fall back to per-DS-field loop."""
-        self._set_vav_flag(backfilled_spliceai_max_ds=False)
+        self._unbackfilled()
         node = DamageNode(analysis=self.analysis, splice_min=0.5)
-        q_str = str(node._get_node_q())
-        self.assertNotIn("variantannotation__spliceai_max_ds__gte", q_str)
-        self.assertIn("variantannotation__spliceai_pred_ds_ag__gte", q_str)
-        self.assertIn("variantannotation__spliceai_pred_ds_al__gte", q_str)
-        self.assertIn("variantannotation__spliceai_pred_ds_dg__gte", q_str)
-        self.assertIn("variantannotation__spliceai_pred_ds_dl__gte", q_str)
+        self.assertEqual({"acceptor_gain", "donor_loss_only"}, self._filtered(node))
 
     def test_unbackfilled_required_no_allow_null_omits_per_field_isnull(self):
-        """splice_required without splice_allow_null on a pre-backfill VAV keeps the per-field
-        gte clauses but emits no isnull alternatives."""
-        self._set_vav_flag(backfilled_spliceai_max_ds=False)
-        node = DamageNode(
-            analysis=self.analysis,
-            splice_min=0.5,
-            splice_required=True,
-            splice_allow_null=False,
-        )
-        q_str = str(node._get_node_q())
-        # allow_null=False → no per-field isnull alternative
-        self.assertNotIn("spliceai_pred_ds_ag__isnull", q_str)
-        # but the per-field gte clauses still emitted
-        self.assertIn("variantannotation__spliceai_pred_ds_ag__gte", q_str)
-        self.assertIn("variantannotation__spliceai_pred_ds_dl__gte", q_str)
+        self._unbackfilled()
+        node = DamageNode(analysis=self.analysis, splice_min=0.5, splice_required=True, splice_allow_null=False)
+        self.assertEqual({"acceptor_gain", "donor_loss_only"}, self._filtered(node))
 
     def test_unbackfilled_required_allow_null_true_includes_isnulls(self):
-        self._set_vav_flag(backfilled_spliceai_max_ds=False)
-        node = DamageNode(
-            analysis=self.analysis,
-            splice_min=0.5,
-            splice_required=True,
-            splice_allow_null=True,
-        )
-        q_str = str(node._get_node_q())
-        for ds in ("spliceai_pred_ds_ag", "spliceai_pred_ds_al",
-                   "spliceai_pred_ds_dg", "spliceai_pred_ds_dl"):
-            self.assertIn(f"variantannotation__{ds}__isnull", q_str)
+        self._unbackfilled()
+        node = DamageNode(analysis=self.analysis, splice_min=0.5, splice_required=True, splice_allow_null=True)
+        self.assertEqual({"acceptor_gain", "donor_loss_only", "no_spliceai"}, self._filtered(node))
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
-class TestDamageNodeDamageCountsBackfillFlag(_BackfillFlagMixin, TestCase):
+class TestDamageNodeDamageCountsBackfillFlag(_AnnotatedVariantsMixin, TestCase):
+    ANNOTATIONS = {
+        "three_pathogenic": {"predictions_num_pathogenic": 3},
+        "one_pathogenic": {"predictions_num_pathogenic": 1},
+    }
 
     def test_backfilled_emits_predictions_num_pathogenic_clause(self):
         self._set_vav_flag(backfilled_damage_counts=True)
         node = DamageNode(analysis=self.analysis, damage_predictions_min=2)
-        q_str = str(node._get_node_q())
-        self.assertIn("variantannotation__predictions_num_pathogenic__gte", q_str)
+        self.assertEqual({"three_pathogenic"}, self._filtered(node))
 
     def test_unbackfilled_omits_predictions_num_pathogenic_clause(self):
-        """On pre-backfill VAV, predictions_num_pathogenic / predictions_num_benign
-        default to 0 on every row, so we skip the filter entirely rather than
-        excluding the whole partition."""
+        """ On a pre-backfill VAV the counts are 0 on every row, so the filter is skipped rather than
+            excluding the whole partition """
         self._set_vav_flag(backfilled_damage_counts=False)
+        VariantAnnotation.objects.filter(variant__in=self.variants.values()).update(predictions_num_pathogenic=0)
         node = DamageNode(analysis=self.analysis, damage_predictions_min=2)
-        q = node._get_node_q()
-        q_str = str(q) if q is not None else ""
-        self.assertNotIn("predictions_num_pathogenic", q_str)
-        self.assertNotIn("predictions_num_benign", q_str)
+        self.assertEqual({"three_pathogenic", "one_pathogenic"}, self._filtered(node))
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
@@ -152,8 +154,13 @@ class TestDamageNodeBackfillFlagWarnings(_BackfillFlagMixin, TestCase):
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
-class TestDamageNodePTCBackfillFlag(_BackfillFlagMixin, TestCase):
+class TestDamageNodePTCBackfillFlag(_AnnotatedVariantsMixin, TestCase):
     """ ptc_nmd (#579) is columns_version 5 only, so force the VAV up. """
+    ANNOTATIONS = {
+        "escaping": {"nmd_escape_status": NMDEscapeStatus.ESCAPING},
+        "predicted_nmd": {"nmd_escape_status": NMDEscapeStatus.PREDICTED_NMD},
+        "not_calculated": {"nmd_escape_status": None},
+    }
 
     def _cv5_node(self, **kwargs) -> DamageNode:
         vav = self.analysis.annotation_version.variant_annotation_version
@@ -170,15 +177,14 @@ class TestDamageNodePTCBackfillFlag(_BackfillFlagMixin, TestCase):
     def test_backfilled_emits_nmd_escape_status_clause(self):
         self._set_vav_flag(backfilled_ptc=True)
         node = self._cv5_node(ptc_nmd=PTCNMDFilter.ESCAPING)
-        self.assertIn("variantannotation__nmd_escape_status", str(node._get_node_q()))
+        self.assertEqual({"escaping"}, self._filtered(node))
 
     def test_unbackfilled_omits_nmd_escape_status_clause(self):
         """On pre-backfill VAVs nmd_escape_status is null on every row, so we skip the filter
         entirely rather than excluding the whole partition."""
         self._set_vav_flag(backfilled_ptc=False)
         node = self._cv5_node(ptc_nmd=PTCNMDFilter.ESCAPING)
-        q = node._get_node_q()
-        self.assertNotIn("nmd_escape_status", str(q) if q is not None else "")
+        self.assertEqual({"escaping", "predicted_nmd", "not_calculated"}, self._filtered(node))
 
     def test_ptc_warning_on_unbackfilled_vav(self):
         self._set_vav_flag(backfilled_ptc=False)

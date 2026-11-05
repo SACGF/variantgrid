@@ -37,8 +37,8 @@ class ClassificationTestDataMixin:
         self.somatic_tier_1_or_2 = self._create_classification("somatic",
                                                                somatic_clinical_significance=SomaticClinicalSignificance.TIER_1_OR_2)
 
-    def _create_classification(self, allele_origin: str, clinical_significance: str = None,
-                               somatic_clinical_significance: str = None) -> Classification:
+    def _create_classification(self, allele_origin: str, clinical_significance: str | None = None,
+                               somatic_clinical_significance: str | None = None) -> Classification:
         data = {
             SpecialEKeys.C_HGVS: {'value': 'c.301A>C'},
             SpecialEKeys.ALLELE_ORIGIN: {'value': allele_origin},
@@ -146,10 +146,8 @@ class InternalClassificationGridAnnotationTest(ClassificationTestDataMixin, Test
                          {"U", "tier_1", "tier_3", "tier_1_or_2"})
 
 
-@override_settings(CLASSIFICATION_ALLOW_UNKNOWN_KEYS=True)
-class BuiltInClassificationFilterTest(ClassificationTestDataMixin, TestCase):
-    """ The classification built-in filters / node counts - Classified is origin-agnostic,
-        Classified Pathogenic is germline LP/P, Classified Tier I/II is somatic """
+class ClassifiedVariantsMixin(ClassificationTestDataMixin):
+    """ A variant per classification (variant_pks is keyed by classification pk) and an analysis for their user """
 
     def setUp(self):
         super().setUp()
@@ -164,6 +162,12 @@ class BuiltInClassificationFilterTest(ClassificationTestDataMixin, TestCase):
             classification.allele = create_mock_allele(variant, grch37)
             classification.save()
             self.variant_pks[classification.pk] = variant.pk
+
+
+@override_settings(CLASSIFICATION_ALLOW_UNKNOWN_KEYS=True)
+class BuiltInClassificationFilterTest(ClassifiedVariantsMixin, TestCase):
+    """ The classification built-in filters / node counts - Classified is origin-agnostic,
+        Classified Pathogenic is germline LP/P, Classified Tier I/II is somatic """
 
     def _filter_variant_pks(self, built_in_filter) -> set:
         q = get_extra_filters_q(self.analysis, built_in_filter)
@@ -194,12 +198,19 @@ class ClassificationsNodeInputTest(AnalysisSetupMixin, TestCase):
             self.assertEqual((node.min_inputs, node.max_inputs), (1, 1))
             self.assertFalse(node.is_source)
 
+
+@override_settings(CLASSIFICATION_ALLOW_UNKNOWN_KEYS=True)
+class ClassificationsNodeNotMatchingTest(ClassifiedVariantsMixin, TestCase):
     def test_not_matching_negates_the_match(self):
-        matching = ClassificationsNode.objects.create(analysis=self.analysis,
-                                                      node_input=NodeMatchInput.PARENT_MATCHING)
+        """ The parent's variants the matching node drops - a variant nobody has classified among them """
+        unclassified_pk = slowly_create_test_variant("1", 2000, "A", "T", self.analysis.genome_build).pk
+        parent_pks = {*self.variant_pks.values(), unclassified_pk}
         not_matching = ClassificationsNode.objects.create(analysis=self.analysis,
+                                                          allele_origin=AlleleOriginFilterDefault.GERMLINE,
                                                           node_input=NodeMatchInput.PARENT_NOT_MATCHING)
-        self.assertEqual(not_matching._get_node_q(), ~matching._get_node_q())
+        filtered_pks = set(Variant.objects.filter(pk__in=parent_pks).filter(not_matching._get_node_q())
+                           .values_list("pk", flat=True))
+        self.assertEqual(parent_pks - {self.variant_pks[self.germline_p.pk]}, filtered_pks)
 
 
 class ClassificationsNodeEditorTest(AnalysisSetupMixin, TestCase):

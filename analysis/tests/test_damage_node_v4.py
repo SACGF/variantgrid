@@ -1,144 +1,117 @@
+import unittest
+
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from analysis.models import Analysis
 from analysis.models.nodes.filters.damage_node import DamageNode
+from analysis.tests.utils import create_annotated_variants, node_keeps
 from annotation.fake_data import (
-    create_fake_variant_annotation,
-    create_fake_variants,
     get_fake_annotation_settings_dict,
     get_fake_annotation_version,
 )
 from annotation.models import VariantAnnotationVersion
-from annotation.pathogenicity_predictions import TOOLS
-from snpdb.models import Variant
+from annotation.pathogenicity_predictions import TOOLS, PathogenicityTool, RawScoreDirection
 from snpdb.models.models_genome import GenomeBuild
 
+RAW_SCORE_TOOLS = [tool for tool in TOOLS if tool.raw_field]
+# (field, damaging value, other value)
+PRED_FIELDS = [("alphamissense_pred", "P", "B"), ("clinpred_pred", "D", "T"),
+               ("metarnn_pred", "D", "T"), ("primateai_pred", "D", "T")]
+
+
+def _threshold(tool: PathogenicityTool) -> float:
+    """ Three quarters of the way up the slider - inside every tool's range, and never 0 """
+    return tool.raw_min + (tool.raw_max - tool.raw_min) * 0.75
+
+
+def _raw_score(tool: PathogenicityTool, steps_to_damaging_side: int) -> float:
+    """ A score the given number of slider steps from the threshold, towards the damaging side """
+    offset = steps_to_damaging_side * tool.raw_step
+    if tool.raw_direction == RawScoreDirection.LOWER:
+        offset = -offset
+    return _threshold(tool) + offset
+
+
+class _ColumnsVersionMixin:
+    """ columns_version is a derived property on AnalysisNode (reads through the VAV), so forcing
+        the VAV is the only way to flip the node into a version's code path. """
+    COLUMNS_VERSION = 4
+    ROWS: dict[str, dict] = {}
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(cls.grch37)
+        vav = VariantAnnotationVersion.objects.filter(genome_build=cls.grch37).first()
+        vav.columns_version = cls.COLUMNS_VERSION
+        vav.save()
+        user = User.objects.get_or_create(username=f"test_{cls.__name__}")[0]
+        cls.analysis = Analysis(genome_build=cls.grch37)
+        cls.analysis.set_defaults_and_save(user)
+
+        cls.variants = create_annotated_variants(vav, cls.ROWS)
+
+    def _filtered(self, node: DamageNode, among: set[str]) -> set[str]:
+        return node_keeps(node, self.variants, among)
+
 
 @override_settings(**get_fake_annotation_settings_dict(columns_version=2))
-class TestDamageNodeV4Q(TestCase):
+class TestDamageNodeV4Q(_ColumnsVersionMixin, TestCase):
     """ Verifies DamageNode raw-score and pred-field filtering at columns_version 4. """
+    RAW_SCORE_ROWS = {"damaging", "at_threshold", "benign", "unscored"}
+    PRED_ROWS = {"pred_damaging", "pred_other", "pred_null"}
+    BAYESDEL_ROWS = {"bayesdel_negative", "bayesdel_zero", "bayesdel_positive"}
+    ROWS = {
+        "damaging": {tool.raw_field: _raw_score(tool, 1) for tool in RAW_SCORE_TOOLS},
+        "at_threshold": {tool.raw_field: _raw_score(tool, 0) for tool in RAW_SCORE_TOOLS},
+        "benign": {tool.raw_field: _raw_score(tool, -1) for tool in RAW_SCORE_TOOLS},
+        "unscored": {},
+        "pred_damaging": {field: damaging for field, damaging, _ in PRED_FIELDS},
+        "pred_other": {field: other for field, _, other in PRED_FIELDS},
+        "pred_null": {},
+        # BayesDel's range spans 0, so a slider at 0 is a real threshold
+        "bayesdel_negative": {"bayesdel_noaf_score": -0.5},
+        "bayesdel_zero": {"bayesdel_noaf_score": 0.0},
+        "bayesdel_positive": {"bayesdel_noaf_score": 0.5},
+    }
 
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
-        get_fake_annotation_version(cls.grch37)
-        # Force VAV onto v4 so DamageNode v4 branches activate. columns_version is a
-        # derived property on AnalysisNode (reads through the VAV), so this is the
-        # only way to flip the node into its v4 code path.
-        vav = VariantAnnotationVersion.objects.filter(genome_build=cls.grch37).first()
-        vav.columns_version = 4
-        vav.save()
-        user = User.objects.get_or_create(username="test_TestDamageNodeV4Q")[0]
-        cls.analysis = Analysis(genome_build=cls.grch37)
-        cls.analysis.set_defaults_and_save(user)
+    def test_raw_score_threshold_keeps_damaging_side_per_tool(self):
+        for tool in RAW_SCORE_TOOLS:
+            with self.subTest(tool=tool.name):
+                node = DamageNode(analysis=self.analysis, **{tool.node_threshold_field: _threshold(tool)})
+                self.assertEqual({"damaging", "at_threshold"}, self._filtered(node, self.RAW_SCORE_ROWS))
 
-    def test_raw_score_min_emits_per_tool_q(self):
-        # Pre-existing falsy-zero idiom in DamageNode means raw_min=0 is dropped;
-        # pick a small positive value (or the BayesDel midpoint) per tool.
-        kwargs = {}
-        expected_fields = []
-        for tool in TOOLS:
-            field = f"{tool.raw_field}_min" if tool.raw_field else None
-            if not field or not hasattr(DamageNode, field):
-                continue
-            kwargs[field] = max(tool.raw_min + tool.raw_step, 0.01)
-            expected_fields.append(tool.raw_field)
-        node = DamageNode(analysis=self.analysis, **kwargs)
-        q_str = str(node._get_node_q())
-        for raw_field in expected_fields:
-            self.assertIn(f"variantannotation__{raw_field}__gte", q_str)
+    # Suspected bug: _get_node_q's `if threshold := getattr(self, tool.node_threshold_field)` drops a 0 threshold
+    @unittest.expectedFailure
+    def test_raw_score_threshold_of_zero_filters(self):
+        node = DamageNode(analysis=self.analysis, bayesdel_noaf_score_min=0.0)
+        self.assertEqual({"bayesdel_zero", "bayesdel_positive"}, self._filtered(node, self.BAYESDEL_ROWS))
 
-    def test_pred_field_emits_per_tool_q(self):
-        node = DamageNode(
-            analysis=self.analysis,
-            alphamissense_pred="P",
-            clinpred_pred="D",
-            metarnn_pred="D",
-            primateai_pred="D",
-        )
-        q_str = str(node._get_node_q())
-        self.assertIn("variantannotation__alphamissense_pred", q_str)
-        self.assertIn("variantannotation__clinpred_pred", q_str)
-        self.assertIn("variantannotation__metarnn_pred", q_str)
-        self.assertIn("variantannotation__primateai_pred", q_str)
+    def test_pred_field_keeps_matching_prediction_per_tool(self):
+        for field, damaging, _ in PRED_FIELDS:
+            with self.subTest(field=field):
+                node = DamageNode(analysis=self.analysis, **{field: damaging})
+                self.assertEqual({"pred_damaging"}, self._filtered(node, self.PRED_ROWS))
 
-    def test_raw_score_required_with_allow_null_includes_isnull(self):
-        node = DamageNode(
-            analysis=self.analysis,
-            revel_rankscore_min=0.5,  # ensure required logic path executed
-            alphamissense_score_min=0.5,
-            alphamissense_score_required=True,
-            alphamissense_score_allow_null=True,
-        )
-        q_str = str(node._get_node_q())
-        self.assertIn("variantannotation__alphamissense_score__isnull", q_str)
-
-    def test_pred_filter_returns_expected_rows(self):
-        create_fake_variants(self.grch37)
-        vav = self.analysis.annotation_version.variant_annotation_version
-        variants = list(Variant.objects.filter(Variant.get_no_reference_q())[:3])
-        self.assertGreaterEqual(len(variants), 3)
-
-        v_path, v_benign, v_null = variants
-
-        va_path = create_fake_variant_annotation(v_path, vav)
-        va_path.alphamissense_pred = "P"
-        va_path.save()
-        va_benign = create_fake_variant_annotation(v_benign, vav)
-        va_benign.alphamissense_pred = "B"
-        va_benign.save()
-        create_fake_variant_annotation(v_null, vav)  # alphamissense_pred stays null
-
-        node = DamageNode(analysis=self.analysis, alphamissense_pred="P")
-        q = node._get_node_q()
-        matched = set(Variant.objects.filter(q)
-                                     .filter(pk__in=[v.pk for v in variants])
-                                     .values_list("pk", flat=True))
-        self.assertEqual(matched, {v_path.pk})
-
-    def test_raw_score_filter_returns_expected_rows(self):
-        create_fake_variants(self.grch37)
-        vav = self.analysis.annotation_version.variant_annotation_version
-        variants = list(Variant.objects.filter(Variant.get_no_reference_q())[:3])
-        self.assertGreaterEqual(len(variants), 3)
-
-        v_path, v_benign, v_null = variants
-
-        va_path = create_fake_variant_annotation(v_path, vav)
-        va_path.alphamissense_score = 0.9  # above 0.170 PP3-supporting
-        va_path.save()
-        va_benign = create_fake_variant_annotation(v_benign, vav)
-        va_benign.alphamissense_score = 0.05  # below threshold
-        va_benign.save()
-        create_fake_variant_annotation(v_null, vav)  # alphamissense_score stays null
-
-        node = DamageNode(analysis=self.analysis, alphamissense_score_min=0.170)
-        q = node._get_node_q()
-        matched = set(Variant.objects.filter(q)
-                                     .filter(pk__in=[v.pk for v in variants])
-                                     .values_list("pk", flat=True))
-        self.assertEqual(matched, {v_path.pk})
+    def test_raw_score_required_with_allow_null_keeps_unscored(self):
+        alphamissense = next(tool for tool in TOOLS if tool.raw_field == "alphamissense_score")
+        node = DamageNode(analysis=self.analysis, alphamissense_score_min=_threshold(alphamissense),
+                          alphamissense_score_required=True, alphamissense_score_allow_null=True)
+        self.assertEqual({"damaging", "at_threshold", "unscored"}, self._filtered(node, self.RAW_SCORE_ROWS))
+        node.alphamissense_score_allow_null = False
+        self.assertEqual({"damaging", "at_threshold"}, self._filtered(node, self.RAW_SCORE_ROWS))
 
 
 @override_settings(**get_fake_annotation_settings_dict(columns_version=2))
-class TestDamageNodeV3IgnoresV4Fields(TestCase):
+class TestDamageNodeV3IgnoresV4Fields(_ColumnsVersionMixin, TestCase):
     """ A v3 (or earlier) DamageNode must ignore v4-only model fields, even if set. """
+    COLUMNS_VERSION = 3
+    ROWS = {"alphamissense_high": {"alphamissense_score": 0.9},
+            "alphamissense_low": {"alphamissense_score": 0.05}}
 
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
-        get_fake_annotation_version(cls.grch37)
-        vav = VariantAnnotationVersion.objects.filter(genome_build=cls.grch37).first()
-        vav.columns_version = 3
-        vav.save()
-        user = User.objects.get_or_create(username="test_TestDamageNodeV3IgnoresV4Fields")[0]
-        cls.analysis = Analysis(genome_build=cls.grch37)
-        cls.analysis.set_defaults_and_save(user)
-
-    def test_v3_does_not_emit_v4_q(self):
+    def test_v3_ignores_raw_score_threshold(self):
         node = DamageNode(analysis=self.analysis, alphamissense_score_min=0.5)
-        q_str = str(node._get_node_q() or "")
-        self.assertNotIn("variantannotation__alphamissense_score__gte", q_str)
+        self.assertFalse(node.modifies_parents())
+        self.assertEqual({"alphamissense_high", "alphamissense_low"}, self._filtered(node, set(self.ROWS)))

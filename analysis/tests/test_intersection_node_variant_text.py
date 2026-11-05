@@ -6,6 +6,7 @@ from analysis.models.nodes.filters.intersection_node import IntersectionNode
 from analysis.tests.utils import AnalysisSetupMixin
 from analysis.variant_text import parse_region, resolve_variant_text
 from library.preview_request import PreviewData
+from snpdb.models.models_variant import Variant
 from snpdb.search import SearchResult
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
@@ -87,9 +88,11 @@ class ResolveVariantTextTest(AnalysisSetupMixin, TestCase):
 
     @override_settings(SEARCH_VARIANT_REQUIRE_CLASSIFICATION_FOR_NON_ADMIN=True)
     def test_classified_only_search_is_left_to_search(self):
-        """ On Shariant a non-admin's search only finds classified variants """
-        self._resolve("1:169519049 T>C", search_results=[_search_result(self.variant)])
-        self.search_data.assert_called_once()
+        """ On Shariant a non-admin's search only finds classified variants, so a coordinate in the database
+            isn't resolved locally - when search doesn't find it, neither does the node """
+        resolution = self._resolve("1:169519049 T>C")
+        self.assertEqual(resolution.variant_ids, [])
+        self.assertEqual(resolution.unresolved, ["1:169519049 T>C"])
 
 
 class IntersectionNodeVariantsQTest(AnalysisSetupMixin, TestCase):
@@ -99,9 +102,14 @@ class IntersectionNodeVariantsQTest(AnalysisSetupMixin, TestCase):
         self.assertEqual(node._get_node_q(), node.q_none())
 
     def test_variant_ids_and_regions_are_ored(self):
+        listed = slowly_create_test_variant("1", 5000, "A", "T", self.grch37)
+        in_region = slowly_create_test_variant("1", 10050, "A", "T", self.grch37)
+        elsewhere = slowly_create_test_variant("1", 20000, "A", "T", self.grch37)
         node = IntersectionNode(analysis=self.analysis, accordion_panel=IntersectionNode.VARIANTS,
-                                variant_text="x\ny", variant_ids=[1, 2], variant_regions=["1:100-200"])
-        self.assertEqual(node._get_node_q().connector, "OR")
+                                variant_text="x\ny", variant_ids=[listed.pk], variant_regions=["1:10000-10100"])
+        pks = [listed.pk, in_region.pk, elsewhere.pk]
+        filtered_pks = set(Variant.objects.filter(pk__in=pks).filter(node._get_node_q()).values_list("pk", flat=True))
+        self.assertEqual({listed.pk, in_region.pk}, filtered_pks)
 
     def test_text_that_resolved_to_nothing_still_modifies_parents(self):
         node = IntersectionNode(analysis=self.analysis, accordion_panel=IntersectionNode.VARIANTS,

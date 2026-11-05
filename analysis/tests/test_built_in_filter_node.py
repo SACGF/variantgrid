@@ -2,8 +2,9 @@ from django.test import TestCase, override_settings
 
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
 from analysis.tests.utils import AnalysisSetupMixin
-from annotation.enums import PathogenicityImpact
+from annotation.enums import ClinVarReviewStatus, Pathogenicity, PathogenicityImpact
 from annotation.fake_data import create_fake_variant_annotation, create_fake_variants
+from annotation.models.models_clinvar import ClinVar
 from snpdb.enums import BuiltInFilters
 from snpdb.models import Variant
 
@@ -59,9 +60,18 @@ class TestBuiltInFilterNode(AnalysisSetupMixin, TestCase):
         self.assertEqual(self._matched(node), {self.variants[0].pk})
 
     def test_clinvar_stars_min_adds_review_status_filter(self):
+        clinvar_version = self.analysis.annotation_version.clinvar_version
+        v_expert_panel, v_single_submitter, _v_no_record = self.variants
+        for i, (variant, review_status) in enumerate([
+                (v_expert_panel, ClinVarReviewStatus.REVIEWED_BY_EXPERT_PANEL),
+                (v_single_submitter, ClinVarReviewStatus.CRITERIA_PROVIDED_SINGLE_SUBMITTER)]):
+            ClinVar.objects.create(version=clinvar_version, variant=variant, clinvar_variation_id=i,
+                                   clinvar_allele_id=i, review_status=review_status,
+                                   highest_pathogenicity=Pathogenicity.PATHOGENIC)
+
         node = BuiltInFilterNode(analysis=self.analysis, built_in_filter=BuiltInFilters.CLINVAR,
                                  clinvar_stars_min=2)
-        self.assertIn("clinvar__review_status__in", str(node._get_node_q()))
+        self.assertEqual(self._matched(node), {v_expert_panel.pk})
 
     def test_node_name_shows_stars(self):
         node = BuiltInFilterNode(analysis=self.analysis, built_in_filter=BuiltInFilters.CLINVAR,

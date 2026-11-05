@@ -40,12 +40,27 @@ class TestConservationNode(AnalysisSetupMixin, TestCase):
     def test_individual_slider_above_minimum_filters(self):
         self.assertTrue(self._individual_node(gerp_pp_rs=4.4).modifies_parents())
 
-    def test_allow_null_skips_scores_that_are_never_null(self):
-        """ gerp_pp_rs comes from dbNSFP so intergenic variants are legitimately null """
-        node = self._individual_node(gerp_pp_rs=4.4, allow_null=True)
-        q_str = str(node._get_node_q())
-        self.assertIn("phylop_100_way_vertebrate__isnull", q_str)
-        self.assertNotIn("gerp_pp_rs__isnull", q_str)
+    def test_allow_null_keeps_null_phylop_but_not_null_gerp(self):
+        """ gerp_pp_rs comes from dbNSFP, so it is null on every intergenic variant - allowing nulls
+            there would let them all through """
+        node = ConservationNode(analysis=self.analysis)
+        maxed = {f: VariantAnnotation.CONSERVATION_SCORES[f]["max"] for f in node.get_individual_field_names()}
+        unconserved = {f: VariantAnnotation.CONSERVATION_SCORES[f]["min"] for f in maxed}
+        create_fake_variants(self.grch37)
+        vav = self.analysis.annotation_version.variant_annotation_version
+        v_null_gerp, v_null_phylop, v_unconserved = Variant.objects.filter(Variant.get_no_reference_q())[:3]
+        for variant, scores in [(v_null_gerp, unconserved | {"gerp_pp_rs": None}),
+                                (v_null_phylop, unconserved | {"phylop_100_way_vertebrate": None}),
+                                (v_unconserved, unconserved)]:
+            va = create_fake_variant_annotation(variant, vav)
+            VariantAnnotation.objects.filter(pk=va.pk).update(**scores)
+
+        # Every threshold at its score's max, so only a null that is allowed can pass
+        node = ConservationNode(analysis=self.analysis, use_individual_sliders=True, allow_null=True, **maxed)
+        matched = set(Variant.objects.filter(node._get_node_q())
+                      .filter(pk__in=[v_null_gerp.pk, v_null_phylop.pk, v_unconserved.pk])
+                      .values_list("pk", flat=True))
+        self.assertEqual(matched, {v_null_phylop.pk})
 
     def test_filter_returns_expected_rows(self):
         create_fake_variants(self.grch37)
