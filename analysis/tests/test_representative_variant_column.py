@@ -2,12 +2,10 @@
 Tests for the representative Variant column and the Classifications column (variantgrid_private#686).
 
 The renderers are client side, so what's tested here is what the server has to get right for them:
-the members riding along hidden, the columns, the genomic sort and the expanded row.
+the members riding along hidden, the columns, the genomic sort and the expanded row. Whether every
+client_renderer names a function the browser has is `vg page --js-writes-to-database` on an analysis
+grid: resolveFunctionName throws on an unknown name and the harness reports it as an uncaught error.
 """
-import os
-import re
-
-from django.conf import settings
 from django.test.client import Client
 from django.urls.base import reverse
 from django.utils.html import escape
@@ -105,21 +103,6 @@ class RepresentativeVariantColumnTest(GridExportTestCase):
         for path, value in [("alt__seq", "<DEL>"), ("variantannotation__hgvs_g", "NC_012920.1:m.16319G>A")]:
             cell = CellData(all_data={path: value}, key=path)
             self.assertEqual(self.grid._render_json_cell(cell, columns[path]), value, path)
-
-    def test_composite_columns_carry_their_renderers(self):
-        """ A client_renderer is resolved by name in the browser (resolveFunctionName), so every
-            VariantGridFormat renderer a column names has to be defined in variantgrid_formats.js """
-        formats_js = os.path.join(settings.BASE_DIR, "variantgrid", "static_files", "default_static", "js",
-                                  "variantgrid_formats.js")
-        with open(formats_js, encoding="utf-8") as f:
-            defined = set(re.findall(r"^VariantGridFormat\.(\w+)\s*=", f.read(), flags=re.MULTILINE))
-
-        prefix = "VariantGridFormat."
-        renderers = {rc.name: rc.client_renderer.removeprefix(prefix) for rc in self.grid.enabled_columns
-                     if rc.client_renderer and rc.client_renderer.startswith(prefix)}
-        self.assertIn("spliceai", renderers)  # a composite: drawn entirely client side
-        for name, renderer in renderers.items():
-            self.assertIn(renderer, defined, name)
 
     def test_composite_sort_menus_name_columns_in_the_grid(self):
         """ An entry naming a column this grid doesn't carry is dropped client side, so the menu has
