@@ -1,6 +1,7 @@
 """
 DamageNode filters over the plugins added to annotation versions in use (#2561): AVI, AlphaGenome splicing,
-SpliceVault and UTRAnnotator - skipped until the version is backfilled, AlphaGenome splicing joining the splicing OR.
+SpliceVault and UTRAnnotator - skipped until the version is backfilled, or where it withholds the column (#2571),
+AlphaGenome splicing joining the splicing OR.
 """
 from unittest.mock import patch
 
@@ -22,8 +23,10 @@ PLUGIN_FILTERS = {"avi_phred_min": 20, "alphagenome_splicing_min": 0.5,
                   "splicevault_out_of_frame": SpliceVaultOutOfFrame.ALL, "utr_high_impact": UTRHighImpact.ANY_FRAME}
 
 
+# The fake version has no AlphaGenome pin, so it would withhold that column: the tests say which columns are offered
 @override_settings(**get_fake_annotation_settings_dict(columns_version=2))
 @patch.object(VariantAnnotationVersion, "visible_columns", PLUGIN_COLUMNS)
+@patch.object(VariantAnnotationVersion, "withheld_licence_restricted_columns", frozenset())
 class DamageNodePluginFiltersTest(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -59,6 +62,19 @@ class DamageNodePluginFiltersTest(TestCase):
                        "utr_annotator_annotation__iregex"]:
             self.assertIn(lookup, q_str)
         self.assertFalse([w for w in node.get_warnings() if "NOT being applied" in w])
+
+    def test_withheld_non_commercial_filter_not_applied(self):
+        """ #2571: a saved AlphaGenome threshold on a version that withholds it (licence rules out the deployment's use) mustn't still filter """
+        self._set_backfilled(True)
+        node = DamageNode(analysis=self.analysis, alphagenome_splicing_min=0.5, avi_phred_min=20)
+        withheld = frozenset({"alphagenome_splicing"})
+        with (patch.object(VariantAnnotationVersion, "visible_columns", PLUGIN_COLUMNS - withheld),
+              patch.object(VariantAnnotationVersion, "withheld_licence_restricted_columns", withheld)):
+            q_str = str(node._get_node_q())
+            warnings = node.get_warnings()
+        self.assertNotIn("alphagenome_splicing", q_str)
+        self.assertIn("avi_phred__gte", q_str)
+        self.assertEqual(1, len([w for w in warnings if "AlphaGenome splicing filter is NOT being applied" in w]))
 
     def test_alphagenome_splicing_is_a_splicing_or_term(self):
         """ Required splicing keeps a variant passing SpliceAI or AlphaGenome, or with no AlphaGenome score """
