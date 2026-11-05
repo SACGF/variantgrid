@@ -44,8 +44,7 @@ def queryset_to_pk_in_q(qs: QuerySet) -> Q:
         We render to RawSQL, capturing the compiled SQL + params (incl. the partition table rewrite the
         TransformerQuerySet applies in as_sql), so it runs as a single DB-side semi-join. RawSQL also keeps
         arg_q_dict picklable for the q-cache cache.set: a live TransformerQuerySet embedded in the Q is
-        unpicklable (closure-local compiler classes) which previously forced the materialise-to-list
-        workaround (issue #546, #240, ad35a7fb1). """
+        unpicklable (closure-local compiler classes) (issue #546, #240). """
     pk_qs = qs.values_list("pk", flat=True)
     sql, params = pk_qs.query.sql_with_params()
     return Q(pk__in=RawSQL(sql, params))

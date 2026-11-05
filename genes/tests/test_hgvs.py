@@ -127,8 +127,7 @@ class TestHGVS(TestCase):
             integration point. Exercises all three version strategies (via the
             version=4 / version=None inputs) and locks the method_sort fix: local
             (internal) resolution must sort before the external ClinGen Allele
-            Registry (the old code compared an enum against a string constant, so the
-            'prefer local' branch never engaged). """
+            Registry. """
         LOCAL = HGVSConverterType.BIOCOMMONS_HGVS
         CLINGEN = HGVSConverterType.CLINGEN_ALLELE_REGISTRY
         # Local present for [1,2,3,5,6] (missing v4); ClinGen present for all [1..6]

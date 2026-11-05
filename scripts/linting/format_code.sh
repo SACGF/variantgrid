@@ -2,7 +2,7 @@
 
 VG_DIR=$(dirname $0)/../..
 
-# Ruff replaces the old autopep8 pass. Safe auto-fixes only: whitespace,
+# Safe auto-fixes only: whitespace,
 # unused imports, import ordering, modern-syntax. Config: ruff.toml
 ruff check "${VG_DIR}" --fix
 

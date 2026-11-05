@@ -1023,7 +1023,7 @@ VariantGridFormat.representativeVariantLabel = (variantId, rowData) => {
         return {html: `<span class='rv-hgvs'>${escapeHtml(chrom)}:${position} ${escapeHtml(_formatAllele(ref))}&gt;${escapeHtml(_formatAllele(alt))}</span>`,
                 title: title};
     }
-    // 5. Last resort while annotation is still running - the id the old details box linked to
+    // 5. Last resort while annotation is still running
     return {html: `<span class='rv-sub'>v ${variantId}</span>`, title: `VariantGrid variant ${variantId}`};
 };
 
