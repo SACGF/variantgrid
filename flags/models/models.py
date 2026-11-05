@@ -552,9 +552,6 @@ class FlagCollection(models.Model, GuardianPermissionsMixin):
 
         return flag
 
-    # note that unseen flag activity is no longer supported (well was never really supported, can look at supporting
-    # it properly one day)
-
 
 def fetch_flag_infos(flag_collections: list[FlagCollection], flags: Iterable[Flag], user: User = None) -> FlagInfos:
     flag_infos = FlagInfos(flag_collections=flag_collections, flags=flags)

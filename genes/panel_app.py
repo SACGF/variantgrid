@@ -193,7 +193,6 @@ def _get_or_update_panel_app_panel(server, json_data):
 def store_panel_app_panels_from_web(server: PanelAppServer, cached_web_resource: CachedWebResource):
     """ Used to build autocomplete list """
 
-    # Now uses paging
     num_panels = 0
     seen_panel_ids: set[int] = set()
     url = server.url + PANEL_APP_LIST_PANELS_PATH

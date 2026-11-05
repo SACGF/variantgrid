@@ -148,7 +148,6 @@ def generate_auto_populate_data(
     data[SpecialEKeys.GENOME_BUILD] = genome_build.get_build_with_patch(annotation_version)
     data[SpecialEKeys.CURATION_SYSTEM] = get_curation_system()
 
-    # Used to be a check if variant existed, but pretty sure it can be guaranteed to exist at this point
     data.annotation_version = annotation_version
     data.update(get_evidence_fields_for_variant(genome_build, variant,
                                                 refseq_transcript_accession, ensembl_transcript_accession,

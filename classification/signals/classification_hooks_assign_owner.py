@@ -22,7 +22,6 @@ def assign_classification_user(sender, **kwargs) -> ValidationMerger:  # pylint:
     vm = ValidationMerger()
 
     if patch_meta.is_modified(SpecialEKeys.OWNER):
-        # user_correct = False
         owner_text = patch_meta.get(SpecialEKeys.OWNER)
         user = User.objects.filter(username=owner_text).first()
         if user:
@@ -40,17 +39,8 @@ def assign_classification_user(sender, **kwargs) -> ValidationMerger:  # pylint:
                 # user is valid for this lab (currently anyway)
                 # assign the record to the user.
                 record.user = user
-                # user_correct = True
                 if record.id:
                     record.fix_permissions()
 
-        # removed this message as it was exposing owner names in Shariant where we didn't want to see them
-        # if not user_correct:
-        #     message = f'"{owner_text}" is not currently a user in this system, record is assigned to "{record.user.username}"'
-        #     vm.add_message(
-        #         key=SpecialEKeys.OWNER,
-        #         code=ValidationCode.USER_NOT_FOUND,
-        #         severity='info',
-        #         message=message,
-        #     )
+        # No message when the owner isn't a user here, as it would expose owner names on Shariant
     return vm

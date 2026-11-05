@@ -95,8 +95,7 @@ class DbRefRegexResult:
         self.match = match
 
         # this is where we check our database to see if we know what this reference is about
-        # no longer pre-emptively load citation, save that for rendering
-        # but normalise the ID
+        # citations are loaded at render time, here we only normalise the ID
         if self.db in {"PMID", "PMCID", "Bookshelf ID"}:
             self.idx = CitationIdNormalized.from_parts(self.db, self.idx).index
 

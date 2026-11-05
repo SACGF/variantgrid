@@ -495,11 +495,6 @@ class ClassificationFilter:
             except ValueError:
                 raise ParseError(f"Invalid 'allele' parameter: '{allele_str}' - expected an allele id (eg 9678 or a9678)")  # noqa: B904
 
-        ## Have removed the ability to provide record filters in general from_request
-        # record_filters: Optional[str] = None
-        # if record_filters_str := request.query_params.get('record_filters'):
-        #     record_filters = record_filters_str
-
         benchmarking = request.query_params.get('benchmark') == 'true'
 
         rows_per_file = None
@@ -582,10 +577,6 @@ class ClassificationFilter:
         return flag_ids_to(Classification, FlagComment.objects.filter(
             flag__flag_type__in={
                 classification_flag_types.classification_withdrawn,
-                ## the following flags are no longer supported
-                # classification_flag_types.transcript_version_change_flag,
-                # classification_flag_types.matching_variant_warning_flag,
-                # classification_flag_types.classification_pending_changes
             },
             created__gte=self.since
         ))

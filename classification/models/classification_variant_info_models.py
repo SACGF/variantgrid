@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from dataclasses import replace as dataclass_replace
 from datetime import timedelta
 from functools import lru_cache
-from typing import Any, Literal, Optional, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, Optional, TypedDict
 
 import django.dispatch
 from django.apps import apps
@@ -74,11 +74,14 @@ from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, GenomeBuildPatchVersion, Variant, VariantCoordinate
 from snpdb.models.models import CodeVersion, CodeVersionMixin
 
+if TYPE_CHECKING:
+    from classification.models.classification import ClassificationImport
+    from snpdb.models.models_variant import LiftoverRun
+
 """
-Now we have
 Classifications
 - have a genome_build, c.hgvs when first created
-- attempt to avoid referring to classification.allele now, instead classification.allele_info.allele
+- refer to classification.allele_info.allele rather than classification.allele
 
 ImportedAlleleInfo
 - shared between classifications that have the same genome_build, c.hgvs
@@ -1189,8 +1192,7 @@ class ImportedAlleleInfo(TimeStampedModel):
         """ returns if a valid variant_coordinate could be derived """
 
         # TODO, support variant_coordinate being provided
-        # Code used to check to see if transcript was supported here
-        # but it's better to do that in the validation step
+        # Whether the transcript is supported is checked in the validation step
         cvc = self.calculate_variant_coordinate()
         self.message = cvc.message
         self.hgvs_converter_version = cvc.hgvs_converter_version

@@ -57,7 +57,7 @@ class QueryJsonFilter:
         # special hardcoded segment, should migrate
         if key == SOMATIC_FILTER_KEY:
             if value is False:
-                # old code also allowed value to be isnull
+                # not somatic includes records with no allele origin
                 return ~self.q('allele_origin', ['somatic'], 'in') | self.q('allele_origin', True, 'isnull')
             else:
                 # so ugly that this is the only way I know to make a Q that wont restrict record counts

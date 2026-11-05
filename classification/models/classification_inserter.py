@@ -6,7 +6,6 @@ from django.contrib.auth.models import User
 from django.db import transaction
 from django.utils.timezone import now
 
-# from classification.enums import ForceUpdate
 from classification.enums import (
     ClassificationPatchStatus,
     ShareLevel,
@@ -126,15 +125,6 @@ class BulkClassificationInserter:
             debug_timer.tick("Security Check")
 
             # -- ENSURE REQUEST IS WELL FORMATTED --
-
-            # note we don't actually use ForceUpdate for anything at the moment
-            # at one time (never in prod) was used to stop changes to only source ID, curation date
-            # force: Optional[ForceUpdate] = None
-            # if force_str := data.pop('force', None):
-            #     try:
-            #         force = ForceUpdate(force_str)
-            #     except ValueError:
-            #         pass
 
             for op in ['create', 'upsert', 'overwrite', 'data', 'patch', 'patch-empty']:
                 op_data = data.pop(op, None)
@@ -311,8 +301,7 @@ class BulkClassificationInserter:
                         record.set_withdrawn(user=user, withdraw=False)
 
                 elif record.withdrawn:
-                    # Withdrawn records are no longer automatically un-withdrawn
-                    # record.set_withdrawn(user=user, withdraw=False)
+                    # An update leaves a withdrawn record withdrawn, only an explicit undelete un-withdraws it
                     patch_response.status = ClassificationPatchStatus.ALREADY_WITHDRAWN
                     patch_response.lab_record_id = record.lab_record_id
                     patch_response.append_warning(code="withdrawn",

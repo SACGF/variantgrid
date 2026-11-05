@@ -50,12 +50,7 @@ def nan_to_none(val):
 
 
 def df_nan_to_none(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    old code: df.where((pd.notnull(df)), None) no longer works in Pandas 1.3.0 (comment July 2021)
-    see https://github.com/pandas-dev/pandas/issues/17494#issuecomment-328890572
-
-    I then moved to "return df.replace(np.nan, None)" but this didn't always work
-    """
+    """ astype(object) first, as where()/replace() on a numeric column coerce None back to NaN """
     return df.astype(object).where(pd.notna(df), None)
 
 

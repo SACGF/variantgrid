@@ -151,7 +151,7 @@ class UsedKeyTracker:
     def check_evidence_qs(self, qs: QuerySet[ClassificationModification]):
         """
         By performing an aggregate over the entire queryset, work out which columns
-        have values, the old way was to just review all the data twice.
+        have values.
         """
         aggregate_list = [kp.count_aggregate() for kp in self.all_key_properties]
         result_dict = qs.aggregate(*aggregate_list)

@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from functools import cached_property, reduce
 from re import Match, Pattern
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -41,6 +41,9 @@ from library.preview_request import (
 )
 from library.utils import clean_string, first, remove_duplicates_from_list
 from snpdb.models import Allele, GenomeBuild, UserSettings, Variant
+
+if TYPE_CHECKING:
+    from genes.enums import AnnotationConsortium
 
 HAS_ALPHA_PATTERN = re.compile(r"[a-zA-Z]")
 HAS_ANYTHING = re.compile(r".")
@@ -312,11 +315,7 @@ class SearchResult:
 
     @property
     def error_severity(self) -> Optional[LogLevel]:
-        # I originally looked through messages to get max severity but many
-        # messages on ok results have been set to ERROR
-        # severity_list = [m.severity for m in self.messages]
-        # if severity_list:
-        #    ms = max(severity_list, key=log_level_to_int)
+        # From the preview, not the messages: many messages on ok results are set to ERROR
         ms = None
         if self.preview.is_error:
             ms = LogLevel.ERROR
@@ -428,7 +427,7 @@ class SearchResult:
         return self.preview.genome_builds
 
     @property
-    def annotation_consortia(self) -> Optional[list['AnnotationConsortia']]:
+    def annotation_consortia(self) -> Optional[list['AnnotationConsortium']]:
         if consortia := self.preview.annotation_consortia:
             return sorted(consortia)
 

@@ -105,7 +105,7 @@ class AbstractBulkVCFProcessor(abc.ABC):
         return {}  # No variants, or only reference
 
     def add_modified_imported_variant(self, variant: cyvcf2.Variant, variant_hash, miv_hash_list=None, miv_list=None):
-        # This used to handle VT tags: OLD_MULTIALLELIC / OLD_VARIANT but now we handle BCFTOOLS only
+        # Reads the bcftools OLD_VARIANT tag
         if bcftools_old_variant := variant.INFO.get(ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG):
             ref, alt, svlen, _modification = vcf_get_ref_alt_svlen_and_modification(variant,
                                                                                     old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)

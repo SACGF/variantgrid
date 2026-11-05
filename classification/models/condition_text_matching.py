@@ -1163,11 +1163,6 @@ def condition_matching_suggestions(ct: ConditionText, ignore_existing=False) -> 
                     cms.add_message(ConditionMatchingMessage(severity="success",
                                                              text=f"{term.id} : has a relationship to {gene_symbol.symbol}"))
                     cms.add_term(matches_gene_level_leafs[0])
-                    # code that used to tell you which other leaf terms were related, but got too messy
-                    # for term in sorted(list(not_root_gene_terms), key=attrgetter("name")):
-                    #    if term != matches_gene_level_leafs[0]:
-                    #        cms.add_message(ConditionMatchingMessage(severity="info", text=f"{term.id} {term.name} is also associated to {gene_symbol}"))
-
                 elif len(not_root_gene_terms) == 1:
                     term = not_root_gene_terms[0]
                     cms.add_term(term)

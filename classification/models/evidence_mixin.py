@@ -268,15 +268,6 @@ class EvidenceMixin:
             if transcript := self.get(transcript_key):
                 return transcript
 
-        # note old code would try to fix the transcript version of the record
-        # but only if refseq_transcript_id and ensemble were blank
-        """
-        matcher = HGVSMatcher(self.get_genome_build())
-        transcript_id = matcher.get_transcript_id(c_hgvs, transcript_version=True)
-        if transcript_id:
-            return transcript_id
-        """
-
         return None
 
     def calc_clinical_significance_choice(self) -> Optional[str]:

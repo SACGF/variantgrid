@@ -80,5 +80,5 @@ class SnpdbConfig(AppConfig):
         if sys.version_info < (3, 10):
             raise SystemExit("VariantGrid requires Python 3.10 or later.")
 
-        # So static serve of MEDIA_ROOT just prompts to download VCF (used to rename to vcf.vcf)
+        # So static serve of MEDIA_ROOT prompts to download a VCF rather than display it
         mimetypes.add_type("application/octet-stream", ".vcf", strict=True)

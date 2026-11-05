@@ -266,8 +266,8 @@ class DiscordanceReport(TimeStampedModel, ReviewableModelMixin, PreviewModelMixi
 
         report = DiscordanceReport(clinical_context=self.clinical_context, cause_text=cause)
         report.save()
-        # there used to be code that would create a new discordance report at the state the old "continued discordance" report was in
-        # but that's very confusing as the data won't match the created date aka "discordance detected date"
+        # The new report starts from the current state, not the continued one's, so its data matches its created
+        # date (the "discordance detected date")
         ccd = ClinicalContextChangeData(
             cause_text=cause,
             cause_code=ClinicalContextRecalcTrigger.RE_OPEN

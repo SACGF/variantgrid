@@ -159,7 +159,7 @@ def write_scripts(args):
                 # bcftools merge doesn't work with type='A'
                 modify_fields2 = "sed -e 's/,Number=A,/,Number=1,/'"
                 # gnomAD appears to already be decomposed - vt decompose + -s -o +
-                # We no longer remove AC=0 as we want to keep AN (total counts) for pops for later AF calculations
+                # AC=0 records are kept, as AN (total counts) per population is needed for later AF calculations
                 cs.write(f"bcftools annotate --remove '^{keep_columns}' {annotate_args} {gnomad_vcf_filename} | {modify_fields2} | vt uniq + -o {output_vcf}\n")
                 output_vcfs.append(output_vcf)
 

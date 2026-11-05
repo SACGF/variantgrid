@@ -305,13 +305,8 @@ def _build_venn_cache(vennode_cache: VennNodeCache):
                                               version=vennode_cache.parent_a_node_version.version)
         b = AnalysisNode.objects.get_subclass(pk=vennode_cache.parent_b_node_version.node_id,
                                               version=vennode_cache.parent_b_node_version.version)
-        # We retrieve variant ids and do set operations in Python
-        # We originally did this via except/intersect then select into but sometimes
-        # died w/ "too many range tables" (joining across too many partitions)
-
-        # If we were going to do that we should have used Django QS methods instead
-        # https://docs.djangoproject.com/en/4.1/ref/models/querysets/#union
-        # and then write_sql_to_variant_collection
+        # Set operations on variant ids are done in Python: EXCEPT/INTERSECT in SQL can fail with
+        # "too many range tables" when joining across many partitions
 
         # Pulling a side's variant ids is the expensive part, so skip the ones an empty parent
         # already decides - an empty intersection stays empty however big the other side is

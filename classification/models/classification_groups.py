@@ -25,8 +25,7 @@ from snpdb.models import Allele, GenomeBuild, Lab
 #
 # DEPRECATED
 #
-# This is only used on the Discordance Report (soon to get rid of)
-# It has been replaced by ClassificationGroupingColumn - which is stored in the database
+# Superseded by ClassificationGroupingColumn, which is stored in the database
 
 
 # This is the primary way of displaying classifications (not count the big fat listing)

@@ -191,15 +191,6 @@ class FlagHelper:
             comments = flag.flagcomment_set.order_by('created')
             for comment in comments:
                 self.include_comment(flag_comment=comment, detailed=True)
-            # previously included first and last comment for tooltips
-            # but made syncing difficult
-            """
-            else:
-                if comments:
-                    comments = comments.all()
-                    self.include_comment(flag_comment=comments.first())
-                    self.include_comment(flag_comment=comments.last())
-            """
         self.include_user(flag.user)
 
     def include_flag_type(self, flag_type: FlagType):

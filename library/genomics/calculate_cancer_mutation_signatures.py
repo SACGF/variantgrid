@@ -192,7 +192,7 @@ class MutationSignatures:
 
         # --------------------------
         # get observed data in VCF file
-        self.ObservedRawFrequency = None   # this is now
+        self.ObservedRawFrequency = None   # counts per mutation type, not normalised
         self.RawMutIndexList = []    # list of observed mutations (by index)
         self.TOTAL_VARS = 0
 
@@ -258,8 +258,8 @@ class MutationSignatures:
                 row_ct += 1
 
     def ParseVCF(self, reference_fasta, vcf_filename):
-        """ previous this function would update self.observed_freq, which contains normalised frequencies
-            but this is no longer useful, as it won't allow random subsampling, so need to keep it as counts """
+        """ Keeps the observed mutations as counts rather than normalised frequencies, so they can be
+            randomly subsampled """
 
         reference = FastaFileWrapper(reference_fasta)
         invcf = cyvcf2.VCF(vcf_filename)

@@ -71,10 +71,7 @@ def match_evidence_option(options, check_value) -> Optional[dict[str, str]]:
             aliases.append(option_value)
         if option.get('label'):
             aliases.append(option.get('label'))
-        # Originally had index as a value you could submit, but this starts to get dangerous for fields
-        # that allow custom values, can't distinguish between index 3 and custom value 3
-        # if option.get('index') is not None:
-        #    aliases.append(str(option.get('index')))
+        # Index isn't accepted as a value: where custom values are allowed, index 3 and custom value 3 would clash
         elif option_value:
             aliases.append(EvidenceKey.pretty_label_from_string(option_value))
 
