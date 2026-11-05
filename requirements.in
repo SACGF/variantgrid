@@ -3,7 +3,7 @@ more-itertools
 beautifulsoup4
 bgzip>=0.5.0
 biopython>=1.81
-cdot>=0.2.35
+cdot>=0.2.37
 celery
 certifi>=2026.10.19  # transitive (requests): drops the compromised eMudhra emSign roots
 dataclasses-json==0.6.7  # pinned for omniimporter

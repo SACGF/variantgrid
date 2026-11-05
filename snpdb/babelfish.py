@@ -10,8 +10,6 @@ from typing import TYPE_CHECKING
 from cdot.hgvs.dataproviders.fasta_seqfetcher import GenomeFastaSeqFetcher
 from hgvs.extras.babelfish import Babelfish
 
-from library.genomics.fasta_wrapper import make_contig_fastas_thread_local
-
 if TYPE_CHECKING:
     # snpdb.models.models_variant imports this module, so importing snpdb.models here closes a cycle
     from snpdb.models.models_genome import GenomeBuild
@@ -27,10 +25,6 @@ def babelfish_assembly_name(genome_build: 'GenomeBuild') -> str:
 class GenomeFastaSequenceProvider(GenomeFastaSeqFetcher):
     """ The one data provider method Babelfish's VCF coordinate conversions call. Looks contigs up by
         accession, as the HGVS converter's fasta seqfetcher does """
-
-    def __init__(self, *args):
-        super().__init__(*args)
-        make_contig_fastas_thread_local(self.contig_fastas)  # get_genome_babelfish shares this across threads
 
     def get_seq(self, ac, start_i=None, end_i=None) -> str:
         return self.fetch_seq(ac, start_i, end_i)

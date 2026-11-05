@@ -1,11 +1,6 @@
 """
-pysam FASTA access: FastaFileWrapper (fasta[chrom][start:end], contig names converted on lookup) and
-ThreadLocalFastaFile / make_contig_fastas_thread_local, which give each thread and process its own handle under a
-cdot seqfetcher that is shared (cached) across them (#2624).
+pysam FASTA access: FastaFileWrapper (fasta[chrom][start:end], contig names converted on lookup).
 """
-import os
-import threading
-
 from pysam.libcfaidx import FastaFile
 
 
@@ -49,37 +44,3 @@ class FastaFileWrapper:
             raise KeyError(msg)
         return FastaFileContigWrapper(self.fasta_file, contig)
 
-
-class ThreadLocalFastaFile:
-    """ A FastaFile opened once per thread and per process. One pysam handle read from two threads, or from both sides
-        of a fork, breaks for the life of the process ("failure when retrieving sequence" on every fetch) """
-
-    def __init__(self, filename):
-        self.filename = filename
-        self._local = threading.local()
-
-    @property
-    def fasta_file(self) -> FastaFile:
-        local = self._local
-        # A forked child keeps the forking thread's locals, so the pid says whose handle it is
-        if getattr(local, "pid", None) != os.getpid():
-            local.fasta_file = FastaFile(self.filename)
-            local.pid = os.getpid()
-        return local.fasta_file
-
-    def fetch(self, *args, **kwargs) -> str:
-        return self.fasta_file.fetch(*args, **kwargs)
-
-    def __getattr__(self, name):
-        return getattr(self.fasta_file, name)
-
-
-def make_contig_fastas_thread_local(contig_fastas: dict):
-    """ Swaps the FastaFiles in a cdot GenomeFastaSeqFetcher's contig_fastas ({contig: FastaFile}) for
-        ThreadLocalFastaFiles, so the seqfetcher can be cached and shared. Until cdot does this itself (SACGF/cdot#234) """
-    proxies = {}
-    for contig, fasta_file in contig_fastas.items():
-        if (proxy := proxies.get(id(fasta_file))) is None:
-            proxy = proxies[id(fasta_file)] = ThreadLocalFastaFile(fasta_file.filename)
-            fasta_file.close()
-        contig_fastas[contig] = proxy

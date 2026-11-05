@@ -9,7 +9,6 @@ from hgvs.exceptions import HGVSDataNotAvailableError
 from genes.enums import MANEStatus
 from genes.models import MANE, NoTranscript, TranscriptVersion, TranscriptVersionSequenceInfo
 from genes.transcripts_utils import get_refseq_type
-from library.genomics.fasta_wrapper import make_contig_fastas_thread_local
 from snpdb.models import Contig
 
 # cdot tag spellings expected by cdot's DEFAULT_TAG_PRIORITY list
@@ -67,7 +66,6 @@ class SingleBuildFastaSeqFetcher(FastaSeqFetcher):
         the genome build provided """
     def __init__(self, genome_build):
         super().__init__(genome_build.genome_fasta.filename)
-        make_contig_fastas_thread_local(self.contig_fastas)  # HGVSMatcher.instance shares this across threads
         self.genome_build = genome_build
 
     def fetch_seq(self, ac, start_i=None, end_i=None):
