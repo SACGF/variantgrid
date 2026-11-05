@@ -19,7 +19,10 @@ from annotation.models import (
     CohortGenotypeGeneAnnotationStats,
     CohortGenotypeVariantAnnotationStats,
 )
-from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
+from annotation.tasks.calculate_sample_stats import (
+    SAMPLE_STATS_CODE_VERSION,
+    enqueue_cohort_stats_recompute,
+)
 from snpdb.enums import BuiltInFilters
 from snpdb.models import CohortGenotypeStats
 
@@ -37,8 +40,8 @@ def get_cached_label_count_for_cohort(cohort, sample, filter_key: Optional[str],
                                       enqueue_recompute: Optional[Callable[[], None]] = None) -> Optional[int]:
     """ sample=None → aggregate row; sample=Sample(...) → per-sample row.
         filter_key=None → raw count; canonical-JSON string → filter-keyed row.
-        Returns None on cache miss (caller falls back to live count); on miss
-        also fires a lazy recompute task - enqueue_recompute, or the cohort's. """
+        Returns None on cache miss - no row, or one from an older stats version - so the caller falls back
+        to a live count; on miss also fires a lazy recompute task - enqueue_recompute, or the cohort's. """
     model = LABEL_TO_MODEL.get(label)
     if model is None:
         return None
@@ -59,8 +62,11 @@ def get_cached_label_count_for_cohort(cohort, sample, filter_key: Optional[str],
         lookup["clinvar_version"] = annotation_version.clinvar_version
 
     try:
-        obj = model.objects.get(**lookup)
+        obj = model.objects.select_related("code_version").get(**lookup)
     except ObjectDoesNotExist:
+        obj = None
+    # A row from an older SAMPLE_STATS_CODE_VERSION may count the label by an older rule (#2662)
+    if obj is None or obj.code_version.version < SAMPLE_STATS_CODE_VERSION:
         if enqueue_recompute:
             enqueue_recompute()
         else:
