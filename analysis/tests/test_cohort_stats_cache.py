@@ -7,13 +7,15 @@
       - SampleNode (per-sample) and CohortNode (aggregate) cache hits use
         the right row keys
 """
-from unittest.mock import patch
+from typing import Optional
+from unittest.mock import Mock, patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase
 
 from analysis.enums import TrioInheritance
 from analysis.models import CohortNode, TrioNode
+from analysis.models.nodes.stats_cache import get_cached_label_count_for_cohort
 from annotation.fake_data import get_fake_annotation_version
 from annotation.models import (
     CohortGenotypeClinVarAnnotationStats,
@@ -27,7 +29,7 @@ from annotation.tasks.calculate_sample_stats import (
 )
 from library.utils.json_utils import canonical_filter_key
 from patients.enums import ZygosityRequirement
-from snpdb.enums import ImportStatus
+from snpdb.enums import BuiltInFilters, ImportStatus
 from snpdb.fake_data import create_fake_cohort, create_fake_trio
 from snpdb.models import (
     CodeVersion,
@@ -218,3 +220,40 @@ class TestCohortStatsRecomputeLock(TestCase):
         with patch("annotation.tasks.calculate_sample_stats._compute_and_persist_cohort_stats") as mock_compute:
             calculate_cohort_stats(self.cohort, self.annotation_version)
             mock_compute.assert_called_once()
+
+
+class TestCachedLabelCountCodeVersion(TestCase):
+    """ #2662: a stats row from an older SAMPLE_STATS_CODE_VERSION counted the label by an older rule (C was
+        germline only), so a node must count live rather than show it """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        user = User.objects.get_or_create(username="label_count_code_version_user")[0]
+        grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        cls.annotation_version = get_fake_annotation_version(grch37)
+        cls.cohort = create_fake_cohort(user, grch37)
+        cls.code_version = get_sample_stats_code_version()
+
+    def _clinvar_count(self, code_version) -> tuple[Optional[int], Mock]:
+        CohortGenotypeClinVarAnnotationStats.objects.create(
+            cohort_genotype_collection=self.cohort.cohort_genotype_collection, sample=None, filter_key=None,
+            passing_filter=False, code_version=code_version, clinvar_version=self.annotation_version.clinvar_version,
+            het_clinvar_pathogenic_count=7)
+        enqueue_recompute = Mock()
+        count = get_cached_label_count_for_cohort(self.cohort, None, None, self.annotation_version, False,
+                                                  (False, True, False, False), BuiltInFilters.CLINVAR,
+                                                  enqueue_recompute=enqueue_recompute)
+        return count, enqueue_recompute
+
+    def test_current_version_row_is_read(self):
+        count, enqueue_recompute = self._clinvar_count(self.code_version)
+        self.assertEqual(count, 7)
+        enqueue_recompute.assert_not_called()
+
+    def test_older_version_row_is_a_miss_and_recomputes(self):
+        older = SampleStatsCodeVersion.objects.create(name=self.code_version.name,
+                                                      version=self.code_version.version - 1)
+        count, enqueue_recompute = self._clinvar_count(older)
+        self.assertIsNone(count)
+        enqueue_recompute.assert_called_once()
