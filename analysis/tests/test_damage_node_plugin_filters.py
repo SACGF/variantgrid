@@ -101,13 +101,14 @@ class DamageNodePluginFiltersTest(TestCase):
         """ #2571: a saved AlphaGenome threshold on a version that withholds it (licence rules out the deployment's use) mustn't still filter """
         self._set_backfilled(True)
         node = DamageNode(analysis=self.analysis, alphagenome_splicing_min=0.5, avi_phred_min=20)
+        among = {"avi", "alphagenome_only", "fails_every_plugin"}
+        self.assertEqual({"avi", "alphagenome_only"}, self._filtered(node, among))
+
         withheld = frozenset({"alphagenome_splicing"})
         with (patch.object(VariantAnnotationVersion, "visible_columns", PLUGIN_COLUMNS - withheld),
               patch.object(VariantAnnotationVersion, "withheld_licence_restricted_columns", withheld)):
-            q_str = str(node._get_node_q())
+            self.assertEqual({"avi"}, self._filtered(node, among))  # AVI still filters, AlphaGenome no longer admits
             warnings = node.get_warnings()
-        self.assertNotIn("alphagenome_splicing", q_str)
-        self.assertIn("avi_phred__gte", q_str)
         self.assertEqual(1, len([w for w in warnings if "AlphaGenome splicing filter is NOT being applied" in w]))
 
     def test_alphagenome_splicing_is_a_splicing_or_term(self):
