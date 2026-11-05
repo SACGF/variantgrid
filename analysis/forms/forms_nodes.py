@@ -76,10 +76,9 @@ from patients.enums import GnomADPopulation, SampleSourceLevel
 from patients.models import Patient
 from patients.sample_grouping import SOURCE_LEVELS, get_patient_for_source
 from snpdb.enums import AlleleOriginFilterDefault
-from snpdb.forms import GenomeBuildAutocompleteForwardMixin
+from snpdb.forms import GenomeBuildAutocompleteForwardMixin, VariantTypesField
 from snpdb.models import Cohort, Lab, Sample, Tag, VCFFilter
 from snpdb.models.models_genome import Contig
-from snpdb.variant_filters import get_all_variant_types, get_variant_type_label
 from uicore.widgets.date_widget import NativeDateInput
 
 # Can use this for ModelForm.exclude to only use node specific fields
@@ -385,12 +384,11 @@ class AllVariantsNodeForm(BaseNodeForm):
                                              queryset=Contig.objects.all(),
                                              widget=ModelSelect2Multiple(url='contig_autocomplete',
                                                                          attrs={'data-placeholder': 'Chromosome...'}))
+    variant_types = VariantTypesField(include_reference=True, label="Variant types")
 
     class Meta:
         model = AllVariantsNode
-        fields = ('max_variant', "gene_symbol",
-                  "reference", "snps", "indels", "complex_subsitution", "structural_variants",
-                  "fusions", "copy_number", "splicing",
+        fields = ('max_variant', "gene_symbol", "variant_types",
                   "min_het_or_hom_count", "max_het_or_hom_count",
                   "min_unk_count", "max_unk_count", "min_ref_count", "max_ref_count",
                   "min_hom_count", "max_hom_count", "min_het_count", "max_het_count")
@@ -643,9 +641,7 @@ class ConservationNodeForm(BaseNodeForm):
 
 
 class DamageNodeForm(BaseNodeForm):
-    # The All Variants grid's types - a deployment without symbolic alts or gene-level variants offers fewer
-    variant_types = forms.MultipleChoiceField(required=False, label="Variant type",
-                                              widget=forms.CheckboxSelectMultiple, choices=[])
+    variant_types = VariantTypesField()
 
     class Meta:
         model = DamageNode
@@ -679,7 +675,6 @@ class DamageNodeForm(BaseNodeForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["variant_types"].choices = [(vt, get_variant_type_label(vt)) for vt in get_all_variant_types()]
         self.fields["damage_predictions_min"].widget.attrs["max"] = self.instance.num_prediction_fields
         # Columns v4 raw-score sliders driven by the per-tool table. data-* threshold attrs drive the
         # calibrated ClinGen colour bands and value colouring in damagenode_editor.html (omitted when None).

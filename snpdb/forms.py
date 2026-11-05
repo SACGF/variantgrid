@@ -59,6 +59,7 @@ from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.sample_file_path import PATTERN_KEYS, validate_sample_file_path_pattern
 from snpdb.tag_operations import get_case_collision
+from snpdb.variant_filters import get_variant_type_choices
 from uicore.utils.form_helpers import FormHelperHelper, form_helper_horizontal
 from variantgrid.perm_path import get_visible_url_names
 
@@ -479,6 +480,18 @@ class SampleMultiForm(GenomeBuildAutocompleteForwardMixin, BaseDeclareForm):
                                             required=False,
                                             widget=ModelSelect2Multiple(url='sample_autocomplete',
                                                                         attrs={'data-placeholder': 'Sample...'}))
+
+
+class VariantTypesField(forms.MultipleChoiceField):
+    """ The variant type checkboxes the All Variants and Effect node editors share: the All Variants grid's
+        types (snpdb.variant_filters), one per type the deployment offers, filled when the form is built so
+        a deployment without symbolic alts or gene-level variants offers fewer """
+
+    def __init__(self, *, include_reference: bool = False, **kwargs):
+        kwargs.setdefault("required", False)
+        kwargs.setdefault("label", "Variant type")
+        kwargs.setdefault("widget", forms.CheckboxSelectMultiple)
+        super().__init__(choices=lambda: get_variant_type_choices(include_reference=include_reference), **kwargs)
 
 
 class VariantsTypeMultipleChoiceForm(forms.Form):

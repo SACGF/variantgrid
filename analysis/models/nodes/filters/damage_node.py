@@ -42,7 +42,7 @@ from annotation.pathogenicity_predictions import (
 )
 from genes.models.models_gnomad_gene_constraint import GnomADGeneConstraint
 from snpdb.enums import BuiltInFilters
-from snpdb.variant_filters import get_all_variant_types, get_variant_type_label, get_variant_types_q
+from snpdb.variant_filters import get_variant_type_labels, get_variant_types_q, restricts_variant_types
 
 
 class _ColumnFilter(NamedTuple):
@@ -369,7 +369,7 @@ class DamageNode(AnalysisNode):
     def modifies_parents(self):
         all_versions = [self.impact_min, self.splice_min, self.cosmic_count_min, self.damage_predictions_min,
                         self.in_cosmic, self.omim_phenotype, self.protein_domain, self.published,
-                        self._restricts_variant_types(), bool(self._gene_constraint_filters()),
+                        restricts_variant_types(self.variant_types), bool(self._gene_constraint_filters()),
                         self._applies_outside_repeat_region()]
         return any(all_versions) or any(cf.is_set(self) for cf in self._column_filters())
 
@@ -487,19 +487,11 @@ class DamageNode(AnalysisNode):
     def _get_node_q_hash(self) -> str:
         return str(self._get_node_q())
 
-    def _restricts_variant_types(self) -> bool:
-        """ Neither nothing nor everything is ticked """
-        return bool(self.variant_types) and not set(self.variant_types) >= set(get_all_variant_types())
-
-    def _variant_types_q(self) -> Optional[Q]:
-        """ None when the node keeps every type """
-        return get_variant_types_q(self.variant_types, all_variant_types=get_all_variant_types())
-
     def _get_node_q(self) -> Optional[Q]:
         or_filters = []
         and_filters = []
 
-        if (q_variant_types := self._variant_types_q()) is not None:
+        if (q_variant_types := get_variant_types_q(self.variant_types)) is not None:
             and_filters.append(q_variant_types)
 
         if self.impact_min is not None:
@@ -786,10 +778,9 @@ class DamageNode(AnalysisNode):
 
     def get_node_chips(self) -> list[NodeChip]:
         chips = super().get_node_chips()
-        if self._restricts_variant_types():
-            labels = [get_variant_type_label(vt) for vt in get_all_variant_types() if vt in self.variant_types]
-            chips.append(NodeChip(text=", ".join(labels), icon="fa-solid fa-shapes",
-                                  title=f"Variant type: {', '.join(labels)}"))
+        if restricts_variant_types(self.variant_types):
+            labels = ", ".join(get_variant_type_labels(self.variant_types))
+            chips.append(NodeChip(text=labels, icon="fa-solid fa-shapes", title=f"Variant type: {labels}"))
         splice_titles = []
         if self.splice_min is not None:
             splice_titles.append(f"Splicing prediction score >= {self.splice_min}")

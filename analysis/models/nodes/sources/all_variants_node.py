@@ -2,6 +2,7 @@ from functools import cached_property
 from typing import Optional
 
 from auditlog.registry import auditlog
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import CASCADE, SET_NULL, Q
 
@@ -14,10 +15,11 @@ from library.django_utils import highest_pk
 from snpdb.models import Variant, VariantZygosityCountCollection
 from snpdb.models.models_genome import Contig
 from snpdb.variant_filters import (
-    VariantType,
+    get_all_variant_types,
     get_contig_ids_for_variant_types,
     get_contigs_q,
     get_gene_symbols_q,
+    get_variant_type_labels,
     get_variant_types_q,
 )
 
@@ -26,15 +28,9 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
     # Store max_variant so we know when we are out of date
     max_variant = models.ForeignKey(Variant, null=True, on_delete=SET_NULL)
     gene_symbol = models.ForeignKey(GeneSymbol, null=True, blank=True, on_delete=CASCADE)
-    reference = models.BooleanField(default=False, blank=True)
-    snps = models.BooleanField(default=True, blank=True)
-    indels = models.BooleanField(default=True, blank=True)
-    complex_subsitution = models.BooleanField(default=True, blank=True)
-    structural_variants = models.BooleanField(default=True, blank=True)
-    # Gene-level events - @see snpdb.gene_level_variants
-    fusions = models.BooleanField(default=True, blank=True)
-    copy_number = models.BooleanField(default=True, blank=True)
-    splicing = models.BooleanField(default=True, blank=True)
+    # The All Variants grid's types (snpdb.variant_filters) plus reference. A new node has everything but
+    # reference; nothing ticked, or everything, is no restriction
+    variant_types = ArrayField(models.CharField(max_length=20), default=get_all_variant_types, blank=True)
     min_inputs = 0
     max_inputs = 0
 
@@ -68,30 +64,16 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
         ).order_by("contig__genomebuildcontig__order")
         return list(qs.values_list("contig_id", flat=True))
 
-    # The types this node offers, ie what "everything selected" means for it
-    VARIANT_TYPES = [VariantType.REFERENCE, VariantType.SNV, VariantType.INDEL,
-                     VariantType.COMPLEX, VariantType.SYMBOLIC,
-                     VariantType.FUSION, VariantType.COPY_NUMBER, VariantType.SPLICE]
-
-    @property
-    def selected_variant_types(self) -> list[str]:
-        type_lookup = [
-            (self.reference, VariantType.REFERENCE),
-            (self.snps, VariantType.SNV),
-            (self.indels, VariantType.INDEL),
-            (self.complex_subsitution, VariantType.COMPLEX),
-            (self.structural_variants, VariantType.SYMBOLIC),
-            (self.fusions, VariantType.FUSION),
-            (self.copy_number, VariantType.COPY_NUMBER),
-            (self.splicing, VariantType.SPLICE),
-        ]
-        return [variant_type for test, variant_type in type_lookup if test]
+    @staticmethod
+    def all_variant_types() -> list[str]:
+        """ What "everything selected" means for this node - the grid's types plus reference """
+        return get_all_variant_types(include_reference=True)
 
     def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         """ Restrict to analysis genome build """
 
         genome_build = self.analysis.genome_build
-        contig_ids = get_contig_ids_for_variant_types(genome_build, self.contig_ids, self.selected_variant_types)
+        contig_ids = get_contig_ids_for_variant_types(genome_build, self.contig_ids, self.variant_types)
         q_contigs = get_contigs_q(genome_build, contig_ids=contig_ids)
         q_dict = {
             str(q_contigs): q_contigs,
@@ -101,7 +83,7 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
             # Key by the symbol - the Q wraps a queryset, whose str() would evaluate it
             q_dict[f"gene_symbol={self.gene_symbol_id}"] = q_gene
 
-        q_variant_types = get_variant_types_q(self.selected_variant_types, all_variant_types=self.VARIANT_TYPES)
+        q_variant_types = get_variant_types_q(self.variant_types, all_variant_types=self.all_variant_types())
         if q_variant_types is not None:
             q_dict["variant_types"] = q_variant_types
 
@@ -120,26 +102,9 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
         if self.gene_symbol:
             name_lines.append(self.gene_symbol_id)
 
-        name_lookup = [
-            # Field to enable, on by default, name
-            (self.reference, False, "ref"),
-            (self.snps, True, "snps"),
-            (self.indels, True, "indels"),
-            (self.complex_subsitution, True, "complex sub"),
-            (self.structural_variants, True, "SVs"),
-            (self.fusions, True, "fusions"),
-            (self.copy_number, True, "copy number"),
-            (self.splicing, True, "splicing"),
-        ]
-        name_description = []
-        all_default = True
-        for test, on_by_default, type_name in name_lookup:
-            all_default &= (test == on_by_default)
-            if test:
-                name_description.append(type_name)
-
-        if not all_default:
-            name_lines.append(f"(type: {', '.join(name_description)})")
+        if set(self.variant_types) != set(get_all_variant_types()):
+            type_names = ", ".join(get_variant_type_labels(self.variant_types)) or "any"
+            name_lines.append(f"(type: {type_names})")
 
         return "\n".join(name_lines)
 

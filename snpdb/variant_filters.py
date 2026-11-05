@@ -133,13 +133,26 @@ def get_gene_level_variant_types() -> list[str]:
     return []
 
 
-def get_all_variant_types() -> list[str]:
-    return STANDARD_VARIANT_TYPES + get_symbolic_variant_types() + get_gene_level_variant_types()
+def get_all_variant_types(include_reference: bool = False) -> list[str]:
+    """ The types a deployment offers, in display order. Reference is only for the All Variants node -
+        the grid and the Effect node never see one """
+    reference = [VariantType.REFERENCE] if include_reference else []
+    return reference + STANDARD_VARIANT_TYPES + get_symbolic_variant_types() + get_gene_level_variant_types()
 
 
 def get_variant_type_label(variant_type: str) -> str:
     """ Symbolic alts display as eg 'DEL' - the angle brackets are noise on a button """
     return VARIANT_TYPE_LABELS.get(variant_type) or variant_type.strip("<>")
+
+
+def get_variant_type_choices(include_reference: bool = False) -> list[tuple[str, str]]:
+    return [(vt, get_variant_type_label(vt)) for vt in get_all_variant_types(include_reference=include_reference)]
+
+
+def get_variant_type_labels(variant_types: Iterable[str]) -> list[str]:
+    """ The selected types' labels in display order, for a node's chip or name """
+    selected = set(variant_types)
+    return [get_variant_type_label(vt) for vt in get_all_variant_types(include_reference=True) if vt in selected]
 
 
 def get_variant_type_q(variant_type: str) -> Q:
@@ -165,6 +178,16 @@ def _any_variant_type_q(variant_types: Iterable[str]) -> Q:
     return reduce(operator.or_, [get_variant_type_q(vt) for vt in sorted(variant_types)])
 
 
+def restricts_variant_types(variant_types: Optional[Iterable[str]],
+                            all_variant_types: Optional[Iterable[str]] = None) -> bool:
+    """ A selection that is empty, or covers every available type, is no restriction """
+    if not variant_types:
+        return False
+    if all_variant_types is None:
+        all_variant_types = get_all_variant_types()
+    return not set(variant_types) >= set(all_variant_types)
+
+
 def get_variant_types_q(variant_types: Optional[Iterable[str]],
                         all_variant_types: Optional[Iterable[str]] = None) -> Optional[Q]:
     """ Returns None (ie no restriction) when the selection is empty or covers every available type.
@@ -173,14 +196,12 @@ def get_variant_types_q(variant_types: Optional[Iterable[str]],
         assumes), so a selection can also be built as "none of the unselected types". Each row is tested
         against the types in turn, so whichever side costs less is used - the default AllVariantsNode
         (everything but reference) is a single alt_id exclusion rather than a 7-way OR """
-    if not variant_types:
-        return None
-    selected = set(variant_types)
     if all_variant_types is None:
         all_variant_types = get_all_variant_types()
-    unselected = set(all_variant_types) - selected
-    if not unselected:
+    if not restricts_variant_types(variant_types, all_variant_types):
         return None
+    selected = set(variant_types)
+    unselected = set(all_variant_types) - selected
     if _variant_types_cost(unselected) < _variant_types_cost(selected):
         return ~_any_variant_type_q(unselected)
     return _any_variant_type_q(selected)

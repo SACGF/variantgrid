@@ -1,6 +1,8 @@
 """ AllVariantsNode's variant type checkboxes - the Q is built as an OR of the selected types or as the
     complement of the unselected ones, whichever is cheaper, and both have to select the same variants """
-from django.test import TestCase, override_settings
+from importlib import import_module
+
+from django.test import SimpleTestCase, TestCase, override_settings
 
 from analysis.models import AllVariantsNode
 from analysis.tests.utils import AnalysisSetupMixin
@@ -14,18 +16,10 @@ from snpdb.tests.utils.vcf_testing_utils import (
     slowly_create_test_variant,
     slowly_create_test_variant_from_coordinate,
 )
-from snpdb.variant_filters import VariantType
+from snpdb.variant_filters import VariantType, get_all_variant_types
 
-NODE_FIELD_FOR_TYPE = {
-    VariantType.REFERENCE: "reference",
-    VariantType.SNV: "snps",
-    VariantType.INDEL: "indels",
-    VariantType.COMPLEX: "complex_subsitution",
-    VariantType.SYMBOLIC: "structural_variants",
-    VariantType.FUSION: "fusions",
-    VariantType.COPY_NUMBER: "copy_number",
-    VariantType.SPLICE: "splicing",
-}
+booleans_to_variant_types = import_module(
+    "analysis.migrations.0015_allvariantsnode_variant_types").booleans_to_variant_types
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
@@ -51,26 +45,25 @@ class AllVariantsNodeVariantTypeTest(AnalysisSetupMixin, TestCase):
             VariantType.SNV: [create("A", "G", 1000)],
             VariantType.INDEL: [create("A", "AT", 1000), create("AT", "A", 2000)],
             VariantType.COMPLEX: [create("AT", "GC", 3000)],
-            VariantType.SYMBOLIC: [slowly_create_test_variant_from_coordinate(deletion, cls.grch37)],
+            VCFSymbolicAllele.DEL: [slowly_create_test_variant_from_coordinate(deletion, cls.grch37)],
             VariantType.FUSION: [create_gene_fusion("CD74", "ROS1").variant],
             VariantType.COPY_NUMBER: [create_gene_level(GeneLevelSymbolicAlt.GAIN)],
             VariantType.SPLICE: [create_gene_level(GeneLevelSymbolicAlt.SPLICE, label="V_7")],
         }
 
     def _node_variant_ids(self, variant_types) -> set[int]:
-        node = AllVariantsNode(analysis=self.analysis,
-                               **{field: vt in variant_types for vt, field in NODE_FIELD_FOR_TYPE.items()})
-        qs = Variant.objects.filter(pk__in=self._variant_ids(AllVariantsNode.VARIANT_TYPES))
+        node = AllVariantsNode(analysis=self.analysis, variant_types=list(variant_types))
+        qs = Variant.objects.filter(pk__in=self._variant_ids(self.variants_by_type))
         if q := node._get_node_arg_q_dict()[None].get("variant_types"):
             qs = qs.filter(q)
         return set(qs.values_list("pk", flat=True))
 
     def _variant_ids(self, variant_types) -> set[int]:
-        return {v.pk for vt in variant_types for v in self.variants_by_type[vt]}
+        return {v.pk for vt in variant_types for v in self.variants_by_type.get(vt, [])}
 
     def test_variant_type_selections(self):
-        all_types = AllVariantsNode.VARIANT_TYPES
-        default_types = [vt for vt in all_types if vt != VariantType.REFERENCE]
+        all_types = AllVariantsNode.all_variant_types()
+        default_types = get_all_variant_types()
         selections = {"default": default_types}
         for variant_type in all_types:
             selections[f"only {variant_type}"] = [variant_type]
@@ -81,3 +74,39 @@ class AllVariantsNodeVariantTypeTest(AnalysisSetupMixin, TestCase):
         for description, variant_types in selections.items():
             with self.subTest(description):
                 self.assertEqual(self._variant_ids(variant_types), self._node_variant_ids(variant_types))
+
+
+class AllVariantsNodeNameTest(SimpleTestCase):
+    def test_default_types_say_nothing(self):
+        self.assertEqual("", AllVariantsNode().get_node_name())
+
+    def test_restricted_types_are_named_in_grid_order(self):
+        node = AllVariantsNode(variant_types=[VCFSymbolicAllele.DEL, VariantType.SNV, VariantType.REFERENCE])
+        self.assertEqual("(type: Reference, SNV, DEL)", node.get_node_name())
+
+    def test_nothing_ticked_is_any_type(self):
+        self.assertEqual("(type: any)", AllVariantsNode(variant_types=[]).get_node_name())
+
+
+class AllVariantsNodeMigrationTest(SimpleTestCase):
+    """ The eight checkboxes an AllVariantsNode had become the grid's types (migration 0015) """
+    ALL = [VariantType.REFERENCE, VariantType.SNV, VariantType.INDEL, VariantType.COMPLEX,
+           VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP, VariantType.FUSION, VariantType.COPY_NUMBER,
+           VariantType.SPLICE]
+    FIELDS = ["reference", "snps", "indels", "complex_subsitution", "structural_variants",
+              "fusions", "copy_number", "splicing"]
+
+    def _mapped(self, *ticked_fields) -> list[str]:
+        ticked = {field: field in ticked_fields for field in self.FIELDS}
+        with override_settings(VARIANT_SYMBOLIC_ALT_ENABLED=True,
+                               VARIANT_SYMBOLIC_ALT_VALID_TYPES={VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP}):
+            return booleans_to_variant_types(ticked, self.ALL)
+
+    def test_default_node_is_everything_but_reference(self):
+        self.assertEqual([vt for vt in self.ALL if vt != VariantType.REFERENCE], self._mapped(*self.FIELDS[1:]))
+
+    def test_structural_variants_is_every_symbolic_alt(self):
+        self.assertEqual([VCFSymbolicAllele.DEL, VCFSymbolicAllele.DUP], self._mapped("structural_variants"))
+
+    def test_nothing_ticked_stays_nothing(self):
+        self.assertEqual([], self._mapped())

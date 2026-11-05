@@ -53,11 +53,10 @@ from snpdb.search import search_data
 from snpdb.serializers import VariantAlleleSerializer
 from snpdb.utils import get_genome_build_or_404
 from snpdb.variant_filters import (
-    get_all_variant_types,
     get_all_variants_filters,
     get_default_all_variants_filters,
     get_gene_symbol_alias_strs,
-    get_variant_type_label,
+    get_variant_type_choices,
     resolve_gene_symbols,
 )
 from upload.models.models import ModifiedImportedVariant
@@ -93,7 +92,7 @@ def variants(request, genome_build_name=None):
     context = {
         "genome_build": genome_build,
         "standard_contigs": genome_build.standard_contigs,
-        "variant_types": [(vt, get_variant_type_label(vt)) for vt in get_all_variant_types()],
+        "variant_types": get_variant_type_choices(),
         "initial_filters": initial_filters,
         "default_contig_id": default_contig_ids[0] if default_contig_ids else None,
         "gene_symbol_form": gene_symbol_form,

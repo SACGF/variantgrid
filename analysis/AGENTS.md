@@ -83,6 +83,9 @@ Patterns here:
   with `model` set + template `analysis/node_editors/<classname>_editor.html`.
   `analysis/views/views_node.py:get_node_view_classes_by_class` finds the view by `model`, so defining the class registers it;
   `analysis/views/nodes/node_view.py:NodeView.form_valid` does the dirty/save/update_analysis dance for you.
+  The All Variants and Effect editors' variant type checkboxes are one `snpdb/forms.py:VariantTypesField` over
+  a `variant_types` ArrayField of `snpdb/variant_filters.py:VariantType` tokens, rendered inside
+  `.editor-choices`; the tokens, labels, name text and Q all come from `snpdb/variant_filters.py`.
 - ACMG presets on the Effect, Population and ClinVar editors (`analysis/node_presets.py`, #2605) fill the form
   client side; the only thing saved is the node's name - the hidden `preset` field carries the picked key, and
   `BaseNodeForm._post_clean` names the node `NodePreset.name` with auto name off. `BaseNodeForm.get_preset_data`
