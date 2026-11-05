@@ -7,6 +7,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    {% url 'page_frame' as page_frame_url %}
+    <script>window.pageFrameRequest = fetch({{ page_frame_url|jsonify }} + "?url_name=" + encodeURIComponent({{ url_name|default:""|jsonify }}), {credentials: "same-origin"}).then((response) => response.json());</script>
     <link href="{% static 'js/lib/bootstrap/4.5.2/css/bootstrap.min.css' %}" rel="stylesheet">
 
     <title>{{ site_short_name }} {% block title %}{% endblock %}</title>
@@ -149,8 +151,6 @@
         <script src="{% static 'js/scientific_number_widget.js' %}"></script>
         <script src="{% static 'js/tips.js' %}"></script>
     {% endcompress %}
-    {% url 'page_frame' as page_frame_url %}
-    <script>loadPageFrame({{ page_frame_url|jsonify }}, {{ url_name|default:""|jsonify }});</script>
     {% block head %}{% endblock %}
 </head>
 <body>
@@ -191,6 +191,7 @@
         </div>
         <div class="main-content">
             <div id="main-content-messages" class="container"><div id="django-messages"></div></div>
+            <script>loadPageFrame(window.pageFrameRequest);</script>
             <div id="main-content-body">
                 {% block content %}{% endblock content %}
             </div>
