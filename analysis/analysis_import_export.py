@@ -18,6 +18,7 @@ from analysis.models import (
 from analysis.models.nodes.node_utils import reload_analysis_nodes
 from analysis.serializers import AnalysisNodeSerializer, AnalysisSerializer
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import ZygosityRequirement
 
 # References into a server's own data - an exported analysis arrives with its source nodes
 # unconfigured, like a template before its variables are populated
@@ -51,6 +52,23 @@ NODE_EXCLUDE = ["created", "modified", "version", "appearance_version", "ready",
 ANALYSIS_EXCLUDE = ["id", "created", "modified", "user", "default_sort_by_column",
                     "custom_columns_collection", "tag_config_collection", "canonical_transcript_collection",
                     "visible", "annotation_version"]
+
+# Exports written before the ZygosityRequirement choice (#2659) carry the boolean it replaced:
+# {model: {old boolean field: new choice field}}
+LEGACY_ZYGOSITY_REQUIREMENT_FIELDS = {
+    "analysis.DuoNode": {"require_zygosity": "relative_zygosity_requirement"},
+    "analysis.PedigreeNode": {"require_zygosity": "zygosity_requirement"},
+    "analysis.QuadNode": {"require_parent_zygosity": "parent_zygosity_requirement",
+                          "require_sibling_zygosity": "sibling_zygosity_requirement"},
+    "analysis.TrioNode": {"require_zygosity": "parent_zygosity_requirement"},
+}
+
+
+def upgrade_legacy_node_fields(model_name: str, data: dict):
+    for old_field, new_field in LEGACY_ZYGOSITY_REQUIREMENT_FIELDS.get(model_name, {}).items():
+        if old_field in data:
+            required = data.pop(old_field)
+            data[new_field] = ZygosityRequirement.CALL_REQUIRED if required else ZygosityRequirement.ALLOW_NO_CALL
 
 
 def analysis_export_to_dict(analysis: Analysis) -> dict:
@@ -132,6 +150,7 @@ def _create_analysis(user: User, genome_build: Optional[GenomeBuild],
 
         for field in NON_PORTABLE_NODE_FIELDS:
             data.pop(field, None)
+        upgrade_legacy_node_fields(model_name, data)
         internal_references = {}
         for field in INTERNAL_NODE_REFERENCE_FIELDS:
             if old_reference_pk := data.pop(field, None):

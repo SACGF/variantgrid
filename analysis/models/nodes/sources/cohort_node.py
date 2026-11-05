@@ -10,7 +10,7 @@ from django.db.models.functions import Concat, Length, Replace, Substr
 
 from analysis.enums import GroupOperation
 from analysis.models.nodes.analysis_node import AnalysisNode
-from analysis.models.nodes.cohort_mixin import CohortMixin
+from analysis.models.nodes.cohort_mixin import MERGED_COHORT_WARNING, CohortMixin
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.stats_cache import (
     get_cached_label_count_for_cohort,
@@ -125,9 +125,12 @@ class CohortNode(AbstractCohortBasedNode, AbstractZygosityCountNode):
 
     def get_warnings(self) -> list[str]:
         warnings = super().get_warnings()
-        if self.cohort and self.accordion_panel == self.COUNT:
-            if msg := self.get_min_above_max_warning_message(self.zygosity_count_max_samples):
-                warnings.append(msg)
+        if self.cohort:
+            if self.accordion_panel == self.COUNT:
+                if msg := self.get_min_above_max_warning_message(self.zygosity_count_max_samples):
+                    warnings.append(msg)
+            elif self.accordion_panel == self.PER_SAMPLE_ZYGOSITY and self.cohort.get_vcf() is None:
+                warnings.append(MERGED_COHORT_WARNING)
         return warnings
 
     def _has_filters_that_affect_label_counts(self) -> bool:

@@ -27,7 +27,10 @@
     <div class="editor-row">
         <label class="editor-label" for="{{ form.inheritance_model.id_for_label }}">Inheritance</label>
         {{ form.inheritance_model }}
-        <label for="{{ form.require_zygosity.id_for_label }}">{{ form.require_zygosity }} Require all zygosity calls</label>
+    </div>
+    <div class="editor-row">
+        <label class="editor-label" for="{{ form.zygosity_requirement.id_for_label }}" title="How a family member's genotype is held to the table: a no call (./.) may pass, a call is needed (a merged cohort's missing record still counts as REF), or REF must be a real 0/0 call">Family calls</label>
+        {{ form.zygosity_requirement }}{{ form.zygosity_requirement.errors }}
     </div>
     {% load vcf_locus_filter_tags %}
     {% vcf_locus_filter node node.pedigree.cohort.vcf %}

@@ -19,10 +19,11 @@ from cache_memoize import cache_memoize
 from django.db.models import Count, TextChoices
 from django.db.models.query_utils import Q
 
+from analysis.models.nodes.cohort_mixin import merged_cohort_warnings
 from analysis.models.nodes.node_display import truncate_name_line
 from annotation.models.models import VariantTranscriptAnnotation
 from library.constants import DAY_SECS
-from patients.enums import Sex, Zygosity
+from patients.enums import Sex, Zygosity, ZygosityRequirement
 from snpdb.models import Contig
 
 MOTHER = "mother"
@@ -37,7 +38,7 @@ class FamilyMember:
     role: str
     label: str
     affected_field: Optional[str] = None  # on the family - the proband is always affected
-    require_zygosity_field: Optional[str] = None  # on the node - the proband always requires it (#947)
+    zygosity_requirement_field: Optional[str] = None  # on the node - the proband always needs a call (#947)
 
     @property
     def is_proband(self) -> bool:
@@ -51,10 +52,10 @@ class FamilyMember:
             return True
         return getattr(family, self.affected_field)
 
-    def requires_zygosity(self, node) -> bool:
-        if self.require_zygosity_field is None:
-            return True
-        return getattr(node, self.require_zygosity_field)
+    def zygosity_requirement(self, node) -> ZygosityRequirement:
+        if self.zygosity_requirement_field is None:
+            return ZygosityRequirement.CALL_REQUIRED
+        return ZygosityRequirement(getattr(node, self.zygosity_requirement_field))
 
 
 @dataclass(frozen=True)
@@ -69,8 +70,8 @@ class FamilyShape:
         return [m.role for m in self.members]
 
     @property
-    def require_zygosity_fields(self) -> list[str]:
-        return list(dict.fromkeys(m.require_zygosity_field for m in self.members if m.require_zygosity_field))
+    def zygosity_requirement_fields(self) -> list[str]:
+        return list(dict.fromkeys(m.zygosity_requirement_field for m in self.members if m.zygosity_requirement_field))
 
     def get_member(self, role: str) -> FamilyMember:
         return next(m for m in self.members if m.role == role)
@@ -81,18 +82,18 @@ def _build_family_zyg_q(cohort_genotype_collection, sample_zyg_require: list[tup
 
     Args:
         cohort_genotype_collection: The CGC to build the Q for.
-        sample_zyg_require: List of (sample, zygosity_set, require_zygosity).
+        sample_zyg_require: List of (sample, zygosity_set, ZygosityRequirement).
             Entries with an empty zygosity_set are silently skipped
             (used for father in X-linked recessive).
     """
     sample_zygosities_dict = {}
-    sample_require_zygosity_dict = {}
-    for sample, zyg_set, require in sample_zyg_require:
+    sample_zygosity_requirements = {}
+    for sample, zyg_set, requirement in sample_zyg_require:
         if zyg_set:
             sample_zygosities_dict[sample] = zyg_set
-            sample_require_zygosity_dict[sample] = require
+            sample_zygosity_requirements[sample] = requirement
     return cohort_genotype_collection.get_zygosity_q(
-        sample_zygosities_dict, sample_require_zygosity_dict
+        sample_zygosities_dict, sample_zygosity_requirements
     )
 
 
@@ -212,7 +213,7 @@ class AbstractFamilyInheritance(ABC):
         """ member_zygosities = one zygosity set per member, in FAMILY_SHAPE order """
         family = self.family
         return _build_family_zyg_q(cohort_genotype_collection, [
-            (member.get_sample(family), zyg, member.requires_zygosity(self.node))
+            (member.get_sample(family), zyg, member.zygosity_requirement(self.node))
             for member, zyg in zip(self.family_shape.members, member_zygosities)
         ])
 
@@ -221,7 +222,7 @@ class AbstractFamilyInheritance(ABC):
         filters = {}
         members = zip(self.family_shape.members, member_zygosities)
         for member, zyg in sorted(members, key=lambda member_zyg: not member_zyg[0].is_proband):
-            filters[self._member_label(member)] = self._zygosity_options(zyg, not member.requires_zygosity(self.node))
+            filters[self._member_label(member)] = self._zygosity_options(zyg, member.zygosity_requirement(self.node))
         return ", ".join([f"{k}: {v}" for k, v in filters.items() if v])
 
     @classmethod
@@ -231,12 +232,15 @@ class AbstractFamilyInheritance(ABC):
         return affected_zyg if affected else cls.NOT_HOM_ALT
 
     @staticmethod
-    def _zygosity_options(zyg: set, allow_unknown=False):
-        if allow_unknown:
-            # Make a new set so as to not alter passed in value
-            zyg = zyg | {Zygosity.UNKNOWN_ZYGOSITY}
-        zyg = zyg - {Zygosity.MISSING}  # Implementation detail - don't show to user
-        return ", ".join(sorted([Zygosity.display(z) for z in zyg]))
+    def _zygosity_options(zyg: set, requirement=ZygosityRequirement.CALL_REQUIRED):
+        """ What the editor's table and the method summary show for one member. REF stands for REF or no
+            record unless a REF call is required, so that case says which it is """
+        called_ref = requirement == ZygosityRequirement.REF_CALL_REQUIRED and Zygosity.MISSING in zyg
+        zyg = ZygosityRequirement(requirement).apply(zyg) - {Zygosity.MISSING}
+        options = sorted(Zygosity.display(z) for z in zyg)
+        if called_ref:
+            options = [f"{o} (called)" if o == Zygosity.display(Zygosity.HOM_REF) else o for o in options]
+        return ", ".join(options)
 
     @abstractmethod
     def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
@@ -431,7 +435,7 @@ class AnyAffectedInheritance(AbstractFamilyInheritance):
     def get_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         cgc = self._get_cohort_genotype_collection()
         per_member_qs = [
-            cgc.get_zygosity_q({s: self.HAS_VARIANT}, {s: True})
+            cgc.get_zygosity_q({s: self.HAS_VARIANT}, {s: ZygosityRequirement.CALL_REQUIRED})
             for s in self._get_affected_samples()
         ]
         combined = reduce(operator.or_, per_member_qs)
@@ -497,16 +501,16 @@ class MosaicEitherParentInheritance(AbstractMosaicParentInheritance):
         return {cgc.cohortgenotype_alias: {str(combined): combined}}
 
     def get_method(self) -> str:
-        allow_unknown = not self.family_shape.get_member(MOTHER).requires_zygosity(self.node)
+        parent_requirement = self.family_shape.get_member(MOTHER).zygosity_requirement(self.node)
         proband = self._zygosity_options(self.HAS_VARIANT)
-        mosaic = self._zygosity_options(self.MOSAIC_ZYGOSITIES, allow_unknown)
-        other = self._zygosity_options(self.NO_VARIANT, allow_unknown)
+        mosaic = self._zygosity_options(self.MOSAIC_ZYGOSITIES, parent_requirement)
+        other = self._zygosity_options(self.NO_VARIANT, parent_requirement)
         method = (f"Proband: {proband}, and either parent ({mosaic}) with {self._evidence_description()} "
                   f"while the other ({other}) has <{self.node.mosaic_min_alt_reads} alt reads")
         for member in self.family_shape.members:
             if not (member.is_proband or member.role in self.MOSAIC_ROLES):
                 zyg = self._zygosity_options(self._constitutional_zygosity(member),
-                                             not member.requires_zygosity(self.node))
+                                             member.zygosity_requirement(self.node))
                 method += f"; {self._member_label(member)}: {zyg}"
         return method
 
@@ -626,11 +630,18 @@ class FamilyInheritanceNodeMixin:
         return field_errors
 
     def get_warnings(self) -> list[str]:
-        """ Mosaic detection depends on the data as much as the filter - say so every time """
+        """ Inheritance depends on the data as much as the filter - say so every time """
         warnings = super().get_warnings()
-        if self.family and self.inheritance == self.INHERITANCE.MOSAIC_PARENT:
-            warnings.extend(mosaic_parent_warnings(self.family.cohort))
+        if self.family:
+            if self.inheritance == self.INHERITANCE.MOSAIC_PARENT:
+                warnings.extend(mosaic_parent_warnings(self.family.cohort))
+            else:
+                warnings.extend(merged_cohort_warnings(self.family.cohort, self.zygosity_requirements))
         return warnings
+
+    @property
+    def zygosity_requirements(self) -> list[ZygosityRequirement]:
+        return [ZygosityRequirement(getattr(self, field)) for field in self.FAMILY_SHAPE.zygosity_requirement_fields]
 
     def _get_cohort(self):
         return self.family.cohort if self.family else None
@@ -662,8 +673,11 @@ class FamilyInheritanceNodeMixin:
 
     def get_node_name(self):
         label = self.INHERITANCE(self.inheritance).label
-        if not all(getattr(self, field) for field in self.FAMILY_SHAPE.require_zygosity_fields):
+        requirements = set(self.zygosity_requirements)
+        if ZygosityRequirement.ALLOW_NO_CALL in requirements:
             label += "?"
+        if ZygosityRequirement.REF_CALL_REQUIRED in requirements:
+            label += " (called REF)"
         name_parts = [label]
         if family := self.family:
             name_parts.insert(0, truncate_name_line(str(family)))

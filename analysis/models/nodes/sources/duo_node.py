@@ -28,7 +28,7 @@ from analysis.models.nodes.family_inheritance import (
 )
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
-from patients.enums import Zygosity
+from patients.enums import Zygosity, ZygosityRequirement
 from snpdb.enums import DuoRelationship
 from snpdb.models import Duo
 
@@ -174,7 +174,7 @@ def _duo_stub_node(shape: FamilyShape, relationship: DuoRelationship, relative_a
 class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
     FAMILY_SHAPE = FamilyShape(source_field="duo", members=(
         FamilyMember(RELATIVE, "Relative", affected_field="relative_affected",
-                     require_zygosity_field="require_zygosity"),
+                     zygosity_requirement_field="relative_zygosity_requirement"),
         FamilyMember(PROBAND, "Proband"),
     ))
     INHERITANCE = DuoInheritance
@@ -191,7 +191,9 @@ class DuoNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
 
     duo = models.ForeignKey(Duo, null=True, on_delete=SET_NULL)
     inheritance = models.CharField(max_length=1, choices=DuoInheritance.choices, default=DuoInheritance.RECESSIVE)
-    require_zygosity = models.BooleanField(default=True)  # relative only - proband always required (#947)
+    # Relative only - the proband always needs a call (#947)
+    relative_zygosity_requirement = models.CharField(max_length=1, choices=ZygosityRequirement.choices,
+                                                     default=ZygosityRequirement.CALL_REQUIRED)
     # Mosaic parent mode only - the low VAF band the parent's alt reads have to fall in (#1830)
     mosaic_max_af = models.FloatField(default=0.35)
     mosaic_min_alt_reads = models.IntegerField(default=2)

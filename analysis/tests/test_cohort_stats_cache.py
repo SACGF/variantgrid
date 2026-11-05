@@ -26,6 +26,7 @@ from annotation.tasks.calculate_sample_stats import (
     get_sample_stats_code_version,
 )
 from library.utils.json_utils import canonical_filter_key
+from patients.enums import ZygosityRequirement
 from snpdb.enums import ImportStatus
 from snpdb.fake_data import create_fake_cohort, create_fake_trio
 from snpdb.models import (
@@ -60,9 +61,10 @@ class TestStatsFilterKeyRoundTrip(TestCase):
         keys. A silent mismatch produces cache misses forever. """
 
     @staticmethod
-    def _trio_node(inheritance, mother_affected=False, father_affected=True, require_zygosity=True):
+    def _trio_node(inheritance, mother_affected=False, father_affected=True,
+                   parent_zygosity_requirement=ZygosityRequirement.CALL_REQUIRED):
         trio = Trio(cohort=Cohort(), mother_affected=mother_affected, father_affected=father_affected)
-        return TrioNode(inheritance=inheritance, require_zygosity=require_zygosity, trio=trio)
+        return TrioNode(inheritance=inheritance, parent_zygosity_requirement=parent_zygosity_requirement, trio=trio)
 
     def test_trio_node_round_trip(self):
         for inheritance in TrioNode.STATS_INHERITANCE_MODES:
@@ -83,12 +85,13 @@ class TestStatsFilterKeyRoundTrip(TestCase):
         affected_mother = set(Trio(cohort=Cohort(), mother_affected=True, father_affected=False).get_stats_filter_keys())
         self.assertEqual(len(unaffected_parents & affected_mother), len(Trio.STATS_INHERITANCE_MODES) - 1)
 
-    def test_trio_node_uncacheable_without_require_zygosity(self):
-        """ The buckets are computed requiring a parent zygosity call, so a node that also
-            accepts parent no-calls has to count live """
+    def test_trio_node_uncacheable_unless_call_required(self):
+        """ The buckets are computed requiring a parent zygosity call, so a node that also accepts
+            parent no-calls, or only a called REF, has to count live """
         for inheritance in TrioNode.STATS_INHERITANCE_MODES:
-            node = self._trio_node(inheritance, require_zygosity=False)
-            self.assertIsNone(node._stats_inheritance_mode())
+            for requirement in (ZygosityRequirement.ALLOW_NO_CALL, ZygosityRequirement.REF_CALL_REQUIRED):
+                node = self._trio_node(inheritance, parent_zygosity_requirement=requirement)
+                self.assertIsNone(node._stats_inheritance_mode(), (inheritance, requirement))
 
 
 class TestCohortNodeCountLimitsDefeatCache(TestCase):

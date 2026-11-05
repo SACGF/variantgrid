@@ -24,7 +24,7 @@ from analysis.models.nodes.family_inheritance import (
 )
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
-from patients.enums import Zygosity
+from patients.enums import Zygosity, ZygosityRequirement
 from snpdb.models import Quad
 
 
@@ -98,12 +98,12 @@ class QuadAnyAffected(AnyAffectedInheritance):
 class QuadNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
     FAMILY_SHAPE = FamilyShape(source_field="quad", members=(
         FamilyMember(MOTHER, "Mother", affected_field="mother_affected",
-                     require_zygosity_field="require_parent_zygosity"),
+                     zygosity_requirement_field="parent_zygosity_requirement"),
         FamilyMember(FATHER, "Father", affected_field="father_affected",
-                     require_zygosity_field="require_parent_zygosity"),
+                     zygosity_requirement_field="parent_zygosity_requirement"),
         FamilyMember(PROBAND, "Proband"),
         FamilyMember("sibling", "Sibling", affected_field="sibling_affected",
-                     require_zygosity_field="require_sibling_zygosity"),
+                     zygosity_requirement_field="sibling_zygosity_requirement"),
     ))
     INHERITANCE = QuadInheritance
     INHERITANCE_CLASSES = {
@@ -120,8 +120,10 @@ class QuadNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
     quad = models.ForeignKey(Quad, null=True, on_delete=SET_NULL)
     inheritance = models.CharField(max_length=1, choices=QuadInheritance.choices,
                                    default=QuadInheritance.RECESSIVE)
-    require_parent_zygosity = models.BooleanField(default=True)
-    require_sibling_zygosity = models.BooleanField(default=True)
+    parent_zygosity_requirement = models.CharField(max_length=1, choices=ZygosityRequirement.choices,
+                                                   default=ZygosityRequirement.CALL_REQUIRED)
+    sibling_zygosity_requirement = models.CharField(max_length=1, choices=ZygosityRequirement.choices,
+                                                    default=ZygosityRequirement.CALL_REQUIRED)
     # Mosaic parent mode only - the low VAF band a mosaic parent's alt reads have to fall in (#1830)
     mosaic_max_af = models.FloatField(default=0.35)
     mosaic_min_alt_reads = models.IntegerField(default=2)

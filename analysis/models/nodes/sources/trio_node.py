@@ -28,7 +28,7 @@ from analysis.models.nodes.family_inheritance import (
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
 from annotation.tasks.calculate_trio_stats import enqueue_trio_stats_recompute
-from patients.enums import Zygosity
+from patients.enums import Zygosity, ZygosityRequirement
 from snpdb.models import Trio
 
 
@@ -80,8 +80,10 @@ class TrioAnyAffected(AnyAffectedInheritance):
 
 class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
     FAMILY_SHAPE = FamilyShape(source_field="trio", members=(
-        FamilyMember(MOTHER, "Mother", affected_field="mother_affected", require_zygosity_field="require_zygosity"),
-        FamilyMember(FATHER, "Father", affected_field="father_affected", require_zygosity_field="require_zygosity"),
+        FamilyMember(MOTHER, "Mother", affected_field="mother_affected",
+                     zygosity_requirement_field="parent_zygosity_requirement"),
+        FamilyMember(FATHER, "Father", affected_field="father_affected",
+                     zygosity_requirement_field="parent_zygosity_requirement"),
         FamilyMember(PROBAND, "Proband"),
     ))
     INHERITANCE = TrioInheritance
@@ -106,7 +108,8 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
 
     trio = models.ForeignKey(Trio, null=True, on_delete=SET_NULL)
     inheritance = models.CharField(max_length=1, choices=TrioInheritance.choices, default=TrioInheritance.RECESSIVE)
-    require_zygosity = models.BooleanField(default=True)
+    parent_zygosity_requirement = models.CharField(max_length=1, choices=ZygosityRequirement.choices,
+                                                   default=ZygosityRequirement.CALL_REQUIRED)
     # Mosaic parent mode only - the low VAF band a mosaic parent's alt reads have to fall in (#1830)
     mosaic_max_af = models.FloatField(default=0.35)
     mosaic_min_alt_reads = models.IntegerField(default=2)
@@ -134,9 +137,9 @@ class TrioNode(FamilyInheritanceNodeMixin, AbstractCohortBasedNode):
 
     def _stats_inheritance_mode(self) -> Optional[str]:
         """ The precomputed inheritance bucket this node's counts are in, None if there isn't one.
-            The buckets require both parents to have a zygosity call - require_zygosity=False also
-            matches parent no-calls, which no bucket represents """
-        if not self.require_zygosity:
+            The buckets require both parents to have a zygosity call - the other requirements also
+            match a parent no-call, or only a called REF, which no bucket represents """
+        if self.parent_zygosity_requirement != ZygosityRequirement.CALL_REQUIRED:
             return None
         return self.STATS_INHERITANCE_MODES.get(TrioInheritance(self.inheritance))
 

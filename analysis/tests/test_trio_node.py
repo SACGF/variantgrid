@@ -34,11 +34,12 @@ class TestTrioNodeInheritance(InheritanceNodeTestsMixin, TestCase):
     """
     INHERITANCE = TrioInheritance
     NODE_CLASS = TrioNode
-    REQUIRE_PARENT_ZYGOSITY = "require_zygosity"
+    PARENT_ZYGOSITY_REQUIREMENT = "parent_zygosity_requirement"
     # samples_zygosity index: [proband, mother, father]
     SHARED_ZYGOSITIES = {
         "recessive_v": "OEE",                # proband=HOM_ALT, both parents=HET
         "denovo_v": "ERR",                   # proband=HET, both parents=HOM_REF
+        "denovo_father_no_record_v": "ER.",  # de novo, but the father's VCF had no record there
         "control_v": "RRR",                  # matches no inheritance mode
         "unknown_father_v": "OEU",           # recessive but father is a no-call
         "xlinked_v": "OER",                  # proband=HOM_ALT, mother=HET, on chrX

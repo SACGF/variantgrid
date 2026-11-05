@@ -2,12 +2,14 @@
 Shared inheritance-mode coverage for the pedigree source nodes (TrioNode / QuadNode).
 
 The two nodes run the same inheritance filters over a different sample layout, so the
-assertions below are identical - only the zygosity strings, the enum and the
-"require parent zygosity" field name change. Subclasses supply those via the class
-attributes and hooks at the top of InheritanceNodeTestsMixin.
+assertions below are identical - only the zygosity strings, the enum and the parent
+ZygosityRequirement field name change. Subclasses supply those via the class attributes
+and hooks at the top of InheritanceNodeTestsMixin.
 
 samples_zygosity encoding: E=HET, R=HOM_REF, O=HOM_ALT, U=UNKNOWN, .=MISSING
 """
+from analysis.models.nodes.cohort_mixin import MERGED_COHORT_REF_CALL_WARNING, MERGED_COHORT_WARNING
+from patients.enums import ZygosityRequirement
 from snpdb.fake_data import make_cohort_genotype
 from snpdb.models import Variant
 from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
@@ -16,6 +18,7 @@ from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 SHARED_VARIANTS = [
     ("recessive_v", "3", 1000),
     ("denovo_v", "3", 2000),
+    ("denovo_father_no_record_v", "3", 2500),
     ("control_v", "3", 4000),
     ("unknown_father_v", "3", 5000),
     ("xlinked_v", "X", 1000),
@@ -26,7 +29,7 @@ SHARED_VARIANTS = [
 class InheritanceNodeTestsMixin:
     INHERITANCE = None  # TrioInheritance / QuadInheritance
     NODE_CLASS = None  # TrioNode / QuadNode
-    REQUIRE_PARENT_ZYGOSITY = None  # field name - "require_zygosity" / "require_parent_zygosity"
+    PARENT_ZYGOSITY_REQUIREMENT = None  # field name - "parent_zygosity_requirement" on both today
     # samples_zygosity per SHARED_VARIANTS attribute, in the subclass's own sample order
     SHARED_ZYGOSITIES = {}
 
@@ -90,15 +93,54 @@ class InheritanceNodeTestsMixin:
         self.assertNotIn(self.recessive_v.pk, ids)
         self.assertNotIn(self.denovo_v.pk, ids)
 
-    # ── require parent zygosity ───────────────────────────────────────────────
+    # ── parent zygosity requirement ───────────────────────────────────────────
 
-    def test_require_parent_zygosity_true_excludes_unknown_parental_zygosity(self):
-        node = self._make_node(self.INHERITANCE.RECESSIVE, **{self.REQUIRE_PARENT_ZYGOSITY: True})
+    def _make_node_requiring(self, inheritance, requirement: ZygosityRequirement):
+        return self._make_node(inheritance, **{self.PARENT_ZYGOSITY_REQUIREMENT: requirement})
+
+    def test_call_required_excludes_unknown_parental_zygosity(self):
+        node = self._make_node_requiring(self.INHERITANCE.RECESSIVE, ZygosityRequirement.CALL_REQUIRED)
         self.assertNotIn(self.unknown_father_v.pk, self._filter_variants(node))
 
-    def test_require_parent_zygosity_false_allows_unknown_parental_zygosity(self):
-        node = self._make_node(self.INHERITANCE.RECESSIVE, **{self.REQUIRE_PARENT_ZYGOSITY: False})
+    def test_allow_no_call_allows_unknown_parental_zygosity(self):
+        node = self._make_node_requiring(self.INHERITANCE.RECESSIVE, ZygosityRequirement.ALLOW_NO_CALL)
         self.assertIn(self.unknown_father_v.pk, self._filter_variants(node))
+
+    def test_call_required_counts_a_parent_with_no_record_as_ref(self):
+        """ A merged cohort stores '.' where a parent's own VCF had no record - it passes as "no variant" """
+        node = self._make_node_requiring(self.INHERITANCE.DENOVO, ZygosityRequirement.CALL_REQUIRED)
+        ids = self._filter_variants(node)
+        self.assertIn(self.denovo_v.pk, ids)
+        self.assertIn(self.denovo_father_no_record_v.pk, ids)
+
+    def test_ref_call_required_excludes_a_parent_with_no_record(self):
+        node = self._make_node_requiring(self.INHERITANCE.DENOVO, ZygosityRequirement.REF_CALL_REQUIRED)
+        ids = self._filter_variants(node)
+        self.assertIn(self.denovo_v.pk, ids)
+        self.assertNotIn(self.denovo_father_no_record_v.pk, ids)
+
+    def test_node_name_marks_the_requirement(self):
+        label = self.INHERITANCE.DENOVO.label
+        for requirement, expected in [(ZygosityRequirement.CALL_REQUIRED, label),
+                                      (ZygosityRequirement.ALLOW_NO_CALL, f"{label}?"),
+                                      (ZygosityRequirement.REF_CALL_REQUIRED, f"{label} (called REF)")]:
+            node = self._make_node_requiring(self.INHERITANCE.DENOVO, requirement)
+            self.assertEqual(expected, node.get_node_name().split("\n")[1], requirement)
+
+    def test_joint_called_cohort_has_no_merged_cohort_warning(self):
+        node = self._make_node_requiring(self.INHERITANCE.DENOVO, ZygosityRequirement.REF_CALL_REQUIRED)
+        self.assertNotIn(MERGED_COHORT_WARNING, node.get_warnings())
+
+    def test_merged_cohort_warns_and_ref_call_required_warns_again(self):
+        node = self._make_node_requiring(self.INHERITANCE.DENOVO, ZygosityRequirement.CALL_REQUIRED)
+        node._get_cohort().vcf = None
+        warnings = node.get_warnings()
+        self.assertIn(MERGED_COHORT_WARNING, warnings)
+        self.assertNotIn(MERGED_COHORT_REF_CALL_WARNING, warnings)
+
+        node = self._make_node_requiring(self.INHERITANCE.DENOVO, ZygosityRequirement.REF_CALL_REQUIRED)
+        node._get_cohort().vcf = None
+        self.assertIn(MERGED_COHORT_REF_CALL_WARNING, node.get_warnings())
 
     # ── Node type ─────────────────────────────────────────────────────────────
 
@@ -134,20 +176,20 @@ class InheritanceNodeTestsMixin:
         self.assertNotIn(self.denovo_v.pk, ids)
         self.assertNotIn(self.control_v.pk, ids)
 
-    def test_all_recessive_require_parent_zygosity_excludes_unknown_father_on_autosome(self):
-        node = self._make_node(self.INHERITANCE.ALL_RECESSIVE, **{self.REQUIRE_PARENT_ZYGOSITY: True})
+    def test_all_recessive_call_required_excludes_unknown_father_on_autosome(self):
+        node = self._make_node_requiring(self.INHERITANCE.ALL_RECESSIVE, ZygosityRequirement.CALL_REQUIRED)
         self.assertNotIn(self.unknown_father_v.pk, self._filter_variants(node))
 
-    def test_all_recessive_no_require_parent_zygosity_includes_unknown_father_on_autosome(self):
-        node = self._make_node(self.INHERITANCE.ALL_RECESSIVE, **{self.REQUIRE_PARENT_ZYGOSITY: False})
+    def test_all_recessive_allow_no_call_includes_unknown_father_on_autosome(self):
+        node = self._make_node_requiring(self.INHERITANCE.ALL_RECESSIVE, ZygosityRequirement.ALLOW_NO_CALL)
         self.assertIn(self.unknown_father_v.pk, self._filter_variants(node))
 
-    def test_all_recessive_require_parent_zygosity_excludes_unknown_mother_on_xlr(self):
-        node = self._make_node(self.INHERITANCE.ALL_RECESSIVE, **{self.REQUIRE_PARENT_ZYGOSITY: True})
+    def test_all_recessive_call_required_excludes_unknown_mother_on_xlr(self):
+        node = self._make_node_requiring(self.INHERITANCE.ALL_RECESSIVE, ZygosityRequirement.CALL_REQUIRED)
         self.assertNotIn(self.xlinked_unknown_mother_v.pk, self._filter_variants(node))
 
-    def test_all_recessive_no_require_parent_zygosity_includes_unknown_mother_on_xlr(self):
-        node = self._make_node(self.INHERITANCE.ALL_RECESSIVE, **{self.REQUIRE_PARENT_ZYGOSITY: False})
+    def test_all_recessive_allow_no_call_includes_unknown_mother_on_xlr(self):
+        node = self._make_node_requiring(self.INHERITANCE.ALL_RECESSIVE, ZygosityRequirement.ALLOW_NO_CALL)
         self.assertIn(self.xlinked_unknown_mother_v.pk, self._filter_variants(node))
 
     def test_all_recessive_is_source_node(self):

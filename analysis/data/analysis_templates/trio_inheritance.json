@@ -804,7 +804,7 @@
         "analysis": 188,
         "name": "C. Het\n (non strict)",
         "inheritance": "C",
-        "require_zygosity": false,
+        "parent_zygosity_requirement": "N",
         "x": 509,
         "y": 475,
         "auto_node_name": true,

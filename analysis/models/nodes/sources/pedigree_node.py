@@ -5,10 +5,11 @@ from django.db import models
 from django.db.models import Q
 from django.db.models.deletion import SET_NULL
 
+from analysis.models.nodes.cohort_mixin import merged_cohort_warnings
 from analysis.models.nodes.family_inheritance import AbstractFamilyInheritance
 from analysis.models.nodes.node_display import NodeIcon
 from analysis.models.nodes.sources.cohort_node import AbstractCohortBasedNode
-from patients.enums import Zygosity
+from patients.enums import Zygosity, ZygosityRequirement
 from pedigree.enums import PedigreeInheritance
 from pedigree.models import CohortSamplePedFileRecord, Pedigree
 
@@ -16,7 +17,8 @@ from pedigree.models import CohortSamplePedFileRecord, Pedigree
 class PedigreeNode(AbstractCohortBasedNode):
     pedigree = models.ForeignKey(Pedigree, null=True, on_delete=SET_NULL)
     inheritance_model = models.CharField(max_length=2, choices=PedigreeInheritance.choices)
-    require_zygosity = models.BooleanField(default=True)
+    zygosity_requirement = models.CharField(max_length=1, choices=ZygosityRequirement.choices,
+                                            default=ZygosityRequirement.CALL_REQUIRED)
     min_inputs = 0
     max_inputs = 0
 
@@ -54,7 +56,7 @@ class PedigreeNode(AbstractCohortBasedNode):
         """ A record with unknown affection (None) is left unconstrained - the same rule as
             Pedigree.get_samples(affected=False), which excludes it """
         sample_zygosities_dict = {}
-        sample_require_zygosity_dict = {}
+        sample_zygosity_requirements = {}
 
         for cspfr in CohortSamplePedFileRecord.objects.filter(pedigree=self.pedigree):
             affection = cspfr.ped_file_record.affection
@@ -66,27 +68,32 @@ class PedigreeNode(AbstractCohortBasedNode):
                 zyg = unaffected_zygosities
             sample = cspfr.cohort_sample.sample
             sample_zygosities_dict[sample] = zyg
-            sample_require_zygosity_dict[sample] = self.require_zygosity
-        return sample_zygosities_dict, sample_require_zygosity_dict
+            sample_zygosity_requirements[sample] = ZygosityRequirement(self.zygosity_requirement)
+        return sample_zygosities_dict, sample_zygosity_requirements
 
     def get_recessive_q(self, cohort_genotype_collection):
         unaffected = AbstractFamilyInheritance.NOT_HOM_ALT
         affected = {Zygosity.HOM_ALT}
-        sample_zygosities_dict, sample_require_zygosity_dict = self.get_affected_unaffected_sample_zygosities_dict(unaffected, affected)
-        q = cohort_genotype_collection.get_zygosity_q(sample_zygosities_dict, sample_require_zygosity_dict)
-        return q
+        sample_zygosities_dict, sample_zygosity_requirements = self.get_affected_unaffected_sample_zygosities_dict(unaffected, affected)
+        return cohort_genotype_collection.get_zygosity_q(sample_zygosities_dict, sample_zygosity_requirements)
 
     def get_dominant_q(self, cohort_genotype_collection):
         unaffected = AbstractFamilyInheritance.NO_VARIANT
         affected = AbstractFamilyInheritance.HAS_VARIANT
-        sample_zygosities_dict, sample_require_zygosity_dict = self.get_affected_unaffected_sample_zygosities_dict(unaffected, affected)
-        return cohort_genotype_collection.get_zygosity_q(sample_zygosities_dict, sample_require_zygosity_dict)
+        sample_zygosities_dict, sample_zygosity_requirements = self.get_affected_unaffected_sample_zygosities_dict(unaffected, affected)
+        return cohort_genotype_collection.get_zygosity_q(sample_zygosities_dict, sample_zygosity_requirements)
 
     def _get_method_summary(self):
         method_summary = ''
         if self.pedigree:
             pass
         return method_summary
+
+    def get_warnings(self) -> list[str]:
+        warnings = super().get_warnings()
+        if self.pedigree:
+            warnings.extend(merged_cohort_warnings(self.pedigree.cohort, [ZygosityRequirement(self.zygosity_requirement)]))
+        return warnings
 
     def get_node_name(self):
         name = ''

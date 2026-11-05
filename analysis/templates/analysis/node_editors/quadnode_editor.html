@@ -19,15 +19,15 @@
         var map = ZYGOSITY_MAP[mode];
         if (!map) return;
 
-        var requireZyg = $("#id_require_parent_zygosity").is(":checked");
-        var requireSiblingZyg = $("#id_require_sibling_zygosity").is(":checked");
+        var parentRequirement = $("#id_parent_zygosity_requirement").val();
+        var siblingRequirement = $("#id_sibling_zygosity_requirement").val();
 
-        function memberZyg(key, affected, require) {
+        function memberZyg(key, affected, requirement) {
             var affectedKey = key + (affected ? '_affected' : '_unaffected');
             var val = (affectedKey in map) ? map[affectedKey] : map[key];
             if (val === undefined || val === null) return '';
             if (!val) return '--';
-            if (!require && key !== 'proband') val += ', ?';
+            if (key !== 'proband') val = zygosityRequirementOptions(val, requirement);
             return val;
         }
 
@@ -41,10 +41,10 @@
             return fillMosaicThresholds(map['other_filters_' + key] || '');
         }
 
-        $(".zyg-mother").text(memberZyg('mother', motherAffected, requireZyg));
-        $(".zyg-father").text(memberZyg('father', fatherAffected, requireZyg));
-        $(".zyg-proband").text(memberZyg('proband', false, true));
-        $(".zyg-sibling").text(memberZyg('sibling', siblingAffected, requireSiblingZyg));
+        $(".zyg-mother").text(memberZyg('mother', motherAffected, parentRequirement));
+        $(".zyg-father").text(memberZyg('father', fatherAffected, parentRequirement));
+        $(".zyg-proband").text(memberZyg('proband', false, null));
+        $(".zyg-sibling").text(memberZyg('sibling', siblingAffected, siblingRequirement));
         $(".other-mother").text(otherFilters('mother'));
         $(".other-father").text(otherFilters('father'));
         $(".other-proband").text(otherFilters('proband'));
@@ -107,8 +107,8 @@
         updateZygosityTable();
         updateMosaicFields();
     });
-    $("#id_require_parent_zygosity").change(updateZygosityTable);
-    $("#id_require_sibling_zygosity").change(updateZygosityTable);
+    $("#id_parent_zygosity_requirement").change(updateZygosityTable);
+    $("#id_sibling_zygosity_requirement").change(updateZygosityTable);
     // mosaic_max_af is a HiddenInput (rendered in the hidden fields loop) the slider writes into
     {% if af_show_in_percent %}$("#id_mosaic_max_af").attr("percent", "1");{% endif %}
     setupSlider($("#id_mosaic_max_af"), $("#mosaic-max-af-slider"));
@@ -137,6 +137,7 @@
 
 
 {% block content %}
+<script src="{% static 'js/analysis/zygosity_requirement.js' %}"></script>
 <form id="quad-form" method="post" action="{{ request.path }}">
     {% csrf_token %}
     {% for hidden in form.hidden_fields %}
@@ -162,11 +163,17 @@
         {{ form.inheritance }}{{ form.inheritance.errors }}
     </div>
     <div class="editor-row">
+        <label class="editor-label" for="{{ form.parent_zygosity_requirement.id_for_label }}" title="How a parent's genotype is held to the table: a no call (./.) may pass, a call is needed (a merged cohort's missing record still counts as REF), or REF must be a real 0/0 call">Parent calls</label>
+        {{ form.parent_zygosity_requirement }}{{ form.parent_zygosity_requirement.errors }}
+    </div>
+    <div class="editor-row">
+        <label class="editor-label" for="{{ form.sibling_zygosity_requirement.id_for_label }}" title="How a sibling's genotype is held to the table: a no call (./.) may pass, a call is needed (a merged cohort's missing record still counts as REF), or REF must be a real 0/0 call">Sibling calls</label>
+        {{ form.sibling_zygosity_requirement }}{{ form.sibling_zygosity_requirement.errors }}
+    </div>
+    <div class="editor-row">
         <span class="editor-label"></span>
         <span class="editor-checks">
             <label for="{{ form.ignore_field_errors.id_for_label }}" title="Save and run even though the inheritance mode doesn't fit this family - the reasons show as warnings">{{ form.ignore_field_errors }} {{ form.ignore_field_errors.label }}</label>
-            <label for="{{ form.require_parent_zygosity.id_for_label }}">{{ form.require_parent_zygosity }} Require parent zygosity calls</label>{{ form.require_parent_zygosity.errors }}
-            <label for="{{ form.require_sibling_zygosity.id_for_label }}">{{ form.require_sibling_zygosity }} Require sibling zygosity calls</label>{{ form.require_sibling_zygosity.errors }}
         </span>
     </div>
     {{ zygosity_table_data|json_script:"zygosity-data" }}

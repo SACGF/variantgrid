@@ -7,6 +7,7 @@ from analysis.models.nodes.node_display import first_and_more_name_line, truncat
 from analysis.tests.utils import AnalysisSetupMixin
 from annotation.enums import PathogenicityImpact
 from genes.models import GeneList, SampleGeneList
+from patients.enums import ZygosityRequirement
 from snpdb.fake_data import create_fake_quad
 from snpdb.models import Sample
 
@@ -29,10 +30,9 @@ class TestNodeNames(AnalysisSetupMixin, TestCase):
 
     def test_quad_node_leads_with_family(self):
         quad = create_fake_quad(self.analysis.user, self.grch37, name="Smith family")
-        node = QuadNode(analysis=self.analysis, quad=quad, inheritance=QuadInheritance.RECESSIVE,
-                        require_parent_zygosity=True, require_sibling_zygosity=True)
+        node = QuadNode(analysis=self.analysis, quad=quad, inheritance=QuadInheritance.RECESSIVE)
         self.assertEqual(["Smith family", "Recessive"], node.get_node_name().split("\n"))
-        node.require_sibling_zygosity = False
+        node.sibling_zygosity_requirement = ZygosityRequirement.ALLOW_NO_CALL
         self.assertEqual("Recessive?", node.get_node_name().split("\n")[1])
 
         quad.name = ""

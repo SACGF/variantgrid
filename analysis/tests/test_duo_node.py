@@ -19,7 +19,7 @@ from analysis.models import Analysis, DuoNode
 from analysis.models.nodes.family_inheritance import MOSAIC_JOINT_CALL_WARNING
 from analysis.models.nodes.sources.duo_node import COMP_HET_SIBLING_UNPHASED
 from annotation.fake_data import get_fake_annotation_version
-from patients.enums import Sex, Zygosity
+from patients.enums import Sex, Zygosity, ZygosityRequirement
 from snpdb.enums import DuoRelationship
 from snpdb.fake_data import DEFAULT_GENOTYPE_VALUES, create_fake_duo, make_cohort_genotype
 from snpdb.models import Duo, GenomeBuild, Variant
@@ -256,21 +256,34 @@ class TestDuoNodeInheritance(TestCase):
         finally:
             self.duo.relative_affected = False
 
-    # ── require_zygosity (parent only) ────────────────────────────────────────
+    # ── relative_zygosity_requirement (relative only) ─────────────────────────
 
-    def test_require_zygosity_true_excludes_parent_no_call(self):
-        node = self._make_node(DuoInheritance.RECESSIVE, require_zygosity=True)
+    def test_call_required_excludes_parent_no_call(self):
+        node = self._make_node(DuoInheritance.RECESSIVE,
+                               relative_zygosity_requirement=ZygosityRequirement.CALL_REQUIRED)
         self.assertNotIn(self.unknown_parent_v.pk, self._filter_variants(node))
 
-    def test_require_zygosity_false_allows_parent_no_call(self):
-        node = self._make_node(DuoInheritance.RECESSIVE, require_zygosity=False)
+    def test_allow_no_call_allows_parent_no_call(self):
+        node = self._make_node(DuoInheritance.RECESSIVE,
+                               relative_zygosity_requirement=ZygosityRequirement.ALLOW_NO_CALL)
         self.assertIn(self.unknown_parent_v.pk, self._filter_variants(node))
 
-    def test_require_zygosity_false_still_requires_proband_zygosity(self):
+    def test_allow_no_call_still_requires_proband_zygosity(self):
         """ #947 - widening applies to the parent only, so a no-call proband is still excluded """
         proband_no_call_v = self._make_variant("3", 9000, "UE")
-        node = self._make_node(DuoInheritance.RECESSIVE, require_zygosity=False)
+        node = self._make_node(DuoInheritance.RECESSIVE,
+                               relative_zygosity_requirement=ZygosityRequirement.ALLOW_NO_CALL)
         self.assertNotIn(proband_no_call_v.pk, self._filter_variants(node))
+
+    def test_ref_call_required_excludes_a_parent_with_no_record(self):
+        """ [proband, parent] - absent in parent reads the '.' a merged cohort stores as REF unless a call is required """
+        parent_no_record_v = self._make_variant("3", 9100, "E.")
+        node = self._make_node(DuoInheritance.ABSENT_IN_PARENT,
+                               relative_zygosity_requirement=ZygosityRequirement.CALL_REQUIRED)
+        self.assertIn(parent_no_record_v.pk, self._filter_variants(node))
+        node = self._make_node(DuoInheritance.ABSENT_IN_PARENT,
+                               relative_zygosity_requirement=ZygosityRequirement.REF_CALL_REQUIRED)
+        self.assertNotIn(parent_no_record_v.pk, self._filter_variants(node))
 
     # ── Node type ─────────────────────────────────────────────────────────────
 

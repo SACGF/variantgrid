@@ -715,15 +715,15 @@ class CohortGenotypeCollection(DataArchiveMixin, RelatedModelsPartitionModel):
             return None
         return cg.get_sample_genotype(sample)
 
-    def get_sample_zygosity_regex(self, sample_zygosities: dict, sample_require_zygosity: dict):
-        """ sample_zygosities_dict = {sample_id : zygosities_set} """
+    def get_sample_zygosity_regex(self, sample_zygosities: dict, sample_zygosity_requirements: dict):
+        """ sample_zygosities = {sample : zygosities_set}, sample_zygosity_requirements = {sample : ZygosityRequirement} """
 
         zygosity_sample_matches = ["."] * self.num_samples
 
         for cs in self.cohort.get_cohort_samples():
             sample_zyg = sample_zygosities.get(cs.sample)
-            require_zygosity = sample_require_zygosity.get(cs.sample, True)
-            regex_match = Zygosity.get_regex_match(sample_zyg, require_zygosity=require_zygosity)
+            requirement = sample_zygosity_requirements.get(cs.sample)
+            regex_match = Zygosity.get_regex_match(sample_zyg, requirement)
             zygosity_sample_matches[cs.cohort_genotype_packed_field_index] = regex_match
 
         regex_string = ''.join(zygosity_sample_matches)
@@ -740,9 +740,9 @@ class CohortGenotypeCollection(DataArchiveMixin, RelatedModelsPartitionModel):
         # For https://docs.djangoproject.com/en/2.1/ref/contrib/postgres/fields/#index-transforms
         return self.get_packed_index_by_sample_id[sample_id]  # 0 based
 
-    def get_zygosity_q(self, sample_zygosities: dict, sample_require_zygosity: dict = None, exclude=False) -> Q:
+    def get_zygosity_q(self, sample_zygosities: dict, sample_zygosity_requirements: dict = None, exclude=False) -> Q:
         """ sample_zygosities = {sample : zygosities_set}
-            sample_require_zygosity = {sample : True/False} - defaults to True
+            sample_zygosity_requirements = {sample : ZygosityRequirement} - defaults to CALL_REQUIRED
             exclude - invert query (not equals)
 
         Uses regex on samples_zygosity. Benchmarking showed SUBSTRING+IN is faster for
@@ -757,10 +757,10 @@ class CohortGenotypeCollection(DataArchiveMixin, RelatedModelsPartitionModel):
             q_none = Q(pk__isnull=True)
             return q_none
 
-        if sample_require_zygosity is None:
-            sample_require_zygosity = {}
+        if sample_zygosity_requirements is None:
+            sample_zygosity_requirements = {}
 
-        regex_string = self.get_sample_zygosity_regex(sample_zygosities, sample_require_zygosity)
+        regex_string = self.get_sample_zygosity_regex(sample_zygosities, sample_zygosity_requirements)
         if exclude:
             # Inverting a query via ~Q() leads to extremely slow queries so inverting regex.
             # Use ! (negative lookahead) only works where regex is anchored at start of line

@@ -19,7 +19,7 @@ from analysis.models.nodes.node_query_mixin import (
 from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
 from library.django_utils.data_archive_mixin import DataArchivedError
 from library.genomics.vcf_writer import percent_decode_info_value
-from patients.enums import SampleSourceLevel, Zygosity
+from patients.enums import SampleSourceLevel, Zygosity, ZygosityRequirement
 from patients.models import Patient
 from patients.sample_grouping import get_patient_for_source
 from snpdb.enums import ImportStatus
@@ -90,6 +90,28 @@ def get_sample_any_zygosity_arg_q_dict(sample: Sample) -> dict[Optional[str], di
     alias, field = sample.get_cohort_genotype_alias_and_field("zygosity")
     q = Q(**{f"{field}__in": [code for code, _ in Zygosity.CHOICES]})
     return {alias: {str(q): q}}
+
+
+MERGED_COHORT_WARNING = (
+    "Cohort is merged from separate VCFs, not joint called - a sample with no record at a site counts as no "
+    "variant, so de novo and recessive results can't be confirmed by a parent REF call. Joint call the samples "
+    "into one VCF to confirm"
+)
+MERGED_COHORT_REF_CALL_WARNING = (
+    "Called REF required matches next to nothing in a merged cohort - a sample's own VCF rarely holds 0/0 records"
+)
+
+
+def merged_cohort_warnings(cohort, zygosity_requirements=()) -> list[str]:
+    """ A cohort built from one VCF (directly or as a sub cohort) is joint called, so every sample has a
+        record at every site. Anything else was merged by cohort_genotype_tasks, which stores
+        Zygosity.MISSING where a sample's own VCF had no record """
+    warnings = []
+    if cohort and cohort.get_vcf() is None:
+        warnings.append(MERGED_COHORT_WARNING)
+        if ZygosityRequirement.REF_CALL_REQUIRED in zygosity_requirements:
+            warnings.append(MERGED_COHORT_REF_CALL_WARNING)
+    return warnings
 
 
 class CohortMixin:

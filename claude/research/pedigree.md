@@ -51,7 +51,7 @@ With `inheritance_model` set it builds a per-sample zygosity regex over the coho
 zygosity sets as the trio code (`analysis/models/nodes/family_inheritance.py:AbstractFamilyInheritance`): recessive =
 affected HOM_ALT, unaffected anything but HOM_ALT; dominant = affected HET/HOM_ALT, unaffected MISSING/HOM_REF. A record
 of unknown affection (`None`) is unconstrained, matching `Pedigree.get_samples(affected=False)` leaving it out.
-`require_zygosity=False` also lets a no-call through. Any inheritance model defeats the label-count cache (`_has_filters_that_affect_label_counts`).
+`zygosity_requirement` (`patients.enums.ZygosityRequirement`) decides whether a no-call also passes, or only a called REF counts as REF. Any inheritance model defeats the label-count cache (`_has_filters_that_affect_label_counts`).
 
 ### Chart
 
