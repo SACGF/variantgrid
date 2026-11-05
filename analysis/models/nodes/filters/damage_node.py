@@ -882,15 +882,11 @@ class DamageNode(AnalysisNode):
 
     @staticmethod
     def get_node_class_label():
-        return "EffectNode"
+        return "Effect"
 
     @classmethod
     def get_node_class_icon(cls) -> NodeIcon:
         return NodeIcon(symbol="node-icon-effect")
-
-    @classmethod
-    def get_node_class_label_short(cls) -> str:
-        return "Effect"
 
 
 auditlog.register(DamageNode)

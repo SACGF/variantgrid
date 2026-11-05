@@ -146,7 +146,7 @@ function renderNodeName(node, name) {
 	node.data("nodeName", name || "");
 	const nodeName = $(".node-name", node).empty();
 	for (const line of (name || "").split("\n").filter(Boolean)) {
-		$("<span/>", {class: "node-name-line", text: line}).appendTo(nodeName);
+		$("<span/>", {class: "node-name-line", lang: "en", text: line}).appendTo(nodeName);
 	}
 }
 

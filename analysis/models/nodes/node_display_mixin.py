@@ -11,6 +11,8 @@ class NodeDisplayMixin:
         - get_node_class_label_short / get_node_strip_label: the class strip on the node card
         - get_node_icon / get_node_chips: config-dependent badge icon and the pills under the name
         - get_css_classes, get_rendering_args, get_connection_data, get_grid_post_data """
+    # Above this the class strip's ~45px runs out at 7px, so the card asks for the smaller rule
+    MAX_STRIP_LABEL_CHARS = 8
 
     def get_connection_data(self, parent):
         """ Return dict of source_id/target_id for sending as JSON """
@@ -45,6 +47,8 @@ class NodeDisplayMixin:
             css_classes.append("output-node")
         if self.analysis.template_type == AnalysisTemplateType.TEMPLATE and self.analysisvariable_set.exists():
             css_classes.append("variable-node")
+        if len(self.get_node_strip_label()) > self.MAX_STRIP_LABEL_CHARS:
+            css_classes.append("node-klass-long")
         return css_classes
 
     def _get_method_summary(self):
