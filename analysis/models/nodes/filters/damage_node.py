@@ -51,12 +51,19 @@ class _ColumnFilter(NamedTuple):
     required_field: str
     prediction: bool = True  # a per-tool pathogenicity prediction, rather than a LoF flag
     rankscore: bool = False
+    numeric: bool = False  # a threshold, where 0 is a value the user chose (the editor's enable box clears to None)
+
+    def is_set(self, node) -> bool:
+        value = getattr(node, self.value_field)
+        return value is not None if self.numeric else bool(value)
 
 
 _COLUMN_FILTERS = (
-    *(_ColumnFilter(t.rankscore_field, f"{t.rankscore_field}_min", f"{t.rankscore_field}_required", rankscore=True)
+    *(_ColumnFilter(t.rankscore_field, f"{t.rankscore_field}_min", f"{t.rankscore_field}_required",
+                    rankscore=True, numeric=True)
       for t in TOOLS if t.rankscore_field),
-    *(_ColumnFilter(t.raw_field, t.node_threshold_field, f"{t.raw_field}_required") for t in TOOLS if t.raw_field),
+    *(_ColumnFilter(t.raw_field, t.node_threshold_field, f"{t.raw_field}_required", numeric=True)
+      for t in TOOLS if t.raw_field),
     *(_ColumnFilter(t.pred_field, t.pred_field, f"{t.pred_field}_required") for t in TOOLS if t.pred_field),
     _ColumnFilter("nmd_escaping_variant", "nmd_escaping_variant", "nmd_escaping_variant_required", prediction=False),
     _ColumnFilter("aloft_pred", "aloft", "aloft_required", prediction=False),
@@ -289,8 +296,8 @@ class DamageNode(AnalysisNode):
             (VEP_COLUMNS), so the version and build decide, as they do for the editor's sliders. """
         if self.columns_version == 1:
             # cadd_phred / revel_score are populated again from v4, where the node filters them as raw scores
-            return [_ColumnFilter("cadd_phred", "cadd_score_min", "cadd_score_required"),
-                    _ColumnFilter("revel_score", "revel_score_min", "revel_score_required")]
+            return [_ColumnFilter("cadd_phred", "cadd_score_min", "cadd_score_required", numeric=True),
+                    _ColumnFilter("revel_score", "revel_score_min", "revel_score_required", numeric=True)]
         visible_columns = self.analysis.annotation_version.variant_annotation_version.visible_columns
         column_filters = [cf for cf in _COLUMN_FILTERS if cf.column in visible_columns]
         # nmd_escape_status is calculated by VariantGrid, not a VEP column
@@ -344,7 +351,7 @@ class DamageNode(AnalysisNode):
                         self.protein_domain, self.published, self.variant_class,
                         self.structural != StructuralFilter.ANY, bool(self._gene_constraint_filters()),
                         self._applies_outside_repeat_region()]
-        return any(all_versions) or any(getattr(self, cf.value_field) for cf in self._column_filters())
+        return any(all_versions) or any(cf.is_set(self) for cf in self._column_filters())
 
     def has_required(self) -> bool:
         all_versions = [self.impact_required, self.splice_required, self.cosmic_count_required,
@@ -356,11 +363,11 @@ class DamageNode(AnalysisNode):
                                         if show_rankscores or not cf.rankscore)
 
     def has_individual_pathogenic_predictions(self) -> bool:
-        return any(getattr(self, cf.value_field) for cf in self._column_filters() if cf.prediction)
+        return any(cf.is_set(self) for cf in self._column_filters() if cf.prediction)
 
     def has_rankscore_predictions(self) -> bool:
         """ v4 hides rankscore sliders by default - used to auto-reveal them when one is still set. """
-        return any(getattr(self, cf.value_field) for cf in _COLUMN_FILTERS if cf.rankscore)
+        return any(cf.is_set(self) for cf in _COLUMN_FILTERS if cf.rankscore)
 
     def show_rankscore_sliders(self) -> bool:
         """ v2/v3 only have rankscores so always show them. At v4 they're legacy: offered when the
@@ -548,7 +555,7 @@ class DamageNode(AnalysisNode):
             vav = self.analysis.annotation_version.variant_annotation_version
             for path_prediction in vav.get_rankscore_pathogenic_prediction_funcs():
                 path_prediction_min = f"{path_prediction}_min"
-                if score_min := getattr(self, path_prediction_min):
+                if (score_min := getattr(self, path_prediction_min)) is not None:
                     q_path = Q(**{f"variantannotation__{path_prediction}__gte": score_min})
                     if getattr(self, f"{path_prediction}_required"):
                         if getattr(self, f"{path_prediction}_allow_null"):
@@ -565,7 +572,7 @@ class DamageNode(AnalysisNode):
                     raw_field = tool.raw_field
                     if not raw_field or not self._filter_column_applied(raw_field):
                         continue
-                    if threshold := getattr(self, tool.node_threshold_field):
+                    if (threshold := getattr(self, tool.node_threshold_field)) is not None:
                         q_raw = self._raw_score_q(tool, threshold)
                         if getattr(self, f"{raw_field}_required"):
                             if getattr(self, f"{raw_field}_allow_null"):

@@ -1,5 +1,3 @@
-import unittest
-
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
@@ -83,11 +81,17 @@ class TestDamageNodeV4Q(_ColumnsVersionMixin, TestCase):
                 node = DamageNode(analysis=self.analysis, **{tool.node_threshold_field: _threshold(tool)})
                 self.assertEqual({"damaging", "at_threshold"}, self._filtered(node, self.RAW_SCORE_ROWS))
 
-    # Suspected bug: _get_node_q's `if threshold := getattr(self, tool.node_threshold_field)` drops a 0 threshold
-    @unittest.expectedFailure
     def test_raw_score_threshold_of_zero_filters(self):
+        """ The editor's enable box clears a slider to None; an enabled slider at 0 is a threshold (#2657) """
         node = DamageNode(analysis=self.analysis, bayesdel_noaf_score_min=0.0)
+        self.assertTrue(node.modifies_parents())
         self.assertEqual({"bayesdel_zero", "bayesdel_positive"}, self._filtered(node, self.BAYESDEL_ROWS))
+
+    def test_raw_score_required_at_zero_keeps_only_scored(self):
+        """ On a 0..1 scale, required >= 0 with allow-null off is "has a score": every scored variant passes """
+        node = DamageNode(analysis=self.analysis, alphamissense_score_min=0.0,
+                          alphamissense_score_required=True, alphamissense_score_allow_null=False)
+        self.assertEqual({"damaging", "at_threshold", "benign"}, self._filtered(node, self.RAW_SCORE_ROWS))
 
     def test_pred_field_keeps_matching_prediction_per_tool(self):
         for field, damaging, _ in PRED_FIELDS:
