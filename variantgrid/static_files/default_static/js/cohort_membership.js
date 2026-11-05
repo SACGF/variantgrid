@@ -107,9 +107,9 @@ class CohortMembershipEditor {
         const rebuildNote = `Samples come from <b>${vcfIds.size} VCFs</b> - saving rebuilds the genotype data in the ` +
             "background. A sample has no record at a site its own VCF didn't call, so it is stored as <b>no call</b> " +
             "there, not REF - a cohort can't tell reference from no coverage the way a joint called VCF does. " +
-            "Where the samples belong together, <a target='_blank' " +
+            "To confirm de novo or recessive inheritance in a family, <a target='_blank' " +
             "href='https://variantgrid.readthedocs.io/en/latest/data/vcf_samples.html#multi-sample-vcfs'>joint call</a> " +
-            "them into one VCF and upload that instead.";
+            "them into one VCF instead - a merged cohort can't tell a parent's REF from no coverage.";
         if (members.length >= this.config.large_rebuild_samples) {
             return {
                 key: "rebuild-large",
