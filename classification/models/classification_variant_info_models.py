@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from dataclasses import replace as dataclass_replace
 from datetime import timedelta
 from functools import lru_cache
-from typing import Any, Literal, Optional, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, Optional, TypedDict
 
 import django.dispatch
 from django.apps import apps
@@ -73,6 +73,10 @@ from library.utils import IconWithTooltip, md5sum_str, pretty_label
 from snpdb.genome_build_manager import GenomeBuildManager
 from snpdb.models import Allele, GenomeBuild, GenomeBuildPatchVersion, Variant, VariantCoordinate
 from snpdb.models.models import CodeVersion, CodeVersionMixin
+
+if TYPE_CHECKING:
+    from classification.models.classification import ClassificationImport
+    from snpdb.models.models_variant import LiftoverRun
 
 """
 Classifications

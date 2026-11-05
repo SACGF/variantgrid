@@ -29,6 +29,10 @@ from snpdb.enums.snpdb_enums import (  # noqa: F401 - re-exported, see module do
     SomaticClinicalSignificance,
 )
 
+if typing.TYPE_CHECKING:
+    from classification.models.classification import Classification
+    from snpdb.models.models import Lab
+
 CRITERIA_NOT_MET = 'NM'
 CRITERIA_NOT_APPLICABLE = 'NA'
 CRITERIA_NEUTRAL = 'N'

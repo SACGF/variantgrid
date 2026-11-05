@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import django.dispatch
 from django.conf import settings
@@ -28,6 +28,9 @@ from library.utils import invalidate_cached_property
 from snpdb.enums import AlleleOriginBucket
 from snpdb.models import Lab
 from snpdb.models.models_variant import Allele
+
+if TYPE_CHECKING:
+    from classification.models.discordance_models import DiscordanceReport
 
 clinical_context_signal = django.dispatch.Signal()  # args: "clinical_context", "status", "is_significance_change", "clinical_context_change_data:ClinicalContextChangeData"
 
