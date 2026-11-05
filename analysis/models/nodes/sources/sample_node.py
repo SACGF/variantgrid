@@ -109,8 +109,6 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         SampleSourceLevel.PATIENT: NodeIcon(fa=Patient.preview_icon()),
     }
     VCF_CHIP_ICON = "fa-solid fa-file-lines"
-    # Above this the class strip's ~45px runs out at 7px, so the card asks for the smaller rule
-    MAX_STRIP_LABEL_CHARS = 8
     # Above this many siblings in one chip group the card runs out of room, so they collapse to a count
     MAX_GROUP_CHIPS = 3
     min_inputs = 0
@@ -551,12 +549,6 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
 
     def get_node_strip_label(self) -> str:
         return SampleSourceLevel(self.source_level).label
-
-    def get_css_classes(self):
-        css_classes = super().get_css_classes()
-        if len(self.get_node_strip_label()) > self.MAX_STRIP_LABEL_CHARS:
-            css_classes.append("node-klass-long")
-        return css_classes
 
     def _get_patient_badge(self) -> Optional[str]:
         """ The sprite symbol for the patient's pedigree shape, or None where there is no patient """

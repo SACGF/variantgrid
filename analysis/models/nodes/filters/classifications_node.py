@@ -151,6 +151,10 @@ class ClassificationsNode(SignificanceFilterNodeMixin, AnalysisNode):
         return "Classifications"
 
     @classmethod
+    def get_node_class_label_short(cls) -> str:
+        return "Classified"
+
+    @classmethod
     def get_node_class_icon(cls) -> NodeIcon:
         return NodeIcon(fa="fa-solid fa-clipboard-check")
 

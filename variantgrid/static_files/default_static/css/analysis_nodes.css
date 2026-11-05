@@ -299,7 +299,7 @@ button.add-analysis-variable-button {
 
 /* EXTRACTION doesn't fit the strip's ~45px at 7px - nodes whose strip label can be that long
    ask for the smaller rule from get_css_classes() */
-.node-klass-long .node-klass {
+.design-a-node .node-klass-long .node-klass {
 	font-size: 6px;
 	letter-spacing: .02em;
 }
@@ -337,6 +337,7 @@ button.add-analysis-variable-button {
 	-webkit-box-orient: vertical;
 	overflow: hidden;
 	overflow-wrap: anywhere;
+	hyphens: auto;
 }
 
 /* Line 2 on is the mode or a filter, lighter under the thing the node reads */
@@ -1282,7 +1283,7 @@ span.node-counts {
 }
 
 .significance-pills.origin-disabled label.pill-toggle {
-	opacity: 0.3;
+	opacity: 0.2;
 	filter: grayscale(1);
 	cursor: default;
 	pointer-events: none;
