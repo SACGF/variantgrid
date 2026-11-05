@@ -105,10 +105,10 @@ check and the server status integrations table with a one-day warning age; both 
 
 The config is JSON rather than columns because every deployment's mapping is different (which labs go up, legacy lab
 names mapped onto current ones, share levels downgraded on the way out, local usernames renamed) and most keys are
-per-feature flags. `remote_lab_record_url` and `remote_gene_level` are compatibility gates for a remote
-that has not been upgraded yet: VariantGrid deployments upgrade on their own schedules (SA Pathology runs validated
-releases), so the sender must not assume the receiver understands a lab-record URL or a gene-level variant. The same
-concern is behind `HistoricalEKeyConverter`, whose conversion table drops `variant_type`.
+per-feature flags. `remote_gene_level` is a compatibility gate for a remote that has not been upgraded yet:
+VariantGrid deployments upgrade on their own schedules (SA Pathology runs validated releases), so the sender must not
+assume the receiver understands a gene-level variant. The same concern is behind `HistoricalEKeyConverter`, whose
+conversion table drops `variant_type`.
 
 Sync records are only written once the connection has worked (see the model docstring): a bad password should produce
 one FAILED run, not a failure row per classification. Tracking per modification rather than per classification is what

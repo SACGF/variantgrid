@@ -113,18 +113,7 @@ class ClassificationSyncStatusTestCase(TestCase):
         self.assertEqual(status.state, ClassificationSyncState.CHANGES_PENDING)
         self.assertEqual(status.remote_url, f"{REMOTE_HOST}/classification/classification/1234")
 
-    def test_pending_falls_back_to_remote_search(self):
-        """ Remotes yet to be upgraded have no view_classification_lab_record to link to """
-        vc = self._create_classification()
-
-        status = self._only_status(vc)
-        self.assertEqual(status.state, ClassificationSyncState.PENDING)
-        self.assertEqual(status.remote_url, f"{REMOTE_HOST}/variantopedia/search?search={vc.lab_record_id}")
-        self.assertIsNone(status.last_synced)
-
-    def test_pending_links_to_lab_record_once_remote_is_upgraded(self):
-        self.sync_destination.config["remote_lab_record_url"] = True
-        self.sync_destination.save()
+    def test_pending_links_to_lab_record(self):
         vc = self._create_classification()
 
         status = self._only_status(vc)
