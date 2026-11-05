@@ -98,12 +98,9 @@ class Zygosity:
         return zygosity_display.get(zygosity, zygosity)
 
     @staticmethod
-    def get_regex_match(zygosities_set: set, require_zygosity=True):
+    def get_regex_match(zygosities_set: set, requirement: "ZygosityRequirement" = None):
         if zygosities_set:
-            if not require_zygosity:
-                # Make new set so as to not alter passed in values
-                zygosities_set = zygosities_set | {Zygosity.UNKNOWN_ZYGOSITY}
-
+            zygosities_set = ZygosityRequirement(requirement or ZygosityRequirement.CALL_REQUIRED).apply(zygosities_set)
             if zygosities_set == Zygosity.ALL_ZYGOSITIES_SET:
                 return "."
 
@@ -131,6 +128,27 @@ class Zygosity:
         """ expanded_zygosity = (HOM_REF, HOM_ALT, HET) """
 
         return Zygosity.get_genotype(Zygosity.REVERSE_CHOICES_LOOKUP[expanded_zygosity])
+
+
+class ZygosityRequirement(models.TextChoices):
+    """ How strictly a sample other than the proband is held to an inheritance mode's zygosity set.
+        Zygosity.MISSING is what a cohort merged from separate VCFs stores where a sample's own VCF had no
+        record, so only REF_CALL_REQUIRED tells a called 0/0 from no coverage """
+    ALLOW_NO_CALL = 'N', "No call allowed"
+    CALL_REQUIRED = 'C', "Call required"
+    REF_CALL_REQUIRED = 'R', "Called REF required"
+
+    def apply(self, zygosities: set) -> set:
+        """ The set a member is matched against - a new set, the caller's is left alone """
+        if self == ZygosityRequirement.ALLOW_NO_CALL:
+            return zygosities | {Zygosity.UNKNOWN_ZYGOSITY}
+        if self == ZygosityRequirement.REF_CALL_REQUIRED:
+            return zygosities - {Zygosity.MISSING}
+        return set(zygosities)
+
+    @property
+    def is_default(self) -> bool:
+        return self == ZygosityRequirement.CALL_REQUIRED
 
 
 class Sex(models.TextChoices):

@@ -20,7 +20,7 @@
         var map = ZYGOSITY_MAP[mode];
         if (!map) return;
 
-        var requireZyg = $("#id_require_zygosity").is(":checked");
+        var relativeRequirement = $("#id_relative_zygosity_requirement").val();
 
         // Most rows are a plain key; some vary with the relative's affected status, and some with
         // who the relative is (no XLR branch through the father, sibling rules of their own)
@@ -34,11 +34,11 @@
             return undefined;
         }
 
-        function memberZyg(key, affected, require) {
+        function memberZyg(key, affected, requirement) {
             var val = lookup('', key, affected);
             if (val === undefined || val === null) return '';
             if (!val) return '--';
-            if (!require && key !== 'proband') val += ', ?';
+            if (key !== 'proband') val = zygosityRequirementOptions(val, requirement);
             return val;
         }
 
@@ -52,8 +52,8 @@
             return fillMosaicThresholds(lookup('other_filters_', key, relativeAffected) || '');
         }
 
-        $(".zyg-relative").text(memberZyg('relative', relativeAffected, requireZyg));
-        $(".zyg-proband").text(memberZyg('proband', false, true));
+        $(".zyg-relative").text(memberZyg('relative', relativeAffected, relativeRequirement));
+        $(".zyg-proband").text(memberZyg('proband', false, null));
         $(".other-relative").text(otherFilters('relative'));
         $(".other-proband").text(otherFilters('proband'));
     }
@@ -104,7 +104,7 @@
         updateZygosityTable();
         updateMosaicFields();
     });
-    $("#id_require_zygosity").change(updateZygosityTable);
+    $("#id_relative_zygosity_requirement").change(updateZygosityTable);
     // mosaic_max_af is a HiddenInput (rendered in the hidden fields loop) the slider writes into
     {% if af_show_in_percent %}$("#id_mosaic_max_af").attr("percent", "1");{% endif %}
     setupSlider($("#id_mosaic_max_af"), $("#mosaic-max-af-slider"));
@@ -140,6 +140,7 @@
 
 
 {% block content %}
+<script src="{% static 'js/analysis/zygosity_requirement.js' %}"></script>
 <form id="duo-form" method="post" action="{{ request.path }}">
     {% csrf_token %}
     {% for hidden in form.hidden_fields %}
@@ -163,10 +164,13 @@
         {{ form.inheritance }}{{ form.inheritance.errors }}
     </div>
     <div class="editor-row">
+        <label class="editor-label" for="{{ form.relative_zygosity_requirement.id_for_label }}" title="How a relative's genotype is held to the table: a no call (./.) may pass, a call is needed (a merged cohort's missing record still counts as REF), or REF must be a real 0/0 call"><span class='relative-role'>Relative</span> calls</label>
+        {{ form.relative_zygosity_requirement }}{{ form.relative_zygosity_requirement.errors }}
+    </div>
+    <div class="editor-row">
         <span class="editor-label"></span>
         <span class="editor-checks">
             <label for="{{ form.ignore_field_errors.id_for_label }}" title="Save and run even though the inheritance mode doesn't fit this family - the reasons show as warnings">{{ form.ignore_field_errors }} {{ form.ignore_field_errors.label }}</label>
-            <label for="{{ form.require_zygosity.id_for_label }}">{{ form.require_zygosity }} Require <span class='relative-role-lower'>relative</span> zygosity calls</label>{{ form.require_zygosity.errors }}
         </span>
     </div>
     <div class='genotype-row' id='mosaic-fields' style='display: none'>

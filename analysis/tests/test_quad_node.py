@@ -7,6 +7,7 @@ from analysis.enums import QuadInheritance
 from analysis.models import Analysis, QuadNode
 from analysis.tests.inheritance_node_mixin import InheritanceNodeTestsMixin
 from annotation.fake_data import get_fake_annotation_version
+from patients.enums import ZygosityRequirement
 from snpdb.fake_data import DEFAULT_GENOTYPE_VALUES, create_fake_quad, make_cohort_genotype
 from snpdb.models import GenomeBuild
 from snpdb.models.models_cohort import CohortGenotypeCollection
@@ -32,11 +33,12 @@ class TestQuadNodeInheritance(InheritanceNodeTestsMixin, TestCase):
     """
     INHERITANCE = QuadInheritance
     NODE_CLASS = QuadNode
-    REQUIRE_PARENT_ZYGOSITY = "require_parent_zygosity"
+    PARENT_ZYGOSITY_REQUIREMENT = "parent_zygosity_requirement"
     # samples_zygosity index: [proband, mother, father, sibling]
     SHARED_ZYGOSITIES = {
         "recessive_v": "OEER",               # sibling=HOM_REF - a carrier is ok, not affected
         "denovo_v": "ERRR",
+        "denovo_father_no_record_v": "ER.R",
         "control_v": "RRRR",
         "unknown_father_v": "OEUR",
         "xlinked_v": "OERR",
@@ -150,24 +152,23 @@ class TestQuadNodeInheritance(InheritanceNodeTestsMixin, TestCase):
         node = self._make_node(QuadInheritance.RECESSIVE, quad=self.quad)
         self.assertIn(self.recessive_v.pk, self._filter_variants(node))  # sibling='R' is allowed
 
-    # ── require_sibling_zygosity ──────────────────────────────────────────────
+    # ── sibling_zygosity_requirement ──────────────────────────────────────────
 
-    def test_require_sibling_zygosity_true_excludes_unknown_sibling(self):
-        """Default (require_sibling_zygosity=True) excludes a sibling with no genotype call."""
+    def test_sibling_call_required_excludes_unknown_sibling(self):
         node = self._make_node(QuadInheritance.RECESSIVE, quad=self.quad_aff,
-                               require_sibling_zygosity=True)
+                               sibling_zygosity_requirement=ZygosityRequirement.CALL_REQUIRED)
         self.assertNotIn(self.recessive_sib_unknown_v.pk, self._filter_variants(node))
 
-    def test_require_sibling_zygosity_false_includes_unknown_sibling(self):
-        """With require_sibling_zygosity=False, a no-call sibling is allowed through."""
+    def test_sibling_allow_no_call_includes_unknown_sibling(self):
         node = self._make_node(QuadInheritance.RECESSIVE, quad=self.quad_aff,
-                               require_sibling_zygosity=False)
+                               sibling_zygosity_requirement=ZygosityRequirement.ALLOW_NO_CALL)
         self.assertIn(self.recessive_sib_unknown_v.pk, self._filter_variants(node))
 
-    def test_require_sibling_zygosity_independent_of_parent_toggle(self):
-        """Requiring sibling zygosity but not parent zygosity still excludes a no-call sibling."""
+    def test_sibling_requirement_independent_of_parent_requirement(self):
+        """Requiring a sibling call but not a parent call still excludes a no-call sibling."""
         node = self._make_node(QuadInheritance.RECESSIVE, quad=self.quad_aff,
-                               require_parent_zygosity=False, require_sibling_zygosity=True)
+                               parent_zygosity_requirement=ZygosityRequirement.ALLOW_NO_CALL,
+                               sibling_zygosity_requirement=ZygosityRequirement.CALL_REQUIRED)
         self.assertNotIn(self.recessive_sib_unknown_v.pk, self._filter_variants(node))
 
     # ── Dominant (mosaic parent) ──────────────────────────────────────────────
@@ -240,12 +241,14 @@ class TestQuadNodeInheritance(InheritanceNodeTestsMixin, TestCase):
         node = self._make_node(QuadInheritance.MOSAIC_PARENT, quad=self.quad_aff)
         self.assertNotIn(self.mosaic_aff_sibling_ref_v.pk, self._filter_variants(node))
 
-    def test_mosaic_require_sibling_zygosity_true_excludes_unknown_sibling(self):
-        node = self._make_node(QuadInheritance.MOSAIC_PARENT, require_sibling_zygosity=True)
+    def test_mosaic_sibling_call_required_excludes_unknown_sibling(self):
+        node = self._make_node(QuadInheritance.MOSAIC_PARENT,
+                               sibling_zygosity_requirement=ZygosityRequirement.CALL_REQUIRED)
         self.assertNotIn(self.mosaic_sibling_unknown_v.pk, self._filter_variants(node))
 
-    def test_mosaic_require_sibling_zygosity_false_includes_unknown_sibling(self):
-        node = self._make_node(QuadInheritance.MOSAIC_PARENT, require_sibling_zygosity=False)
+    def test_mosaic_sibling_allow_no_call_includes_unknown_sibling(self):
+        node = self._make_node(QuadInheritance.MOSAIC_PARENT,
+                               sibling_zygosity_requirement=ZygosityRequirement.ALLOW_NO_CALL)
         self.assertIn(self.mosaic_sibling_unknown_v.pk, self._filter_variants(node))
 
     # ── Validation ────────────────────────────────────────────────────────────

@@ -8,7 +8,9 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from analysis.models import Analysis, PedigreeNode
+from analysis.models.nodes.cohort_mixin import MERGED_COHORT_WARNING
 from annotation.fake_data import get_fake_annotation_version
+from patients.enums import ZygosityRequirement
 from pedigree.enums import PedigreeInheritance
 from pedigree.models import CohortSamplePedFileRecord, PedFileRecord
 from snpdb.fake_data import create_fake_pedigree, make_cohort_genotype
@@ -57,9 +59,9 @@ class TestPedigreeNodeInheritance(TestCase):
         make_cohort_genotype(cls.cgc, variant, zygosity)
         return variant
 
-    def _filter_variants(self, inheritance_model):
+    def _filter_variants(self, inheritance_model, **kwargs):
         node = PedigreeNode.objects.create(analysis=self.analysis, pedigree=self.pedigree,
-                                           inheritance_model=inheritance_model)
+                                           inheritance_model=inheritance_model, **kwargs)
         arg_q_dict = node._get_node_arg_q_dict()
         qs = Variant.objects.annotate(**self.cgc.get_annotation_kwargs())
         for alias in (self.cgc.cohortgenotype_alias, None):
@@ -72,6 +74,22 @@ class TestPedigreeNodeInheritance(TestCase):
         self.assertIn(self.dominant_mother_ref_v.pk, pks)
         self.assertIn(self.dominant_mother_missing_v.pk, pks)
         self.assertNotIn(self.dominant_mother_het_v.pk, pks)
+
+    def test_dominant_ref_call_required_excludes_mother_with_no_record(self):
+        pks = self._filter_variants(PedigreeInheritance.AUTOSOMAL_DOMINANT,
+                                    zygosity_requirement=ZygosityRequirement.REF_CALL_REQUIRED)
+        self.assertIn(self.dominant_mother_ref_v.pk, pks)
+        self.assertNotIn(self.dominant_mother_missing_v.pk, pks)
+
+    def test_merged_cohort_warning(self):
+        node = PedigreeNode(analysis=self.analysis, pedigree=self.pedigree,
+                            inheritance_model=PedigreeInheritance.AUTOSOMAL_DOMINANT)
+        self.assertNotIn(MERGED_COHORT_WARNING, node.get_warnings())
+        self.pedigree.cohort.vcf = None
+        try:
+            self.assertIn(MERGED_COHORT_WARNING, node.get_warnings())
+        finally:
+            self.pedigree.cohort.refresh_from_db()
 
     def test_dominant_unknown_affection_is_unconstrained(self):
         pks = self._filter_variants(PedigreeInheritance.AUTOSOMAL_DOMINANT)
