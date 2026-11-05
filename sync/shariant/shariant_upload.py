@@ -1,5 +1,7 @@
+import re
 import socket
 from typing import Dict, Optional, Iterable, List, TypeVar, Union, Tuple
+from urllib.parse import quote
 
 import requests
 from django.db.models import QuerySet
@@ -32,6 +34,8 @@ def insert_nones(data: Dict) -> Dict:
 
 
 T = TypeVar("T")
+
+_REMOTE_PK_PATTERN = re.compile(r'[\w\-]+')
 
 
 def batch_iterator_end(iterable: Iterable[T], batch_size: int = 10) -> Iterable[Union[List[T], bool]]:
@@ -95,20 +99,22 @@ class ClassificationUploader:
 
         return qs
 
+    def remote_id(self, classification) -> str:
+        """ The id the remote knows this record by: mapped lab name / lab record id """
+        lab = classification.lab
+        mapped_lab_name = self.lab_mappings.get(lab.group_name)
+        if mapped_lab_name is True:
+            mapped_lab_name = lab.group_name
+        return mapped_lab_name + '/' + classification.lab_record_id
+
     def classification_to_json(self, vcm: ClassificationModification) -> Dict:
         raw_json = vcm.as_json(ClassificationJsonParams(current_user=admin_bot(), include_data=True, include_messages=False, strip_complicated=True, api_version=2))
         formatted_json = {}
 
-        lab = vcm.classification.lab
-        mapped_lab_name = self.lab_mappings.get(lab.group_name)
-        if mapped_lab_name is True:
-            mapped_lab_name = lab.group_name
-
         share_level = vcm.share_level
         share_level = self.share_level_mappings.get(share_level, share_level)
 
-        # might need to map the lab group names if we don't map them all into shariant
-        formatted_json['id'] = mapped_lab_name + '/' + vcm.classification.lab_record_id
+        formatted_json['id'] = self.remote_id(vcm.classification)
         data = raw_json.get('data')
         for dont_share in SHARIANT_PRIVATE_FIELDS:
             data.pop(dont_share, None)
@@ -189,24 +195,36 @@ class ClassificationUploader:
 
         return run
 
+    def remote_url_for(self, sync_record: ClassificationModificationSyncRecord) -> str:
+        """ URL of an uploaded record on the remote: by the pk it returned in the upload response, else by lab record id """
+        remote_pk = ((sync_record.meta or {}).get("meta") or {}).get("id")
+        # the pk comes from the remote server, so don't let it add anything but a path segment to the link
+        if remote_pk and _REMOTE_PK_PATTERN.fullmatch(str(remote_pk)):
+            return self.shariant.url(f"classification/classification/{remote_pk}")
+        remote_id = self.remote_id(sync_record.classification_modification.classification)
+        return self.shariant.url(f"classification/classification/lab_record/{quote(remote_id)}")
+
     def get_sync_match_status_and_remote_url(self, classification) -> Tuple[bool, Optional[bool], Optional[str]]:
         """
             :return:
                 * sync_match - True/False if sync will collect classification or filter it out
                 * sync_success - status of last sync run
-                * remote_url - Url on remote system
+                * remote_url - Url on remote system, from the last successful upload of any version
         """
+        sync_records = ClassificationModificationSyncRecord.objects.filter(run__destination=self.sync_destination)
         qs = self.records_to_sync(full_sync=True).filter(classification=classification)
         sync_match = False
         sync_success = None
-        remote_url = None
         if cm := qs.first():  # Should only be 1
             sync_match = True
-            if cm_sync_record := ClassificationModificationSyncRecord.objects.filter(run__destination=self.sync_destination,
-                                                                                    classification_modification=cm).order_by("modified").last():
-                if sync_success := cm_sync_record.success:
-                    # Search is a bit of a hack as we don't have a way to access it directly
-                    remote_url = self.shariant.url(f'variantopedia/search?search={classification.lab_record_id}')
+            if cm_sync_record := sync_records.filter(classification_modification=cm).order_by("modified").last():
+                sync_success = cm_sync_record.success
+
+        # an earlier version stays on the remote while a newer one awaits sync, or after sharing is withdrawn
+        remote_url = None
+        if last_uploaded := sync_records.filter(classification_modification__classification=classification,
+                                                success=True).order_by("modified").last():
+            remote_url = self.remote_url_for(last_uploaded)
 
         return sync_match, sync_success, remote_url
 
@@ -236,7 +254,7 @@ def shariant_upload_status(classification):
                     status = "Failed"
                 destination_status_and_url[sd.name] = (status, remote_url)
             else:
-                destination_status_and_url[sd.name] = (None, None)
+                destination_status_and_url[sd.name] = (None, remote_url)
         except KeyError:
             pass
     return destination_status_and_url
