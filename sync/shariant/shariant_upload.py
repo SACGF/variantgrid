@@ -1,7 +1,6 @@
 import re
 import socket
 from typing import Dict, Optional, Iterable, List, TypeVar, Union, Tuple
-from urllib.parse import quote
 
 import requests
 from django.db.models import QuerySet
@@ -99,22 +98,20 @@ class ClassificationUploader:
 
         return qs
 
-    def remote_id(self, classification) -> str:
-        """ The id the remote knows this record by: mapped lab name / lab record id """
-        lab = classification.lab
-        mapped_lab_name = self.lab_mappings.get(lab.group_name)
-        if mapped_lab_name is True:
-            mapped_lab_name = lab.group_name
-        return mapped_lab_name + '/' + classification.lab_record_id
-
     def classification_to_json(self, vcm: ClassificationModification) -> Dict:
         raw_json = vcm.as_json(ClassificationJsonParams(current_user=admin_bot(), include_data=True, include_messages=False, strip_complicated=True, api_version=2))
         formatted_json = {}
 
+        lab = vcm.classification.lab
+        mapped_lab_name = self.lab_mappings.get(lab.group_name)
+        if mapped_lab_name is True:
+            mapped_lab_name = lab.group_name
+
         share_level = vcm.share_level
         share_level = self.share_level_mappings.get(share_level, share_level)
 
-        formatted_json['id'] = self.remote_id(vcm.classification)
+        # might need to map the lab group names if we don't map them all into shariant
+        formatted_json['id'] = mapped_lab_name + '/' + vcm.classification.lab_record_id
         data = raw_json.get('data')
         for dont_share in SHARIANT_PRIVATE_FIELDS:
             data.pop(dont_share, None)
@@ -195,14 +192,17 @@ class ClassificationUploader:
 
         return run
 
-    def remote_url_for(self, sync_record: ClassificationModificationSyncRecord) -> str:
-        """ URL of an uploaded record on the remote: by the pk it returned in the upload response, else by lab record id """
-        remote_pk = ((sync_record.meta or {}).get("meta") or {}).get("id")
+    def remote_url_for(self, sync_record: ClassificationModificationSyncRecord) -> Optional[str]:
+        """ URL of an uploaded record on the remote, from the pk it returned in the upload response """
+        meta = sync_record.meta or {}
+        # a withdrawn record the remote held below all users (or never had) is deleted there, so there's nothing to link to
+        if meta.get("deleted"):
+            return None
+        remote_pk = (meta.get("meta") or {}).get("id")
         # the pk comes from the remote server, so don't let it add anything but a path segment to the link
         if remote_pk and _REMOTE_PK_PATTERN.fullmatch(str(remote_pk)):
             return self.shariant.url(f"classification/classification/{remote_pk}")
-        remote_id = self.remote_id(sync_record.classification_modification.classification)
-        return self.shariant.url(f"classification/classification/lab_record/{quote(remote_id)}")
+        return None
 
     def get_sync_match_status_and_remote_url(self, classification) -> Tuple[bool, Optional[bool], Optional[str]]:
         """
