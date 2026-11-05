@@ -5,7 +5,7 @@ import socket
 import time
 from collections.abc import Iterable
 from typing import Any, Optional, TypeVar, Union
-from urllib.parse import quote, urljoin
+from urllib.parse import urljoin
 
 from django.db.models import QuerySet
 from django.urls import reverse
@@ -85,7 +85,6 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
         self.sync_destination: Optional[SyncDestination] = None
         self.filters = {}
         self.filter_labels = {}
-        self.remote_lab_record_url = False
         self.remote_gene_level = False
         self.lab_mappings = {}
         self.share_level_mappings = {}
@@ -98,8 +97,6 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
         config = sync_destination.config
         self.filters = config.get('filters', {})
         self.filter_labels = config.get('filter_labels', {})
-        # only true once the remote has been upgraded to a version serving view_classification_lab_record
-        self.remote_lab_record_url = config.get('remote_lab_record_url', False)
         # only true once the remote resolves 'BCR::ABL1' / 'EGFR amplification' as a gene-level Variant (#1506, #1836) -
         # an older remote accepts the record but leaves it as Matching Failed
         self.remote_gene_level = config.get('remote_gene_level', False)
@@ -207,13 +204,8 @@ class VariantGridUploadSyncer(ClassificationUploadSyncRunner):
         if not mapped_lab_name:
             return None
 
-        lab_record_id = cm.classification.lab_record_id
-        if self.remote_lab_record_url:
-            path = reverse('view_classification_lab_record',
-                           kwargs={'classification_ref': ClassificationRef.make_lab_id_str(mapped_lab_name, lab_record_id)})
-        else:
-            # remote is on a version without view_classification_lab_record, so search for it instead
-            path = f"variantopedia/search?search={quote(lab_record_id)}"
+        lab_id_str = ClassificationRef.make_lab_id_str(mapped_lab_name, cm.classification.lab_record_id)
+        path = reverse('view_classification_lab_record', kwargs={'classification_ref': lab_id_str})
         return urljoin(self.sync_destination.sync_details["host"], path)
 
     def classification_to_json(self, vcm: ClassificationModification) -> dict:
