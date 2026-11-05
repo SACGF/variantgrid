@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from analysis.models.nodes.node_counts import get_omim_q
+from analysis.models.nodes.filters.damage_node import get_omim_q
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.fake_data import get_fake_annotation_version
 from annotation.models import AnnotationRun, GeneAnnotation, GeneAnnotationVersion

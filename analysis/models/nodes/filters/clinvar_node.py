@@ -11,7 +11,7 @@ from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeChip, NodeIcon, significance_chips
 from analysis.models.nodes.significance_filter_mixin import SignificanceFilterNodeMixin
 from annotation.enums import ClinVarOncogenicity, ClinVarReviewStatus, Pathogenicity
-from snpdb.enums import AlleleOriginFilterDefault, SomaticClinicalSignificance
+from snpdb.enums import AlleleOriginFilterDefault, BuiltInFilters, SomaticClinicalSignificance
 
 NO_CLINVAR_CALL = 0
 """ ClinVar.highest_pathogenicity for a record ClinVar hasn't given a germline classification on """
@@ -46,6 +46,13 @@ ONCOGENICITY_CSS_CLASSES = {
 
 class ClinVarNode(SignificanceFilterNodeMixin, AnalysisNode):
     """ What ClinVar says about a variant - every pill on means "has a ClinVar record" """
+    COUNT_LABEL_FIELDS = {
+        BuiltInFilters.CLINVAR: {"germline_uncertain": False, "germline_likely_benign": False,
+                                 "germline_benign": False, "germline_other": False,
+                                 "somatic_tier_3": False, "somatic_tier_4": False,
+                                 "oncogenicity_uncertain": False, "oncogenicity_likely_benign": False,
+                                 "oncogenicity_benign": False},
+    }
     node_input = models.CharField(max_length=1, choices=NodeMatchInput.choices,
                                   default=NodeMatchInput.PARENT_MATCHING)
     # Default is to show all
@@ -146,12 +153,16 @@ class ClinVarNode(SignificanceFilterNodeMixin, AnalysisNode):
     def _get_node_q(self) -> Q:
         and_filters = [Q(clinvar__isnull=False)]
 
+        # A record matches when any axis the node narrows says so - as ClassificationsNode does for germline/somatic
+        axis_filters = []
         if selected := self._pathogenicity_values():
-            and_filters.append(Q(clinvar__highest_pathogenicity__in=selected))
+            axis_filters.append(Q(clinvar__highest_pathogenicity__in=selected))
         if selected := self._somatic_tier_values():
-            and_filters.append(self._somatic_tier_q(selected))
+            axis_filters.append(self._somatic_tier_q(selected))
         if selected := self._oncogenicity_values():
-            and_filters.append(Q(clinvar__highest_oncogenicity__in=selected))
+            axis_filters.append(Q(clinvar__highest_oncogenicity__in=selected))
+        if axis_filters:
+            and_filters.append(reduce(operator.or_, axis_filters))
 
         if self.stars_min:
             and_filters.append(self._review_status_q(ClinVarReviewStatus.statuses_gte_stars(self.stars_min)))

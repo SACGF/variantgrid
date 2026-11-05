@@ -9,11 +9,24 @@ from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeChip, NodeIcon, significance_chips
 from analysis.models.nodes.significance_filter_mixin import SignificanceFilterNodeMixin
 from classification.models.classification import Classification, ClassificationModification
-from snpdb.enums import AlleleOriginFilterDefault, ClinicalSignificance, SomaticClinicalSignificance
+from snpdb.enums import (
+    AlleleOriginFilterDefault,
+    BuiltInFilters,
+    ClinicalSignificance,
+    SomaticClinicalSignificance,
+)
 from snpdb.models import Lab
 
 
 class ClassificationsNode(SignificanceFilterNodeMixin, AnalysisNode):
+    COUNT_LABEL_FIELDS = {
+        BuiltInFilters.CLASSIFIED: {},
+        BuiltInFilters.CLASSIFIED_PATHOGENIC: {"allele_origin": AlleleOriginFilterDefault.GERMLINE,
+                                               "other": False, "benign": False, "likely_benign": False, "vus": False},
+        BuiltInFilters.CLASSIFIED_TIER_1_2: {"allele_origin": AlleleOriginFilterDefault.SOMATIC,
+                                             "tier_3": False, "tier_4": False},
+    }
+
     node_input = models.CharField(max_length=1, choices=NodeMatchInput.choices,
                                   default=NodeMatchInput.PARENT_MATCHING)
     # Default is to show all
@@ -106,7 +119,14 @@ class ClassificationsNode(SignificanceFilterNodeMixin, AnalysisNode):
         return q
 
     def get_labs(self):
+        if self.pk is None:
+            return Lab.objects.none()  # An unsaved node (a count label's) has no lab rows to read
         return Lab.objects.filter(pk__in=self.classificationsnodelab_set.all().values_list("lab", flat=True))
+
+    def matches_count_label(self) -> Optional[str]:
+        if self.get_labs().exists():
+            return None  # The badges count every lab
+        return super().matches_count_label()
 
     def save_clone(self):
         labs = list(self.get_labs())  # Save before clone

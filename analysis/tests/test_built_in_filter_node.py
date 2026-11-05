@@ -1,6 +1,10 @@
 from django.test import TestCase, override_settings
 
+from analysis.enums import NodeStatus
 from analysis.models.nodes.filters.built_in_filter_node import BuiltInFilterNode
+from analysis.models.nodes.node_types import get_node_class_choices, get_nodes_by_classification
+from analysis.models.nodes.node_version import NodeVersion
+from analysis.models.nodes.sources.all_variants_node import AllVariantsNode
 from analysis.tests.utils import AnalysisSetupMixin
 from annotation.enums import ClinVarReviewStatus, Pathogenicity, PathogenicityImpact
 from annotation.fake_data import create_fake_variant_annotation, create_fake_variants
@@ -77,3 +81,26 @@ class TestBuiltInFilterNode(AnalysisSetupMixin, TestCase):
         node = BuiltInFilterNode(analysis=self.analysis, built_in_filter=BuiltInFilters.CLINVAR,
                                  clinvar_stars_min=3)
         self.assertIn("★★★", node.get_node_name())
+
+    def _child_of_counted_parent(self, **kwargs) -> BuiltInFilterNode:
+        parent = AllVariantsNode.objects.create(analysis=self.analysis, count=50, status=NodeStatus.READY)
+        NodeVersion.objects.filter(pk=parent.node_version.pk).update(
+            load_data={"counts": {BuiltInFilters.TOTAL: 50, BuiltInFilters.COSMIC: 7}})
+        node = BuiltInFilterNode.objects.create(analysis=self.analysis, built_in_filter=BuiltInFilters.COSMIC,
+                                                **kwargs)
+        node.add_parent(parent)
+        node._cached_parents = None  # Clear stale cache from create()'s save()
+        node.save()
+        return node
+
+    def test_reuses_the_parents_count(self):
+        self.assertEqual(7, self._child_of_counted_parent()._get_cached_label_count(BuiltInFilters.TOTAL))
+
+    def test_extra_filter_counts_itself(self):
+        node = self._child_of_counted_parent(cosmic_count_min=10)
+        self.assertIsNone(node._get_cached_label_count(BuiltInFilters.TOTAL))
+
+    def test_not_offered_for_new_nodes_but_still_labelled(self):
+        palette_classes = {node["class_name"] for nodes in get_nodes_by_classification().values() for node in nodes}
+        self.assertNotIn("BuiltInFilterNode", palette_classes)
+        self.assertIn("BuiltInFilterNode", dict(get_node_class_choices()))

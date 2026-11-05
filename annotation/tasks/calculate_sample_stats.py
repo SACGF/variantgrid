@@ -11,7 +11,7 @@ from django.db import connection, transaction
 from django.db.models import F, Q
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
-from annotation.enums import PathogenicityImpact
+from annotation.enums import ClinVarOncogenicity, Pathogenicity, PathogenicityImpact
 from annotation.models import (
     AnnotationVersion,
     CohortGenotypeClinVarAnnotationStats,
@@ -24,7 +24,7 @@ from library.django_utils.database_utils import pg_settings
 from library.enums.log_level import LogLevel
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VariantClass, VCFSymbolicAllele
 from library.log_utils import get_traceback
-from snpdb.enums import ImportStatus, SequenceRole
+from snpdb.enums import ImportStatus, SequenceRole, SomaticClinicalSignificance
 from snpdb.models import (
     VCF,
     Cohort,
@@ -41,7 +41,7 @@ from snpdb.models.models import CodeVersion
 
 # Bump when a change alters what the stats count - readers treat rows from older versions as stale
 # and enqueue a recompute (@see snpdb/views/views_data.py:_sample_stats)
-SAMPLE_STATS_CODE_VERSION = 5
+SAMPLE_STATS_CODE_VERSION = 6
 
 
 @celery.shared_task
@@ -68,6 +68,7 @@ def get_sample_stats_code_version() -> SampleStatsCodeVersion:
         3 - Optimisations
         4 - fusions_count, and gene-level variants left out of VCFLengthStats
         5 - Per-sample totals and chrX hom only count the sample's own variant calls (#2087)
+        6 - ClinVar pathogenic counts ClinVar's somatic tier and oncogenicity as well (#2662)
     """
     code_version, _ = SampleStatsCodeVersion.objects.get_or_create(name="SampleStats",
                                                                    version=SAMPLE_STATS_CODE_VERSION,
@@ -304,11 +305,16 @@ _BOOLEAN_FLAGS_SQL = {
     "has_transcript": "coalesce(v.transcript_id, '') <> ''",
     "omim": "coalesce(v.omim_terms, '') <> ''",
     "clinvar": "coalesce(v.clinvar_highest_pathogenicity, 0) <> 0",
-    "clinvar_pathogenic": "coalesce(v.clinvar_highest_pathogenicity, 0) >= %s",
+    # Any of ClinVar's 3 axes, as the ClinVar count badge's node (@see ClinVarNode.COUNT_LABEL_FIELDS)
+    "clinvar_pathogenic": "coalesce(v.clinvar_highest_pathogenicity, 0) >= %s "
+                          "OR coalesce(v.clinvar_somatic_tier IN (%s, %s, %s), false) "
+                          "OR coalesce(v.clinvar_highest_oncogenicity, 0) >= %s",
     "is_x": "v.contig = %s",
     "passing_filter": "coalesce(v.cohort_filters, '') = ''",
 }
-BOOLEAN_FLAGS_PARAMS = [PathogenicityImpact.HIGH, PathogenicityImpact.MODERATE, 4, "X"]
+BOOLEAN_FLAGS_PARAMS = [PathogenicityImpact.HIGH, PathogenicityImpact.MODERATE,
+                        Pathogenicity.LIKELY_PATHOGENIC, *SomaticClinicalSignificance.TIER_1_AND_2_VALUES,
+                        ClinVarOncogenicity.LIKELY_ONCOGENIC, "X"]
 assert tuple(_BOOLEAN_FLAGS_SQL) == VariantFlags._fields[2:]
 
 # Grouping on one integer is much cheaper than on each flag. Bit i is boolean flag i, the bits above
@@ -434,6 +440,8 @@ def get_cohort_rows_queryset(cgc: CohortGenotypeCollection, annotation_version: 
         "transcript_id": "variantannotation__transcript_id",
         "omim_terms": "variantannotation__gene__geneannotation__omim_terms",
         "clinvar_highest_pathogenicity": "clinvar__highest_pathogenicity",
+        "clinvar_somatic_tier": "clinvar__somatic_tier",
+        "clinvar_highest_oncogenicity": "clinvar__highest_oncogenicity",
         "cohort_filters": f"{cgc.cohortgenotype_alias}__filters",
     }
     if with_gene:

@@ -4,8 +4,8 @@ from django.urls import reverse
 from analysis.enums import NodeMatchInput
 from analysis.forms.forms_nodes import ClassificationsNodeForm
 from analysis.models import Analysis
+from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.filters.classifications_node import ClassificationsNode
-from analysis.models.nodes.node_counts import get_extra_filters_q
 from analysis.tests.utils import AnalysisSetupMixin
 from annotation.fake_data import get_fake_annotation_version
 from classification.enums import SpecialEKeys, SubmissionSource
@@ -165,25 +165,38 @@ class ClassifiedVariantsMixin(ClassificationTestDataMixin):
 
 
 @override_settings(CLASSIFICATION_ALLOW_UNKNOWN_KEYS=True)
-class BuiltInClassificationFilterTest(ClassifiedVariantsMixin, TestCase):
-    """ The classification built-in filters / node counts - Classified is origin-agnostic,
-        Classified Pathogenic is germline LP/P, Classified Tier I/II is somatic """
+class ClassificationCountLabelTest(ClassifiedVariantsMixin, TestCase):
+    """ The classification count labels - Classified is origin-agnostic, Classified Pathogenic is LP/P in
+        the germline or unknown bucket, Classified Tier I/II is Tier I/II in the somatic or unknown bucket """
 
-    def _filter_variant_pks(self, built_in_filter) -> set:
-        q = get_extra_filters_q(self.analysis, built_in_filter)
+    def setUp(self):
+        super().setUp()
+        # Each axis is read only in its own buckets - a somatic record's germline P isn't a germline call
+        self.somatic_p = self._create_classification("somatic", clinical_significance="P")
+        self.unknown_p_tier_1 = self._create_classification(
+            "unknown", clinical_significance="P", somatic_clinical_significance=SomaticClinicalSignificance.TIER_1)
+        for position, classification in enumerate([self.somatic_p, self.unknown_p_tier_1], start=3000):
+            variant = slowly_create_test_variant("1", position, "A", "T", self.analysis.genome_build)
+            classification.allele = create_mock_allele(variant, self.analysis.genome_build)
+            classification.save()
+            self.variant_pks[classification.pk] = variant.pk
+
+    def _filter_variant_pks(self, label) -> set:
+        q = AnalysisNode.count_label_q(self.analysis, label)
         return set(Variant.objects.filter(q).values_list("pk", flat=True))
 
     def test_classified_matches_any_origin(self):
         self.assertEqual(self._filter_variant_pks(BuiltInFilters.CLASSIFIED), set(self.variant_pks.values()))
 
-    def test_classified_pathogenic_is_germline_only(self):
+    def test_classified_pathogenic_is_germline_or_unknown(self):
         self.assertEqual(self._filter_variant_pks(BuiltInFilters.CLASSIFIED_PATHOGENIC),
-                         {self.variant_pks[self.germline_p.pk]})
+                         {self.variant_pks[self.germline_p.pk], self.variant_pks[self.unknown_p_tier_1.pk]})
 
-    def test_classified_tier_1_2_is_somatic_only(self):
+    def test_classified_tier_1_2_is_somatic_or_unknown(self):
         self.assertEqual(self._filter_variant_pks(BuiltInFilters.CLASSIFIED_TIER_1_2),
                          {self.variant_pks[self.somatic_tier_1.pk],
-                          self.variant_pks[self.somatic_tier_1_or_2.pk]})
+                          self.variant_pks[self.somatic_tier_1_or_2.pk],
+                          self.variant_pks[self.unknown_p_tier_1.pk]})
 
 
 class ClassificationsNodeInputTest(AnalysisSetupMixin, TestCase):

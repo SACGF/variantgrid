@@ -33,6 +33,8 @@ from annotation.enums import (
     PrimateAIPrediction,
 )
 from annotation.models.models import VariantAnnotation
+from annotation.models.models_annotation_version import AnnotationVersion
+from annotation.models.models_gene_annotation import GeneAnnotation
 from annotation.pathogenicity_predictions import (
     TOOLS,
     TOOLS_BY_PRED_FIELD,
@@ -41,6 +43,7 @@ from annotation.pathogenicity_predictions import (
 )
 from genes.models.models_gnomad_gene_constraint import GnomADGeneConstraint
 from library.genomics.vcf_enums import VARIANT_CLASS_GROUPS, VariantClass
+from snpdb.enums import BuiltInFilters
 from snpdb.models.models_variant import Variant
 
 
@@ -80,8 +83,23 @@ _PLUGIN_BACKFILL_COLUMNS = frozenset({"avi_phred", "alphagenome_splicing", "spli
                                       "utr_annotator_annotation"})
 
 
+def get_omim_q(annotation_version: AnnotationVersion) -> Q:
+    """ Genes with OMIM terms, as a subquery against the small GeneAnnotation table - going through
+        'variantannotation__gene__geneannotation' joins the huge VariantAnnotation table through Gene """
+    gene_annotation_qs = GeneAnnotation.objects.filter(omim_terms__isnull=False)
+    if gene_annotation_version_id := annotation_version.gene_annotation_version_id:
+        gene_annotation_qs = gene_annotation_qs.filter(version_id=gene_annotation_version_id)
+    return Q(variantannotation__gene__in=gene_annotation_qs.values_list("gene_id", flat=True))
+
+
 class DamageNode(AnalysisNode):
     """ This is called 'EffectNode' in analysis """
+    COUNT_LABEL_FIELDS = {
+        BuiltInFilters.IMPACT_HIGH_OR_MODERATE: {"impact_min": PathogenicityImpact.MODERATE},
+        BuiltInFilters.COSMIC: {"in_cosmic": True},
+        BuiltInFilters.OMIM: {"omim_phenotype": True},
+    }
+
     # A type restriction restricts - it goes in and_filters rather than the scoring OR pool,
     # so it has no _required flag. Empty means every type.
     variant_class = ArrayField(models.CharField(max_length=2, choices=VariantClass.choices),
@@ -103,6 +121,14 @@ class DamageNode(AnalysisNode):
 
     cosmic_count_min = models.IntegerField(null=True, blank=True)
     cosmic_count_required = models.BooleanField(default=False)
+
+    # "Has a COSMIC id", separate from cosmic_count_min: the id comes from VEP's Existing_variation on every
+    # deployment, the count only from the licensed COSMIC custom VCF
+    in_cosmic = models.BooleanField(default=False)
+    in_cosmic_required = models.BooleanField(default=False)
+    # The variant's gene has OMIM phenotype terms (GeneAnnotation.omim_terms for the analysis's gene annotation version)
+    omim_phenotype = models.BooleanField(default=False)
+    omim_phenotype_required = models.BooleanField(default=False)
 
     protein_domain = models.BooleanField(default=False)
     protein_domain_required = models.BooleanField(default=False)
@@ -348,13 +374,14 @@ class DamageNode(AnalysisNode):
 
     def modifies_parents(self):
         all_versions = [self.impact_min, self.splice_min, self.cosmic_count_min, self.damage_predictions_min,
-                        self.protein_domain, self.published, self.variant_class,
+                        self.in_cosmic, self.omim_phenotype, self.protein_domain, self.published, self.variant_class,
                         self.structural != StructuralFilter.ANY, bool(self._gene_constraint_filters()),
                         self._applies_outside_repeat_region()]
         return any(all_versions) or any(cf.is_set(self) for cf in self._column_filters())
 
     def has_required(self) -> bool:
         all_versions = [self.impact_required, self.splice_required, self.cosmic_count_required,
+                        self.in_cosmic_required, self.omim_phenotype_required,
                         self.damage_predictions_required, self.protein_domain_required, self.published_required,
                         *(required for _, _, _, required, _ in self._gene_constraint_filters())]
         # A rankscore's required checkbox is only on screen while the rankscore sliders are
@@ -388,8 +415,8 @@ class DamageNode(AnalysisNode):
         vav = self.analysis.annotation_version.variant_annotation_version
         if self.damage_predictions_min is not None and not vav.backfilled_damage_counts:
             warnings.append(
-                f"damage_predictions_min filter is NOT being applied on this VariantAnnotationVersion: "
-                f"predictions_num_pathogenic / predictions_num_benign aggregates have not been backfilled. "
+                "damage_predictions_min filter is NOT being applied on this VariantAnnotationVersion: "
+                "predictions_num_pathogenic / predictions_num_benign aggregates have not been backfilled. "
                 "Set the analysis to the latest annotation version to use the filter."
             )
         if self.ptc_nmd and self.columns_version >= 5 and not vav.backfilled_ptc:
@@ -681,6 +708,20 @@ class DamageNode(AnalysisNode):
             else:
                 or_filters.append(q_cosmic_count)
 
+        if self.in_cosmic:
+            q_in_cosmic = Q(variantannotation__cosmic_id__isnull=False)
+            if self.in_cosmic_required:
+                and_filters.append(q_in_cosmic)
+            else:
+                or_filters.append(q_in_cosmic)
+
+        if self.omim_phenotype:
+            q_omim = get_omim_q(self.analysis.annotation_version)
+            if self.omim_phenotype_required:
+                and_filters.append(q_omim)
+            else:
+                or_filters.append(q_omim)
+
         if self.protein_domain:
             protein_domains_fields_or = []
             for f in ["interpro_domain", "domains"]:  # TODO: What about UniProt??
@@ -773,6 +814,10 @@ class DamageNode(AnalysisNode):
         if self.cosmic_count_min is not None:
             chips.append(self._filter_chip("COSMIC", f"COSMIC count ≥ {self.cosmic_count_min}",
                                            self.cosmic_count_required))
+        if self.in_cosmic:
+            chips.append(self._filter_chip("COSMIC", "Has a COSMIC id", self.in_cosmic_required))
+        if self.omim_phenotype:
+            chips.append(self._filter_chip("OMIM", "Gene has OMIM phenotypes", self.omim_phenotype_required))
         if self.protein_domain:
             chips.append(self._filter_chip("domain", "In a protein domain", self.protein_domain_required))
         if self.published:
