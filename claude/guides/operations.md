@@ -232,3 +232,9 @@ VG4 run side by side. `API_FEATURES` is the client contract: add a name in the s
 names once added. `upload_file_types` is derived from the import task factories, so it needs no upkeep. A server too old to have
 the endpoint answers 404, or on VG3 (which only exempts `^/api/v1/capabilities$`, not `^/api/.*`) a redirect to login. The
 client (variantgrid_api) doesn't follow redirects and reads either as "legacy server".
+
+Privilege has two levels: a user and a superuser. `is_staff` is not a supported tier: the OIDC backend sets it from the same
+flag as `is_superuser` (`oidc_auth/backend.py`), no deployment grants one without the other, and a new permission check uses
+`is_superuser`. The handful of `is_staff` checks that exist (`library/django_utils/__init__.py:staff_only` on the seqauto admin
+pages, ClinVar VCF import, sequencing run edits) are therefore superuser checks in practice, and a Django admin action without
+`allowed_permissions` is reachable by every admin user, which today means every superuser.
