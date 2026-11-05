@@ -71,7 +71,6 @@ class AllVariantsNodeView(NodeView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['num_samples_for_build'] = self.object.num_samples_for_build
-        context["gene_level_enabled"] = settings.VARIANT_GENE_LEVEL_ENABLED
         context["max_variant_id"] = self.object.max_variant_id
         return context
 

@@ -7,12 +7,6 @@
 	    display: none;
 	}
 
-	#variant-types label {
-	    margin-right: 10px;
-	    font-weight: normal;
-	    white-space: nowrap;
-	}
-
 	#damage-table th.filter-required,
 	#damage-table td.filter-required {
 	    text-align: center;
@@ -83,13 +77,7 @@
             </tr>
             <tr>
                 <th>{{ form.variant_types.label }}</th>
-                <td>{{ form.variant_types.errors }}
-                    <div id="variant-types">
-                        {% for subwidget in form.variant_types %}
-                            <label>{{ subwidget.tag }} {{ subwidget.choice_label }}</label>
-                        {% endfor %}
-                    </div>
-                </td>
+                <td>{{ form.variant_types.errors }}<div class="editor-choices">{{ form.variant_types }}</div></td>
                 <td class="collapse filter-required"> <!-- variant type always restricts --> </td>
                 <td class="collapse filter-required"> <!-- variant_types is non-nullable --> </td>
             </tr>
