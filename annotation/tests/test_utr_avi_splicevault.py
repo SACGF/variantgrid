@@ -288,8 +288,31 @@ class PluginPinStampTests(TestCase):
         vav.refresh_from_db()
         self.assertIsNone(vav.alphagenome_splicing)
         self.assertIsNotNone(vav.avi)
-        self.assertIn("not stamping alphagenome_splicing", output)
+        self.assertIn("alphagenome_splicing configured, but its licence rules out", output)
         self.assertNotIn("AlphaGenome_splicing_score", output)
+
+    def test_pin_cleared_once_the_deployment_makes_a_use_the_licence_rules_out(self):
+        """ A version annotated with AlphaGenome splicing before the deployment declared diagnostic use """
+        vav = self._vav(self.grch38, VariantAnnotationVersion.Status.ACTIVE)
+        settings_dict = {**_settings_with_plugins(), "DEPLOYMENT_DIAGNOSTIC_USE": True}
+        with override_settings(**settings_dict):
+            component_kwargs = vep_component_version_kwargs(settings.ANNOTATION[settings.BUILD_GRCH38])
+        pins = {pin_field: component_kwargs[pin_field] for pin_field in SOURCE_PINS}
+        VariantAnnotationVersion.objects.filter(pk=vav.pk).update(
+            **{**pins, "alphagenome_splicing": os.path.basename(ALPHAGENOME_SPLICING_FILE)},
+            backfilled_utr_avi_splicevault=True)
+        vav.refresh_from_db()
+
+        with override_settings(**settings_dict):
+            fix = vep_mismatch_fix(vav, pins)
+        self.assertIn("alphagenome_splicing pinned on this version but its licence rules out", fix)
+        self.assertNotIn("backfill steps", fix)
+
+        output = self._enable("--genome-build", "GRCh38", settings_dict=settings_dict)
+        vav.refresh_from_db()
+        self.assertIsNone(vav.alphagenome_splicing)
+        self.assertTrue(vav.backfilled_utr_avi_splicevault)
+        self.assertIn(f"GRCh38 (VariantAnnotationVersion {vav.pk}) in place", output)
 
     def test_older_columns_version_stamped_but_not_flagged(self):
         vav = self._vav(self.grch37, VariantAnnotationVersion.Status.ACTIVE, columns_version=4)

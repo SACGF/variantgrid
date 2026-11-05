@@ -7,8 +7,9 @@ the backfill steps.
 Entry points: stamp_plugin_pins (the migration and `manage.py enable_vep_plugin_backfill`), backfill_steps
 (the command's output, with the backfill's VEP command line built by backfill_vep_command), backfill_script (the same
 steps as a bash script, the command's `--bash-script`), backfill_note (the ManualOperation note, pointing at the script),
-enable_plugins_fix / vep_mismatch_fix (what the mismatch warnings tell the admin to run). Functions take the model
-classes, so the migration passes its historical ones; nothing here imports annotation.models.
+enable_plugins_fix / vep_mismatch_fix (what the mismatch warnings tell the admin to run), vav_label (how the command
+and script name a version). Functions take the model classes, so the migration passes its historical ones; nothing
+here imports annotation.models.
 """
 import os
 import shlex
@@ -21,7 +22,7 @@ from django.db.models import Max, Q
 from annotation import vep_columns
 from annotation.enums import VariantAnnotationPipelineType, VEPCustom, VEPPlugin
 from annotation.vep_annotation import get_vep_command, get_vep_skipped_variants_filename
-from annotation.vep_config import vep_component_version_kwargs
+from annotation.vep_config import licence_excluded_pin_fields, vep_component_version_kwargs
 from snpdb.models.models_genome import GenomeBuild
 
 VEPSource = Union[VEPPlugin, VEPCustom]
@@ -95,26 +96,43 @@ def settings_pin_changes(vav) -> dict[str, tuple]:
             if getattr(vav, pin_field) != pins[pin_field]}
 
 
-def _enable_fix(pin_fields) -> str:
-    return (f"{', '.join(pin_fields)} set in settings but not pinned on this version, so every VEP run against it "
-            f"fails the version check. Stop annotation_workers, run '{ENABLE_COMMAND} --dry-run' then "
-            f"'{ENABLE_COMMAND}' to stamp the pins, restart the celery workers and gunicorn, and run the backfill "
-            f"steps it prints for variants already annotated (#2426, #2433)")
+def _pin_fix(pin_changes: dict[str, tuple]) -> str:
+    """ pin_changes: pin field -> (version's pin, live settings' pin) """
+    licence_excluded = set(licence_excluded_pin_fields())
+    switched_on = [f for f, (old, new) in pin_changes.items() if new and not old]
+    licence_cleared = [f for f, (old, new) in pin_changes.items() if old and not new and f in licence_excluded]
+    other = [f for f in pin_changes if f not in switched_on and f not in licence_cleared]
+    reasons = []
+    if switched_on:
+        reasons.append(f"{', '.join(switched_on)} set in settings but not pinned on this version")
+    if licence_cleared:
+        reasons.append(f"{', '.join(licence_cleared)} pinned on this version but its licence rules out this "
+                       f"deployment's use (DEPLOYMENT_COMMERCIAL_USE / DEPLOYMENT_DIAGNOSTIC_USE) and it is no "
+                       f"longer passed to VEP")
+    if other:
+        reasons.append(f"{', '.join(other)} pinned on this version differs from settings")
+    fix = (f"{'; '.join(reasons)}, so every VEP run against it fails the version check. Stop annotation_workers, "
+           f"run '{ENABLE_COMMAND} --dry-run' then '{ENABLE_COMMAND}' to update the pins on this version in place "
+           f"(no new version), restart the celery workers and gunicorn")
+    if any(new for _old, new in pin_changes.values()):
+        fix += ", and run the backfill steps it prints for variants already annotated"
+    return fix + " (#2426, #2433)"
 
 
 def enable_plugins_fix(vav) -> Optional[str]:
-    """ What to run when settings switch on a plugin / custom VCF this version doesn't pin, else None """
+    """ What to run when settings switch on, change or (by licence) rule out a plugin / custom VCF this version
+        pins differently, else None """
     if vav.status in ACTIVE_STATUSES and (changes := settings_pin_changes(vav)):
-        return _enable_fix(changes)
+        return _pin_fix(changes)
     return None
 
 
 def vep_mismatch_fix(vav, vep_vav_kwargs: dict) -> str:
     """ What to run when vav differs from vep_vav_kwargs (get_vep_variant_annotation_version_kwargs): stamping
         the plugin pins when only those differ, otherwise a new version """
-    mismatched = [k for k, v in vep_vav_kwargs.items() if getattr(vav, k) != v]
-    if vav.status in ACTIVE_STATUSES and mismatched and set(mismatched) <= SOURCE_PINS.keys():
-        return _enable_fix(mismatched)
+    mismatched = {k: (getattr(vav, k), v) for k, v in vep_vav_kwargs.items() if getattr(vav, k) != v}
+    if vav.status in ACTIVE_STATUSES and mismatched and mismatched.keys() <= SOURCE_PINS.keys():
+        return _pin_fix(mismatched)
     return ("Upgrade via 'python3 manage.py create_new_variant_annotation_version "
             f"--genome-build={vav.genome_build_id}'")
 
@@ -256,7 +274,8 @@ def backfill_commands(vav, annotation_range_lock_model) -> list[BackfillStep]:
     return steps
 
 
-def _backfill_heading(vav) -> str:
+def vav_label(vav) -> str:
+    """ Names the build first: VariantAnnotationVersion.__str__ gives "v<pk>.", which reads as a version number """
     return f"{vav.genome_build_id} (VariantAnnotationVersion {vav.pk})"
 
 
@@ -265,7 +284,7 @@ def backfill_steps(vav, annotation_range_lock_model) -> list[str]:
     steps = backfill_commands(vav, annotation_range_lock_model)
     if not steps:
         return []
-    lines = [f"{_backfill_heading(vav)}:"]
+    lines = [f"{vav_label(vav)}:"]
     for i, step in enumerate(steps, 1):
         comment = f"  ({step.comment})" if step.comment else ""
         lines.append(f"{i}. {step.command}{comment}")
@@ -294,7 +313,7 @@ def backfill_script(vavs, annotation_range_lock_model) -> str:
         if not steps:
             continue
         versions += 1
-        lines.extend(["", f"echo \"=== {_backfill_heading(vav)} $(date) ===\""])
+        lines.extend(["", f"echo \"=== {vav_label(vav)} $(date) ===\""])
         for step in steps:
             if step.comment:
                 lines.append(f"# {step.comment}")
@@ -322,7 +341,7 @@ def versions_pending_backfill(variant_annotation_version_model, genome_build_nam
 def backfill_note(variant_annotation_version_model, genome_build_name: Optional[str] = None) -> str:
     """ What the backfill is and which versions need it - the steps themselves come from the command, whose
         VEP command lines would bury the upgrader in output """
-    versions = ", ".join(_backfill_heading(vav)
+    versions = ", ".join(vav_label(vav)
                          for vav in versions_pending_backfill(variant_annotation_version_model, genome_build_name))
     return ("Fill in UTRAnnotator, AVI, SpliceVault and AlphaGenome splicing annotation of variants annotated "
             "before they were switched on (#2426, #2433), the UTRAnnotator and SpliceVault transcript rows the "

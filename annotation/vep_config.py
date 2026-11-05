@@ -78,6 +78,11 @@ def licence_excluded_keys() -> list[str]:
             if any(getattr(settings, use) for use in ruled_out_uses)]
 
 
+def licence_excluded_pin_fields() -> list[str]:
+    """ VariantAnnotationVersion pins of the data licence_excluded_keys leaves out """
+    return [_BASENAME_PIN_FIELDS[key] for key in licence_excluded_keys()]
+
+
 def allowed_vep_config_data(vep_config_data: dict) -> dict:
     """ vep_config with the data cleared that the deployment may not use """
     if excluded_keys := licence_excluded_keys():

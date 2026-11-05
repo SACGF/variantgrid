@@ -19,6 +19,7 @@ from annotation.vep_plugin_backfill import (
     backfill_script,
     backfill_steps,
     stamp_plugin_pins,
+    vav_label,
 )
 from snpdb.models.models_genome import GenomeBuild
 
@@ -68,8 +69,9 @@ class Command(BaseCommand):
 
         for genome_build in genome_builds:
             if keys := configured_licence_excluded_keys(genome_build.settings["vep_config"]):
-                self.stdout.write(f"{genome_build}: not stamping {', '.join(keys)} - its licence rules out this "
-                                  f"deployment's use (DEPLOYMENT_COMMERCIAL_USE / DEPLOYMENT_DIAGNOSTIC_USE)")
+                self.stdout.write(f"{genome_build}: {', '.join(keys)} configured, but its licence rules out this "
+                                  f"deployment's use (DEPLOYMENT_COMMERCIAL_USE / DEPLOYMENT_DIAGNOSTIC_USE) - never "
+                                  f"passed to VEP, and cleared from any version that pins it")
 
         stamps = self._stamp(genome_builds, dry_run=True)
         # Only a pin change puts runs at risk: a re-run for a later backfill pass stamps nothing and can go ahead
@@ -92,10 +94,10 @@ class Command(BaseCommand):
             vav = stamp.variant_annotation_version
             if stamp.changed_pins:
                 changes = ", ".join(f"{pin}: {old} -> {new}" for pin, (old, new) in stamp.changed_pins.items())
-                self.stdout.write(f"{verb} {vav}: {changes}")
+                self.stdout.write(f"{verb} {vav_label(vav)} in place: {changes}")
             else:
                 pins = ", ".join(f"{pin}={getattr(vav, pin)}" for pin in SOURCE_PINS)
-                self.stdout.write(f"{vav}: already matches settings ({pins})")
+                self.stdout.write(f"{vav_label(vav)}: already matches settings ({pins})")
 
         if any(stamp.changed_pins for stamp in stamps) and not options["dry_run"]:
             self.stdout.write("\nStart annotation_workers (stop them before running this, as get_vep_version is "
