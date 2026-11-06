@@ -2,7 +2,8 @@
 
     Identifier formats come from the search framework's receivers (dbSNP, HGVS, variant
     coordinates, loci, ClinGen allele IDs, COSMIC), so anything the search box understands
-    can be pasted in, as can VEP's "&"-joined dbSNP ids. Regions are the one shape search doesn't cover, so they're parsed here.
+    can be pasted in, as can VEP's "&"-joined dbSNP ids. Regions and cytogenetic bands (11p13, snpdb/cytobands.py)
+    are the shapes search doesn't cover, so they're parsed here.
 """
 import re
 from dataclasses import dataclass, field
@@ -12,6 +13,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 
 from library.genomics import format_chrom
+from snpdb.cytobands import parse_cytoband
 from snpdb.models import GenomeBuild, Variant
 from snpdb.models.models_variant import (
     VARIANT_GNOMAD_PATTERN,
@@ -67,6 +69,17 @@ def _resolve_region(line: str, genome_build: GenomeBuild, resolution: VariantTex
                 resolution.regions.append(format_region(contig.name, start, end))
         else:
             resolution.errors.append(f"'{line}': chromosome/contig not in {genome_build}")
+        return True
+    return False
+
+
+def _resolve_cytoband(line: str, genome_build: GenomeBuild, resolution: VariantTextResolution) -> bool:
+    """ A band not in this build is unresolved rather than searched - nothing else looks like 11p13 """
+    if cytoband_range := parse_cytoband(line):
+        if interval := cytoband_range.get_interval(genome_build):
+            resolution.regions.append(format_region(interval.contig.name, interval.start, interval.end))
+        else:
+            resolution.unresolved.append(line)
         return True
     return False
 
@@ -135,7 +148,7 @@ def resolve_variant_text(user: User, genome_build: GenomeBuild, text: str) -> Va
     variant_id_by_line = _exact_coordinate_variant_ids(user, genome_build, lines)
     seen_variant_ids = set()
     for line in lines:
-        if _resolve_region(line, genome_build, resolution):
+        if _resolve_region(line, genome_build, resolution) or _resolve_cytoband(line, genome_build, resolution):
             continue
         if variant_id := variant_id_by_line.get(line):
             variant_ids = [variant_id]
@@ -151,12 +164,26 @@ def resolve_variant_text(user: User, genome_build: GenomeBuild, text: str) -> Va
     return resolution
 
 
-def get_variant_text_summary(num_entries: int, variant_ids: list[int], regions: list[str],
-                             unresolved: list[str]) -> Optional[str]:
-    if not num_entries:
+def _get_cytoband_regions(genome_build: GenomeBuild, entries: list[str]) -> list[str]:
+    cytoband_regions = []
+    for entry in entries:
+        if cytoband_range := parse_cytoband(entry):
+            if interval := cytoband_range.get_interval(genome_build):
+                region = format_region(interval.contig.name, interval.start, interval.end)
+                cytoband_regions.append(f"{entry} = {region}")
+    return cytoband_regions
+
+
+def get_variant_text_summary(genome_build: GenomeBuild, entries: list[str], variant_ids: list[int],
+                             regions: list[str], unresolved: list[str]) -> Optional[str]:
+    """ Bands are listed with their coordinates, as nothing else shows what 11p13 became """
+    if not entries:
         return None
+    num_entries = len(entries)
     resolved = num_entries - len(unresolved)
     summary = f"{resolved}/{num_entries} entries resolved to {len(variant_ids)} variants"
     if regions:
         summary += f" and {len(regions)} regions"
+    if cytoband_regions := _get_cytoband_regions(genome_build, entries):
+        summary += f" ({', '.join(cytoband_regions)})"
     return summary
