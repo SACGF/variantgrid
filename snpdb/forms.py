@@ -18,7 +18,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.forms import ALL_FIELDS, EmailInput, URLInput, inlineformset_factory
 from django.forms.forms import DeclarativeFieldsMetaclass
-from django.forms.widgets import HiddenInput, NullBooleanSelect, TextInput
+from django.forms.widgets import HiddenInput, NullBooleanSelect, Textarea, TextInput
 from guardian import shortcuts
 from guardian.shortcuts import assign_perm, remove_perm
 
@@ -731,6 +731,7 @@ class CohortPhenotypeForm(forms.ModelForm):
     class Meta:
         model = models.Cohort
         fields = ['phenotype']
+        widgets = {'phenotype': Textarea(attrs={'class': 'form-control'})}
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user")
@@ -748,7 +749,7 @@ class CohortForm(CohortPhenotypeForm):
     class Meta(CohortPhenotypeForm.Meta):
         model = models.Cohort
         fields = ['name', 'phenotype']
-        widgets = {'name': TextInput()}
+        widgets = {**CohortPhenotypeForm.Meta.widgets, 'name': TextInput()}
 
 
 class CustomColumnsCollectionForm(forms.ModelForm):

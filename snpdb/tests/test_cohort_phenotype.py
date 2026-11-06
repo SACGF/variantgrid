@@ -1,7 +1,7 @@
 """  The cohort's own phenotype text (issue #1426).
 
      Owns: that saving a Cohort matches its phenotype text to ontology terms through its PhenotypeDescription,
-     and that the cohort and VCF pages carry the editor.
+     and that the cohort and VCF pages carry the editor, collapsed while it is empty.
 """
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -64,3 +64,11 @@ class CohortPhenotypeTest(TestCase):
         # Prefixed so it doesn't collide with the create patient dialog's own phenotype field
         self.assertEqual(response.context["cohort_phenotype_form"].instance, self.vcf_cohort)
         self.assertContains(response, 'id="id_cohort-phenotype"')
+
+    def test_phenotype_section_starts_collapsed_only_when_empty(self):
+        self.client.force_login(self.user)
+        url = reverse("view_cohort", kwargs={"cohort_id": self.cohort.pk})
+        self.assertContains(self.client.get(url), 'id="cohort-phenotype" class="collapse"')
+
+        Cohort.objects.filter(pk=self.cohort.pk).update(phenotype=RAISED_TSH)
+        self.assertContains(self.client.get(url), 'id="cohort-phenotype" class="collapse show"')
