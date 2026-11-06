@@ -883,10 +883,45 @@ function setAutocompleteValue(selector, value, label) {
 }
 
 function setupUnsavedChangesMessage(form, excludeSelector) {
-    /* Reveals the form's .unsaved-changes-message as soon as any field is altered */
-    const fields = excludeSelector ? ":input:not(" + excludeSelector + ")" : ":input";
-    $(form).on("change", fields, function() {
-        $(".unsaved-changes-message", form).show();
+    /* While any field differs from its value at page load, shows the form's .unsaved-changes-message and marks
+       each changed field with a hint beside it, as the message sits by the save button, often below the fold */
+    form = $(form);
+    const fieldSelector = excludeSelector ? ":input:not(" + excludeSelector + ")" : ":input";
+    const message = $(".unsaved-changes-message", form);
+    const messageText = message.first().text().trim();
+    const hintText = messageText ? "Unsaved - " + messageText.charAt(0).toLowerCase() + messageText.slice(1) : "Unsaved";
+
+    function fieldValue(field) {
+        return JSON.stringify($(field).is(":checkbox, :radio") ? field.checked : $(field).val());
+    }
+
+    function markField(field) {
+        const savedValue = $(field).data("unsaved-changes-saved-value");
+        const changed = savedValue === undefined || fieldValue(field) !== savedValue;
+        $(field).toggleClass("unsaved-change", changed);
+        if (field.type === "hidden") {
+            return;
+        }
+        $(field).next(".select2-container").toggleClass("unsaved-change", changed);
+        // Fields sharing a parent (a radio group, a table cell) share one hint
+        const fieldParent = $(field).parent();
+        const parentChanged = fieldParent.children(":input.unsaved-change").length > 0;
+        let hint = fieldParent.children(".unsaved-change-hint");
+        if (parentChanged && hint.length === 0) {
+            hint = $("<div/>", {"class": "unsaved-change-hint", text: hintText}).appendTo(fieldParent);
+        }
+        hint.toggle(parentChanged);
+    }
+
+    $(fieldSelector, form).each(function() {
+        $(this).data("unsaved-changes-saved-value", fieldValue(this));
+    });
+
+    form.on("change", fieldSelector, function() {
+        // Checking a radio unchecks the rest of its group without a change event on them
+        const fields = this.type === "radio" ? $(":radio", form).filter((i, radio) => radio.name === this.name) : $(this);
+        fields.each((i, field) => markField(field));
+        message.toggle($(":input.unsaved-change", form).length > 0);
     });
 }
 
