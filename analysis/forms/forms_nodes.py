@@ -56,6 +56,10 @@ from annotation.pathogenicity_predictions import (
     ALPHAGENOME_SPLICING_MAX,
     ALPHAGENOME_SPLICING_MIN,
     ALPHAGENOME_SPLICING_STEP,
+    ANNOTSV_ACMG_SCORE_CUTOFF,
+    ANNOTSV_ACMG_SCORE_MAX,
+    ANNOTSV_ACMG_SCORE_MIN,
+    ANNOTSV_ACMG_SCORE_STEP,
     GENE_LOEUF_CUTOFF,
     GENE_LOEUF_MAX,
     GENE_LOEUF_MIN,
@@ -658,6 +662,9 @@ class DamageNodeForm(BaseNodeForm):
                                                  "step": GENE_LOEUF_STEP, "data-default": GENE_LOEUF_CUTOFF}),
             "gene_mis_z_min": HiddenInput(attrs={"min": GENE_MIS_Z_MIN, "max": GENE_MIS_Z_MAX,
                                                  "step": GENE_MIS_Z_STEP, "data-default": GENE_MIS_Z_CUTOFF}),
+            "annotsv_acmg_score_min": HiddenInput(attrs={"min": ANNOTSV_ACMG_SCORE_MIN, "max": ANNOTSV_ACMG_SCORE_MAX,
+                                                         "step": ANNOTSV_ACMG_SCORE_STEP,
+                                                         "data-default": ANNOTSV_ACMG_SCORE_CUTOFF}),
             "damage_predictions_min": HiddenInput(attrs={"min": 0}),
             # Columns v1
             "cadd_score_min": HiddenInput(attrs={"min": 0, "max": 70}),
@@ -713,6 +720,8 @@ class DamageNodeForm(BaseNodeForm):
             sliders.append(("alphagenome_splicing_min", "alphagenome-splicing"))
         if node.has_gene_constraint:
             sliders.extend([("gene_loeuf_max", "gene-loeuf"), ("gene_mis_z_min", "gene-mis-z")])
+        if node.has_annotsv:
+            sliders.append(("annotsv_acmg_score_min", "annotsv-acmg-score"))
         if node.columns_version == 1:
             sliders.extend([("cadd_score_min", "cadd"), ("revel_score_min", "revel")])
         elif node.columns_version >= 2:

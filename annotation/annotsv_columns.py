@@ -55,6 +55,12 @@ ANNOTSV_COLUMNS: tuple[AnnotSVColumnDef, ...] = (
                      tsv_column=False),
 )
 
+# An SV breakpoint in any of these is where callers most often report false positives - ENCODE blacklist,
+# segmental duplication, repeat
+ANNOTSV_ARTEFACT_REGION_COLUMNS: tuple[str, ...] = tuple(f"annotsv_{region}_{side}"
+                                                         for region in ("encode_blacklist", "segdup", "repeat_type")
+                                                         for side in ("left", "right"))
+
 # AnnotSV TSV column name -> VariantAnnotation field name, for the fields read straight off a row.
 # Values verified against the bundle shipped with AnnotSV 3.5.8.
 FULL_COLUMN_MAP: dict[str, str] = {

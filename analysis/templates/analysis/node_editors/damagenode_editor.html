@@ -497,6 +497,41 @@
                     <td class="collapse filter-required"> <!-- outside_repeat_region is non-nullable --> </td>
                 </tr>
             {% endif %}
+            {% if node.has_annotsv %}
+                <tr class="editor-table-head">
+                    <th colspan="4" title="AnnotSV annotates structural variants only - every small variant has these empty, so make a filter Required with Allow Null to apply it to SVs and leave small variants to the filters above">Structural variants (AnnotSV)</th>
+                </tr>
+                <tr>
+                    <th title="AnnotSV's ACMG class for the SV, from its ranking score on the ACMG/ClinGen CNV points system">AnnotSV ACMG class &ge;</th>
+                    <td>{{ form.annotsv_acmg_class_min.errors }} {{ form.annotsv_acmg_class_min }}</td>
+                    <td class="collapse filter-required">{{ form.annotsv_acmg_class_required }}</td>
+                    <td class="collapse filter-required">{{ form.annotsv_acmg_class_allow_null }}</td>
+                </tr>
+                <tr>
+                    <th title="AnnotSV ranking score: 0.90 and above is likely pathogenic, 0.99 and above pathogenic. Starts at 0.90">AnnotSV ranking score &ge;</th>
+                    <td>{{ form.annotsv_acmg_score_min.errors }}
+                        <input id="enable-annotsv-acmg-score" title="Enable AnnotSV ranking score slider" class="enable-slider" type="checkbox" />
+                        <span class='slider-container'>
+                            <div class="display-flex">
+                                <span class="slider-track"><input type="range" id="annotsv-acmg-score-slider" class='slider' /></span>
+                                <div class='label slider-value'></div>
+                            </div>
+                            <div class='slider-labels'>
+                                <span class='label min-value left'></span>
+                                <span class='label max-value right'></span>
+                            </div>
+                        </span>
+                    </td>
+                    <td class="collapse filter-required">{{ form.annotsv_acmg_score_required }}</td>
+                    <td class="collapse filter-required">{{ form.annotsv_acmg_score_allow_null }}</td>
+                </tr>
+                <tr>
+                    <th title="Keep only variants with no SV breakpoint in an ENCODE blacklist region, segmental duplication or repeat (AnnotSV) - where SV callers most often report false positives. Small variants pass. Always restricts, like Variant type">Exclude SV artefact regions</th>
+                    <td>{{ form.exclude_sv_artefact_regions.errors }} {{ form.exclude_sv_artefact_regions }}</td>
+                    <td class="collapse filter-required"> <!-- exclude_sv_artefact_regions always restricts --> </td>
+                    <td class="collapse filter-required"> <!-- exclude_sv_artefact_regions is non-nullable --> </td>
+                </tr>
+            {% endif %}
         </table>
 
         <div class="editor-note">

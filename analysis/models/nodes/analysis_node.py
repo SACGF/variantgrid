@@ -377,6 +377,21 @@ class AnalysisNode(NodeSamplesMixin, NodeQueryMixin, NodeDisplayMixin, NodeError
                 extra_columns.append(col)
         return extra_columns
 
+    def _get_node_extra_grid_columns(self) -> list[str]:
+        """ Subclasses override to add catalogue columns (VariantGridColumn names) to the node grid. The grid builds
+            them, as snpdb.grid_columns imports these models """
+        return []
+
+    def get_extra_grid_columns(self) -> list[str]:
+        """ This node's extra catalogue columns, after the ones it inherits - like get_extra_columns """
+        grid_columns = []
+        if self.inherits_parent_columns() and self.is_valid:
+            grid_columns.extend(self.get_single_parent().get_extra_grid_columns())
+        for grid_column in self._get_node_extra_grid_columns():
+            if grid_column not in grid_columns:
+                grid_columns.append(grid_column)
+        return grid_columns
+
     def get_node_classification(self):
         if self.is_source:
             classification = "source"

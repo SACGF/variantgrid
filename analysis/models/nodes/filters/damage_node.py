@@ -17,6 +17,7 @@ from analysis.enums import (
 )
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeChip, NodeIcon
+from annotation.annotsv_columns import ANNOTSV_ARTEFACT_REGION_COLUMNS
 from annotation.effect_filters import (
     gene_constraint_q,
     splicevault_out_of_frame_q,
@@ -28,10 +29,13 @@ from annotation.enums import (
     ClinPredPrediction,
     EVEClass,
     MetaRNNPrediction,
+    Pathogenicity,
     PathogenicityImpact,
     PrimateAIPrediction,
+    VariantAnnotationPipelineType,
 )
 from annotation.models.models import VariantAnnotation
+from annotation.models.models_annotation_run import AnnotationPipelineVersion
 from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.models.models_gene_annotation import GeneAnnotation
 from annotation.pathogenicity_predictions import (
@@ -42,7 +46,11 @@ from annotation.pathogenicity_predictions import (
 )
 from genes.models.models_gnomad_gene_constraint import GnomADGeneConstraint
 from snpdb.enums import BuiltInFilters
-from snpdb.variant_filters import get_variant_type_labels, get_variant_types_q, restricts_variant_types
+from snpdb.variant_filters import (
+    get_variant_type_labels,
+    get_variant_types_q,
+    restricts_variant_types,
+)
 
 
 class _ColumnFilter(NamedTuple):
@@ -79,6 +87,10 @@ _COLUMN_FILTERS = (
 # VariantAnnotationVersion.backfilled_utr_avi_splicevault, so filtering on them earlier would drop every such variant
 _PLUGIN_BACKFILL_COLUMNS = frozenset({"avi_phred", "alphagenome_splicing", "splicevault_out_of_frame_events",
                                       "utr_annotator_annotation"})
+
+# Composite grid columns (VariantGridColumn) showing what the AnnotSV filters read
+ANNOTSV_ACMG_GRID_COLUMN = "annotsv_acmg"
+ANNOTSV_REGION_GRID_COLUMN = "annotsv_region"
 
 
 def get_omim_q(annotation_version: AnnotationVersion) -> Q:
@@ -300,6 +312,19 @@ class DamageNode(AnalysisNode):
     # PM4's "non-repeat region" - a restriction like variant_types, so it has no _required flag
     outside_repeat_region = models.BooleanField(default=False)
 
+    # #2701 - AnnotSV's SV annotations, null on every small variant. Required + allow null reads "SVs must be LP/P,
+    # small variants untouched"; in the OR pool, "damaging by any evidence, AnnotSV included"
+    annotsv_acmg_class_min = models.IntegerField(choices=Pathogenicity.choices, null=True, blank=True)
+    annotsv_acmg_class_required = models.BooleanField(default=False)
+    annotsv_acmg_class_allow_null = models.BooleanField(default=True)
+
+    annotsv_acmg_score_min = models.FloatField(null=True, blank=True)
+    annotsv_acmg_score_required = models.BooleanField(default=False)
+    annotsv_acmg_score_allow_null = models.BooleanField(default=True)
+
+    # No SV breakpoint in ANNOTSV_ARTEFACT_REGION_COLUMNS - a restriction like outside_repeat_region
+    exclude_sv_artefact_regions = models.BooleanField(default=False)
+
     def get_raw_score_tools(self) -> list[PathogenicityTool]:
         """ Tools whose raw-score slider this analysis's annotation version actually populates -
             gated off visible_columns so the editor can't offer a filter over an empty column. """
@@ -356,6 +381,33 @@ class DamageNode(AnalysisNode):
     def _applies_outside_repeat_region(self) -> bool:
         return self.outside_repeat_region and self.has_repeat_masker()
 
+    @cached_property
+    def has_annotsv(self) -> bool:
+        """ AnnotSV is its own pipeline rather than VEP columns, so visible_columns doesn't cover it """
+        genome_build = self.analysis.genome_build
+        return AnnotationPipelineVersion.get_active(VariantAnnotationPipelineType.ANNOTSV, genome_build) is not None
+
+    def _annotsv_filters_set(self) -> bool:
+        return (self.annotsv_acmg_class_min is not None or self.annotsv_acmg_score_min is not None
+                or self.exclude_sv_artefact_regions)
+
+    def _applies_annotsv(self) -> bool:
+        """ Checks the node's own settings first, so a node without AnnotSV filters never looks up the pipeline """
+        return self._annotsv_filters_set() and self.has_annotsv
+
+    def _annotsv_threshold_filters(self) -> list[tuple[str, float, bool, bool]]:
+        """ (column, threshold, required, allow_null) for each AnnotSV threshold set and applied """
+        if not self._applies_annotsv():
+            return []
+        filters = [("annotsv_acmg_class", self.annotsv_acmg_class_min, self.annotsv_acmg_class_required,
+                    self.annotsv_acmg_class_allow_null),
+                   ("annotsv_acmg_score", self.annotsv_acmg_score_min, self.annotsv_acmg_score_required,
+                    self.annotsv_acmg_score_allow_null)]
+        return [f for f in filters if f[1] is not None]
+
+    def _applies_exclude_sv_artefact_regions(self) -> bool:
+        return self.exclude_sv_artefact_regions and self._applies_annotsv()
+
     def _filter_column_applied(self, column: str) -> bool:
         """ False where the column is licence-restricted data the version withholds (the editor hides its slider, so a
             saved threshold can't be seen or changed - #2571) or one the version is still waiting on a backfill for.
@@ -370,14 +422,15 @@ class DamageNode(AnalysisNode):
         all_versions = [self.impact_min, self.splice_min, self.cosmic_count_min, self.damage_predictions_min,
                         self.in_cosmic, self.omim_phenotype, self.protein_domain, self.published,
                         restricts_variant_types(self.variant_types), bool(self._gene_constraint_filters()),
-                        self._applies_outside_repeat_region()]
+                        self._applies_outside_repeat_region(), self._applies_annotsv()]
         return any(all_versions) or any(cf.is_set(self) for cf in self._column_filters())
 
     def has_required(self) -> bool:
         all_versions = [self.impact_required, self.splice_required, self.cosmic_count_required,
                         self.in_cosmic_required, self.omim_phenotype_required,
                         self.damage_predictions_required, self.protein_domain_required, self.published_required,
-                        *(required for _, _, _, required, _ in self._gene_constraint_filters())]
+                        *(required for _, _, _, required, _ in self._gene_constraint_filters()),
+                        *(required for _, _, required, _ in self._annotsv_threshold_filters())]
         # A rankscore's required checkbox is only on screen while the rankscore sliders are
         show_rankscores = self.show_rankscore_sliders()
         return any(all_versions) or any(getattr(self, cf.required_field) for cf in self._column_filters()
@@ -460,6 +513,11 @@ class DamageNode(AnalysisNode):
             warnings.append(
                 f"Outside repeat region filter is NOT being applied: repeat_masker is not populated on "
                 f"{vav.genome_build} / VEP {vav.vep} / columns_version {vav.columns_version}."
+            )
+        if self._annotsv_filters_set() and not self.has_annotsv:
+            warnings.append(
+                f"AnnotSV filters are NOT being applied: there is no active AnnotSV annotation pipeline for "
+                f"{self.analysis.genome_build}."
             )
 
         if self.splice_min is not None and vav.uses_raw_spliceai:
@@ -685,6 +743,19 @@ class DamageNode(AnalysisNode):
         if self._applies_outside_repeat_region():
             and_filters.append(Q(variantannotation__repeat_masker__isnull=True))
 
+        for column, threshold, required, allow_null in self._annotsv_threshold_filters():
+            q_annotsv = Q(**{f"variantannotation__{column}__gte": threshold})
+            if required:
+                if allow_null:
+                    q_annotsv |= Q(**{f"variantannotation__{column}__isnull": True})
+                and_filters.append(q_annotsv)
+            else:
+                or_filters.append(q_annotsv)
+
+        if self._applies_exclude_sv_artefact_regions():
+            and_filters.append(Q(**{f"variantannotation__{column}__isnull": True
+                                    for column in ANNOTSV_ARTEFACT_REGION_COLUMNS}))
+
         if self.cosmic_count_min is not None:
             q_cosmic_count = Q(variantannotation__cosmic_count__gte=self.cosmic_count_min)
             if self.cosmic_count_required:
@@ -819,7 +890,28 @@ class DamageNode(AnalysisNode):
                                            self.gene_mis_z_required, self.gene_mis_z_allow_null))
         if self.outside_repeat_region:
             chips.append(NodeChip(text="no repeat", title="Outside RepeatMasker repeat regions"))
+        if self.annotsv_acmg_class_min is not None:
+            pathogenicity = Pathogenicity(self.annotsv_acmg_class_min)
+            chips.append(self._filter_chip(f"AnnotSV ≥ {pathogenicity.short_label}",
+                                           f"AnnotSV ACMG class ≥ {pathogenicity.label}",
+                                           self.annotsv_acmg_class_required, self.annotsv_acmg_class_allow_null))
+        if self.annotsv_acmg_score_min is not None:
+            chips.append(self._filter_chip("AnnotSV score",
+                                           f"AnnotSV ranking score ≥ {self.annotsv_acmg_score_min:g}",
+                                           self.annotsv_acmg_score_required, self.annotsv_acmg_score_allow_null))
+        if self.exclude_sv_artefact_regions:
+            chips.append(NodeChip(text="no SV artefact",
+                                  title="No SV breakpoint in an ENCODE blacklist, segmental duplication or repeat "
+                                        "region (AnnotSV)"))
         return chips
+
+    def _get_node_extra_grid_columns(self) -> list[str]:
+        grid_columns = []
+        if self._annotsv_threshold_filters():
+            grid_columns.append(ANNOTSV_ACMG_GRID_COLUMN)
+        if self._applies_exclude_sv_artefact_regions():
+            grid_columns.append(ANNOTSV_REGION_GRID_COLUMN)
+        return grid_columns
 
     def _score_chips(self) -> list[NodeChip]:
         """ A chip per tool with a threshold or prediction set - off the TOOLS metadata, so a new tool has one """

@@ -26,14 +26,25 @@ Thresholds page (`annotation/pathogenicity_predictions.py:EFFECT_NODE_FILTERS`).
 | PP1 / BS4 segregation | pedigree genotypes | Pedigree node | covered |
 | PP4 phenotype | HPO / OMIM / MONDO on patient and gene | Phenotype node | covered |
 | Somatic (AMP tiers, oncogenicity) | ClinVar somatic tiers and oncogenicity, COSMIC | ClinVar node, Effect `cosmic_count_min` | covered |
+| CNV / SV (ACMG/ClinGen CNV points, Riggs 2020) | AnnotSV `annotsv_acmg_class`, `annotsv_acmg_score`, breakpoint ENCODE blacklist / segdup / repeat | Effect: `annotsv_acmg_class_min`, `annotsv_acmg_score_min`, `exclude_sv_artefact_regions` (#2701) | covered |
 
 The gene constraint filters read the representative transcript's `symbol` against gnomAD's MANE Select rows (gnomAD
 v4 has a row per transcript, and a MANE gene has an Ensembl and a RefSeq row with the same values). They are offered
 when the gnomAD gene constraint has been imported; Allow Null keeps a variant with no symbol or whose gene has no
 MANE Select value. Outside repeat region is a restriction (ANDed), offered where the version populates `repeat_masker`.
 
+SVs and small variants go through the one Effect node, so the AnnotSV filters are offered when the AnnotSV pipeline is
+active for the build (`AnnotationPipelineVersion.get_active`) and lean on the `_required` / `_allow_null` pair: every
+`annotsv_*` column is null for a small variant, so "ACMG class ≥ LP, required, allow null" filters SVs and leaves small
+variants to the other filters, and in the OR pool it is one more kind of damaging evidence. Exclude SV artefact regions
+is a restriction like outside repeat region, and small variants pass it. A node using them adds the AnnotSV ACMG and
+region columns to its grid and its descendants' (`AnalysisNode.get_extra_grid_columns`). The terms are column checks
+on the annotation row the node already joins, and the pipeline is only looked up when one is set: on a 3.9M variant
+WGS sample they add about 0.15-0.2 s to a 2 s count, a few ms on a panel.
+
 The Effect, Population and ClinVar editors offer an ACMG preset dropdown (`analysis/node_presets.py`, #2605) that
-fills the form with one criterion's cutoffs for the user to adjust and save: PVS1 (impact HIGH, LOEUF), PP3 (any
+fills the form with one criterion's cutoffs for the user to adjust and save: PVS1 (impact HIGH, or AnnotSV LP/P where
+AnnotSV is active - VEP gives a partial exonic deletion a MODIFIER term; LOEUF), PP3 (any
 ClinGen-calibrated predictor at its supporting cutoff), PP2 (missense Z), PM2 and PP5 (ClinVar P/LP at two or more
 stars). The PM2 lines depend on mode of inheritance, penetrance and severity and are lab policy, so they are
 admin-edited `PopulationNodePreset` rows - seeded as dominant severe early onset (gnomAD allele count ≤ 1), dominant
