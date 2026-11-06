@@ -102,8 +102,8 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
         if self.gene_symbol:
             name_lines.append(self.gene_symbol_id)
 
-        if set(self.variant_types) != set(get_all_variant_types()):
-            type_names = ", ".join(get_variant_type_labels(self.variant_types)) or "any"
+        if self.variant_types and set(self.variant_types) != set(get_all_variant_types()):
+            type_names = ", ".join(get_variant_type_labels(self.variant_types))
             name_lines.append(f"(type: {type_names})")
 
         return "\n".join(name_lines)

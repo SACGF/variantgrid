@@ -192,16 +192,18 @@ def get_variant_types_q(variant_types: Optional[Iterable[str]],
                         all_variant_types: Optional[Iterable[str]] = None) -> Optional[Q]:
     """ Returns None (ie no restriction) when the selection is empty or covers every available type.
 
-        The available types cover every variant between them (as returning None for all of them already
-        assumes), so a selection can also be built as "none of the unselected types". Each row is tested
-        against the types in turn, so whichever side costs less is used - the default AllVariantsNode
-        (everything but reference) is a single alt_id exclusion rather than a 7-way OR """
+        Every type plus reference covers every variant between them, so a selection can also be built as
+        "none of the unselected types". Each row is tested against the types in turn, so whichever side
+        costs less is used - the default AllVariantsNode (everything but reference) is a single alt_id
+        exclusion rather than a 7-way OR. Reference is always in the unselected side unless picked: the
+        Effect node doesn't offer it, and a partial selection there still mustn't pass reference rows """
     if all_variant_types is None:
         all_variant_types = get_all_variant_types()
     if not restricts_variant_types(variant_types, all_variant_types):
         return None
     selected = set(variant_types)
-    unselected = set(all_variant_types) - selected
+    every_variant_type = set(all_variant_types) | set(get_all_variant_types(include_reference=True))
+    unselected = every_variant_type - selected
     if _variant_types_cost(unselected) < _variant_types_cost(selected):
         return ~_any_variant_type_q(unselected)
     return _any_variant_type_q(selected)
