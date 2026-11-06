@@ -27,7 +27,7 @@ from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.population_node import PopulationNode, PopulationNodePreset
-from annotation.enums import PathogenicityImpact
+from annotation.enums import Pathogenicity, PathogenicityImpact
 from annotation.pathogenicity_predictions import (
     GENE_LOEUF_CUTOFF,
     GENE_MIS_Z_CUTOFF,
@@ -57,8 +57,16 @@ def _pp3_tools(node: DamageNode) -> list[PathogenicityTool]:
 def damage_node_presets(node: DamageNode) -> list[NodePreset]:
     presets = []
 
-    pvs1 = {"impact_min": PathogenicityImpact.HIGH, "impact_required": True}
-    pvs1_description = ("Impact HIGH (stop gained, frameshift, canonical splice site, start lost), required. ")
+    pvs1 = {"impact_min": PathogenicityImpact.HIGH}
+    pvs1_description = "Impact HIGH (stop gained, frameshift, canonical splice site, start lost)"
+    if node.has_annotsv:
+        # A partial exonic deletion AnnotSV ranks class 5 can get a MODIFIER term from VEP. With nothing else in the
+        # OR pool this is "HIGH or AnnotSV LP/P", which for small variants (no AnnotSV class) is just HIGH
+        pvs1 |= {"annotsv_acmg_class_min": Pathogenicity.LIKELY_PATHOGENIC}
+        pvs1_description += " or a structural variant AnnotSV ranks Likely pathogenic or Pathogenic. "
+    else:
+        pvs1 |= {"impact_required": True}
+        pvs1_description += ", required. "
     if node.has_gene_constraint:
         pvs1 |= {"gene_loeuf_max": GENE_LOEUF_CUTOFF, "gene_loeuf_required": True, "gene_loeuf_allow_null": True}
         pvs1_description += (f"gnomAD LOEUF ≤ {GENE_LOEUF_CUTOFF:g}, required - loss of function is a known "

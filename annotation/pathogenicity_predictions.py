@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
+from annotation.annotsv_columns import ANNOTSV_ARTEFACT_REGION_COLUMNS
+
 
 class RawScoreDirection(Enum):
     """ Which way a raw score runs, so the DamageNode slider filters on the damaging side of it """
@@ -547,6 +549,12 @@ GENE_MIS_Z_MIN = 0.0
 GENE_MIS_Z_MAX = 10.0
 GENE_MIS_Z_STEP = 0.01
 GENE_MIS_Z_CUTOFF = 3.09
+# AnnotSV ranking score, on the ClinGen CNV points scale: >= 0.99 pathogenic, 0.90-0.98 likely pathogenic,
+# -0.89-0.89 uncertain, then likely benign / benign below -0.90 / -0.99. Anything past +-1 is the same class
+ANNOTSV_ACMG_SCORE_MIN = -1.0
+ANNOTSV_ACMG_SCORE_MAX = 1.0
+ANNOTSV_ACMG_SCORE_STEP = 0.01
+ANNOTSV_ACMG_SCORE_CUTOFF = 0.9
 
 _DAWES_2023 = (
     "Dawes R, Bournazos AM, Bryen SJ, et al. SpliceVault predicts the precise nature of variant-associated "
@@ -591,6 +599,18 @@ _RICHARDS_2015 = (
     "joint consensus recommendation of the American College of Medical Genetics and Genomics and the Association "
     "for Molecular Pathology. Genet Med. 2015;17(5):405-424.",
     "https://doi.org/10.1038/gim.2015.30",
+)
+_RIGGS_2020 = (
+    "Riggs ER, Andersen EF, Cherry AM, et al. Technical standards for the interpretation and reporting of "
+    "constitutional copy-number variants: a joint consensus recommendation of the American College of Medical "
+    "Genetics and Genomics (ACMG) and the Clinical Genome Resource (ClinGen). Genet Med. 2020;22(2):245-257.",
+    "https://doi.org/10.1038/s41436-019-0686-8",
+)
+_GEOFFROY_2018 = (
+    "Geoffroy 2018",
+    "Geoffroy V, Herenger Y, Kress A, et al. AnnotSV: an integrated tool for structural variations annotation. "
+    "Bioinformatics. 2018;34(20):3572-3574.",
+    "https://doi.org/10.1093/bioinformatics/bty304",
 )
 _ELLINGFORD_2022 = (
     "Ellingford 2022",
@@ -685,6 +705,30 @@ EFFECT_NODE_FILTERS: tuple[EffectNodeFilter, ...] = (
         source="Richards 2015",
         source_detail=_RICHARDS_2015[0],
         source_url=_RICHARDS_2015[1],
+    ),
+    EffectNodeFilter(
+        name="AnnotSV ACMG class / ranking score",
+        fields=("annotsv_acmg_class", "annotsv_acmg_score"),
+        rule="Keeps a structural variant AnnotSV ranks at or above the chosen class, or with a ranking score at or "
+             "above the slider. Null for every small variant, so Required with Allow Null applies it to SVs and "
+             "leaves small variants to the other filters.",
+        raw_min=ANNOTSV_ACMG_SCORE_MIN, raw_max=ANNOTSV_ACMG_SCORE_MAX, cutoff=ANNOTSV_ACMG_SCORE_CUTOFF,
+        source="Riggs 2020",
+        source_detail=_RIGGS_2020[0],
+        source_url=_RIGGS_2020[1],
+        note="AnnotSV scores deletions and duplications on the ACMG/ClinGen CNV points system; the slider starts at "
+             "0.90, the likely pathogenic line. Offered where the AnnotSV pipeline is active for the build.",
+        references=(_GEOFFROY_2018,),
+    ),
+    EffectNodeFilter(
+        name="Exclude SV artefact regions",
+        fields=ANNOTSV_ARTEFACT_REGION_COLUMNS,
+        rule="Keeps only variants with no SV breakpoint in an ENCODE blacklist region, segmental duplication or "
+             "repeat, per AnnotSV - always a restriction. Small variants have no AnnotSV annotation and pass.",
+        source="Geoffroy 2018",
+        source_detail=_GEOFFROY_2018[1],
+        source_url=_GEOFFROY_2018[2],
+        note="Breakpoints in these regions are where SV callers most often report false positives.",
     ),
 )
 

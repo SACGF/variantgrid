@@ -65,6 +65,7 @@ from ontology.models import OntologyTermRelation, OntologyVersion
 from patients.enums import Zygosity
 from snpdb.enums import ProcessingStatus, SequenceRole
 from snpdb.grid_columns.custom_columns import (
+    build_variant_grid_columns,
     get_all_variant_grid_columns,
     get_variantgrid_extra_annotate,
 )
@@ -231,7 +232,7 @@ class VariantGrid(AbstractVariantGrid):
                 return columns[:sample_cols_pos] + new_columns + columns[sample_cols_pos:]
             return columns + new_columns
 
-        if extra_columns := self.node.get_extra_columns():
+        if extra_columns := self.node.get_extra_columns() + self._get_node_extra_grid_columns():
             rich_columns = insert_columns(rich_columns, extra_columns)
 
         if self.cohorts:
@@ -258,6 +259,17 @@ class VariantGrid(AbstractVariantGrid):
                 if rc.name == default_sort_by_column.variant_column and rc.orderable:
                     rc.default_sort = SortOrder.ASC
                     break
+        return rich_columns
+
+    def _get_node_extra_grid_columns(self) -> list[RichColumn]:
+        """ The catalogue columns the node adds (AnalysisNode.get_extra_grid_columns), with the members they draw.
+            One the user's own columns already show is dropped by insert_columns """
+        if not (names := self.node.get_extra_grid_columns()):
+            return []
+        columns_by_name = VariantGridColumn.objects.prefetch_related("composite_members__column").in_bulk(names)
+        grid_columns = [columns_by_name[name] for name in names if name in columns_by_name]
+        rich_columns, _ = build_variant_grid_columns(grid_columns, self._get_annotation_version(),
+                                                     self._get_standard_overrides(self.af_show_in_percent))
         return rich_columns
 
     @staticmethod
