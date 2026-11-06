@@ -44,6 +44,7 @@ COMPOSITE_EXAMPLE_ROWS: dict[str, dict[str, Any]] = {
             hgvs_p="NP_012345.1:p.(Arg412Trp)",
             hgvs_g="NC_000012.12:g.12345678C>T",
             symbol="EXAMPL1",
+            overlapping_symbols="EXAMPL1",
         ),
     },
     # ClinVar has a germline LP with 2 stars and a somatic Tier III; internally one lab has called it
