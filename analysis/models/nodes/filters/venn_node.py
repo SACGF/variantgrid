@@ -93,8 +93,10 @@ class VennNode(AnalysisNode):
 
     def get_connection_data(self, parent):
         values = super().get_connection_data(parent)
-        side = self.get_side_for_parent(parent)
-        values['side'] = side
+        try:
+            values['side'] = self.get_side_for_parent(parent)
+        except ValueError:
+            pass  # Drawn on either input rather than failing the whole analysis page, so it can be deleted (#2711)
         return values
 
     def get_rendering_args(self):

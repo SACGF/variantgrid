@@ -103,6 +103,14 @@ class TestVennNode(AnalysisSetupMixin, TestCase):
         venn.refresh_from_db()
         self.assertIsNone(venn.left_parent_id)
 
+    def test_edge_with_no_side_still_draws(self):
+        """ The analysis page draws every edge - one whose side was lost mustn't fail the page """
+        venn, _left, right = self._venn()
+        VennNode.objects.filter(pk=venn.pk).update(right_parent=None)
+        connection_data = self._reload(venn).get_connection_data(right)
+        self.assertEqual(right.get_css_id(), connection_data["source_id"])
+        self.assertNotIn("side", connection_data)
+
     def test_ordered_parents_returns_left_then_right(self):
         venn, left, right = self._venn()
         a, b = self._reload(venn).ordered_parents
