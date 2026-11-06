@@ -82,7 +82,7 @@ from patients.sample_grouping import SOURCE_LEVELS, get_patient_for_source
 from snpdb.enums import AlleleOriginFilterDefault
 from snpdb.forms import GenomeBuildAutocompleteForwardMixin, VariantTypesField
 from snpdb.models import Cohort, Lab, Sample, Tag, VCFFilter
-from snpdb.models.models_genome import Contig
+from snpdb.models.models_genome import Contig, Cytoband
 from uicore.widgets.date_widget import NativeDateInput
 
 # Can use this for ModelForm.exclude to only use node specific fields
@@ -838,7 +838,7 @@ class GeneListNodeForm(AncestorSampleSourceMixin, BaseNodeForm):
 
 
 class IntersectionNodeForm(GenomeBuildAutocompleteForwardMixin, BaseNodeForm):
-    genome_build_fields = ["genomic_intervals_collection", "contigs"]
+    genome_build_fields = ["genomic_intervals_collection", "contigs", "cytobands"]
     VARIANT_TEXT_PLACEHOLDER = "\n".join([
         "One entry per line, eg:",
         "rs6025",
@@ -852,6 +852,10 @@ class IntersectionNodeForm(GenomeBuildAutocompleteForwardMixin, BaseNodeForm):
                                              queryset=Contig.objects.all(),
                                              widget=ModelSelect2Multiple(url='contig_autocomplete',
                                                                          attrs={'data-placeholder': 'Chromosome...'}))
+    cytobands = forms.ModelMultipleChoiceField(required=False,
+                                               queryset=Cytoband.objects.all(),
+                                               widget=ModelSelect2Multiple(url='cytoband_autocomplete',
+                                                                           attrs={'data-placeholder': 'Band or arm, eg 11p13, 17p'}))
 
     class Meta:
         model = IntersectionNode
@@ -891,6 +895,11 @@ class IntersectionNodeForm(GenomeBuildAutocompleteForwardMixin, BaseNodeForm):
         contigs_set.all().delete()
         for contig in self.cleaned_data["contigs"]:
             contigs_set.create(contig=contig)
+
+        cytobands_set = self.instance.intersectionnodecytoband_set
+        cytobands_set.all().delete()
+        for cytoband in self.cleaned_data["cytobands"]:
+            cytobands_set.create(cytoband=cytoband)
 
         if commit:
             node.save()
