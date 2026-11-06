@@ -8,6 +8,7 @@ from snpdb.cytobands import CytobandRange, parse_cytoband
 from snpdb.enums import CytobandLevel
 from snpdb.models import GenomeBuild
 from snpdb.models.models_genome import Cytoband
+from snpdb.search import search_data
 
 
 class ParseCytobandTest(TestCase):
@@ -100,3 +101,27 @@ class CytobandAutocompleteTest(TestCase):
 
     def test_not_band_shaped(self):
         self.assertEqual(self._search("BRCA1"), [])
+
+
+class CytobandSearchAndPageTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(username="cytoband_search_user")
+        cls.grch38 = GenomeBuild.grch38()
+
+    def test_search_finds_the_band(self):
+        urls = {r.preview.internal_url for r in search_data(self.user, "chr11p15").results}
+        contig_11 = self.grch38.chrom_contig_mappings["11"]
+        self.assertIn(Cytoband.objects.get(contig=contig_11, name="p15").get_absolute_url(), urls)
+
+    def test_search_ignores_ranges(self):
+        self.assertEqual(search_data(self.user, "11p13-p12").results, [])
+
+    def test_contig_page_shows_band(self):
+        contig_11 = self.grch38.chrom_contig_mappings["11"]
+        self.client.force_login(self.user)
+        response = self.client.get(Cytoband.objects.get(contig=contig_11, name="p15").get_absolute_url())
+        interval = response.context["cytoband_interval"]
+        self.assertEqual((interval.start, interval.end), (1, 22000000))
+        selected = [str(c) for c in response.context["cytobands"] if getattr(c, "in_selected_band", False)]
+        self.assertEqual(selected, ["11p15.5", "11p15.4", "11p15.3", "11p15.2", "11p15.1"])

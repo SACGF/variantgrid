@@ -20,6 +20,7 @@ from django.views.decorators.http import require_POST
 from termsandconditions.decorators import terms_required
 
 from library import uptime_check
+from snpdb.cytobands import parse_cytoband
 from snpdb.models import (
     CachedGeneratedFile,
     Contig,
@@ -27,6 +28,7 @@ from snpdb.models import (
     UserSettings,
     Wiki,
 )
+from snpdb.models.models_genome import Cytoband
 from user_messages.models import Message
 
 
@@ -129,10 +131,26 @@ def view_contig(request, contig_accession):
     else:
         genome_build = None
 
+    # ?band=p13 (from cytoband search) or a range, ?band=p13-p12
+    band = request.GET.get("band")
+    cytoband_interval = None
+    if band and genome_build:
+        if cytoband_range := parse_cytoband(f"{contig.name}{band}"):
+            cytoband_interval = cytoband_range.get_interval(genome_build)
+
+    # The file's bands - the levels above them are generated, with no stain
+    cytobands = list(Cytoband.objects.filter(contig=contig).exclude(stain="").select_related("contig").order_by("start"))
+    if cytoband_interval:
+        for cytoband in cytobands:
+            cytoband.in_selected_band = cytoband_interval.start <= cytoband.start and cytoband.end <= cytoband_interval.end
+
     context = {
         "contig": contig,
         "genome_build": genome_build,
         "has_annotation": has_annotation,
+        "band": band,
+        "cytoband_interval": cytoband_interval,
+        "cytobands": cytobands,
     }
     return render(request, "snpdb/genomics/view_contig.html", context)
 
