@@ -1,14 +1,11 @@
 {% extends "analysis/node_editors/grid_editor.html" %}
-
-{% block docreadyjs %}
-    var intersectionNodeForm = $('form#intersection-node-form');
-    accordionForm(intersectionNodeForm);
-    ajaxForm(intersectionNodeForm);
-
-{% endblock docreadyjs %}
-
+{% load static %}
 
 {% block content %}
+<script src="{% static 'js/analysis/intersectionnode_editor.js' %}"></script>
+<script>
+    initIntersectionNodeEditor();
+</script>
 <style>
 	#intersectionnode-variants textarea {
 		width: 100%;
@@ -40,8 +37,8 @@
             <div class="card-body" id='intersectionnode-variants'>
             {{ form.variant_text.errors }}{{ form.variant_text }}
             <div class="editor-help">
-                dbSNP IDs, HGVS, variant coordinates, loci, ClinGen allele IDs, COSMIC IDs
-                and regions (chr:start-end) - one per line.
+                dbSNP IDs, HGVS, variant coordinates, loci, ClinGen allele IDs, COSMIC IDs,
+                regions (chr:start-end) and cytogenetic bands (11p13, 17p, 11p13-p12) - one per line.
             </div>
             </div>
         </div>
@@ -53,6 +50,10 @@
                 <div class="editor-row editor-row-top">
                     <label class="editor-label" for="{{ form.contigs.id_for_label }}">Chromosomes</label>
                     {{ form.contigs.errors }}{{ form.contigs }}
+                </div>
+                <div class="editor-row editor-row-top">
+                    <label class="editor-label" for="{{ form.cytobands.id_for_label }}">Cytoband</label>
+                    {{ form.cytobands.errors }}{{ form.cytobands }}
                 </div>
             </div>
         </div>

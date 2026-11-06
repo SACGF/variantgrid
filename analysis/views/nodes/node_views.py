@@ -196,6 +196,7 @@ class IntersectionNodeView(NodeView):
     def _get_form_initial(self):
         form_initial = super()._get_form_initial()
         form_initial["contigs"] = self.object.intersectionnodecontig_set.all().values_list("contig", flat=True)
+        form_initial["cytobands"] = self.object.intersectionnodecytoband_set.all().values_list("cytoband", flat=True)
         return form_initial
 
     def get_form_kwargs(self):

@@ -15,10 +15,15 @@ from django.db.models.query_utils import Q
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_audit_log_mixin import NodeAuditLogMixin
 from analysis.models.nodes.node_display import NodeIcon, first_and_more_name_line
-from analysis.variant_text import get_variant_text_summary, parse_region, resolve_variant_text
+from analysis.variant_text import (
+    format_region,
+    get_variant_text_summary,
+    parse_region,
+    resolve_variant_text,
+)
 from snpdb.enums import ImportStatus
 from snpdb.models import GenomicIntervalsCollection, VariantCollection
-from snpdb.models.models_genome import Contig
+from snpdb.models.models_genome import Contig, Cytoband
 from snpdb.models.models_variant import Variant
 from snpdb.variants_to_vcf import write_qs_to_vcf_file_sort_alphabetically
 
@@ -52,6 +57,16 @@ class IntersectionNode(AnalysisNode):
         ).order_by("contig__genomebuildcontig__order")
         return list(qs.values_list("contig_id", flat=True))
 
+    @cached_property
+    def cytobands(self) -> list[Cytoband]:
+        if self.pk is None:
+            return []
+        qs = Cytoband.objects.filter(
+            intersectionnodecytoband__intersection_node=self,
+            contig__genomebuildcontig__genome_build=self.analysis.genome_build
+        ).select_related("contig").order_by(*Cytoband.GENOME_BUILD_ORDERING)
+        return list(qs)
+
     def valid_selected_genomic_intervals_collection(self):
         return self.accordion_panel == self.SELECTED_INTERVALS and self.genomic_intervals_collection
 
@@ -60,7 +75,7 @@ class IntersectionNode(AnalysisNode):
         return self.accordion_panel == self.VARIANTS and bool(self.variant_text)
 
     def valid_contig(self):
-        return self.accordion_panel == self.CONTIG and bool(self.contig_ids)
+        return self.accordion_panel == self.CONTIG and bool(self.contig_ids or self.cytobands)
 
     def modifies_parents(self):
         return any([self.valid_selected_genomic_intervals_collection(),
@@ -101,8 +116,12 @@ class IntersectionNode(AnalysisNode):
         if self.accordion_panel == self.VARIANTS:
             q = self._get_variants_q()
         elif self.accordion_panel == self.CONTIG:
-            if self.contig_ids:
-                q = reduce(operator.or_, [Q(locus__contig_id=c) for c in self.contig_ids])
+            q_list = [Q(locus__contig_id=c) for c in self.contig_ids]
+            q_list.extend(Q(locus__contig_id=cytoband.contig_id,
+                            locus__position__gte=cytoband.start, locus__position__lte=cytoband.end)
+                          for cytoband in self.cytobands)
+            if q_list:
+                q = reduce(operator.or_, q_list)
             else:
                 q = self.q_none()
         elif self.accordion_panel == self.SELECTED_INTERVALS:
@@ -117,8 +136,22 @@ class IntersectionNode(AnalysisNode):
             elif self.accordion_panel == self.SELECTED_INTERVALS:
                 method_summary = f"Filtering to selected interval {self.genomic_intervals_collection.name}"
             elif self.accordion_panel == self.CONTIG:
-                method_summary = f"Filtering to contigs {self._get_contig_names()}"
+                method_summary = f"Filtering to {self._get_contig_and_cytoband_description(with_coordinates=True)}"
         return method_summary
+
+    def _get_contig_and_cytoband_description(self, with_coordinates=False) -> str:
+        """ Bands get their coordinates in the method summary, as nothing else shows what 11p13 is """
+        descriptions = []
+        if contig_names := self._get_contig_names():
+            descriptions.append(f"contigs {contig_names}")
+        if self.cytobands:
+            if with_coordinates:
+                cytoband_names = [f"{cytoband} = {format_region(cytoband.contig.name, cytoband.start, cytoband.end)}"
+                                  for cytoband in self.cytobands]
+            else:
+                cytoband_names = [str(cytoband) for cytoband in self.cytobands]
+            descriptions.append(f"cytobands {', '.join(cytoband_names)}")
+        return " and ".join(descriptions)
 
     def _get_contig_names(self) -> str:
         contig_names = list(Contig.objects.filter(pk__in=self.contig_ids,
@@ -135,7 +168,7 @@ class IntersectionNode(AnalysisNode):
             elif self.accordion_panel == self.SELECTED_INTERVALS:
                 name = self.genomic_intervals_collection.name
             elif self.accordion_panel == self.CONTIG:
-                name = self._get_contig_names()
+                name = ", ".join(filter(None, [self._get_contig_names()] + [str(c) for c in self.cytobands]))
         return name
 
     def _get_variant_text_name(self) -> str:
@@ -194,9 +227,12 @@ class IntersectionNode(AnalysisNode):
 
     def save_clone(self):
         contig_ids = self.contig_ids  # Save before clone
+        cytobands = self.cytobands
         copy = super().save_clone()
         for contig_id in contig_ids:
             copy.intersectionnodecontig_set.create(contig_id=contig_id)
+        for cytoband in cytobands:
+            copy.intersectionnodecytoband_set.create(cytoband=cytoband)
         return copy
 
     def write_cache(self, variant_collection: VariantCollection):
@@ -248,5 +284,21 @@ class IntersectionNodeContig(NodeAuditLogMixin, models.Model):
         return f"IntersectionNodeContig {self.intersection_node_id}: {self.contig}"
 
 
+class IntersectionNodeCytoband(NodeAuditLogMixin, models.Model):
+    """ Stores multi-select cytoband values """
+    intersection_node = models.ForeignKey(IntersectionNode, on_delete=CASCADE)
+    cytoband = models.ForeignKey(Cytoband, on_delete=CASCADE)
+
+    class Meta:
+        unique_together = ("intersection_node", "cytoband")
+
+    def __str__(self):
+        return f"IntersectionNodeCytoband {self.intersection_node_id}: {self.cytoband}"
+
+    def _get_node(self):
+        return self.intersection_node
+
+
 auditlog.register(IntersectionNode)
 auditlog.register(IntersectionNodeContig)
+auditlog.register(IntersectionNodeCytoband)

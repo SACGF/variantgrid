@@ -20,6 +20,7 @@ from django.conf import settings
 from django.db import models, transaction
 from django.db.models import QuerySet
 from django.db.models.deletion import CASCADE
+from django.db.models.functions import Length
 from django.db.models.query_utils import Q
 from django.urls import reverse
 from django.utils.text import slugify
@@ -31,7 +32,7 @@ from library.django_utils.django_object_managers import ObjectManagerCachingImmu
 from library.genomics.fasta_wrapper import FastaFileWrapper
 from library.preview_request import PreviewModelMixin
 from library.utils import invert_dict
-from snpdb.enums import AssemblyMoleculeType, SequenceRole
+from snpdb.enums import AssemblyMoleculeType, CytobandLevel, SequenceRole
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_REFSEQ_ACCESSION
 from snpdb.genome.fasta_index import load_genome_fasta_index
 
@@ -470,9 +471,12 @@ class GenomeBuildContig(models.Model):
 
 
 class Cytoband(models.Model):
-    """ A cytogenetic band (name is the arm and band, eg "p13" or "p15.5") - start/end are 1-based inclusive """
+    """ A cytogenetic band at any level (name is the arm and band, eg "p", "p1", "p13" or "p15.5") - start/end are
+        1-based inclusive. The cytoband files only hold the finest level; the levels above are generated from them,
+        spanning their children, with a blank stain """
     contig = models.ForeignKey(Contig, on_delete=CASCADE)
     name = models.TextField()
+    level = models.CharField(max_length=2, choices=CytobandLevel.choices)
     start = models.IntegerField()
     end = models.IntegerField()
     stain = models.TextField()
@@ -482,6 +486,14 @@ class Cytoband(models.Model):
 
     def __str__(self):
         return f"{self.contig.name}{self.name}"
+
+    # For a queryset filtered to one build: contig order, then position with each parent (wider) before its children
+    GENOME_BUILD_ORDERING = ("contig__genomebuildcontig__order", "start", "-end", Length("name"))
+
+    @property
+    def coordinates_label(self) -> str:
+        """ eg 'chr11:31.0-36.4 Mb' """
+        return f"{self.contig.ucsc_name or self.contig.name}:{self.start / 1e6:.1f}\u2013{self.end / 1e6:.1f} Mb"
 
 
 class GenomeFasta(models.Model):

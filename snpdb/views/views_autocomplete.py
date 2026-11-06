@@ -12,6 +12,7 @@ from django.views.decorators.vary import vary_on_cookie
 
 from library.constants import MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
+from snpdb.cytobands import CYTOBAND_PREFIX_PATTERN
 from snpdb.enums import ImportStatus
 from snpdb.models import (
     VCF,
@@ -28,7 +29,7 @@ from snpdb.models import (
     Tag,
     Trio,
 )
-from snpdb.models.models_genome import Contig
+from snpdb.models.models_genome import Contig, Cytoband
 
 
 class GenomeBuildAutocompleteView(AutocompleteView, ABC):
@@ -196,6 +197,31 @@ class ContigAutocompleteView(AutocompleteView):
 
     def get_result_label(self, obj):
         return obj.name
+
+
+@method_decorator(cache_page(MINUTE_SECS), name='dispatch')
+class CytobandAutocompleteView(AutocompleteView):
+    """ Searched the way bands are written: "11p1" is chromosome 11, bands starting "p1" """
+
+    def get_user_queryset(self, user):
+        genome_build_id = self.forwarded.get('genome_build_id')
+        if not genome_build_id:
+            return Cytoband.objects.none()
+        return Cytoband.objects.filter(contig__genomebuildcontig__genome_build_id=genome_build_id)
+
+    def get_queryset(self):
+        qs = self.get_user_queryset(self.request.user)
+        if self.q:
+            if not (m := CYTOBAND_PREFIX_PATTERN.fullmatch(self.q.strip())):
+                return qs.none()
+            if chrom := m.group("chrom"):
+                qs = qs.filter(contig__name__iexact=chrom)
+            if band := m.group("band"):
+                qs = qs.filter(name__istartswith=band)
+        return qs.select_related("contig").order_by(*Cytoband.GENOME_BUILD_ORDERING)
+
+    def get_result_label(self, obj):
+        return f"{obj} ({obj.coordinates_label})"
 
 
 @method_decorator(cache_page(5), name='dispatch')
