@@ -4,7 +4,8 @@ const DELETING_CLASS = "node-deleting";  // fade out transition, see analysis_no
 const FLASH_CLASS = "node-flash";  // new node arrival animation, see analysis_nodes.css
 const ACTIVE_NODE_COUNT_CLASS = "node-counts-selected"; // Needs to be different so not grabbed with multi-draggable
 const NODE_COUNT_TOTAL = "T";  // snpdb.enums.BuiltInFilters.TOTAL
-const SHOW_NODE_IDS_IN_TOOLTIPS = true;
+const SHOW_NODE_IDS_IN_HOVER_CARD = true;
+const NODE_HOVER_CARD_DELAY_MS = 300;  // so sweeping the mouse across the graph doesn't flash up a card per node
 
 // Connector/endpoint look - shared between the instance defaults and the per-node endpoints below
 const CONNECTOR_STYLE = {stroke: endpointColor, strokeWidth: 3};
@@ -61,9 +62,6 @@ function renderChip(chip) {
 	const span = $("<span/>", {class: group ? "node-chip-group" : "node-chip"});
 	if (chip.css_class) {
 		span.addClass(chip.css_class);
-	}
-	if (chip.title) {
-		span.attr("title", chip.title);
 	}
 	const label = group ? $("<span/>", {class: "node-chip-group-label"}).appendTo(span) : span;
 	if (chip.icon) {
@@ -136,6 +134,7 @@ function createNodeFromData(nodeData) {
 	}
 	const node = factory();
 	updateNodeFromData(node, nodeData);
+	setupNodeHoverCard(node);
 
 	return node;
 }
@@ -150,18 +149,83 @@ function renderNodeName(node, name) {
 	}
 }
 
-// The card clamps the name, so hovering has to give the whole thing. The title becomes an html Bootstrap tooltip
-// (global.js), so line breaks are <br> and the text is escaped
-function updateNodeTitle(node) {
-	const parts = [node.data("nodeName").split("\n").map(escapeHtml).join("<br>")];
-	let nodeHelp = NODE_HELP[node.attr("node_class")];
-	if (nodeHelp) {
-		if (SHOW_NODE_IDS_IN_TOOLTIPS) {
-			nodeHelp += " (node #" + node.attr("node_id") + ")";
-		}
-		parts.push(escapeHtml(nodeHelp));
+// The card clamps its name and chips, so hovering gives the whole thing on a Bootstrap popover - the same card as the
+// [data-content] popovers global.js sets up (eg PanelApp evidence on the gene grid). Its title and content are built
+// from the node's current data each time it shows, so an appearance update needs nothing more
+function setupNodeHoverCard(node) {
+	node.popover({
+		trigger: "manual",  // shown after a delay, and hidden on mousedown so it doesn't hang over a click or drag
+		html: true,
+		container: "body",
+		placement: "right",
+		boundary: "window",  // free to sit over the editor beside the graph, rather than flip back over the nodes
+		template: '<div class="popover node-hover-card" role="tooltip"><div class="arrow"></div><h3 class="popover-header"></h3><div class="popover-body"></div></div>',
+		title: function() { return nodeHoverCardTitle($(this)); },
+		content: function() { return nodeHoverCardContent($(this)); },
+	});
+	// Bootstrap leaves an empty title, which global.js would give a (blank) tooltip of its own
+	node.removeAttr("title");
+	node.on("mouseenter", function() {
+		clearTimeout(node.data("hoverCardTimer"));
+		node.data("hoverCardTimer", setTimeout(function() {
+			if (node.data("bs.popover")) {
+				node.popover("show");
+			}
+		}, NODE_HOVER_CARD_DELAY_MS));
+	});
+	node.on("mouseleave mousedown", function() {
+		clearTimeout(node.data("hoverCardTimer"));
+		node.popover("hide");
+	});
+}
+
+function disposeNodeHoverCard(node) {
+	clearTimeout(node.data("hoverCardTimer"));
+	node.popover("dispose");
+}
+
+function nodeHoverCardTitle(node) {
+	const title = $("<span/>", {text: node.attr("node_class")});
+	if (SHOW_NODE_IDS_IN_HOVER_CARD) {
+		title.append(" ", $("<small/>", {class: "text-muted", text: "#" + node.attr("node_id")}));
 	}
-	node.attr("title", parts.filter(Boolean).join("<br><br>"));
+	return title;
+}
+
+// A chip's title is its full text (an untruncated name, the long form of an abbreviation), so it goes under the pill
+function renderHoverCardChip(chip) {
+	const li = $("<li/>").append(renderChip(Object.assign({}, chip, {children: []})));
+	if (chip.title && chip.title !== chip.text) {
+		const detail = $("<div/>", {class: "node-hover-card-chip-detail"}).appendTo(li);
+		for (const line of chip.title.split("\n").filter(Boolean)) {
+			$("<div/>", {text: line}).appendTo(detail);
+		}
+	}
+	if (chip.children && chip.children.length) {
+		$("<ul/>").append(chip.children.map(renderHoverCardChip)).appendTo(li);
+	}
+	return li;
+}
+
+function nodeHoverCardContent(node) {
+	const nodeData = node.data("nodeData");
+	const card = $("<div/>");
+	const nameLines = (nodeData.name || "").split("\n").filter(Boolean);
+	if (nameLines.length) {
+		const name = $("<div/>", {class: "node-hover-card-name"}).appendTo(card);
+		for (const line of nameLines) {
+			$("<div/>", {text: line}).appendTo(name);
+		}
+	}
+	const chips = nodeData.chips || [];
+	if (chips.length) {
+		$("<ul/>", {class: "node-hover-card-chips"}).append(chips.map(renderHoverCardChip)).appendTo(card);
+	}
+	const nodeHelp = NODE_HELP[node.attr("node_class")];
+	if (nodeHelp) {
+		$("<div/>", {class: "node-hover-card-help", text: nodeHelp}).appendTo(card);
+	}
+	return card;
 }
 
 function isManagedByJsPlumb(el) {
@@ -178,6 +242,7 @@ function repaintNode(node) {
 }
 
 function updateNodeFromData(node, nodeData) {
+	node.data("nodeData", nodeData);
 	node.addClass(nodeData.node_class);
 	node.attr(nodeData.attributes);
 	const nodeOverlay = $(".node-overlay", node);
@@ -194,7 +259,6 @@ function updateNodeFromData(node, nodeData) {
 		chipsHolder.append(renderChip(this));
 	});
 
-	updateNodeTitle(node);
 	node.each(function() { this.updateState(nodeData['args']); });
 	repaintNode(node);
 }
@@ -523,8 +587,9 @@ function deleteNodesFromDOM(nodes, data) {
             clearGridAndEditor = true;
         }
 
-        // A tooltip open on the node (eg deleting with the mouse over it) would outlive it
+        // A tooltip or hover card open on the node (eg deleting with the mouse over it) would outlive it
         clearNodeStatusTooltip($(".node-counts-strip, .node-warning-badge", node));
+        disposeNodeHoverCard(node);
         fadeOutAndRemoveNode(node);
         messagePoller.delete_node(nodeId);
 

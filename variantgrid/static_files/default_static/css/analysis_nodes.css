@@ -330,7 +330,7 @@ button.add-analysis-variable-button {
 	font-weight: 600;
 }
 
-/* One per name line (renderNodeName), each clamped on its own so line 2 always shows - the hover title has it all */
+/* One per name line (renderNodeName), each clamped on its own so line 2 always shows - the hover card has it all */
 .design-a-node .node-name-line {
 	display: -webkit-box;
 	-webkit-line-clamp: 2;
@@ -383,8 +383,6 @@ button.add-analysis-variable-button {
 	padding: 0 4px;
 	background-color: #f4f6f8;
 	color: #3d4550;
-	/* .node-overlay is pointer-events: none, but chips need hover for their title */
-	pointer-events: auto;
 }
 
 .node-chip .node-chip-text {
@@ -432,8 +430,6 @@ button.add-analysis-variable-button {
 	border: 1px solid #c6cdd6;
 	border-radius: 6px;
 	background: #e9edf1;
-	/* .node-overlay is pointer-events: none, but chips need hover for their title */
-	pointer-events: auto;
 }
 
 .node-chip-group .node-chip-group-label {
@@ -454,6 +450,66 @@ button.add-analysis-variable-button {
 .node-chip-group .node-chip-group {
 	background: #f4f6f8;
 	padding-left: 3px;
+}
+
+/* Hover card (analysis_nodes.js:setupNodeHoverCard) - the node's whole name, each chip with its full text, then the
+   class help. A Bootstrap popover appended to body, so nothing here is under .design-a-node */
+.node-hover-card {
+	max-width: 360px;
+}
+
+.node-hover-card .node-hover-card-name {
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+/* Line 2 on is the mode or headline filter (node_display.py) */
+.node-hover-card .node-hover-card-name div + div {
+	font-weight: normal;
+	color: #555;
+}
+
+.node-hover-card .node-hover-card-chips,
+.node-hover-card .node-hover-card-chips ul {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.node-hover-card .node-hover-card-chips {
+	margin-top: 6px;
+}
+
+.node-hover-card .node-hover-card-chips li {
+	margin-top: 3px;
+}
+
+.node-hover-card .node-hover-card-chips ul {
+	padding-left: 12px;
+}
+
+.node-hover-card .node-chip {
+	font-size: 11px;
+}
+
+.node-hover-card .node-chip-count {
+	font-size: 9px;
+	line-height: 12px;
+}
+
+.node-hover-card .node-hover-card-chip-detail {
+	font-size: 12px;
+	color: #555;
+	padding-left: 6px;
+	overflow-wrap: anywhere;
+}
+
+.node-hover-card .node-hover-card-help {
+	margin-top: 8px;
+	padding-top: 6px;
+	border-top: 1px solid #e4e7ec;
+	font-size: 12px;
+	color: #555;
 }
 
 .design-a-node .node-venn {
@@ -482,7 +538,7 @@ button.add-analysis-variable-button {
 	height: 28px;
 }
 
-/* Venn and Merge are all picture - the name stays off the card and only shows in the hover title */
+/* Venn and Merge are all picture - the name stays off the card and only shows on the hover card */
 .VennNode .node-name-holder,
 .MergeNode .node-name-holder {
 	display: none;
