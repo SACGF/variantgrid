@@ -34,8 +34,10 @@ class TestImportGeneCoverage(TestCase):
                                                      name="fake_sample_1", user=self.user)
         processing_dir = tempfile.TemporaryDirectory()
         self.addCleanup(processing_dir.cleanup)
+        # With seqauto on, its upload handler requires a QCGeneCoverage record at the path - this tests the task alone
         settings_override = override_settings(IMPORT_PROCESSING_DIR=processing_dir.name,
                                               GENES_DEFAULT_CANONICAL_TRANSCRIPT_COLLECTION_ID=self.canonical_collection.pk,
+                                              SEQAUTO_ENABLED=False,
                                               SEQAUTO_QC_GENE_COVERAGE_STORE_ALL=False,
                                               SEQAUTO_QC_GENE_COVERAGE_STORE_CANONICAL=True)
         settings_override.enable()
