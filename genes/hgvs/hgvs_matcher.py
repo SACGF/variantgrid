@@ -33,6 +33,7 @@ from genes.models import (
     BadTranscript,
     CdotDataVersion,
     LRGRefSeqGene,
+    MissingTranscript,
     NoTranscript,
     Transcript,
     TranscriptParts,
@@ -402,6 +403,10 @@ class HGVSMatcher:
         return self._sort_transcript_converter_types(tv_and_converter_type, version,
                                                      prefer_local=prefer_local, closest=closest)
 
+    def _has_transcript_in_build(self, transcript_accession: str) -> bool:
+        transcript_id, _ = TranscriptVersion.get_transcript_id_and_version(transcript_accession)
+        return TranscriptVersion.objects.filter(genome_build=self.genome_build, transcript_id=transcript_id).exists()
+
     @staticmethod
     def _sort_transcript_converter_types(tv_and_converter_type, version, prefer_local=True, closest=False):
         """ Order (TranscriptVersion, HGVSConverterType) candidates best-first.
@@ -519,6 +524,10 @@ class HGVSMatcher:
             if variant_coordinate is None:
                 if error_messages:
                     combined_error_message = "\n".join(sorted(set(error_messages)))
+                elif not self._has_transcript_in_build(transcript_accession):
+                    # Neither we nor ClinGen have it for this build - expected when a transcript isn't in every
+                    # build (eg Ensembl in T2T), so not an error to report
+                    raise MissingTranscript(f"{transcript_accession} is not available for {self.genome_build}")
 
                 if hgvs_methods:
                     attempts = "\n".join(hgvs_methods)

@@ -66,6 +66,7 @@ def _search_hgvs_using_gene_symbol(
     results_by_variant_identifier: dict[str, list[SearchResult]] = defaultdict(list)
     transcript_accessions_by_variant_identifier: dict[str, list] = defaultdict(list)
     transcript_accessions_by_exception: dict[str, list] = defaultdict(list)
+    all_exceptions_missing_transcript = True
 
     for accession, mane_status in candidates.items():
         transcript_hgvs = f"{accession}:{allele}"
@@ -85,6 +86,7 @@ def _search_hgvs_using_gene_symbol(
                         yield result
         except Exception as e:
             transcript_accessions_by_exception[str(e)].append(tv_message)
+            all_exceptions_missing_transcript &= isinstance(e, MissingTranscript)
 
     have_results = False
     for variant_identifier, results_for_record in results_by_variant_identifier.items():
@@ -111,6 +113,10 @@ def _search_hgvs_using_gene_symbol(
         yield SearchResult(preview=preview, messages=list(unique_messages))
 
     if transcript_accessions_by_exception:
+        if not have_results and all_exceptions_missing_transcript:
+            # search_hgvs reports it against the build
+            raise MissingTranscript("\n".join(transcript_accessions_by_exception))
+
         resolution_errors = []
         for exception_msg, tv_message_list in transcript_accessions_by_exception.items():
             resolution_errors.append(f"Error resolving transcripts: {', '.join(tv_message_list)}: {exception_msg}")
@@ -170,6 +176,8 @@ def search_hgvs(search_input: SearchInputInstance) -> Iterable[SearchResult]:
     if search_input.search_string.lower().startswith("medgen"):
         return [INVALID_INPUT]
     for_all_genome_builds = []
+    resolved_in_a_build = False
+    missing_transcript_messages: dict[GenomeBuild, str] = {}
     for genome_build in search_input.genome_builds:
         results = []
         error_message = None
@@ -179,6 +187,10 @@ def search_hgvs(search_input: SearchInputInstance) -> Iterable[SearchResult]:
                                   visible_variants=get_visible_variants(search_input, genome_build),
                                   classify=search_input.classify)
             results = list(results)  # read iterator to trigger exceptions
+            resolved_in_a_build = True
+        except MissingTranscript as e:
+            # Transcript isn't in every build (eg Ensembl in T2T) - only an error if no build resolved
+            missing_transcript_messages[genome_build] = str(e)
         except (HGVSNomenclatureException, BadTranscript) as e:
             # Show errors about HGVS the user can fix
             error_message = str(e)
@@ -197,14 +209,27 @@ def search_hgvs(search_input: SearchInputInstance) -> Iterable[SearchResult]:
                 # user-friendly errors identifying themselves
 
         if error_message:
-            results = [SearchResult.error_result(error_message, genome_build)]
-            if search_input.classify:
-                results.extend(_classify_unresolved_hgvs(search_input.user, genome_build,
-                                                         search_input.search_string, error_message))
+            results = _unresolved_hgvs_results(search_input, genome_build, error_message)
         if results:
             for_all_genome_builds.append(results)
 
+    for genome_build, message in missing_transcript_messages.items():
+        if resolved_in_a_build:
+            results = [SearchMessageOverall(message, severity=LogLevel.INFO, genome_builds=[genome_build])]
+        else:
+            results = _unresolved_hgvs_results(search_input, genome_build, message)
+        for_all_genome_builds.append(results)
+
     return itertools.chain(*for_all_genome_builds)
+
+
+def _unresolved_hgvs_results(search_input: SearchInputInstance, genome_build: GenomeBuild,
+                             error_message: str) -> list[SearchResult]:
+    results = [SearchResult.error_result(error_message, genome_build)]
+    if search_input.classify:
+        results.extend(_classify_unresolved_hgvs(search_input.user, genome_build,
+                                                 search_input.search_string, error_message))
+    return results
 
 
 def _classify_unresolved_hgvs(user: User, genome_build: GenomeBuild, hgvs_string: str, error_message: str) -> Iterable[SearchResult]:
@@ -415,7 +440,7 @@ def _search_hgvs(hgvs_string: str, user: User, genome_build: GenomeBuild, visibl
     try:
         vc_details, search_messages = _resolve_hgvs(hgvs_matcher, hgvs_string)
     except MissingTranscript:
-        return
+        raise  # search_hgvs reports it against the build
     except Contig.ContigNotInBuildError:
         contig_accession = hgvs_matcher.create_hgvs_variant(hgvs_string).transcript
         if message := _contig_not_in_build_message(contig_accession):
