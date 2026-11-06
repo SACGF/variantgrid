@@ -15,9 +15,12 @@ class SnpdbConfig(AppConfig):
         # pylint: disable=import-outside-toplevel,unused-import
         from django.contrib.auth.models import Group, User
 
-        from snpdb import checks  # noqa: F401  # registers system checks on import
-        from snpdb import user_award_definitions  # noqa: F401  # registers award definitions on import
+        from snpdb import (
+            checks,  # noqa: F401  # registers system checks on import
+            user_award_definitions,  # noqa: F401  # registers award definitions on import
+        )
         from snpdb.models import Trio
+        from snpdb.search import search_registry
 
         # Registers receivers on import - noqa: F401 keeps the unused-import autofix from
         # silently unregistering them
@@ -29,10 +32,13 @@ class SnpdbConfig(AppConfig):
             variant_zygosity_preview_extra,
             vcf_health_check,
         )
-        from snpdb.search import search_registry
         from snpdb.signals.cohort_search import search_cohort
         from snpdb.signals.duo_search import search_duo
-        from snpdb.signals.genomics_search import contig_search, genome_build_search
+        from snpdb.signals.genomics_search import (
+            contig_search,
+            cytoband_search,
+            genome_build_search,
+        )
         from snpdb.signals.lab_search import lab_search
         from snpdb.signals.organization_search import organization_search
         from snpdb.signals.quad_search import search_quad
@@ -50,7 +56,7 @@ class SnpdbConfig(AppConfig):
         search_registry.register(
             search_cohort,
             search_duo,
-            genome_build_search, contig_search,
+            genome_build_search, contig_search, cytoband_search,
             lab_search,
             organization_search,
             search_quad,

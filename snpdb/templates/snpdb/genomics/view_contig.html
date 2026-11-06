@@ -4,12 +4,12 @@
 {% load js_tags %}
 {% load humanize %}
 {% load ui_tabs_builder %}
+{% load static %}
 {% block title %}Contig: {{ contig.refseq_accession }}{% endblock title %}
 {% block content %}
+    <script src="{% static 'js/snpdb/view_contig.js' %}"></script>
     <script>
-        function contigGenesFilter(data) {
-            data.contig_id = {{ contig.pk }};
-        }
+        initViewContig({{ contig.pk }});
     </script>
 
     <div class="current-record-menu-item">
@@ -33,6 +33,41 @@
                 {% labelled hint="tiny" label="Length" %}{{ contig.length|intcomma }}{% endlabelled %}
             </div>
         </div>
+
+        {% if band %}
+        <div class="card">
+            <div class="card-header">Cytoband: {{ contig.name }}{{ band }}</div>
+            <div class="card-body">
+                {% if cytoband_interval %}
+                    {% labelled hint="tiny" label="Coordinates" %}{{ contig.ucsc_name|default:contig.name }}:{{ cytoband_interval.start|intcomma }}-{{ cytoband_interval.end|intcomma }}{% endlabelled %}
+                    {% labelled hint="tiny" label="Genome Build" %}{{ genome_build }}{% endlabelled %}
+                {% else %}
+                    <div class="no-value">{{ contig.name }}{{ band }} is not a band on this contig in {{ genome_build }}</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if cytobands %}
+        <div class="card">
+            <div class="card-header">Cytobands</div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <thead><tr><th>Band</th><th class="text-right">Start</th><th class="text-right">End</th><th>Stain</th></tr></thead>
+                    <tbody>
+                    {% for cytoband in cytobands %}
+                        <tr {% if cytoband.in_selected_band %}class="table-active"{% endif %}>
+                            <td><a href="{{ cytoband.get_absolute_url }}">{{ cytoband }}</a></td>
+                            <td class="text-right">{{ cytoband.start|intcomma }}</td>
+                            <td class="text-right">{{ cytoband.end|intcomma }}</td>
+                            <td>{{ cytoband.stain }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
 
         {% if has_annotation %}
         <div class="card">

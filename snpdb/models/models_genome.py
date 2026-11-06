@@ -23,6 +23,7 @@ from django.db.models.deletion import CASCADE
 from django.db.models.functions import Length
 from django.db.models.query_utils import Q
 from django.urls import reverse
+from django.utils.http import urlencode
 from django.utils.text import slugify
 
 from genes.enums import AnnotationConsortium
@@ -30,7 +31,7 @@ from library.cache import timed_cache
 from library.django_utils import SortMetaOrderingMixin
 from library.django_utils.django_object_managers import ObjectManagerCachingImmutable
 from library.genomics.fasta_wrapper import FastaFileWrapper
-from library.preview_request import PreviewModelMixin
+from library.preview_request import PreviewData, PreviewModelMixin
 from library.utils import invert_dict
 from snpdb.enums import AssemblyMoleculeType, CytobandLevel, SequenceRole
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_REFSEQ_ACCESSION
@@ -470,7 +471,7 @@ class GenomeBuildContig(models.Model):
         return f"{self.contig} ({self.genome_build})"
 
 
-class Cytoband(models.Model):
+class Cytoband(models.Model, PreviewModelMixin):
     """ A cytogenetic band at any level (name is the arm and band, eg "p", "p1", "p13" or "p15.5") - start/end are
         1-based inclusive. The cytoband files only hold the finest level; the levels above are generated from them,
         spanning their children, with a blank stain """
@@ -487,8 +488,24 @@ class Cytoband(models.Model):
     def __str__(self):
         return f"{self.contig.name}{self.name}"
 
+    def get_absolute_url(self):
+        url = reverse("view_contig", kwargs={"contig_accession": self.contig.refseq_accession})
+        return f"{url}?{urlencode({'band': self.name})}"
+
     # For a queryset filtered to one build: contig order, then position with each parent (wider) before its children
     GENOME_BUILD_ORDERING = ("contig__genomebuildcontig__order", "start", "-end", Length("name"))
+
+    @classmethod
+    def preview_icon(cls) -> str:
+        return "fa-solid fa-ruler-horizontal"
+
+    @property
+    def preview(self) -> PreviewData:
+        return self.preview_with(summary=self.coordinates_label)
+
+    @property
+    def genome_builds(self):
+        return self.contig.genome_builds
 
     @property
     def coordinates_label(self) -> str:

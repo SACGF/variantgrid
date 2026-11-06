@@ -4,7 +4,9 @@ from django.conf import settings
 from django.db.models import Q
 
 from library.enums.log_level import LogLevel
+from snpdb.cytobands import CYTOBAND_PATTERN, parse_cytoband
 from snpdb.models import Contig, GenomeBuild
+from snpdb.models.models_genome import Cytoband
 from snpdb.search import SearchExample, SearchInputInstance, SearchMessageOverall, search_receiver
 
 
@@ -47,3 +49,20 @@ def contig_search(search_input: SearchInputInstance):
             enabled_builds = GenomeBuild.get_enabled_builds_comma_separated_string()
             msg = f"contig={search_input.search_string} not in enabled builds: {enabled_builds}"
             yield SearchMessageOverall(msg, severity=LogLevel.WARNING)
+
+
+@search_receiver(
+    search_type=Cytoband,
+    pattern=re.compile(rf"^{CYTOBAND_PATTERN.pattern}$", re.IGNORECASE),
+    example=SearchExample(
+        note="Cytogenetic bands",
+        examples=["11p13", "17p"]
+    ),
+)
+def cytoband_search(search_input: SearchInputInstance):
+    """ One band, not a range - a result is one band's page """
+    cytoband_range = parse_cytoband(search_input.search_string)
+    if cytoband_range and cytoband_range.start_band == cytoband_range.end_band:
+        yield Cytoband.objects.filter(contig__genomebuildcontig__genome_build__in=search_input.genome_builds,
+                                      contig__name=cytoband_range.chrom,
+                                      name=cytoband_range.start_band).select_related("contig").distinct()
