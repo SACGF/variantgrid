@@ -1,6 +1,7 @@
 """
 AnalysisNode.save stores `valid` and cascades version bumps to every descendant - what each save has to
-query (#2200) - and doesn't write back what a concurrent reload or load changed (#2444).
+query (#2200) - doesn't write back what a concurrent reload or load changed (#2444), and tells every descendant
+when the samples above it change, wherever in the chain the edge moved (#2694).
 """
 import json
 from unittest.mock import patch
@@ -12,10 +13,13 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from analysis.enums import NodeStatus
-from analysis.models import Analysis, AnalysisNode, SampleNode, ZygosityNode
+from analysis.models import Analysis, AnalysisNode, PhenotypeNode, SampleNode, ZygosityNode
+from analysis.models.nodes.filters.conservation_node import ConservationNode
 from analysis.models.nodes.node_utils import reload_analysis_nodes
 from annotation.fake_data import get_fake_annotation_version
-from snpdb.fake_data import create_fake_trio
+from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.models import Patient
+from snpdb.fake_data import create_fake_cohort, create_fake_trio
 from snpdb.models import GenomeBuild
 
 
@@ -114,3 +118,61 @@ class TestNodeSave(TestCase):
         self.assertEqual(response.status_code, 200)
         node = AnalysisNode.objects.get(pk=leaf_id)
         self.assertEqual((300, 400, NodeStatus.READY, 5), (node.x, node.y, node.status, node.count))
+
+
+@override_settings(ANALYSIS_NODE_CACHE_Q=False)
+class TestReconnectAncestor(TestCase):
+    """ Reconnecting a node that has no sample of its own moves every descendant onto the new sample (#2694) """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        user = User.objects.get_or_create(username="test_reconnect_ancestor")[0]
+        grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(grch37)
+        cls.samples = []
+        cls.patients = []
+        for i in (1, 2):
+            sample = create_fake_cohort(user, grch37, name=f"reconnect_{i}").get_samples()[0]
+            patient = Patient.objects.create(patient_code=f"RECONNECT_{i}")
+            assign_permission_to_user_and_groups(user, patient)
+            sample.patient = patient
+            sample.save()
+            cls.samples.append(sample)
+            cls.patients.append(patient)
+        cls.analysis = Analysis(genome_build=grch37)
+        cls.analysis.set_defaults_and_save(user)
+
+    def _child(self, node_class, parent) -> AnalysisNode:
+        node = node_class.objects.get(pk=node_class.objects.create(analysis=self.analysis).pk)
+        node.add_parent(parent)
+        node.save()
+        return node
+
+    @staticmethod
+    def _update_connection(node, parent, remove=False):
+        """ As analysis/views/views_json.py:NodeUpdate - each edge change is its own request """
+        node = type(node).objects.get(pk=node.pk)
+        if remove:
+            node.remove_parent(parent)
+        else:
+            node.add_parent(parent)
+        node.save()
+
+    def test_descendants_follow_an_intermediate_node_to_another_sample(self):
+        """ Sample 1 -> Conservation -> Phenotype, and two levels down Conservation -> Conservation -> Zygosity """
+        sample_node_1, sample_node_2 = (SampleNode.objects.create(analysis=self.analysis, sample=s)
+                                        for s in self.samples)
+        conservation = self._child(ConservationNode, sample_node_1)
+        phenotype = self._child(PhenotypeNode, conservation)
+        zygosity = self._child(ZygosityNode, self._child(ConservationNode, conservation))
+        self.assertEqual((self.patients[0], self.samples[0]),
+                         (PhenotypeNode.objects.get(pk=phenotype.pk).patient,
+                          ZygosityNode.objects.get(pk=zygosity.pk).sample))
+
+        self._update_connection(conservation, sample_node_2)
+        self._update_connection(conservation, sample_node_1, remove=True)
+
+        self.assertEqual((self.patients[1], self.samples[1]),
+                         (PhenotypeNode.objects.get(pk=phenotype.pk).patient,
+                          ZygosityNode.objects.get(pk=zygosity.pk).sample))

@@ -720,8 +720,9 @@ class AnalysisNode(NodeSamplesMixin, NodeQueryMixin, NodeDisplayMixin, NodeError
 
         # We also need to bump if node has it's own sample - as in templates, we set fields in toposort order
         # So we could go from having multiple proband samples to only one later (thus can set descendants)
-        ancestor_input_samples_changed = self.is_source or self.ancestor_input_samples_changed or \
-            bool(self.get_samples_from_node_only_not_ancestors())
+        # A reconnected node changes its descendants' ancestor samples even with none of its own (#2694)
+        ancestor_input_samples_changed = self.is_source or self.parents_changed or \
+            self.ancestor_input_samples_changed or bool(self.get_samples_from_node_only_not_ancestors())
         analysis_errors = self._get_analysis_errors()
         parent_ids_by_kid_id = defaultdict(set)
         for kid_id, parent_id in AnalysisEdge.objects.filter(child__in=kids).values_list("child_id", "parent_id"):
