@@ -937,7 +937,7 @@ VariantGridFormat.variantKind = (alt, svlen, chrom, position) => {
     // An SV says how big it is - that, not the coordinate, is what a reader wants off the row
     const size = Math.abs(svlen || 0);
     const title = (chrom != null && position != null)
-                ? `${chrom}:${position}-${position + size} ${alt}` : String(alt);
+                ? `${_contigLabel(chrom)}:${position}-${position + size} ${alt}` : String(alt);
     return {
         code: size ? `${kind} ${_formatBases(size)}` : kind,
         cssClass: `rv-kind-${SV_KIND_CSS[kind] || 'other'}`,
@@ -1013,14 +1013,15 @@ VariantGridFormat.representativeVariantLabel = (variantId, rowData) => {
     }
     // 3/4. Coordinate - symbolic as a span with the type, otherwise ref>alt with long alleles collapsed
     if (chrom != null && position != null && alt != null) {
+        const contig = _contigLabel(chrom);
         if (String(alt).startsWith("<")) {
             // The type and the size are on the kind badge beside the label, for every branch
             const end = position + Math.abs(svlen || 0);
-            const html = `<span class='rv-hgvs'>${escapeHtml(chrom)}:${position}-${end}</span>`;
-            return {html: html, title: `${chrom}:${position}-${end} ${alt}`};
+            const html = `<span class='rv-hgvs'>${escapeHtml(contig)}:${position}-${end}</span>`;
+            return {html: html, title: `${contig}:${position}-${end} ${alt}`};
         }
-        const title = `${chrom}:${position} ${ref}>${alt}`;
-        return {html: `<span class='rv-hgvs'>${escapeHtml(chrom)}:${position} ${escapeHtml(_formatAllele(ref))}&gt;${escapeHtml(_formatAllele(alt))}</span>`,
+        const title = `${contig}:${position} ${ref}>${alt}`;
+        return {html: `<span class='rv-hgvs'>${escapeHtml(contig)}:${position} ${escapeHtml(_formatAllele(ref))}&gt;${escapeHtml(_formatAllele(alt))}</span>`,
                 title: title};
     }
     // 5. Last resort while annotation is still running
