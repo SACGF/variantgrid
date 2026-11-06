@@ -1,7 +1,7 @@
 from dal import forward
 from django import forms
 from django.forms.models import inlineformset_factory, modelform_factory, modelformset_factory
-from django.forms.widgets import TextInput
+from django.forms.widgets import Textarea, TextInput
 
 from library.django_utils.autocomplete_utils import ModelSelect2
 from library.guardian_utils import assign_permission_to_user_and_groups
@@ -38,7 +38,8 @@ class PatientForm(forms.ModelForm):
                    'family_code': TextInput(attrs={'placeholder': 'Family Code'}),
                    'patient_code': TextInput(attrs={'placeholder': 'Patient Code (de-identified)'}),
                    'date_of_birth': NativeDateInput(),
-                   'date_of_death': NativeDateInput()}
+                   'date_of_death': NativeDateInput(),
+                   'phenotype': Textarea(attrs={'class': 'form-control'})}
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user")

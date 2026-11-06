@@ -1,6 +1,13 @@
 {# The cohort's shared condition - same editor a Patient's phenotype uses. 'phenotype_field' is the bound field #}
+{# Starts collapsed when there is nothing in it: no text (the bound value, so a re-rendered POST counts) and no matched terms #}
 {# The seed button starts disabled; setupPatientPhenotypeSeedButton counts what it would copy and enables it #}
 {% load phenotype_tags %}
+{% with expanded=phenotype_field.value|default:cohort.get_phenotype_description %}
+<h3>
+    <a class="toggle-link" data-toggle="collapse" data-target="#cohort-phenotype" href="#cohort-phenotype"
+       role="button" aria-controls="cohort-phenotype" aria-expanded="{{ expanded|yesno:'true,false' }}">Phenotype</a>
+</h3>
+<div id="cohort-phenotype" class="collapse{% if expanded %} show{% endif %}">
 {% if can_edit_phenotype %}
     <p class="text-muted mb-1">
         {% if vcf %}
@@ -16,3 +23,5 @@
     </button>
 {% endif %}
 {% phenotype_entry phenotype_field cohort.phenotype_description edit=can_edit_phenotype show_page_help=False %}
+</div>
+{% endwith %}

@@ -27,15 +27,6 @@
     margin: 5px;
 }
 
-.phenotype-entry-field-container {
-    max-width: 100%;
-}
-
-/* Bootstrap only lets a textarea resize vertically - long notes need it wider */
-.phenotype-entry-field-container textarea {
-    resize: both;
-    max-width: 100%;
-}
 span.select2-container {
     min-width: auto !important;
 }
@@ -99,7 +90,7 @@ initPhenotypeEntry({
 {% endif %}
 <div>
 {% if edit %}
-    <div class='left phenotype-entry-field-container'>
+    <div>
     {{ form_entry_field }}
     {{ form_entry_field.errors }}
     </div>

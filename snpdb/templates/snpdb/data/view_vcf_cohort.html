@@ -402,7 +402,6 @@ $(document).ready(function() {
             {% endif %}
 
             {% if cohort_phenotype_form %}
-                <h3>Phenotype</h3>
                 {% include "snpdb/data/_cohort_phenotype.html" with phenotype_field=cohort_phenotype_form.phenotype %}
             {% endif %}
 
@@ -451,7 +450,6 @@ $(document).ready(function() {
             </div>
         </div>
 
-        <h3>Phenotype</h3>
         {% include "snpdb/data/_cohort_phenotype.html" with phenotype_field=cohort_form.phenotype %}
 
         {% if has_write_permission %}
