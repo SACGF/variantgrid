@@ -7,7 +7,7 @@ from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.tests.utils import AnalysisSetupMixin, annotate_variants, node_keeps
 from annotation.enums import PathogenicityImpact
 from library.genomics.vcf_enums import VariantClass, VCFSymbolicAllele
-from snpdb.models.models_variant import VariantCoordinate
+from snpdb.models.models_variant import Variant, VariantCoordinate
 from snpdb.tests.utils.vcf_testing_utils import (
     slowly_create_test_variant,
     slowly_create_test_variant_from_coordinate,
@@ -30,6 +30,7 @@ class DamageNodeVariantTypesTest(AnalysisSetupMixin, TestCase):
             "snv_low": (slowly_create_test_variant("1", 1100, "A", "T", cls.grch37),
                         {"impact": PathogenicityImpact.LOW}),
             "insertion": (slowly_create_test_variant("1", 1200, "A", "AT", cls.grch37), {}),
+            "reference": (slowly_create_test_variant("1", 1300, "A", Variant.REFERENCE_ALT, cls.grch37), {}),
             "small_deletion": (slowly_create_test_variant("1", 3_000_000, "AT", "A", cls.grch37), {}),
             "sv_deletion": (slowly_create_test_variant_from_coordinate(sv_deletion, cls.grch37), {}),
         })
@@ -57,6 +58,12 @@ class DamageNodeVariantTypesTest(AnalysisSetupMixin, TestCase):
         self.assertEqual({"insertion", "small_deletion"}, self._filtered(node))
         node = DamageNode(analysis=self.analysis, variant_types=[VCFSymbolicAllele.DEL])
         self.assertEqual({"sv_deletion"}, self._filtered(node))
+
+    def test_reference_rows_are_not_a_selected_type(self):
+        """ Everything but SNV is cheapest as "not SNV" - reference rows (not on offer) still mustn't pass """
+        not_snv = [vt for vt in get_all_variant_types() if vt != VariantType.SNV]
+        node = DamageNode(analysis=self.analysis, variant_types=not_snv)
+        self.assertEqual({"insertion", "small_deletion", "sv_deletion"}, self._filtered(node))
 
     def test_ands_with_scoring_pool(self):
         """ It restricts rather than joining the damage OR pool """
