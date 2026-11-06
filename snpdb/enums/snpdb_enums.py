@@ -440,3 +440,13 @@ class GridLoadingAnimation(models.TextChoices):
 DEFAULT_GRID_LOADING_ANIMATIONS = [GridLoadingAnimation.FLOWCELL.value,
                                    GridLoadingAnimation.RIPPLE.value,
                                    GridLoadingAnimation.PILEUP.value]
+
+
+class CytobandLevel(models.TextChoices):
+    """ ISCN's hierarchy, each level spanning the ones below it: arm 'p', region 'p3', band 'p36',
+        sub-band 'p36.3', sub-sub-band 'p36.33' (or finer, eg 'q11.221') """
+    ARM = 'A', 'Arm'
+    REGION = 'R', 'Region'
+    BAND = 'B', 'Band'
+    SUB_BAND = 'S', 'Sub-band'
+    SUB_SUB_BAND = 'SS', 'Sub-sub-band'

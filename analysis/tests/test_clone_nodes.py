@@ -37,6 +37,7 @@ from pedigree.enums import PedigreeInheritance
 from snpdb.enums import BuiltInFilters, ImportStatus
 from snpdb.fake_data import create_fake_pedigree, create_fake_trio
 from snpdb.models import AbstractNodeCountSettings, GenomeBuild, Tag, Variant
+from snpdb.models.models_genome import Cytoband
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
@@ -174,6 +175,15 @@ class TestCloneAnalysisNodes(TestCase):
         intersection_node = IntersectionNode.objects.get(pk=intersection_node.pk)  # contig_ids is cached
         clone = intersection_node.save_clone()
         self.assertEqual([inc.contig for inc in clone.intersectionnodecontig_set.all()], [contig])
+
+    def test_clone_intersection_node_cytobands(self):
+        intersection_node = IntersectionNode.objects.create(analysis=self.analysis,
+                                                            accordion_panel=IntersectionNode.CONTIG)
+        cytoband = Cytoband.objects.filter(contig__genomebuildcontig__genome_build=self.analysis.genome_build).first()
+        intersection_node.intersectionnodecytoband_set.create(cytoband=cytoband)
+        intersection_node = IntersectionNode.objects.get(pk=intersection_node.pk)  # cytobands is cached
+        clone = intersection_node.save_clone()
+        self.assertEqual([inc.cytoband for inc in clone.intersectionnodecytoband_set.all()], [cytoband])
 
     def test_clone_moi_node(self):
         # TODO: Need to also test patient setup w/ontology etc
