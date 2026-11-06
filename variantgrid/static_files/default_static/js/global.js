@@ -886,7 +886,8 @@ function setupUnsavedChangesMessage(form, excludeSelector) {
     /* While any field differs from its value at page load, shows the form's .unsaved-changes-message and marks
        each changed field with a hint beside it, as the message sits by the save button, often below the fold */
     form = $(form);
-    const fieldSelector = excludeSelector ? ":input:not(" + excludeSelector + ")" : ":input";
+    // A field with no name isn't submitted (a UI toggle like the phenotype editor's "Only add new terms"), so is never saved
+    const fieldSelector = excludeSelector ? ":input[name]:not(" + excludeSelector + ")" : ":input[name]";
     const message = $(".unsaved-changes-message", form);
     const messageText = message.first().text().trim();
     const hintText = messageText ? "Unsaved - " + messageText.charAt(0).toLowerCase() + messageText.slice(1) : "Unsaved";
