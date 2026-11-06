@@ -955,6 +955,16 @@ VariantGridFormat.variantKindBadge = (alt, svlen, chrom, position) => {
     return `<span class='rv-kind ${kind.cssClass}' title='${escapeHtml(kind.title)}'>${escapeHtml(kind.code)}</span>`;
 };
 
+// The badge for a variant a template renders (the variant page's SVLEN row):
+// <span data-variant-kind-alt="<DEL>" data-variant-kind-svlen="-11000000" data-variant-kind-chrom="11" data-variant-kind-position="100">
+registerDomProcessor('[data-variant-kind-alt]', (node) => {
+    const position = node.attr('data-variant-kind-position');
+    node.replaceWith(VariantGridFormat.variantKindBadge(node.attr('data-variant-kind-alt'),
+                                                        Number(node.attr('data-variant-kind-svlen')),
+                                                        node.attr('data-variant-kind-chrom'),
+                                                        position == null ? null : Number(position)));
+});
+
 
 // The cascade from the mockup's "Representative variant" card. Returns {html, title}; title is the
 // plain string for the link tooltip. Every key may be undefined on a row cached before these fields

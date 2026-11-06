@@ -3,7 +3,6 @@
 {% load gene_fusion_tags %}
 {% load gene_splice_tags %}
 {% load ui_utils %}
-{% load variant_tags %}
 <div class="container">
     <h3>Variant</h3>
 
@@ -59,7 +58,7 @@
             {% if variant.svlen %}
                 <!-- You can't see ref base in variant coordinate for symbolics - so explicitly show to help admins debug stuff -->
                 {% labelled label="Reference" admin_only=True %}{{ variant.locus.ref }}{% endlabelled %}
-                {% labelled label="SVLEN" help="Structural Variant Length - Difference in length between REF and ALT alleles" %}{{ variant.svlen }}{% with size=variant|sv_size %}{% if size %} ({{ size }}){% endif %}{% endwith %}{% endlabelled %}
+                {% labelled label="SVLEN" help="Structural Variant Length - Difference in length between REF and ALT alleles" %}{{ variant.svlen }} <span data-variant-kind-alt="{{ variant.alt.seq }}" data-variant-kind-svlen="{{ variant.svlen }}" data-variant-kind-chrom="{{ variant.locus.contig.name }}" data-variant-kind-position="{{ variant.locus.position }}"></span>{% endlabelled %}
             {% endif %}
             {% labelled label="Genome Build" %}{{ genome_build }}{% endlabelled %}
             {% if variant.can_have_c_hgvs and variant_show_canonical_hgvs %}
