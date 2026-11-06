@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 # One line of a node name. The card is 64px wide and clamps each line to about 2 rows of 9 characters
-# (analysis_nodes.js:renderNodeName); this cap only keeps the hover title and the editor heading readable
+# (analysis_nodes.js:renderNodeName); this cap only keeps the hover card and the editor heading readable
 NAME_LINE_MAX_LENGTH = 30
 CHIP_TEXT_MAX_LENGTH = 20
 
@@ -26,7 +26,7 @@ class NodeChip:
         change between two nodes of the same class """
     text: str
     icon: Optional[str] = None  # FontAwesome classes
-    title: Optional[str] = None  # hover text
+    title: Optional[str] = None  # full text, shown under the chip on the node's hover card
     css_class: Optional[str] = None
     count: Optional[int] = None  # Small bubble after the text, eg the x3 on a "VCF" chip
     row_break: bool = False  # draw this chip and the ones after it on a new line

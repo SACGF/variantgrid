@@ -77,7 +77,8 @@ Patterns here:
   default. A line is cut to 30 characters by `analysis/models/nodes/node_display.py:truncate_name_line`; several
   things sharing line 1 are the first plus "+N more" (`first_and_more_name_line`), with a chip each. The 64px card
   fits about 9 characters a row, so `analysis_nodes.js` draws each line as its own span clamped to 2 rows (lines 3+
-  to 1) and the full name is the card's hover title - a long line 1 can't hide line 2. `name` is
+  to 1) - a long line 1 can't hide line 2. The full name, each chip with its `title` and the class help are on the
+  node's hover card (`setupNodeHoverCard`, a Bootstrap popover built from the node's data each time it shows). `name` is
   stored at save (`auto_node_name`), so a changed `get_node_name` shows on existing nodes once they are next saved.
 - Node editor = ModelForm subclass of `analysis/forms/forms_nodes.py:BaseNodeForm` + a `NodeView` subclass in views/nodes/
   with `model` set + template `analysis/node_editors/<classname>_editor.html`.
