@@ -1,6 +1,6 @@
 """
 AnalysisNode.save stores `valid` and cascades version bumps to every descendant - what each save has to
-query (#2200) - doesn't write back what a concurrent reload or load changed (#2444), and tells every descendant
+query (#2200) - doesn't write back what a concurrent reload, load or connect changed (#2444, #2711), and tells every descendant
 when the samples above it change, wherever in the chain the edge moved (#2694).
 """
 import json
@@ -15,6 +15,7 @@ from django.urls import reverse
 from analysis.enums import NodeStatus
 from analysis.models import Analysis, AnalysisNode, PhenotypeNode, SampleNode, ZygosityNode
 from analysis.models.nodes.filters.conservation_node import ConservationNode
+from analysis.models.nodes.filters.venn_node import VennNode
 from analysis.models.nodes.node_utils import reload_analysis_nodes
 from annotation.fake_data import get_fake_annotation_version
 from library.guardian_utils import assign_permission_to_user_and_groups
@@ -118,6 +119,29 @@ class TestNodeSave(TestCase):
         self.assertEqual(response.status_code, 200)
         node = AnalysisNode.objects.get(pk=leaf_id)
         self.assertEqual((300, 400, NodeStatus.READY, 5), (node.x, node.y, node.status, node.count))
+
+    @patch("analysis.views.views_json.update_analysis")
+    def test_concurrent_venn_connects_keep_both_sides(self, _update_analysis):
+        """ The left connect's request reads the Venn before the right connect's request saves """
+        left, right = (SampleNode.objects.create(analysis=self.analysis, sample=self.sample) for _ in range(2))
+        venn_id = VennNode.objects.create(analysis=self.analysis).pk
+        stale = VennNode.objects.get(pk=venn_id)
+
+        self.client.force_login(self.analysis.user)
+        url = reverse("node_update", kwargs={"analysis_id": self.analysis.pk, "node_id": venn_id})
+
+        def connect(parent, side):
+            params = {"parent_id": parent.pk, "side": side}
+            response = self.client.post(url, {"op": "update_connection", "params": json.dumps(params)})
+            self.assertEqual(response.status_code, 200)
+
+        connect(right, VennNode.RIGHT_PARENT)
+        nodes_by_id = {venn_id: stale, left.pk: left}
+        with patch("analysis.views.views_json.get_node_subclass_or_non_fatal_exception",
+                   side_effect=lambda _user, node_id, **_kwargs: nodes_by_id[int(node_id)]):
+            connect(left, VennNode.LEFT_PARENT)
+        venn = VennNode.objects.get(pk=venn_id)
+        self.assertEqual((left.pk, right.pk), (venn.left_parent_id, venn.right_parent_id))
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
