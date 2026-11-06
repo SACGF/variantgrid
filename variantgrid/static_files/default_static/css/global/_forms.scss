@@ -125,3 +125,16 @@ fieldset.form-fields texta-area {
 		background-color: #f6f6ff !important;
 	}
 }
+
+// setupUnsavedChangesMessage (global.js) marks fields that differ from their saved value
+.unsaved-change,
+.select2-container.unsaved-change .select2-selection {
+	border-color: #ffc107 !important;
+	box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.35);
+}
+
+.unsaved-change-hint {
+	color: #856404;
+	font-size: 80%;
+	font-weight: bold;
+}
