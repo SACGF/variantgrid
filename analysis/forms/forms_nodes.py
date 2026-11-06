@@ -837,6 +837,7 @@ class IntersectionNodeForm(GenomeBuildAutocompleteForwardMixin, BaseNodeForm):
         "1:169519049 T>C",
         "CA285410130",
         "chr1:169519049-169520049",
+        "11p13-p12",
     ])
     contigs = forms.ModelMultipleChoiceField(required=False,
                                              queryset=Contig.objects.all(),

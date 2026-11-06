@@ -145,8 +145,8 @@ class IntersectionNode(AnalysisNode):
         return [line for line in (self.variant_text or "").splitlines() if line.strip()]
 
     def _get_variant_text_summary(self) -> Optional[str]:
-        return get_variant_text_summary(len(self.get_variant_text_entries()), self.variant_ids,
-                                        self.variant_regions, self.variant_text_unresolved)
+        return get_variant_text_summary(self.analysis.genome_build, self.get_variant_text_entries(),
+                                        self.variant_ids, self.variant_regions, self.variant_text_unresolved)
 
     def get_live_data_notes(self) -> list[str]:
         notes = super().get_live_data_notes()

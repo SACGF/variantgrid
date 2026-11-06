@@ -2,6 +2,7 @@ from unittest.mock import Mock, patch
 
 from django.test import TestCase, override_settings
 
+from analysis.forms.forms_nodes import IntersectionNodeForm
 from analysis.models.nodes.filters.intersection_node import IntersectionNode
 from analysis.tests.utils import AnalysisSetupMixin
 from analysis.variant_text import parse_region, resolve_variant_text
@@ -47,6 +48,12 @@ class ResolveVariantTextTest(AnalysisSetupMixin, TestCase):
         resolution = self._resolve("chr1:200-100")
         self.assertEqual(resolution.regions, [])
         self.assertEqual(len(resolution.errors), 1)
+
+    def test_cytoband_resolved_to_region_without_search(self):
+        resolution = self._resolve("11p13\n11p99")
+        self.assertEqual(resolution.regions, ["11:31000001-36400000"])
+        self.assertEqual(resolution.unresolved, ["11p99"])
+        self.search_data.assert_not_called()
 
     def test_line_matching_nothing_is_reported_not_dropped(self):
         resolution = self._resolve("rs99999999")
@@ -125,6 +132,20 @@ class IntersectionNodeVariantsQTest(AnalysisSetupMixin, TestCase):
         node = IntersectionNode(analysis=self.analysis, accordion_panel=IntersectionNode.VARIANTS,
                                 variant_text="x", variant_ids=[1, 2, 3])
         self.assertFalse(node.use_cache)
+
+    def test_summary_shows_what_a_cytoband_resolved_to(self):
+        node = IntersectionNode(analysis=self.analysis, accordion_panel=IntersectionNode.VARIANTS,
+                                variant_text="11p13", variant_regions=["11:31000001-36400000"])
+        self.assertIn("11p13 = 11:31000001-36400000", node._get_variant_text_summary())
+
+    def test_form_accepts_cytoband(self):
+        node = IntersectionNode.objects.create(analysis=self.analysis)
+        form = IntersectionNodeForm({"variant_text": "11p13", "accordion_panel": IntersectionNode.VARIANTS},
+                                    instance=node)
+        self.assertTrue(form.is_valid(), form.errors)
+        node = form.save()
+        self.assertEqual(node.variant_regions, ["11:31000001-36400000"])
+        self.assertEqual(node.variant_text_unresolved, [])
 
     def test_warnings_name_the_unresolved_entries(self):
         node = IntersectionNode(analysis=self.analysis, accordion_panel=IntersectionNode.VARIANTS,

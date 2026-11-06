@@ -2,7 +2,8 @@
 The genome: GenomeBuild (GRCh37, GRCh38, T2T-CHM13v2.0 - enabled flag plus settings.ANNOTATION
 decide which are usable), Contig (shared between builds, so MT is one row), GenomeBuildContig
 (the ordered join), GenomeBuildPatchVersion (future-proofing; one patch per build today) and
-GenomeFasta (chrom-to-fasta-name mapping for bcftools). GenomeBuild caches lookups
+GenomeFasta (chrom-to-fasta-name mapping for bcftools) and Cytoband (a contig's cytogenetic bands, loaded
+from each build's settings["cytoband"] file). GenomeBuild caches lookups
 (ObjectManagerCachingImmutable, a 60 s timed_cache on get_name_or_alias); use
 `GenomeBuild.builds_with_annotation()` for the annotated set and `Variant.get_contigs_q` to
 restrict variants to a build.
@@ -466,6 +467,21 @@ class GenomeBuildContig(models.Model):
 
     def __str__(self):
         return f"{self.contig} ({self.genome_build})"
+
+
+class Cytoband(models.Model):
+    """ A cytogenetic band (name is the arm and band, eg "p13" or "p15.5") - start/end are 1-based inclusive """
+    contig = models.ForeignKey(Contig, on_delete=CASCADE)
+    name = models.TextField()
+    start = models.IntegerField()
+    end = models.IntegerField()
+    stain = models.TextField()
+
+    class Meta:
+        unique_together = ("contig", "name")
+
+    def __str__(self):
+        return f"{self.contig.name}{self.name}"
 
 
 class GenomeFasta(models.Model):
