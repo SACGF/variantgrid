@@ -84,8 +84,8 @@ class AllVariantsNodeNameTest(SimpleTestCase):
         node = AllVariantsNode(variant_types=[VCFSymbolicAllele.DEL, VariantType.SNV, VariantType.REFERENCE])
         self.assertEqual("(type: Reference, SNV, DEL)", node.get_node_name())
 
-    def test_nothing_ticked_is_any_type(self):
-        self.assertEqual("(type: any)", AllVariantsNode(variant_types=[]).get_node_name())
+    def test_nothing_ticked_says_nothing(self):
+        self.assertEqual("", AllVariantsNode(variant_types=[]).get_node_name())
 
 
 class AllVariantsNodeMigrationTest(SimpleTestCase):
