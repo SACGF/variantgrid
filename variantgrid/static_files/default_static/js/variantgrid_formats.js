@@ -871,6 +871,7 @@ const HGVS_REGEX = /^([^:(]+)(?:\(([^)]+)\))?:([cgmnopr]\..+)$/;
 const HGVS_NOT_CALCULATED = "HGVS not calculated due to length";  // VariantAnnotation.SV_HGVS_TOO_LONG_MESSAGE
 const REPRESENTATIVE_MAX_ALLELE_BASES = 10;   // longer ref/alt collapse to "[52bp]"
 const REPRESENTATIVE_MAX_HGVS_CHARS = 40;     // longer g.HGVS (inserted sequence spelled out) fall through to the coordinate
+const REPRESENTATIVE_MAX_NAMED_GENES = 3;     // an SV over more genes names the pick and counts the rest
 
 function _splitHgvs(hgvs) {
     const m = hgvs ? String(hgvs).match(HGVS_REGEX) : null;
@@ -880,6 +881,24 @@ function _splitHgvs(hgvs) {
 function _formatAllele(seq) {
     seq = seq == null ? '' : String(seq);
     return seq.length > REPRESENTATIVE_MAX_ALLELE_BASES ? `[${seq.length}bp]` : seq;
+}
+
+// The lead slot for an SV spanning several genes - {lead, genes}. The VEP pick is named first so the
+// row agrees with the consequence columns computed on its transcript; the rest are alphabetical (the
+// order overlapping_symbols comes in), so a range would read like a fusion. Past a few names the
+// others are a count, and the whole list is the tooltip. genes is null when there is nothing to add
+function _svGeneLead(symbol, overlappingSymbols, chrom) {
+    const genes = overlappingSymbols ? String(overlappingSymbols).split(",").filter(gene => gene) : [];
+    const others = genes.filter(gene => gene !== symbol);
+    const named = symbol ? [symbol, ...others] : others;
+    if (named.length <= 1) {
+        return {lead: symbol, genes: null};
+    }
+    if (named.length <= REPRESENTATIVE_MAX_NAMED_GENES) {
+        return {lead: named.join(", "), genes: named};
+    }
+    const lead = symbol ? `${symbol} +${others.length} genes` : `${_contigLabel(chrom)} +${named.length} genes`;
+    return {lead: lead, genes: named};
 }
 
 // The contig the way a reader says it - 'chr8' rather than the bare '8' the contig is named
@@ -980,6 +999,7 @@ VariantGridFormat.representativeVariantLabel = (variantId, rowData) => {
     const hgvsP = rowData["variantannotation__hgvs_p"];
     const hgvsG = rowData["variantannotation__hgvs_g"];
     const symbol = rowData["variantannotation__symbol"];
+    const overlappingSymbols = rowData["variantannotation__overlapping_symbols"];
 
     // 1. c.HGVS on the representative transcript - gene symbol leads, transcript is in the expanded row
     if (hgvsC && hgvsC !== HGVS_NOT_CALCULATED) {
@@ -1010,16 +1030,21 @@ VariantGridFormat.representativeVariantLabel = (variantId, rowData) => {
     }
     // 2. g.HGVS (no transcript - an SV, intergenic, or annotation not run yet for this variant). The
     // lead slot is what a reader calls the row: an SV over a gene is an event on that gene ("FGF3
-    // amplification"), so its symbol leads the way it does above; otherwise the contig stands in.
-    // Either way the accession moves to line 2
+    // amplification"), so its symbol leads the way it does above - or its genes, when it spans several;
+    // otherwise the contig stands in. Either way the accession moves to line 2
     const g = _splitHgvs(hgvsG);
     if (g && g.change.length <= REPRESENTATIVE_MAX_HGVS_CHARS) {
-        const geneLead = (alt != null && String(alt).startsWith("<")) ? symbol : null;
-        const lead = geneLead || _contigLabel(chrom);
+        const sv = (alt != null && String(alt).startsWith("<"))
+                 ? _svGeneLead(symbol, overlappingSymbols, chrom) : {lead: null, genes: null};
+        const lead = sv.lead || _contigLabel(chrom);
         const html = (lead ? `<span class='rv-gene'>${escapeHtml(lead)}</span> ` : '')
                    + `<span class='rv-hgvs'>${escapeHtml(g.change)}</span>`
                    + `<span class='rv-line2'>${escapeHtml(g.accession)}</span>`;
-        return {html: html, title: geneLead ? `${geneLead} ${hgvsG}` : hgvsG};
+        let title = sv.lead ? `${sv.lead} ${hgvsG}` : hgvsG;
+        if (sv.genes) {
+            title = `${hgvsG} - ${sv.genes.length} genes: ${sv.genes.join(", ")}`;
+        }
+        return {html: html, title: title};
     }
     // 3/4. Coordinate - symbolic as a span with the type, otherwise ref>alt with long alleles collapsed
     if (chrom != null && position != null && alt != null) {

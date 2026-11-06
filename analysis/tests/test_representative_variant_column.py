@@ -68,8 +68,11 @@ class RepresentativeVariantColumnTest(GridExportTestCase):
 
     def test_renderer_fields_ride_along_hidden(self):
         """ A member rides along hidden while the collection shows the cell that draws it - unless
-            it isn't annotated for this columns version, where there would be nothing to draw """
+            it isn't annotated for this columns version, where there would be nothing to draw, or the
+            collection also shows it standalone (overlapping symbols), where it is simply visible """
         columns = self._columns_by_name()
+        standalone = set(self.node.analysis.custom_columns_collection.customcolumn_set
+                         .values_list("column__variant_column", flat=True))
         self.assertEqual(columns["id"].client_renderer, "VariantGridFormat.representativeVariant")
         for composite_id, path in [("variant", "id"), ("classifications", "classifications"),
                                    ("gnomad", "gnomad"), ("spliceai", "spliceai")]:
@@ -77,7 +80,7 @@ class RepresentativeVariantColumnTest(GridExportTestCase):
             drawn = [m for m in self._member_paths(composite_id) if m in columns]
             self.assertIn(self._member_paths(composite_id)[0], drawn, composite_id)  # the headline
             for member in drawn:
-                self.assertEqual(member == path, columns[member].visible, member)
+                self.assertEqual(member == path or member in standalone, columns[member].visible, member)
         for composite_id in ["annotsv_omim", "denovo_db"]:  # not in the default collection
             for member in self._member_paths(composite_id):
                 self.assertNotIn(member, columns, member)
