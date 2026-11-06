@@ -6,7 +6,6 @@ from django.test import SimpleTestCase, TestCase, override_settings
 
 from annotation.fake_data import get_fake_annotation_version
 from genes.fake_data import create_gata2_transcript_version
-from genes.hgvs import HGVSMatcher
 from genes.models import MissingTranscript
 from library.enums.log_level import LogLevel
 from library.preview_request import PreviewData
@@ -108,41 +107,38 @@ class SearchHGVSUsingGeneSymbolTestCase(TestCase):
 
 @override_settings(PREFER_ALLELE_LINKS=False)
 class SearchHGVSTranscriptMissingFromBuildTestCase(TestCase):
-    """ A transcript in one build only (an Ensembl transcript in T2T) is reported against the build it is
-        missing from, not sent to Rollbar (#2692). GRCh38 without ClinGen resolution stands in for T2T """
+    """ A transcript in one build only (T2T has no ClinGen to fall back on) is reported against the build it is
+        missing from, not sent to Rollbar (#2692) """
     HGVS = "NM_001145661.2(GATA2):c.1121G>A"
-    MISSING_MESSAGE = "NM_001145661.2 is not available for GRCh38"
+    MISSING_MESSAGE = "NM_001145661.2 is not available for T2T-CHM13v2.0"
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
         cls.user = User.objects.get_or_create(username="testuser")[0]
         cls.grch37 = GenomeBuild.grch37()
-        cls.grch38 = GenomeBuild.grch38()
+        cls.t2t = GenomeBuild.t2tv2()
         get_fake_annotation_version(cls.grch37)
-        get_fake_annotation_version(cls.grch38)
+        get_fake_annotation_version(cls.t2t)
         create_gata2_transcript_version(cls.grch37)
 
-    def _search(self):
-        matchers = {
-            self.grch37: HGVSMatcher(self.grch37),
-            self.grch38: HGVSMatcher(self.grch38, clingen_resolution=False),
-        }
-        with mock.patch.object(HGVSMatcher, "instance", side_effect=lambda genome_build, **kwargs: matchers[genome_build]), \
+    def _search(self, *annotated_builds: GenomeBuild):
+        annotated_names = {genome_build.name for genome_build in annotated_builds}
+        annotation = {name: {**build_settings, "enabled": name in annotated_names}
+                      for name, build_settings in settings.ANNOTATION.items()}
+        with self.settings(ANNOTATION=annotation), \
                 mock.patch("variantopedia.signals.hgvs_search.report_exc_info") as report_exc_info:
             search_results = search_data(self.user, self.HGVS, False)
         report_exc_info.assert_not_called()
         return search_results
 
     def test_info_when_another_build_resolved(self):
-        search_results = self._search()
+        search_results = self._search(self.grch37, self.t2t)
         self.assertFalse([r for r in search_results.results if r.preview.is_error])
         missing = [m for m in search_results.messages_overall if m.message == self.MISSING_MESSAGE]
-        self.assertEqual([(m.severity, m.genome_builds) for m in missing], [(LogLevel.INFO, [self.grch38])])
+        self.assertEqual([(m.severity, m.genome_builds) for m in missing], [(LogLevel.INFO, [self.t2t])])
 
     def test_error_when_no_build_resolved(self):
-        grch37_not_annotated = {**settings.ANNOTATION["GRCh37"], "enabled": False}
-        with self.settings(ANNOTATION={**settings.ANNOTATION, "GRCh37": grch37_not_annotated}):
-            search_results = self._search()
+        search_results = self._search(self.t2t)
         errors = [(m.message, r.preview.genome_builds) for r in search_results.results for m in r.messages]
-        self.assertEqual(errors, [(self.MISSING_MESSAGE, {self.grch38})])
+        self.assertEqual(errors, [(self.MISSING_MESSAGE, {self.t2t})])
