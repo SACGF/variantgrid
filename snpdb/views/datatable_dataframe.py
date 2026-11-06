@@ -137,12 +137,12 @@ class DataFrameTableView(JSONResponseView):
         escape_columns = {column_name for _, column_name in columns[1:]
                           if for_html and not config.get_column_client_renderer(column_name)}
         rows = []
-        for index, row in df.iterrows():
+        # itertuples, not iterrows: pandas 3 re-infers each iterrows() Series as str dtype, turning None into NaN
+        for index, *values in df.itertuples(name=None):
             if isinstance(index, float) and math.isnan(index):
                 index = None
             data = {INDEX_COLUMN_KEY: escape_cell(index) if escape_index else index}
-            for column_key, column_name in columns[1:]:
-                value = row[column_name]
+            for (column_key, column_name), value in zip(columns[1:], values):
                 data[column_key] = escape_cell(value) if column_name in escape_columns else value
             rows.append(data)
         return rows

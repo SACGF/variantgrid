@@ -25,6 +25,18 @@ class FakeDataFrameConfig(DataFrameDatatableConfig):
         return f"Label: {column_name}"
 
 
+class MissingCellDataFrameConfig(DataFrameDatatableConfig):
+    """ Genes matched by one ontology but not the other leave holes """
+
+    def get_dataframe(self) -> pd.DataFrame:
+        return pd.DataFrame.from_dict({"ELP4": {"HPO": "HP:0000526"}, "FOXC1": {"MONDO": "MONDO:0019172"}},
+                                      orient="index")
+
+
+def _reject_constant(constant):
+    raise ValueError(f"Invalid JSON constant {constant}")
+
+
 class DataFrameTableViewTests(TestCase):
     def setUp(self):
         self.user = User.objects.create(username='dataframe_datatable_user')
@@ -79,3 +91,12 @@ class DataFrameTableViewTests(TestCase):
 
     def test_json_serializable(self):
         json.dumps(self._data()["data"])
+
+    def test_missing_cells_are_null_in_strict_json(self):
+        request = RequestFactory().get("/fake/dataframe/")
+        request.user = self.user
+        response = DataFrameTableView.as_view(column_class=MissingCellDataFrameConfig)(request)
+        data = json.loads(response.content, parse_constant=_reject_constant)
+        rows = {row[INDEX_COLUMN_KEY]: row for row in data["data"]}
+        self.assertEqual(rows["ELP4"], {INDEX_COLUMN_KEY: "ELP4", "c1": "HP:0000526", "c2": None})
+        self.assertEqual(rows["FOXC1"], {INDEX_COLUMN_KEY: "FOXC1", "c1": None, "c2": "MONDO:0019172"})
