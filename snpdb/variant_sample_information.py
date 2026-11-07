@@ -518,7 +518,8 @@ class VariantSampleGenotypes(VariantZygosityCounts):
     # (gene + c.HGVS, or the fusion pair, with the kind badge). @see VariantGridFormat.representativeVariant
     LOCUS_COUNT_VARIANT_FIELDS = ("locus__contig__name", "locus__position", "locus__ref__seq", "alt__seq", "svlen",
                                   "variantannotation__hgvs_c", "variantannotation__hgvs_p",
-                                  "variantannotation__hgvs_g", "variantannotation__symbol")
+                                  "variantannotation__hgvs_g", "variantannotation__symbol",
+                                  "variantannotation__overlapping_symbols")
 
     def _get_locus_counts(self) -> list[dict]:
         """ Zygosity counts for every variant at this locus, this variant first """
