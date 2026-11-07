@@ -34,7 +34,9 @@ from snpdb.models import (
 )
 from snpdb.models.models_cohort import CohortGenotypeCollection
 from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
+from snpdb.variant_sample_information import VariantSampleGenotypes
 from snpdb.views.datatable_view import CellData, datatable_definition, datatable_response
+from variantopedia.grids import VariantTagsColumns
 
 
 class RepresentativeVariantColumnTest(GridExportTestCase):
@@ -98,6 +100,16 @@ class RepresentativeVariantColumnTest(GridExportTestCase):
                 if member in columns:
                     self.assertIn(member, row, member)
         self.assertIsNone(row["classifications"])  # renderer-only column, like tags
+
+    def test_every_label_outside_the_grid_gets_the_grid_cell_members(self):
+        """ The variant tags grid and the variant page's locus table name a variant with the grid's
+            label code, so a member they don't send is a branch they can never reach - an SV with
+            c.HGVS naming only its pick gene, not the genes it spans (#2709) """
+        members = set(self._member_paths("variant"))
+        self.assertIn("variantannotation__overlapping_symbols", members)
+        for caller, fields in [("variant tags", VariantTagsColumns.REPRESENTATIVE_VARIANT_FIELDS.values()),
+                               ("locus table", VariantSampleGenotypes.LOCUS_COUNT_VARIANT_FIELDS)]:
+            self.assertEqual(members, set(fields), caller)
 
     def test_members_reach_the_renderer_unescaped(self):
         """ The composite renderer escapes what it reads off the row - escaped on the server too, a
