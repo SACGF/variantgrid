@@ -1008,12 +1008,12 @@ const VCForm = (function() {
             const oncoPathTriage = this.record.triages.O;
             if (oncoPathTriage) {
                 if (oncoPathTriage.status === "F") {
-                    let label = "TBD";
+                    let label = "In-Review";
                     if (oncoPathTriage.amend_value) {
                         const eKey = eKeys.key(SpecialEKeys.CLINICAL_SIGNIFICANCE);
                         label = eKey.prettyValue(oncoPathTriage.amend_value).val;
                     }
-                    appendLabelHeading("Pending", label);
+                    appendLabelHeading("Pending", $('<span>', {class:'hover-detail', title: "This record has been triaged and the classification is planned to be updated", html: [$("<i class=\"fa-solid fa-triangle-exclamation\" style=\"opacity:0.5\"></i>"), label]}));
                 }
             }
 
@@ -1031,12 +1031,12 @@ const VCForm = (function() {
                 const clinSigTriage = this.record.triages.S;
                 if (clinSigTriage) {
                     if (clinSigTriage.status === "F") {
-                        let label = "TBD";
+                        let label = "In-Review";
                         if (clinSigTriage.amend_value) {
                             const eKey = eKeys.key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE);
                             label = eKey.prettyValue(clinSigTriage.amend_value).val;
                         }
-                        appendLabelHeading("Pending", label);
+                        appendLabelHeading("Pending", $('<span>', {class:'hover-detail', title: "This record has been triaged and the somatic clinical significance is planned to be updated", html: [$("<i class=\"fa-solid fa-triangle-exclamation\" style=\"opacity:0.5\"></i>"), label]}));
                     }
                 }
             }
