@@ -45,7 +45,8 @@ def get_manual_variant_coordinates(mve: ManualVariantEntry) -> list[VariantCoord
 class ManualVariantsPostInsertTask(ImportVCFStepTask):
     """ Variants have already been normalised and inserted via UploadPipeline
 
-        ManualVariantEntry records are made in BulkManualVariantEntryLinkingVCFProcessor
+        CreatedManualVariant records are made by the processors in
+        upload/vcf/bulk_manual_variant_entry_linking_vcf_processor.py
     """
 
     def process_items(self, upload_step):

@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
@@ -26,6 +27,7 @@ from upload.models import (
     UploadPipeline,
     UploadStep,
 )
+from upload.upload_metadata import GENOME_BUILD
 from upload.upload_processing import process_upload_pipeline
 
 
@@ -44,7 +46,9 @@ def check_can_create_variants(user):
         raise CreateManualVariantForbidden()
 
 
-def create_manual_variants(user, genome_build: GenomeBuild, variants_text: str):
+def create_manual_variants(user, genome_build: GenomeBuild, variants_text: str,
+                           sample_name: Optional[str] = None) -> ManualVariantEntryCollection:
+    """ sample_name imports the entries as a VCF with one sample of that name, so they can be analysed """
     check_can_create_variants(user)
     mvec = ManualVariantEntryCollection.objects.create(user=user,
                                                        genome_build=genome_build)
@@ -80,11 +84,18 @@ def create_manual_variants(user, genome_build: GenomeBuild, variants_text: str):
     working_dir = get_import_processing_dir(mvec.pk, "manual_variants")
     vcf_filename = os.path.join(working_dir, "manual_variant_entry.vcf")
     write_vcf_from_variant_coordinates(vcf_filename, variant_coordinates, vcf_ids=vcf_ids)
+    if sample_name:
+        # The VCF header has no contigs to detect the build from
+        file_upload_kwargs = {"name": sample_name,
+                              "file_type": UploadedFileTypes.MANUAL_VARIANT_ENTRY_SAMPLE,
+                              "metadata": {GENOME_BUILD: genome_build.pk}}
+    else:
+        file_upload_kwargs = {"name": "Manual Variant Entry",
+                              "file_type": UploadedFileTypes.MANUAL_VARIANT_ENTRY}
     file_upload = FileUpload.objects.create(path=vcf_filename,
                                             import_source=ImportSource.WEB,
-                                            name='Manual Variant Entry',
                                             user=user,
-                                            file_type=UploadedFileTypes.MANUAL_VARIANT_ENTRY)
+                                            **file_upload_kwargs)
 
     UploadedManualVariantEntryCollection.objects.create(file_upload=file_upload,
                                                         collection=mvec)

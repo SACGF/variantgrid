@@ -42,6 +42,15 @@
                     {% labelled label="Genome Build" %}
                         {{ form.genome_build }}
                     {% endlabelled %}
+                    {% labelled label="Create as sample" errors=form.sample_name.errors %}
+                        <div class="form-inline">
+                            <div class="form-check mr-3">
+                                {{ form.create_as_sample }}
+                                <label class="form-check-label" for="{{ form.create_as_sample.id_for_label }}">{{ form.create_as_sample.help_text }}</label>
+                            </div>
+                            {% crispy_field form.sample_name %}
+                        </div>
+                    {% endlabelled %}
                     <button class='btn btn-primary' id='add-variants'><i class="fas fa-plus-circle"></i> Add Variants</button>
                 </div>
             </div>

@@ -21,17 +21,27 @@
     <script src="{% static 'js/snpdb/watch_manual_variant_entry.js' %}"></script>
     <script>
         $(document).ready(function() {
-            handleMVECData({{ mvec.pk }}, JSON.parse({{ initial_json|jsonify }}));
+            handleMVECData({{ mvec.pk }}, {{ as_sample|jsonify }}, JSON.parse({{ initial_json|jsonify }}));
         });
     </script>
 {% endblock %}
 {% block content %}
     <div class="container">
+        {% if as_sample %}
+        <h3>Checking Status of New Sample</h3>
+        {% else %}
         <h3>Checking Status of New Variant</h3>
+        {% endif %}
         <div>
+            {% if as_sample %}
+            {% labelled label="Sample" %}
+                <div id="sample-link">{{ mvec.uploadedmanualvariantentrycollection.file_upload.name }} ({{ mvec.genome_build }})</div>
+            {% endlabelled %}
+            {% else %}
             {% labelled label="Coordinate" %}
                 <div>{{ mvec.first_entry.entry_text }} ({{ mvec.genome_build }})</div>
             {% endlabelled %}
+            {% endif %}
             {% labelled label="Status" %}
                 <div>
                     <i id="glowing-cloud" class="fas fa-cloud glowing"></i>

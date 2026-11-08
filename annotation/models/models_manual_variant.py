@@ -1,6 +1,7 @@
 """
 Manual variant entry: a user's search / "create variant" text becomes a ManualVariantEntryCollection of one
-ManualVariantEntry per line, and CreatedManualVariant records the Variants made from each.
+ManualVariantEntry per line, and CreatedManualVariant records the Variants made from each. A collection
+created "as sample" also has the VCF (with one Sample) it was imported as.
 annotation/manual_variant_entry.py does the parsing and creation.
 """
 
@@ -10,7 +11,7 @@ from typing import Optional
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import models
-from django.db.models.deletion import CASCADE
+from django.db.models.deletion import CASCADE, SET_NULL
 
 from annotation.enums import ManualVariantEntryType
 from annotation.models.models_annotation_run import AnnotationRun
@@ -23,6 +24,7 @@ from snpdb.models import (
     GenomeBuild,
     Variant,
 )
+from snpdb.models.models_vcf import VCF, Sample
 
 
 class ManualVariantEntryCollection(models.Model):
@@ -31,6 +33,14 @@ class ManualVariantEntryCollection(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     celery_task = models.CharField(max_length=36, null=True)
+    # Set when the entries were imported as a VCF with one sample ("create as sample"), so they can be analysed
+    vcf = models.ForeignKey(VCF, null=True, blank=True, on_delete=SET_NULL)
+
+    @cached_property
+    def sample(self) -> Optional[Sample]:
+        if self.vcf:
+            return self.vcf.sample_set.first()
+        return None
 
     @cached_property
     def first_entry(self) -> Optional['ManualVariantEntry']:

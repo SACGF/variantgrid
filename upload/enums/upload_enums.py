@@ -22,6 +22,8 @@ class UploadedFileTypes(models.TextChoices):
     GENE_COVERAGE = 'O', 'Gene Coverage'
     LIFTOVER = 'I', 'Liftover'
     MANUAL_VARIANT_ENTRY = 'M', 'Manual Variant Entry'
+    # Manual Variant Entry imported as a VCF with one sample, so the list can be analysed
+    MANUAL_VARIANT_ENTRY_SAMPLE = 'm', 'Manual Variant Entry - as sample'
     PED = 'P', 'Pedigree'
     PATIENT_RECORDS = 'R', 'Patient Records'
     VARIANT_CLASSIFICATIONS = 'S', 'Variant Classifications'

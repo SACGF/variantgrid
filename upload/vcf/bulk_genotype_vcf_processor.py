@@ -531,6 +531,7 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
         if self.variant_hashes and len(self.variant_hashes) >= minimum_insert_size:
             variant_ids = self.variant_pk_lookup.get_variant_ids(self.variant_hashes)
             self.set_max_variant(self.variant_hashes, variant_ids)
+            self.batch_variant_ids_known(self.variant_hashes, variant_ids)
 
             # this can create MIVs (rmdupes)
             self.process_cohort_genotypes(self.variant_hashes, variant_ids)

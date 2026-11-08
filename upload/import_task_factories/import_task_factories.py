@@ -52,8 +52,10 @@ from upload.tasks.import_wiki_task import (
 )
 from upload.tasks.vcf.genotype_vcf_tasks import (
     ImportCreateVCFModelForGenotypeVCFTask,
+    ImportCreateVCFModelForManualVariantEntryTask,
     ImportGenotypeVCFSuccessTask,
     ProcessGenotypeVCFDataTask,
+    ProcessManualVariantEntryGenotypeVCFDataTask,
     SampleLocusCountsTask,
     SomalierVCFTask,
     UpdateVariantZygosityCountsTask,
@@ -508,6 +510,28 @@ class ManualVariantEntryImportFactory(AbstractVCFImportTaskFactory):
 
     def get_post_data_insertion_classes(self):
         return [VCFCheckAnnotationTask]
+
+
+class ManualVariantEntrySampleImportFactory(GenotypeVCFImportFactory):
+    """ Manual Variant Entry "create as sample" - the standard VCF import (VCF, one Sample named after the
+        upload, cohort genotypes), still linking each record to its ManualVariantEntry """
+
+    def get_uploaded_file_type(self):
+        return UploadedFileTypes.MANUAL_VARIANT_ENTRY_SAMPLE
+
+    def get_data_classes(self):
+        # The collection has the genome build before the VCF is made from the header
+        return [UploadedManualVariantEntryCollection, UploadedVCF]
+
+    def get_processing_ability(self, user, filename, file_extension):
+        # Only ever set by create_manual_variants, never detected on an uploaded file
+        return 0
+
+    def get_create_data_from_vcf_header_task_class(self):
+        return ImportCreateVCFModelForManualVariantEntryTask
+
+    def get_known_variants_parallel_vcf_processing_task_class(self):
+        return ProcessManualVariantEntryGenotypeVCFDataTask
 
 
 class LiftoverImportFactory(AbstractVCFImportTaskFactory):

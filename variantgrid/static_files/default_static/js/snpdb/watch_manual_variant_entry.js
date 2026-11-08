@@ -11,25 +11,49 @@ function displayError(message) {
     $("#variant-status").addClass("error").text(message);
 }
 
-function handleMVECData(mvecId, data) {
-    // if we can redirect - do so
-    // otherwise populate screen
-    if (data["is_ready"]) {
+function displaySampleReady(sample) {
+    // The sample page is where an analysis is created from a sample
+    const sampleUrl = Urls.view_sample(sample["id"]) + "#create-analyses";
+    $("#glowing-cloud").remove();
+    $("#variant-status").text("Sample imported - create an analysis from the sample page");
+    $("#sample-link").empty().append($("<a />", {href: sampleUrl, text: sample["name"]}));
+}
+
+function handleSampleData(mvecId, data) {
+    const sample = data["sample"];
+    if (data["import_status"] === 'E' || (sample && sample["import_status"] === 'E')) {
+        displayError("Sample import failed.");
+    } else if (sample && sample["import_status"] === 'S') {
+        displaySampleReady(sample);
+    } else {
+        populatePage(data);
+        if (sample) {
+            $("#variant-status").text(`Sample ${sample["import_status_display"]}`);
+        }
+        setTimeout(() => pollServer(mvecId, true), 2000);
+    }
+}
+
+function handleMVECData(mvecId, asSample, data) {
+    if (asSample) {
+        handleSampleData(mvecId, data);
+    } else if (data["is_ready"]) {
+        // if we can redirect - do so
         window.location.href = Urls.view_variant(data["first_variant_id"]);
     } else {
         if (data["import_status"] == 'E') {
             displayError("Variant import failed.");
         } else {
             populatePage(data);
-            setTimeout(() => pollServer(mvecId), 2000);
+            setTimeout(() => pollServer(mvecId, false), 2000);
         }
     }
 }
 
-function pollServer(mvecId) {
+function pollServer(mvecId, asSample) {
     $.ajax({
         url: Urls.api_manual_variant_entry_collection(mvecId),
-        success: (data) => handleMVECData(mvecId, data),
+        success: (data) => handleMVECData(mvecId, asSample, data),
         error: function() {
             displayError("Error contacting server - please reload page.");
         }
