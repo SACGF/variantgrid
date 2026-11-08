@@ -99,7 +99,8 @@ function initPhenotypeEntry(options) {
             }
             existingText += '\n';
         }
-        description.val(existingText + text);
+        // Setting .val() fires no event, and the picker that supplied the term clears itself back to unchanged
+        description.val(existingText + text).trigger("change");
         startDescriptionUpdateTimer();
     }
 

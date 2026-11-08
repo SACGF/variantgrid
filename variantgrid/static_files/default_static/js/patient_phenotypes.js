@@ -81,7 +81,8 @@ function setupPatientPhenotypeSeedButton(textarea, getPatientIds, patientPhenoty
         const existingText = textarea.val() || "";
         const toAdd = patientPhenotypeTextsToAdd(existingText, getPatientIds(), patientPhenotypes);
         textarea.val([existingText, ...toAdd].filter(Boolean).join("\n"));
-        textarea.trigger("keyup");
+        // keyup re-matches the terms (phenotype_entry_tag.js), change marks the field unsaved
+        textarea.trigger("keyup").trigger("change");
         refresh();
     });
     textarea.on("input change keyup", refresh);
