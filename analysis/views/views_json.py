@@ -3,7 +3,8 @@ The ajax the analysis editor calls: creating, copying, deleting and connecting n
 versions, status and tasks for the client's polling, variant tags and selection, creating filter children, template
 variables and saving a template version, and candidate search status. A change to the DAG ends with
 `update_analysis`, which queues the celery tasks that reload whatever nodes are now out of date. Node position
-updates save only x/y, so a drag can't overwrite the status a worker wrote meanwhile.
+updates save only x/y, so a drag can't overwrite the status a worker wrote meanwhile; a connect re-reads its node
+under the Analysis lock, so two connects to one node can't undo each other.
 """
 import json
 import logging
@@ -128,16 +129,21 @@ class NodeUpdate(NodeJSONPostView):
         elif op == "update_connection":
             parent_id = params["parent_id"]
             parent = get_node_subclass_or_non_fatal_exception(request.user, parent_id, write=True)
-            if params.get("remove"):
-                node.remove_parent(parent)
-            else:
-                kwargs = {}
-                if isinstance(node, VennNode):
-                    side = params.get("side")  # Optional for venn
-                    kwargs["side"] = side
+            with transaction.atomic():
+                # The whole row is saved, so re-read it under the lock its save takes - a node read at request
+                # start would write back what a concurrent connect changed, eg the other side of a Venn (#2711)
+                Analysis.objects.select_related(None).select_for_update().get(pk=node.analysis_id)
+                node = AnalysisNode.objects.get_subclass(pk=node.pk)
+                if params.get("remove"):
+                    node.remove_parent(parent)
+                else:
+                    kwargs = {}
+                    if isinstance(node, VennNode):
+                        side = params.get("side")  # Optional for venn
+                        kwargs["side"] = side
 
-                node.add_parent(parent, **kwargs)
-            node.save()
+                    node.add_parent(parent, **kwargs)
+                node.save()
             update_analysis(node.analysis_id)
         else:
             raise ValueError(f"Unknown operation '{op}'")
