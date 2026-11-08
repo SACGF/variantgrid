@@ -109,6 +109,12 @@
     </script>
 {% endblock head %}
 {% block content %}
+
+    <div class="current-record-menu-item">
+        <div class="text-small text-muted">viewing</div>
+        <div><i class="fa-solid fa-dna main-icon mr-1" style="color:#bbb; font-size:8pt"></i><span class="text-monospace">{{ gene_symbol }}</span></div>
+    </div>
+
 	<div class="container">
         {% load genome_build_tags %}
         {% if show_annotation %}
