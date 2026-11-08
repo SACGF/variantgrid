@@ -78,20 +78,24 @@ class ImportCreateVCFModelForGenotypeVCFTask(ImportVCFStepTask):
 
         # If past this point - we have VCF w/genome build
         create_cohort_genotype_collection_from_vcf(vcf, vcf_reader)
+        self._create_vcf_stats_step(upload_step)
+        self._create_mutational_signature_steps(upload_step, vcf)
 
-        # CalculateVCFStatsTask - called after annotation finished
-        vcf_stats_task_class_name = full_class_name(CalculateVCFStatsTask)
-        calculate_mutational_signature_task_class_name = full_class_name(CalculateMutationalSignaturesForSampleTask)
-
-        sort_order = upload_step.upload_pipeline.get_max_step_sort_order()
-        sort_order += 1
+    @staticmethod
+    def _create_vcf_stats_step(upload_step):
+        """ CalculateVCFStatsTask - run once the VCF's variants are annotated """
         UploadStep.objects.create(upload_pipeline=upload_step.upload_pipeline,
                                   name="Calculate VCF Stats",
-                                  sort_order=sort_order,
+                                  sort_order=upload_step.upload_pipeline.get_max_step_sort_order() + 1,
                                   task_type=UploadStepTaskType.CELERY,
                                   pipeline_stage_dependency=VCFPipelineStage.ANNOTATION_COMPLETE,
-                                  script=vcf_stats_task_class_name)
+                                  script=full_class_name(CalculateVCFStatsTask))
 
+    @staticmethod
+    def _create_mutational_signature_steps(upload_step, vcf):
+        """ One per somatic sample, run once the VCF's variants are annotated """
+        calculate_mutational_signature_task_class_name = full_class_name(CalculateMutationalSignaturesForSampleTask)
+        sort_order = upload_step.upload_pipeline.get_max_step_sort_order()
         for sample in vcf.sample_set.all():
             if sample.variants_type == VariantOrigin.SOMATIC_ONLY:
                 sort_order += 1
@@ -106,8 +110,13 @@ class ImportCreateVCFModelForGenotypeVCFTask(ImportVCFStepTask):
 
 class ImportCreateVCFModelForManualVariantEntryTask(ImportCreateVCFModelForGenotypeVCFTask):
     """ Manual Variant Entry "create as sample": the VCF and its one Sample, linked to the collection.
-        A pasted list of variants says nothing about how often they occur, so the VCF is kept out of
-        the global zygosity counts """
+        The sample is a list of variants to look at together, not an individual, so it gets no mutational
+        signature and is kept out of the global zygosity counts. It keeps the VCF stats, which SampleNode
+        uses as its count cache """
+
+    @staticmethod
+    def _create_mutational_signature_steps(upload_step, vcf):
+        pass
 
     def process_items(self, upload_step):
         super().process_items(upload_step)

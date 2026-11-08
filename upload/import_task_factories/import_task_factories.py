@@ -514,7 +514,10 @@ class ManualVariantEntryImportFactory(AbstractVCFImportTaskFactory):
 
 class ManualVariantEntrySampleImportFactory(GenotypeVCFImportFactory):
     """ Manual Variant Entry "create as sample" - the standard VCF import (VCF, one Sample named after the
-        upload, cohort genotypes), still linking each record to its ManualVariantEntry """
+        upload, cohort genotypes), still linking each record to its ManualVariantEntry.
+
+        The sample is a list of variants to examine together rather than an individual, so none of the
+        per-sample steps (zygosity counts, locus counts, somalier, mutational signatures) run """
 
     def get_uploaded_file_type(self):
         return UploadedFileTypes.MANUAL_VARIANT_ENTRY_SAMPLE
@@ -532,6 +535,12 @@ class ManualVariantEntrySampleImportFactory(GenotypeVCFImportFactory):
 
     def get_known_variants_parallel_vcf_processing_task_class(self):
         return ProcessManualVariantEntryGenotypeVCFDataTask
+
+    def get_post_data_insertion_classes(self):
+        return [VCFCheckAnnotationTask]
+
+    def get_finish_task_classes(self):
+        return [ImportGenotypeVCFSuccessTask]
 
 
 class LiftoverImportFactory(AbstractVCFImportTaskFactory):

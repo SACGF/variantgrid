@@ -15,6 +15,7 @@ from annotation.models.models_manual_variant import (
     ManualVariantEntry,
     ManualVariantEntryCollection,
 )
+from library.utils import full_class_name
 from snpdb.enums import ImportSource
 from snpdb.forms import ManualVariantEntryForm
 from snpdb.models.models_genome import GenomeBuild
@@ -29,6 +30,7 @@ from upload.models import (
     UploadStep,
 )
 from upload.tasks.vcf.genotype_vcf_tasks import ImportCreateVCFModelForManualVariantEntryTask
+from upload.upload_processing import get_upload_processing_task
 from upload.vcf.bulk_manual_variant_entry_linking_vcf_processor import (
     BulkManualVariantEntryLinkingVCFProcessor,
 )
@@ -67,9 +69,18 @@ class ManualVariantEntrySampleTest(TestCase):
         file_upload = mvec.uploadedmanualvariantentrycollection.file_upload
         self.assertEqual(file_upload.file_type, UploadedFileTypes.MANUAL_VARIANT_ENTRY_SAMPLE)
 
-        upload_step = UploadStep.objects.create(upload_pipeline=file_upload.uploadpipeline, sort_order=0,
-                                                input_filename=file_upload.path)
-        ImportCreateVCFModelForManualVariantEntryTask.process_items(upload_step)
+        upload_pipeline = file_upload.uploadpipeline
+        get_upload_processing_task(file_upload.file_type, upload_pipeline)  # Creates the factory's steps
+        header_step = upload_pipeline.uploadstep_set.get(
+            script=full_class_name(ImportCreateVCFModelForManualVariantEntryTask))
+        ImportCreateVCFModelForManualVariantEntryTask.process_items(header_step)
+
+        # A list of variants, not an individual - none of the per-sample steps (counts, somalier), but the VCF stats
+        step_names = set(upload_pipeline.uploadstep_set.values_list("name", flat=True))
+        self.assertEqual(step_names, {"Create Data from VCF Header", UploadStep.PREPROCESS_VCF_NAME,
+                                      "CheckStartAnnotationTask", "Schedule Parallel VCF Processing tasks",
+                                      "VCFCheckAnnotationTask", "ManualVariantsPostInsertTask",
+                                      "ImportGenotypeVCFSuccessTask", "Calculate VCF Stats"})
 
         mvec.refresh_from_db()
         vcf = mvec.vcf
