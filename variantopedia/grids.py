@@ -349,6 +349,7 @@ class VariantTagsColumns(VariantTagCaseColumnsMixin, DatatableConfig[VariantTag]
         "rv_hgvs_p": "variantannotation__hgvs_p",
         "rv_hgvs_g": "variantannotation__hgvs_g",
         "rv_symbol": "variantannotation__symbol",
+        "rv_overlapping_symbols": "variantannotation__overlapping_symbols",
     }
 
     def __init__(self, request: HttpRequest):

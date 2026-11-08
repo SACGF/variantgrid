@@ -886,19 +886,39 @@ function _formatAllele(seq) {
 // The lead slot for an SV spanning several genes - {lead, genes}. The VEP pick is named first so the
 // row agrees with the consequence columns computed on its transcript; the rest are alphabetical (the
 // order overlapping_symbols comes in), so a range would read like a fusion. Past a few names the
-// others are a count, and the whole list is the tooltip. genes is null when there is nothing to add
-function _svGeneLead(symbol, overlappingSymbols, chrom) {
+// others are a count, and the whole list is the tooltip. With no pick, the count follows contigLabel -
+// null where the label shows the contig anyway. genes is null when there is nothing to add
+function _svGeneLead(symbol, overlappingSymbols, contigLabel) {
     const genes = overlappingSymbols ? String(overlappingSymbols).split(",").filter(gene => gene) : [];
     const others = genes.filter(gene => gene !== symbol);
     const named = symbol ? [symbol, ...others] : others;
     if (named.length <= 1) {
-        return {lead: symbol, genes: null};
+        return {lead: named[0] || null, genes: null};
     }
     if (named.length <= REPRESENTATIVE_MAX_NAMED_GENES) {
         return {lead: named.join(", "), genes: named};
     }
-    const lead = symbol ? `${symbol} +${others.length} genes` : `${_contigLabel(chrom)} +${named.length} genes`;
+    let lead = `${named.length} genes`;
+    if (symbol) {
+        lead = `${symbol} +${others.length} genes`;
+    } else if (contigLabel) {
+        lead = `${contigLabel} +${named.length} genes`;
+    }
     return {lead: lead, genes: named};
+}
+
+// A structural variant - everything of VARIANT_SYMBOLIC_ALT_SIZE or more is stored with a symbolic alt.
+// A gene-level alt (<LOSS:HGNC:...>, a fusion) is already named for its gene, so it isn't one here
+function _isStructuralAlt(alt) {
+    if (alt == null || !String(alt).startsWith("<")) {
+        return false;
+    }
+    return !GENE_LEVEL_KINDS[String(alt).slice(1, -1).split(":")[0]];
+}
+
+// The tooltip's tail naming every gene an SV spans - '' when it spans one or none
+function _svGenesTitle(sv) {
+    return sv.genes ? ` - ${sv.genes.length} genes: ${sv.genes.join(", ")}` : '';
 }
 
 // The contig the way a reader says it - 'chr8' rather than the bare '8' the contig is named
@@ -1001,7 +1021,8 @@ VariantGridFormat.representativeVariantLabel = (variantId, rowData) => {
     const symbol = rowData["variantannotation__symbol"];
     const overlappingSymbols = rowData["variantannotation__overlapping_symbols"];
 
-    // 1. c.HGVS on the representative transcript - gene symbol leads, transcript is in the expanded row
+    // 1. c.HGVS on the representative transcript - gene symbol leads, transcript is in the expanded row.
+    // A small variant is named for the pick alone; an SV for the genes it spans, as in 2
     if (hgvsC && hgvsC !== HGVS_NOT_CALCULATED) {
         const c = _splitHgvs(hgvsC);
         if (!c) {
@@ -1015,8 +1036,10 @@ VariantGridFormat.representativeVariantLabel = (variantId, rowData) => {
             }
             return {html: `<span class='rv-hgvs'>${escapeHtml(hgvsC)}</span>`, title: hgvsC};
         }
-        const gene = c.symbol || symbol;
-        let html = gene ? `<span class='rv-gene'>${escapeHtml(gene)}</span> ` : '';
+        const pickGene = c.symbol || symbol;
+        const sv = _isStructuralAlt(alt) ? _svGeneLead(pickGene, overlappingSymbols, _contigLabel(chrom))
+                                         : {lead: pickGene, genes: null};
+        let html = sv.lead ? `<span class='rv-gene'>${escapeHtml(sv.lead)}</span> ` : '';
         html += `<span class='rv-hgvs'>${escapeHtml(c.change)}</span>`;
         const p = _splitHgvs(hgvsP);
         if (p) {
@@ -1026,7 +1049,7 @@ VariantGridFormat.representativeVariantLabel = (variantId, rowData) => {
         // which of the two shows) - the identifiers a reader wants next, without a second column
         html += `<span class='rv-line2'>${escapeHtml(c.accession)}`
               + (p ? ` <span class='rv-hgvs-p'>${escapeHtml(p.change)}</span>` : '') + '</span>';
-        return {html: html, title: hgvsC + (hgvsP ? " " + hgvsP : "")};
+        return {html: html, title: hgvsC + (hgvsP ? " " + hgvsP : "") + _svGenesTitle(sv)};
     }
     // 2. g.HGVS (no transcript - an SV, intergenic, or annotation not run yet for this variant). The
     // lead slot is what a reader calls the row: an SV over a gene is an event on that gene ("FGF3
@@ -1035,25 +1058,28 @@ VariantGridFormat.representativeVariantLabel = (variantId, rowData) => {
     const g = _splitHgvs(hgvsG);
     if (g && g.change.length <= REPRESENTATIVE_MAX_HGVS_CHARS) {
         const sv = (alt != null && String(alt).startsWith("<"))
-                 ? _svGeneLead(symbol, overlappingSymbols, chrom) : {lead: null, genes: null};
+                 ? _svGeneLead(symbol, overlappingSymbols, _contigLabel(chrom)) : {lead: null, genes: null};
         const lead = sv.lead || _contigLabel(chrom);
         const html = (lead ? `<span class='rv-gene'>${escapeHtml(lead)}</span> ` : '')
                    + `<span class='rv-hgvs'>${escapeHtml(g.change)}</span>`
                    + `<span class='rv-line2'>${escapeHtml(g.accession)}</span>`;
-        let title = sv.lead ? `${sv.lead} ${hgvsG}` : hgvsG;
-        if (sv.genes) {
-            title = `${hgvsG} - ${sv.genes.length} genes: ${sv.genes.join(", ")}`;
-        }
+        const title = sv.genes ? hgvsG + _svGenesTitle(sv) : (sv.lead ? `${sv.lead} ${hgvsG}` : hgvsG);
         return {html: html, title: title};
     }
     // 3/4. Coordinate - symbolic as a span with the type, otherwise ref>alt with long alleles collapsed
     if (chrom != null && position != null && alt != null) {
         const contig = _contigLabel(chrom);
         if (String(alt).startsWith("<")) {
-            // The type and the size are on the kind badge beside the label, for every branch
+            // The type and the size are on the kind badge beside the label, for every branch. The span
+            // names the contig, so with no pick to name the lead is just the count
             const end = position + Math.abs(svlen || 0);
-            const html = `<span class='rv-hgvs'>${escapeHtml(contig)}:${position}-${end}</span>`;
-            return {html: html, title: `${contig}:${position}-${end} ${alt}`};
+            const span = `${contig}:${position}-${end}`;
+            const sv = _isStructuralAlt(alt) ? _svGeneLead(symbol, overlappingSymbols, null) : {lead: null, genes: null};
+            const html = (sv.lead ? `<span class='rv-gene'>${escapeHtml(sv.lead)}</span> ` : '')
+                       + `<span class='rv-hgvs'>${escapeHtml(span)}</span>`;
+            const leadTitle = (sv.lead && !sv.genes) ? `${sv.lead} ` : '';
+            // The alt goes last: the tooltip renders the title as HTML, where '<DEL>' swallows what follows
+            return {html: html, title: `${leadTitle}${span}${_svGenesTitle(sv)} ${alt}`};
         }
         const title = `${contig}:${position} ${ref}>${alt}`;
         return {html: `<span class='rv-hgvs'>${escapeHtml(contig)}:${position} ${escapeHtml(_formatAllele(ref))}&gt;${escapeHtml(_formatAllele(alt))}</span>`,
