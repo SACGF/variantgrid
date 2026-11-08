@@ -75,6 +75,22 @@ class AllVariantsNodeVariantTypeTest(AnalysisSetupMixin, TestCase):
             with self.subTest(description):
                 self.assertEqual(self._variant_ids(variant_types), self._node_variant_ids(variant_types))
 
+    def test_nothing_ticked_on_a_chromosome_is_no_restriction(self):
+        """ #2713 - with a chromosome chosen, ticking nothing still keeps the gene-level rows (they live on
+            their own contig) and the reference calls, the same as ticking everything """
+        chrom_contig = self.variants_by_type[VariantType.SNV][0].locus.contig
+        every_variant_id = self._variant_ids(AllVariantsNode.all_variant_types())
+        for description, variant_types in {"nothing": [], "everything": AllVariantsNode.all_variant_types()}.items():
+            with self.subTest(description):
+                node = AllVariantsNode.objects.create(analysis=self.analysis, variant_types=variant_types)
+                node.allvariantsnodecontig_set.create(contig=chrom_contig)
+                node = AllVariantsNode.objects.get(pk=node.pk)  # contig_ids is cached by the save
+                self.assertEqual([chrom_contig.pk], node.contig_ids)
+                qs = Variant.objects.filter(pk__in=every_variant_id)
+                for q in node._get_node_arg_q_dict()[None].values():
+                    qs = qs.filter(q)
+                self.assertEqual(every_variant_id, set(qs.values_list("pk", flat=True)))
+
 
 class AllVariantsNodeNameTest(SimpleTestCase):
     def test_default_types_say_nothing(self):

@@ -224,9 +224,10 @@ def get_non_standard_contig_ids(genome_build: GenomeBuild) -> list[int]:
 def get_contig_ids_for_variant_types(genome_build: GenomeBuild, contig_ids: Iterable[int],
                                      variant_types: Optional[Iterable[str]]) -> list[int]:
     """ The gene-level contig is not a chromosome anyone can tick, so a gene-level type is what lets
-        it through - without it a contig selection hides every fusion whatever else is on """
+        it through - without it a contig selection hides every fusion whatever else is on. No types
+        selected is no restriction, as in get_variant_types_q, so that lets it through too (#2713) """
     contig_id_list = list(contig_ids)
-    if contig_id_list and (variant_types is None or set(variant_types) & set(GENE_LEVEL_VARIANT_TYPES)):
+    if contig_id_list and (not variant_types or set(variant_types) & set(GENE_LEVEL_VARIANT_TYPES)):
         contig_id_list.extend(get_gene_level_contig_ids(genome_build))
     return contig_id_list
 
