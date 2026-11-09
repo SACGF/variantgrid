@@ -1,13 +1,15 @@
 # used for validating multiple keys when one changes
-import operator
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
-from functools import cached_property, reduce
+from functools import cached_property
 from typing import Any, Optional, Union
 
 from django.contrib.auth.models import User
 from django.db.models import Q
+from django.db.models.fields.json import KT
+from django.db.models.functions import Upper
+from django.db.models.lookups import In
 
 from classification.enums import ClassificationPatchStatus
 from classification.models.classification_variant_info_models import ImportedAlleleInfo
@@ -299,7 +301,8 @@ def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Op
         the resolved transcript is one of the genes', or the evidence gene_symbol is the symbol or an alias.
 
         The allele and transcript matches are resolved to ImportedAlleleInfo ids in one subquery - ORing joins
-        across tables can't use an index, so Postgres would otherwise check every visible classification (#2718) """
+        across tables can't use an index, so Postgres would otherwise check every visible classification (#2718).
+        The aliases are matched with one IN: each separate comparison decompresses published_evidence again """
     if gene_symbol := GeneSymbol.cast(gene_symbol):
         if genes := gene_symbol.alias_meta.genes:
             allele_qs = Allele.objects.filter(variantallele__variant__variantannotation__gene__in=genes)
@@ -309,9 +312,9 @@ def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Op
                 | Q(grch37__transcript_version__transcript__in=t_qs)
                 | Q(grch38__transcript_version__transcript__in=t_qs)
             )
-            q_list = [Q(classification__allele_info__in=allele_info_qs.values("pk"))]
-            for symbol in gene_symbol.alias_meta.alias_symbol_strs:
-                q_list.append(Q(published_evidence__gene_symbol__value__iexact=symbol))
-            return reduce(operator.or_, q_list)
+            evidence_gene_symbol = Upper(KT("published_evidence__gene_symbol__value"))
+            aliases = [symbol.upper() for symbol in gene_symbol.alias_meta.alias_symbol_strs]
+            return (Q(classification__allele_info__in=allele_info_qs.values("pk"))
+                    | Q(In(evidence_gene_symbol, aliases)))
 
     return None
