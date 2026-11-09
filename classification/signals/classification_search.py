@@ -4,7 +4,7 @@ from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import Q, QuerySet
+from django.db.models import Count, Q, QuerySet
 from django.dispatch import receiver
 
 from annotation.canonical_annotation import get_canonical_c_hgvs
@@ -77,24 +77,15 @@ def classification_search(search_input: SearchInputInstance):
 
 
 def classification_qs_to_extras(qs: QuerySet[ClassificationModification]) -> list[PreviewKeyValue]:
+    """ A count per allele origin bucket, in one grouped query """
+    bucket_counts = dict(qs.order_by().values_list("classification__allele_origin_bucket").annotate(count=Count("pk")))
     extras = []
-    if qs.exists():
-        includes_origins = []
-        for allele_origin_bucket in AlleleOriginBucket.choices:
-            if filtered_count := qs.filter(classification__allele_origin_bucket=allele_origin_bucket[0]).count():
-                label = allele_origin_bucket[1]
-                if allele_origin_bucket[0] == "U":
-                    label = "Unknown Allele Origin"  # unknown needs more context than somatic or germline
-                includes_origins.append(label)
-                pkv = PreviewKeyValue.count(Classification, filtered_count, override_label=f"{label} Classification Count")
-                pkv.dedicated_row = True
-                extras.append(pkv)
-
-        # override_label = f"Classifications ({join_with_commas_and_ampersand(includes_origins)})"
-        # pkv = PreviewKeyValue.count(Classification, qs.count(), override_label=override_label)
-        # pkv.dedicated_row = True
-        # extras.append(pkv)
-
+    for bucket, bucket_label in AlleleOriginBucket.choices:
+        if count := bucket_counts.get(bucket):
+            label = "Unknown Allele Origin" if bucket == AlleleOriginBucket.UNKNOWN else bucket_label
+            pkv = PreviewKeyValue.count(Classification, count, override_label=f"{label} Classification Count")
+            pkv.dedicated_row = True
+            extras.append(pkv)
     return extras
 
 

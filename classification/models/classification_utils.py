@@ -10,6 +10,7 @@ from django.contrib.auth.models import User
 from django.db.models import Q
 
 from classification.enums import ClassificationPatchStatus
+from classification.models.classification_variant_info_models import ImportedAlleleInfo
 from classification.models.evidence_key import VCPatch, VCStore
 from eventlog.notifications import NotificationBuilder
 from genes.models import GeneSymbol, Transcript
@@ -294,22 +295,23 @@ class PatchMeta:
 
 
 def classification_gene_symbol_filter(gene_symbol: Union[str, GeneSymbol]) -> Optional[Q]:
+    """ ClassificationModification filter: the allele is in one of the symbol's genes (via variant annotation),
+        the resolved transcript is one of the genes', or the evidence gene_symbol is the symbol or an alias.
 
-    # We want to filter using the genes set via variant annotation
+        The allele and transcript matches are resolved to ImportedAlleleInfo ids in one subquery - ORing joins
+        across tables can't use an index, so Postgres would otherwise check every visible classification (#2718) """
     if gene_symbol := GeneSymbol.cast(gene_symbol):
         if genes := gene_symbol.alias_meta.genes:
             allele_qs = Allele.objects.filter(variantallele__variant__variantannotation__gene__in=genes)
-            match_gene = Q(classification__variant__variantallele__allele__in=allele_qs)
-            evidence_q_list = []
-
+            t_qs = Transcript.objects.filter(transcriptversion__gene_version__gene__in=genes)
+            allele_info_qs = ImportedAlleleInfo.objects.filter(
+                Q(allele__in=allele_qs)
+                | Q(grch37__transcript_version__transcript__in=t_qs)
+                | Q(grch38__transcript_version__transcript__in=t_qs)
+            )
+            q_list = [Q(classification__allele_info__in=allele_info_qs.values("pk"))]
             for symbol in gene_symbol.alias_meta.alias_symbol_strs:
-                evidence_q_list.append(Q(published_evidence__gene_symbol__value__iexact=symbol))
-                # TODO match on gene symbol in the variant info
-
-            t_qs = Transcript.objects.filter(transcriptversion__gene_version__gene__in=genes).distinct()
-            evidence_q_list.append(Q(classification__allele_info__grch37__transcript_version__transcript__in=t_qs))
-            evidence_q_list.append(Q(classification__allele_info__grch38__transcript_version__transcript__in=t_qs))
-            match_evidence = reduce(operator.or_, evidence_q_list)
-            return match_gene | match_evidence
+                q_list.append(Q(published_evidence__gene_symbol__value__iexact=symbol))
+            return reduce(operator.or_, q_list)
 
     return None
