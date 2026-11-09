@@ -10,10 +10,11 @@ $(document).ready(function() {
     let reloadWhenDone = false;
 
     // The modals live inside the tab, so replacing it under an open one strands Bootstrap's backdrop -
-    // a dialog opened while the reload was in flight holds it off until that dialog closes
+    // a dialog opened while the reload was in flight holds it off until that dialog closes. The backdrop is
+    // the test as it spans the fade in and out, when the modal itself doesn't have its "show" class
     function reloadTab() {
         $.get(container.data("tab-url"), function(html) {
-            if ($(".modal.show", tabPane).length) {
+            if ($(".modal-backdrop").length) {
                 reloadWhenDone = true;
             } else {
                 tabPane.html(html);
