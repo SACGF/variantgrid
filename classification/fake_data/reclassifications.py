@@ -49,6 +49,7 @@ from classification.models.classification_grouping import (
     ClassificationGrouping,
     ClassificationGroupingEntry,
 )
+from classification.models.classification_variant_info_models import ImportedAlleleInfo
 from library.fake_data import FakeData, FakeDataContext, in_preferred_order, register, zipf_weight
 from snpdb.enums import AlleleOriginBucket, ClinicalSignificance
 from snpdb.fake_data import GERMLINE, SOMATIC
@@ -205,7 +206,7 @@ class FakeRecord:
     tier: Optional[str] = None
     """ Somatic: the initial tier the history walks forward from """
     steps: list['FakeStep'] = field(default_factory=list)
-    allele_info_id: Optional[int] = None
+    allele_info: Optional[ImportedAlleleInfo] = None
     classification_id: Optional[int] = None
 
 
@@ -272,7 +273,7 @@ class FakeReclassifications(FakeData):
                                                 [(group.variant_id, group.gene_symbol) for group in groups])
         for group, allele_info in zip(groups, allele_infos):
             for record in group.records:
-                record.allele_info_id = allele_info.pk
+                record.allele_info = allele_info
         context.stdout.write(f"Created {len(allele_infos)} allele infos")
 
         self._create_classifications(context, records)
@@ -328,7 +329,7 @@ class FakeReclassifications(FakeData):
             classifications.append(Classification(
                 user=random.choice(context.users), lab=record.lab_obj,
                 lab_record_id=f"{prefix}{index + 1}",
-                allele_info_id=record.allele_info_id,
+                allele_info=record.allele_info, allele_id=record.allele_info.allele_id, variant_id=record.variant_id,
                 evidence=latest.evidence,
                 clinical_significance=latest.significance,
                 allele_origin_bucket=AlleleOriginBucket.SOMATIC if record.somatic else AlleleOriginBucket.GERMLINE,

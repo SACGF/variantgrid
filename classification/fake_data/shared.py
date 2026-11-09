@@ -46,7 +46,7 @@ def create_fake_allele_infos(genome_build: GenomeBuild,
     allele_infos = ImportedAlleleInfo.objects.bulk_create([
         ImportedAlleleInfo(imported_c_hgvs=hgvs_c_by_variant.get(variant_id, f"{gene_symbol}:c.{variant_id}A>G"),
                            imported_genome_build_patch_version=patch_version,
-                           allele_id=allele_ids[variant_id],
+                           allele_id=allele_ids[variant_id], matched_variant_id=variant_id,
                            status=ImportedAlleleInfoStatus.MATCHED_ALL_BUILDS)
         for variant_id, gene_symbol in variants_and_genes], batch_size=BATCH_SIZE)
 

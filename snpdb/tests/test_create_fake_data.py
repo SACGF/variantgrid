@@ -6,6 +6,7 @@ from io import StringIO
 
 from django.contrib.auth.models import User
 from django.core.management import call_command
+from django.db.models import F
 
 from analysis.fake_data import FAKE_ANALYSIS_NAME
 from analysis.models import Analysis, VariantTag
@@ -52,6 +53,13 @@ class CreateFakeDataTest(URLTestCase):
     def test_all_creates_every_step(self):
         for name, count in fake_row_counts().items():
             self.assertGreater(count, 0, f"No fake {name}")
+
+    def test_classifications_carry_their_allele_info_match(self):
+        """ As a real match leaves them (apply_allele_info_to_classification), so the gene and allele filters,
+            which read either the copies or the allele info, see the same records """
+        classifications = Classification.objects.filter(lab_record_id__startswith="fake-")
+        mismatched = classifications.exclude(allele=F("allele_info__allele"), variant=F("allele_info__matched_variant"))
+        self.assertEqual(list(mismatched.values_list("lab_record_id", flat=True)), [])
 
     def test_pages_render(self):
         trio = Trio.objects.get(user__username__in=FAKE_USERS)
