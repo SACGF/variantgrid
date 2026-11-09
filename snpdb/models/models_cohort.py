@@ -900,11 +900,11 @@ class SampleGenotype:
             return None
 
     def get_vcf_filters(self) -> list:
-        """ List of VCF Filters (string) """
+        """ List of VCF Filters (string), sorted so the same filters always give the same list """
         vcf_filters = ["."]  # May be missing (if not VCFLocusFilter)
         filter_lookup = invert_dict(self.sample.vcf.get_filter_dict())
         if self._cohort_genotype.filters:
-            vcf_filters = [filter_lookup[f] for f in set(self._cohort_genotype.filters)]
+            vcf_filters = sorted({filter_lookup[f] for f in self._cohort_genotype.filters})
         else:
             vcf_filters = ["PASS"]
         return vcf_filters

@@ -116,6 +116,16 @@ class VariantSampleGenotypesTest(TestCase):
         multiple_data = VariantSampleGenotypes(self.user, multiple).to_json()
         self.assertEqual("YOUSHALLNOTPASS,LOW_DEPTH", self._rows_by_sample_name(multiple_data)["proband"]["filters"])
 
+    def test_sample_genotype_vcf_filters_sorted(self):
+        """ Classification evidence joins these, so the order mustn't depend on set iteration """
+        vcf = self.cohort_37.vcf
+        VCFFilter.objects.create(vcf=vcf, filter_code="Y", filter_id="LOW_DEPTH")
+        variant = slowly_create_test_variant("3", 3500, "A", "T", self.grch37)
+        self._het_proband_and_mother(self.cohort_37, variant, filters="XY")
+
+        proband = Sample.objects.get(vcf=vcf, name="proband")
+        self.assertEqual(["LOW_DEPTH", "YOUSHALLNOTPASS"], proband.get_genotype(variant).get_vcf_filters())
+
     def test_sample_filters(self):
         variant = slowly_create_test_variant("3", 3500, "A", "T", self.grch37)
         # MISSING_FT_VALUE = no FT for that sample, "" = FT of PASS
