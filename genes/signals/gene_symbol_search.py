@@ -38,10 +38,6 @@ def gene_symbol_alias_search(search_input: SearchInputInstance):
 
 @receiver(preview_extra_signal, sender=GeneSymbol)
 def gene_symbol_preview_classifications_extra(sender, user: User, obj: GeneSymbol, **kwargs) -> list[PreviewKeyValue]:
-    extras = []
-
-    q = classification_gene_symbol_filter(obj)
-    cms_qs = ClassificationModification.latest_for_user(user=user).filter(q)
-    if cms_qs.exists():
-        extras += classification_qs_to_extras(cms_qs)
-    return extras
+    if q := classification_gene_symbol_filter(obj):
+        return classification_qs_to_extras(ClassificationModification.latest_for_user(user=user).filter(q))
+    return []
