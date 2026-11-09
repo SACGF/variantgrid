@@ -146,6 +146,14 @@ class PreviewModelMixin:
         return False
 
     @classmethod
+    def preview_one_per_build(cls) -> bool:
+        """
+        True if a search finds one of these per genome build for the same thing (a contig, a cytoband), so search
+        auto-opens the one in the user's preferred build rather than listing every build's copy
+        """
+        return False
+
+    @classmethod
     def preview_enabled(cls) -> bool:
         """
         If this returns false, pretend like the model doesn't exist, don't search for it
@@ -255,6 +263,7 @@ class PreviewData:
     annotation_consortia: Optional[set['AnnotationConsortium']] = None
     obj: Optional[Any] = None
     can_liftover: bool = False  # liftover may add this object to another genome build, see PreviewModelMixin.preview_can_liftover
+    one_per_build: bool = False  # see PreviewModelMixin.preview_one_per_build
     is_operation: bool = False  # indicates that the preview data is the preview of an operation to create the data
     internal_url_post: bool = False  # internal_url performs the operation, so it's followed with a POST not a link
     is_error: bool = False
@@ -331,6 +340,7 @@ class PreviewData:
             genome_builds=genome_builds,
             annotation_consortia=annotation_consortia,
             can_liftover=isinstance(obj, PreviewModelMixin) and obj.preview_can_liftover(),
+            one_per_build=isinstance(obj, PreviewModelMixin) and obj.preview_one_per_build(),
             is_operation=is_operation,
             is_error=is_error,
         )
@@ -405,6 +415,7 @@ class PreviewData:
             annotation_consortia,
             self.obj,
             self.can_liftover,
+            self.one_per_build,
             self.is_operation,
             self.internal_url_post,
         )
