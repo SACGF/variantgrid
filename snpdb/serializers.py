@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from snpdb.models import Duo, Locus, Quad, Trio, Variant
 from snpdb.models.models_clingen_allele import ClinGenAllele
-from snpdb.models.models_genome import Contig, GenomeBuild
+from snpdb.models.models_genome import Contig, Cytoband, GenomeBuild
 from snpdb.models.models_variant import Allele, VariantAllele
 from snpdb.models.models_vcf import Project
 from snpdb.variant_links import variant_link_info
@@ -35,7 +35,19 @@ class ContigSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Contig
-        fields = ('name', 'refseq_accession')
+        fields = ('id', 'name', 'refseq_accession', 'ucsc_name', 'length')
+
+
+class CytobandSerializer(serializers.ModelSerializer):
+    """ start/end are 1-based inclusive; label is the band with its chromosome, eg '11p13' """
+    label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Cytoband
+        fields = ('name', 'level', 'start', 'end', 'stain', 'label')
+
+    def get_label(self, obj) -> str:
+        return str(obj)
 
 
 class LocusSerializer(serializers.ModelSerializer):

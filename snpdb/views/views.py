@@ -30,6 +30,7 @@ from snpdb.models import (
 )
 from snpdb.models.models_genome import Cytoband
 from snpdb.models.models_user_settings import get_igv_data
+from snpdb.serializers import ContigSerializer, CytobandSerializer
 from snpdb.variant_filters import get_default_all_variants_filters, get_variant_type_choices
 from user_messages.models import Message
 
@@ -158,13 +159,10 @@ def view_contig(request, contig_accession):
         "cytoband_interval": cytoband_interval,
         "cytobands": cytobands,
         "contig_page_data": {
-            "contigId": contig.pk,
-            "contigName": contig.name,
-            "contigLabel": contig.ucsc_name or contig.name,
-            "contigLength": contig.length,
+            "contig": ContigSerializer(contig).data,
+            "cytobands": CytobandSerializer(cytobands, many=True).data,
             "band": band if selected_interval else None,
             "selectedInterval": selected_interval,
-            "cytobands": [{"name": c.name, "start": c.start, "end": c.end, "stain": c.stain} for c in cytobands],
         },
     }
     if has_annotation:

@@ -7,7 +7,8 @@ const IDEOGRAM_HEIGHT = 24;
 const IDEOGRAM_LABEL_HEIGHT = 14;
 const IDEOGRAM_MIN_LABEL_WIDTH = 34;
 
-let contigPage = null;  // contig_page_data from snpdb.views.views.view_contig
+let contigPage = null;  // contig_page_data from snpdb.views.views.view_contig: contig and cytobands are
+                        // snpdb.serializers.ContigSerializer / CytobandSerializer output
 let selectedBand = null;  // {band, start, end} - 1-based inclusive - or null for the whole contig
 
 function initViewContig(contigPageData) {
@@ -20,7 +21,7 @@ function initViewContig(contigPageData) {
 
 // data-datatable-data callback for the genes grid
 function contigGenesFilter(data) {
-    data.contig_id = contigPage.contigId;
+    data.contig_id = contigPage.contig.id;
     if (selectedBand) {
         data.region_start = selectedBand.start;
         data.region_end = selectedBand.end;
@@ -81,8 +82,8 @@ function showSelectedBand(band, refilterGrids = true) {
     $("#selected-band-card").toggle(Boolean(band));
     $("#unknown-band-card").toggle(!band && Boolean(new URL(window.location.href).searchParams.get("band")));
     if (band) {
-        $("#selected-band-name").text(contigPage.contigName + band.band);
-        $("#selected-band-coordinates").text(contigPage.contigLabel + ":" + band.start.toLocaleString() + "-" + band.end.toLocaleString());
+        $("#selected-band-name").text(contigPage.contig.name + band.band);
+        $("#selected-band-coordinates").text((contigPage.contig.ucsc_name || contigPage.contig.name) + ":" + band.start.toLocaleString() + "-" + band.end.toLocaleString());
     }
 
     if (refilterGrids) {
@@ -98,7 +99,7 @@ function showSelectedBand(band, refilterGrids = true) {
 
 function contigVariantsLockedFilters() {
     return {
-        contig_ids: [contigPage.contigId],
+        contig_ids: [contigPage.contig.id],
         position_range: selectedBand ? [selectedBand.start, selectedBand.end] : null,
     };
 }
@@ -129,7 +130,7 @@ function svgElement(name, attributes) {
 }
 
 function ideogramScale(width) {
-    return width / contigPage.contigLength;
+    return width / contigPage.contig.length;
 }
 
 function drawIdeogram() {
@@ -171,7 +172,7 @@ function drawIdeogram() {
         shape.setAttribute("class", "ideogram-band");
         shape.setAttribute("data-band", cytoband.name);
         const title = svgElement("title", {});
-        title.textContent = `${contigPage.contigName}${cytoband.name} (${cytoband.stain}) ${cytoband.start.toLocaleString()}-${cytoband.end.toLocaleString()}`;
+        title.textContent = `${cytoband.label} (${cytoband.stain}) ${cytoband.start.toLocaleString()}-${cytoband.end.toLocaleString()}`;
         shape.appendChild(title);
         shape.addEventListener("click", () => selectBand({band: cytoband.name, start: cytoband.start, end: cytoband.end}));
         svg.appendChild(shape);
