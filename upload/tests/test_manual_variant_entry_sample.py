@@ -7,6 +7,7 @@ from unittest.mock import patch
 import cyvcf2
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
+from django.urls import reverse
 
 from annotation.fake_data import get_fake_annotation_version
 from annotation.manual_variant_entry import create_manual_variants
@@ -16,7 +17,7 @@ from annotation.models.models_manual_variant import (
     ManualVariantEntryCollection,
 )
 from library.utils import full_class_name
-from snpdb.enums import ImportSource
+from snpdb.enums import ImportSource, ImportStatus
 from snpdb.forms import ManualVariantEntryForm
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import VariantCoordinate
@@ -63,17 +64,23 @@ class ManualVariantEntrySampleTest(TestCase):
         file_upload = mvec.uploadedmanualvariantentrycollection.file_upload
         self.assertEqual(file_upload.file_type, UploadedFileTypes.MANUAL_VARIANT_ENTRY)
 
-    def test_create_as_sample_imports_one_sample_vcf(self):
-        sample_name = "my variant list"
+    def _create_as_sample_vcf(self, sample_name) -> ManualVariantEntryCollection:
+        """ Runs the import as far as the VCF and its sample being made """
         mvec = self._create_manual_variants(sample_name=sample_name)
         file_upload = mvec.uploadedmanualvariantentrycollection.file_upload
-        self.assertEqual(file_upload.file_type, UploadedFileTypes.MANUAL_VARIANT_ENTRY_SAMPLE)
-
-        upload_pipeline = file_upload.uploadpipeline
-        get_upload_processing_task(file_upload.file_type, upload_pipeline)  # Creates the factory's steps
-        header_step = upload_pipeline.uploadstep_set.get(
+        get_upload_processing_task(file_upload.file_type, file_upload.uploadpipeline)  # Creates the factory's steps
+        header_step = file_upload.uploadpipeline.uploadstep_set.get(
             script=full_class_name(ImportCreateVCFModelForManualVariantEntryTask))
         ImportCreateVCFModelForManualVariantEntryTask.process_items(header_step)
+        mvec.refresh_from_db()
+        return mvec
+
+    def test_create_as_sample_imports_one_sample_vcf(self):
+        sample_name = "my variant list"
+        mvec = self._create_as_sample_vcf(sample_name)
+        file_upload = mvec.uploadedmanualvariantentrycollection.file_upload
+        self.assertEqual(file_upload.file_type, UploadedFileTypes.MANUAL_VARIANT_ENTRY_SAMPLE)
+        upload_pipeline = file_upload.uploadpipeline
 
         # A list of variants, not an individual - none of the per-sample steps (counts, somalier), but the VCF stats
         step_names = set(upload_pipeline.uploadstep_set.values_list("name", flat=True))
@@ -82,12 +89,22 @@ class ManualVariantEntrySampleTest(TestCase):
                                       "VCFCheckAnnotationTask", "ManualVariantsPostInsertTask",
                                       "ImportGenotypeVCFSuccessTask", "Calculate VCF Stats"})
 
-        mvec.refresh_from_db()
         vcf = mvec.vcf
         self.assertEqual(vcf.genome_build, self.grch37)  # From the upload - the VCF header has no contigs
         self.assertFalse(vcf.variant_zygosity_count)
         self.assertEqual(list(vcf.sample_set.values_list("name", flat=True)), [sample_name])
         self.assertEqual(mvec.sample.cohortsample_set.get().cohort, vcf.cohort)
+
+    def test_watch_page_redirects_to_sample_once_imported(self):
+        mvec = self._create_as_sample_vcf("my variant list")
+        self.client.force_login(self.user)
+        watch_url = reverse("watch_manual_variant_entry", kwargs={"pk": mvec.pk})
+        self.assertEqual(self.client.get(watch_url).status_code, 200)  # Importing - keeps polling
+
+        mvec.sample.import_status = ImportStatus.SUCCESS
+        mvec.sample.save()
+        self.assertRedirects(self.client.get(watch_url), reverse("view_sample", kwargs={"sample_id": mvec.sample.pk}),
+                             fetch_redirect_response=False)
 
     def test_create_as_sample_needs_a_name(self):
         data = {"variants_text": VARIANTS_TEXT, "genome_build": self.grch37.pk, "create_as_sample": True}

@@ -35,7 +35,7 @@
         <div>
             {% if as_sample %}
             {% labelled label="Sample" %}
-                <div id="sample-link">{{ mvec.uploadedmanualvariantentrycollection.file_upload.name }} ({{ mvec.genome_build }})</div>
+                <div>{{ mvec.uploadedmanualvariantentrycollection.file_upload.name }} ({{ mvec.genome_build }})</div>
             {% endlabelled %}
             {% else %}
             {% labelled label="Coordinate" %}

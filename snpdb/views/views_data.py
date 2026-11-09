@@ -787,9 +787,12 @@ def watch_manual_variant_entry(request, pk):
     mvec = ManualVariantEntryCollection.get_for_user(request.user, pk)
     # TODO: Quick redirect to variant if it's already ready
 
-    mvec_data = ManualVariantEntryCollectionSerializer(mvec).data
     as_sample = UploadedManualVariantEntryCollection.objects.filter(
         collection=mvec, file_upload__file_type=UploadedFileTypes.MANUAL_VARIANT_ENTRY_SAMPLE).exists()
+    if as_sample and (sample := mvec.sample) and sample.import_status == ImportStatus.SUCCESS:
+        return redirect('view_sample', sample_id=sample.pk)
+
+    mvec_data = ManualVariantEntryCollectionSerializer(mvec).data
     context = {"mvec": mvec,
                "as_sample": as_sample,
                "initial_json": json.dumps(mvec_data)}

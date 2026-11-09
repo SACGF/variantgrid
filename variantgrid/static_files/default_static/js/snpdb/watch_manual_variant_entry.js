@@ -11,20 +11,13 @@ function displayError(message) {
     $("#variant-status").addClass("error").text(message);
 }
 
-function displaySampleReady(sample) {
-    // The sample page is where an analysis is created from a sample
-    const sampleUrl = Urls.view_sample(sample["id"]) + "#create-analyses";
-    $("#glowing-cloud").remove();
-    $("#variant-status").text("Sample imported - create an analysis from the sample page");
-    $("#sample-link").empty().append($("<a />", {href: sampleUrl, text: sample["name"]}));
-}
-
 function handleSampleData(mvecId, data) {
+    // The sample import succeeds once its variants are annotated
     const sample = data["sample"];
     if (data["import_status"] === 'E' || (sample && sample["import_status"] === 'E')) {
         displayError("Sample import failed.");
     } else if (sample && sample["import_status"] === 'S') {
-        displaySampleReady(sample);
+        window.location.href = Urls.view_sample(sample["id"]);
     } else {
         populatePage(data);
         if (sample) {
