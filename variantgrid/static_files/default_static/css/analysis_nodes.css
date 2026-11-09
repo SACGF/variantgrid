@@ -1038,10 +1038,21 @@ span.node-counts {
 /* The toolbar and the editor drawer are pinned to this pane, so the canvas does its own scrolling */
 .analysis-horizontal #left-panel {
 	overflow: hidden;
+	/* The toolbar is in flow above the canvas here, so the canvas takes the remaining height rather
+	   than the panel's full height (which would hang its bottom edge and scrollbar below the panel) */
+	display: flex;
+	flex-direction: column;
+}
+
+.analysis-horizontal #analysis-toolbar {
+	flex: none;
 }
 
 .analysis-horizontal #analysis-container {
 	overflow: auto;
+	flex: 1 1 auto;
+	min-height: 0;
+	height: auto;
 }
 
 .analysis-horizontal #right-panel {
@@ -1141,6 +1152,10 @@ span.node-counts {
 /* Node counts legend - moved into the toolbar (see layoutAnalysisPanels), so it reads as a single row */
 .analysis-horizontal #analysis-toolbar {
 	position: relative;  /* anchor for the node counts legend */
+	/* Contain the floated toolbar divs: in this mode the toolbar is in flow above #analysis-container, whose
+	   overflow: auto makes it a block formatting context, so a float hanging below the toolbar would push
+	   the whole canvas right of it */
+	display: flow-root;
 }
 
 .analysis-horizontal #node-count-legend {
