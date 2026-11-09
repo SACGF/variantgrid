@@ -3488,8 +3488,12 @@ a .c-hgvs-body .c-hgvs-nomen {
   background-color: #ddddff;
 }
 
-.cs-r, cs-dr {
+.cs-d {
   background-color: #eeeeee;
+}
+
+.cs-r {
+  background-color: #ddeeee;
 }
 
 .cs-vus,
@@ -3671,8 +3675,6 @@ table.overlap-summary .overlap-criteria {
   text-align: left;
 }
 
-/* Previous classifications of an allele side by side, grouped by what applying one would copy
-   (classification/tags/consensus_comparison.html) */
 .consensus-comparison table.consensus-compare th.consensus-label {
   width: 160px;
   font-weight: normal;
