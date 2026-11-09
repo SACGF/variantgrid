@@ -28,7 +28,6 @@ from classification.enums import (
 from classification.models.classification_patcher import patch_fuzzy_age
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyValueType, VCDataCell
 from library.utils import cautious_attempt_html_to_text, empty_to_none
-from snpdb.models import Sample
 
 if TYPE_CHECKING:
     from classification.models.classification import Classification
@@ -339,17 +338,6 @@ def normalise_evidence_cell(classification: Classification, cell: VCDataCell, so
         cell.value = value
 
     if value is not None:
-        # remove support for existing_variant_id
-        # variant matching is best done through allele_info stuff now
-        if e_key.key == 'existing_sample_id':
-            try:
-                classification.sample = Sample.objects.get(pk=int(value))
-                # self.requires_auto_population = True
-                return None  # clear out the value
-            except Exception:
-                cell.add_validation(code=ValidationCode.MATCHING_ERROR, severity='error',
-                                    message="Couldn't resolve Sample " + str(value) + ")")
-
         if normaliser := VALUE_TYPE_NORMALISERS.get(e_key.value_type):
             value = normaliser(cell, value)
 

@@ -10,6 +10,9 @@ Patterns here:
 - No new select2 or chosen widgets: both are being retired (#1497, #2009). A new dropdown is a native `<select>`
   (or `autocomplete_light` where the page already uses it), and a page you touch keeps the widget it has unless
   the change is to remove it.
+- An `autocomplete_light` widget reads its `forward` config from inside the select's own `<form>`
+  (`yl.getForwards`), so one rendered without a form - a field dropped bare into a modal - silently forwards
+  nothing, not even the genome build. Wrap it in a form (`classification/templates/classification/classification.html`, `#sample-change-form`).
 - Behaviour is attached to markup, not called: `registerDomProcessor(selector, func)` adds a processor that runs on
   document ready and again for every node the MutationObserver sees added
   (variantgrid/static_files/default_static/js/global.js:processDomNode). Render the attribute/class

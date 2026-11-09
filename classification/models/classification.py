@@ -459,6 +459,13 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
         can_create = settings.CLASSIFICATION_WEB_FORM_CREATE
         return can_create and (user.is_superuser or settings.CLASSIFICATION_WEB_FORM_CREATE_BY_NON_ADMIN)
 
+    def can_reassign_sample(self, user: User) -> bool:
+        """ Moving a record to another sample re-writes its sample-derived evidence, so it is for the head of
+            the (internal) owning lab. Needs a variant, which the genotype fields come from """
+        if not self.variant_id:
+            return False
+        return user.is_superuser or (not self.lab.external and self.lab.is_head(user))
+
     @property
     def variant_coordinate(self):
         """

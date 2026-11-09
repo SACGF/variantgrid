@@ -15,6 +15,7 @@ from typing import Any, Optional, Union
 import rest_framework
 from crispy_forms.bootstrap import FieldWithButtons
 from crispy_forms.layout import Field, Layout, Submit
+from dal import forward
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_not_required
@@ -502,9 +503,26 @@ def view_classification(request: HttpRequest, classification_id: str):
         # Card body is loaded lazily - the gene candidates are a query the page shouldn't wait on
         'gene_consensus_enabled': settings.CLASSIFICATION_GENE_CONSENSUS and vc.can_write(request.user)
                                   and bool(classification_gene_symbol(vc)),
+        'sample_panel_enabled': vc.variant_id is not None and vc.can_write(request.user),
+        'sample_change_form': _sample_change_form(vc, request.user, genome_build),
+        'sample_change_patient_id': vc.sample.patient_id if vc.sample else None,
         'sync_statuses': classification_sync_status(vc),
     }
     return render(request, 'classification/classification.html', context)
+
+
+def _sample_change_form(vc: Classification, user: User, genome_build: GenomeBuild) -> Optional[SampleChoiceForm]:
+    """ The Sample card's dialog, for the users who may move the record to another sample """
+    if not vc.can_reassign_sample(user):
+        return None
+    form = SampleChoiceForm(genome_build=genome_build, prefix="reassign")
+    widget = form.fields["sample"].widget
+    # select2 searches from inside the modal only when its dropdown is attached there
+    widget.attrs["data-dropdown-parent"] = "#sample-change-modal"
+    # The wrong sample is usually a relative in the same case, so searches start within the current sample's
+    # patient - the hidden reassign-patient input in classification.html, which "Show all samples" clears
+    widget.forward = [*widget.forward, forward.Field("patient")]
+    return form
 
 
 def view_classification_lab_record(request: HttpRequest, classification_ref: str):
