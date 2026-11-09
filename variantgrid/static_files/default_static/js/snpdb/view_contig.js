@@ -1,7 +1,7 @@
 // @ts-check
 // snpdb/templates/snpdb/genomics/view_contig.html
 // An ideogram of the contig's cytobands. The selected band (?band=, also a whole arm or a range like p13-p12)
-// is shared by the ideogram, the cytoband table and the genes and variants grids, and changes without a reload
+// is shared by the ideogram, the cytoband table and the genes and variants grid tabs, and changes without a reload
 
 const IDEOGRAM_HEIGHT = 24;
 const IDEOGRAM_LABEL_HEIGHT = 14;
@@ -44,6 +44,10 @@ function setupViewContig() {
         selectBand(cytobandForRow($(this).closest("tr")));
     });
     $("#selected-band-clear").click(() => selectBand(null));
+    // The grids are built while their tab is hidden, so the shown one needs its column widths measured
+    $("#contig-grids a[data-toggle='tab']").on("shown.bs.tab", () => {
+        $.fn.dataTable.tables({visible: true, api: true}).columns.adjust();
+    });
 
     history.replaceState({selectedBand: selectedBand}, "");
     window.addEventListener("popstate", (event) => {
@@ -79,11 +83,11 @@ function showSelectedBand(band, refilterGrids = true) {
         row.toggleClass("table-active", inBand);
     });
 
-    $("#selected-band-card").toggle(Boolean(band));
+    $("#selected-band-summary").toggle(Boolean(band));
+    $("#ideogram-click-hint").toggle(!band);
     $("#unknown-band-card").toggle(!band && Boolean(new URL(window.location.href).searchParams.get("band")));
     if (band) {
         $("#selected-band-name").text(contigPage.contig.name + band.band);
-        $("#selected-band-coordinates").text((contigPage.contig.ucsc_name || contigPage.contig.name) + ":" + band.start.toLocaleString() + "-" + band.end.toLocaleString());
     }
 
     if (refilterGrids) {

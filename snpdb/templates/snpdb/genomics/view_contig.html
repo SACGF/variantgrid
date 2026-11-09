@@ -70,19 +70,16 @@
             <div class="card-header">Ideogram</div>
             <div class="card-body">
                 <div id="contig-ideogram"></div>
-                <div class="text-small text-muted">Click a band to show its genes and variants below</div>
+                <div class="text-small text-muted">
+                    <span id="ideogram-click-hint" {% if cytoband_interval %}style="display: none"{% endif %}>Click a band to show its genes and variants below</span>
+                    <span id="selected-band-summary" {% if not cytoband_interval %}style="display: none"{% endif %}>
+                        Showing <b id="selected-band-name">{{ contig.name }}{{ band }}</b>
+                        &middot; <a id="selected-band-clear" href="javascript:void(0)">Show the whole chromosome</a>
+                    </span>
+                </div>
             </div>
         </div>
         {% endif %}
-
-        <div class="card" id="selected-band-card" {% if not cytoband_interval %}style="display: none"{% endif %}>
-            <div class="card-header">Cytoband: <span id="selected-band-name">{{ contig.name }}{{ band }}</span></div>
-            <div class="card-body">
-                {% labelled hint="tiny" label="Coordinates" %}<span id="selected-band-coordinates">{% if cytoband_interval %}{{ contig.ucsc_name|default:contig.name }}:{{ cytoband_interval.start|intcomma }}-{{ cytoband_interval.end|intcomma }}{% endif %}</span>{% endlabelled %}
-                {% labelled hint="tiny" label="Genome Build" %}{{ genome_build }}{% endlabelled %}
-                <a id="selected-band-clear" href="javascript:void(0)">Show the whole contig</a>
-            </div>
-        </div>
         {% if band and not cytoband_interval %}
         <div class="card" id="unknown-band-card">
             <div class="card-header">Cytoband: {{ contig.name }}{{ band }}</div>
@@ -93,58 +90,60 @@
         {% endif %}
 
         {% if cytobands %}
-        <div class="card">
-            <div class="card-header">Cytobands</div>
-            <div class="card-body">
-                <table id="cytoband-table" class="table table-sm">
-                    <thead><tr><th>Band</th><th class="text-right">Start</th><th class="text-right">End</th><th>Stain</th></tr></thead>
-                    <tbody>
-                    {% for cytoband in cytobands %}
-                        <tr data-band="{{ cytoband.name }}" data-start="{{ cytoband.start }}" data-end="{{ cytoband.end }}" {% if cytoband.in_selected_band %}class="table-active"{% endif %}>
-                            <td><a class="cytoband-link" href="{{ cytoband.get_absolute_url }}">{{ cytoband }}</a></td>
-                            <td class="text-right">{{ cytoband.start|intcomma }}</td>
-                            <td class="text-right">{{ cytoband.end|intcomma }}</td>
-                            <td>{{ cytoband.stain }}</td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
+        <div class="accordion round-indicator indicator-plus-before">
+            <div class="card">
+                <div class="card-header hover-link collapsed" data-toggle="collapse" data-target="#cytoband-table-collapse" aria-expanded="false">Cytobands</div>
+                <div id="cytoband-table-collapse" class="collapse">
+                    <div class="card-body">
+                        <table id="cytoband-table" class="table table-sm">
+                            <thead><tr><th>Band</th><th class="text-right">Start</th><th class="text-right">End</th><th>Stain</th></tr></thead>
+                            <tbody>
+                            {% for cytoband in cytobands %}
+                                <tr data-band="{{ cytoband.name }}" data-start="{{ cytoband.start }}" data-end="{{ cytoband.end }}" {% if cytoband.in_selected_band %}class="table-active"{% endif %}>
+                                    <td><a class="cytoband-link" href="{{ cytoband.get_absolute_url }}">{{ cytoband }}</a></td>
+                                    <td class="text-right">{{ cytoband.start|intcomma }}</td>
+                                    <td class="text-right">{{ cytoband.end|intcomma }}</td>
+                                    <td>{{ cytoband.stain }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
         {% endif %}
 
-        {% if has_annotation %}
-        <div class="card">
-            <div class="card-header">Genes</div>
-            <div class="card-body">
-                <table id="contig-genes-grid" class="sticky-header"
-                       data-datatable-url="{% url 'genes_datatable' genome_build_name=genome_build.name %}"
-                       data-datatable-data="contigGenesFilter"></table>
-            </div>
-        </div>
-        {% else %}
+        {% if not has_annotation %}
             This build has no annotation, so we can't list genes or variants
         {% endif %}
 
     </div>
 
     {% if has_annotation %}
-    <div class="container-table">
-        <h4>Variants</h4>
-        <div class="container">
-            {% include "variantopedia/all_variants/filter_controls.html" with filters=all_variants_filters %}
-            {% labelled label="" %}
-                <button class="btn btn-outline-primary" id='search-button'>Search</button>
-            {% endlabelled %}
-            <p id='all-variants-filter-description' class='mt-2'>
-                Filtering to <span id='all-variants-filter'></span>.
-            </p>
-        </div>
-        <table id="all-variants-datatable" class="sticky-header"
-               data-datatable-url="{% url 'all_variants_grid' genome_build_name=genome_build.name %}"
-               data-datatable-data="allVariantsDatatableFilter"></table>
+    <div class="container-table" id="contig-grids">
+        {% ui_register_tabs tab_set="contig_tabs" %}
+        {% ui_register_tab_embedded tab_set="contig_tabs" label="Genes" %}
+            <table id="contig-genes-grid" class="sticky-header"
+                   data-datatable-url="{% url 'genes_datatable' genome_build_name=genome_build.name %}"
+                   data-datatable-data="contigGenesFilter"></table>
+        {% end_ui_register_tab_embedded %}
+        {% ui_register_tab_embedded tab_set="contig_tabs" label="Variants" %}
+            <div class="container">
+                {% include "variantopedia/all_variants/filter_controls.html" with filters=all_variants_filters %}
+                {% labelled label="" %}
+                    <button class="btn btn-outline-primary" id='search-button'>Search</button>
+                {% endlabelled %}
+                <p id='all-variants-filter-description' class='mt-2'>
+                    Filtering to <span id='all-variants-filter'></span>.
+                </p>
+            </div>
+            <table id="all-variants-datatable" class="sticky-header"
+                   data-datatable-url="{% url 'all_variants_grid' genome_build_name=genome_build.name %}"
+                   data-datatable-data="allVariantsDatatableFilter"></table>
+        {% end_ui_register_tab_embedded %}
+        {% ui_render_tabs tab_set="contig_tabs" %}
     </div>
     {% endif %}
-
 
 {% endblock %}
