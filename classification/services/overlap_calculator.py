@@ -1,11 +1,16 @@
 from abc import ABC, abstractmethod
-from typing import Optional, Iterable
-from classification.enums import OverlapStatus, OverlapOverrideStatus, TriageStatus, OverlapSnapshot
-from classification.models import ClassificationResultValue, \
-    EvidenceKeyMap, OverlapContribution, ClassificationSummaryCacheObj
-from classification.enums.overlaps_enums import OverlapContributionStatus
-from library.utils import first
+from collections.abc import Iterable
+from typing import Optional
 
+from classification.enums import OverlapOverrideStatus, OverlapSnapshot, OverlapStatus, TriageStatus
+from classification.enums.overlaps_enums import OverlapContributionStatus
+from classification.models import (
+    ClassificationResultValue,
+    ClassificationSummaryCacheObj,
+    EvidenceKeyMap,
+    OverlapContribution,
+)
+from library.utils import first
 
 OVERLAP_CLIN_SIG_ENABLED = False  # ensure reference this whenever doing some functionality when ClinSign should be supported
 # So it's easy to work out where to write functionality when we start supporting it
@@ -37,29 +42,25 @@ class OverlapCalculatorBase(ABC):
         """
 
         override_status: Optional[OverlapOverrideStatus] = OverlapOverrideStatus.NO_OVERRIDE
-        non_comparable_values: int = 0
-        contributing: list[OverlapContribution] = []
+        shared: list[OverlapContribution] = []
         involved_labs: list[str] = []
         overlap_status: OverlapStatus
 
-        # work out which contributions actually contribute to the overlap
         for entry in entries:
-            match entry.contribution_status:
-                case OverlapContributionStatus.CONTRIBUTING:
-                    contributing.append(entry)
-                    if classification_grouping := entry.classification_grouping:
-                        if contributing_lab_group := classification_grouping.lab.group_name:
-                            involved_labs.append(contributing_lab_group)
-                case OverlapContributionStatus.NON_COMPARABLE_VALUE:
-                    non_comparable_values += 1
-                case _:
-                    pass  # don't care about unshared for calculation values
+            if entry.contribution_status == OverlapContributionStatus.CONTRIBUTING:
+                shared.append(entry)
+                if classification_grouping := entry.classification_grouping:
+                    if contributing_lab_group := classification_grouping.lab.group_name:
+                        involved_labs.append(contributing_lab_group)
 
         involved_labs.sort()
-        has_pending_values = any(con.is_amending for con in contributing)
+        has_pending_values = any(con.is_amending for con in shared)
+        # A shared value such as Drug Response is part of the overlap but can't agree or disagree with anything.
+        # Judged on effective_value, so a triage amending to or from such a value counts as its pending value would
+        contributing = [con for con in shared if cls.is_comparable_value(con.effective_value)]
         if len(contributing) == 0:
             # no valid contributions
-            if non_comparable_values > 0:
+            if shared:
                 overlap_status = OverlapStatus.NO_COUNTING_CONTRIBUTIONS
             else:
                 overlap_status = OverlapStatus.NO_CONTRIBUTIONS
@@ -68,7 +69,7 @@ class OverlapCalculatorBase(ABC):
             overlap_status = OverlapStatus.SINGLE_SUBMITTER
         else:
             # multiple valid contributions, need to do some work to actually compare
-            all_values = set(con.effective_value for con in contributing)
+            all_values = {con.effective_value for con in contributing}
             if len(all_values) == 1:
                 overlap_status = OverlapStatus.EXACT_AGREEMENT
             else:
@@ -92,7 +93,7 @@ class OverlapCalculatorBase(ABC):
                             override_status = OverlapOverrideStatus.CONTINUED_DISCORDANCE
                         else:
                             # see if it's ClinVar that's making the over discordant
-                            non_clinvar_values = set(con.effective_value for con in interactive_contributors)
+                            non_clinvar_values = {con.effective_value for con in interactive_contributors}
                             if third_party:
                                 clinvar_causing_discordant = len(non_clinvar_values) == 1 or not cls.calculate_status_for_multiple_entries(non_clinvar_values).is_discordant
 
@@ -170,12 +171,11 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
         if OverlapStatus.SINGLE_SUBMITTER <= overlap_state.status <= OverlapStatus.MINOR_DIFFERENCES:
             all_vus = True
             for entry in entries:
-                match entry.contribution_status:
-                    case OverlapContributionStatus.CONTRIBUTING:
-                        # checking for text VUS is a little messy
-                        if entry.value and "VUS" not in entry.value.upper():
-                            all_vus = False
-                            break
+                if entry.contribution_status == OverlapContributionStatus.CONTRIBUTING and cls.is_comparable_value(entry.effective_value):
+                    # checking for text VUS is a little messy
+                    if entry.value and "VUS" not in entry.value.upper():
+                        all_vus = False
+                        break
 
             if all_vus:
                 overlap_state = OverlapSnapshot(
@@ -203,7 +203,6 @@ class OverlapCalculatorOncPath(OverlapCalculatorBase):
             all_bucket_values.add(bucket)
             all_classification_values.add(value)
 
-        desired_value: OverlapStatus
         if len(all_classification_values) == 2 and "VUS" in all_classification_values and len(all_bucket_values) == 1:
             # here we would have VUS and one of VUS_A, VUS_B, VUS_C
             return OverlapStatus.RESOLUTION_DIFFERENCES

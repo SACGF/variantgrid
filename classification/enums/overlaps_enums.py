@@ -58,7 +58,6 @@ class OverlapContributionStatus(TextChoices):
     CONTRIBUTING = "C", "Contributing"
     NOT_SHARED = "N", "Not-shared"
     NO_VALUE = "X", "No value"
-    NON_COMPARABLE_VALUE = "Z", "Non-comparable value"  # e.g. Risk Factor
 
 
 class TriageStatus(TextChoices):
