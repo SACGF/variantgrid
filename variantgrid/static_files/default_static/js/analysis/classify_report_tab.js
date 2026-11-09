@@ -127,6 +127,13 @@ $(document).ready(function() {
         });
     }
 
+    // The samples the variant wasn't called in are offered greyed out - this is the deliberate step to pick one
+    container.on("click", ".allow-uncalled-samples", function() {
+        const link = $(this);
+        link.siblings("select").find("optgroup.uncalled-samples").prop("disabled", false);
+        link.remove();
+    });
+
     container.on("click", ".apply-previous", function() {
         applyPrevious($(this), "copy_from_vcm_id");
     });

@@ -20,10 +20,28 @@
                 {% if not selected_sample_option %}
                     <option value="" selected>Choose the sample the variant was called in&hellip;</option>
                 {% endif %}
-                {% for option in sample_options %}
-                    <option value="{{ option.sample.pk }}" {% if option.selected %}selected{% endif %}>{{ option.label }}</option>
-                {% endfor %}
+                {% if carrier_options %}
+                    <optgroup label="Called in">
+                    {% for option in carrier_options %}
+                        <option value="{{ option.sample.pk }}" {% if option.selected %}selected{% endif %}>{{ option.label }}</option>
+                    {% endfor %}
+                    </optgroup>
+                    {% if other_options %}
+                    <optgroup label="Not called in" class="uncalled-samples" {% if not uncalled_sample_selected %}disabled{% endif %}>
+                    {% for option in other_options %}
+                        <option value="{{ option.sample.pk }}" {% if option.selected %}selected{% endif %}>{{ option.label }}</option>
+                    {% endfor %}
+                    </optgroup>
+                    {% endif %}
+                {% else %}
+                    {% for option in sample_options %}
+                        <option value="{{ option.sample.pk }}" {% if option.selected %}selected{% endif %}>{{ option.label }}</option>
+                    {% endfor %}
+                {% endif %}
             </select>
+            {% if carrier_options and other_options and not uncalled_sample_selected %}
+                <a href="javascript:void(0)" class="allow-uncalled-samples small">Allow a sample the variant wasn't called in</a>
+            {% endif %}
         {% endlabelled %}
         {% labelled label="For lab" %}
             {% if lab_form %}{{ lab_form.lab }}{{ lab_form.media }}{% endif %}
