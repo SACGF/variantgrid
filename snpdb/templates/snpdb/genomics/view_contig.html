@@ -124,11 +124,6 @@
     {% if has_annotation %}
     <div class="container-table" id="contig-grids">
         {% ui_register_tabs tab_set="contig_tabs" %}
-        {% ui_register_tab_embedded tab_set="contig_tabs" label="Genes" %}
-            <table id="contig-genes-grid" class="sticky-header"
-                   data-datatable-url="{% url 'genes_datatable' genome_build_name=genome_build.name %}"
-                   data-datatable-data="contigGenesFilter"></table>
-        {% end_ui_register_tab_embedded %}
         {% ui_register_tab_embedded tab_set="contig_tabs" label="Variants" %}
             <div class="container">
                 {% include "variantopedia/all_variants/filter_controls.html" with filters=all_variants_filters %}
@@ -142,6 +137,11 @@
             <table id="all-variants-datatable" class="sticky-header"
                    data-datatable-url="{% url 'all_variants_grid' genome_build_name=genome_build.name %}"
                    data-datatable-data="allVariantsDatatableFilter"></table>
+        {% end_ui_register_tab_embedded %}
+        {% ui_register_tab_embedded tab_set="contig_tabs" label="Genes" %}
+            <table id="contig-genes-grid" class="sticky-header"
+                   data-datatable-url="{% url 'genes_datatable' genome_build_name=genome_build.name %}"
+                   data-datatable-data="contigGenesFilter"></table>
         {% end_ui_register_tab_embedded %}
         {% ui_render_tabs tab_set="contig_tabs" %}
     </div>
