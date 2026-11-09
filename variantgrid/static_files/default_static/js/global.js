@@ -918,7 +918,8 @@ function setupUnsavedChangesMessage(form, excludeSelector) {
         $(this).data("unsaved-changes-saved-value", fieldValue(this));
     });
 
-    form.on("change", fieldSelector, function() {
+    // input as well as change, so a text field is marked as it is typed in rather than when it loses focus
+    form.on("change input", fieldSelector, function() {
         // Checking a radio unchecks the rest of its group without a change event on them
         const fields = this.type === "radio" ? $(":radio", form).filter((i, radio) => radio.name === this.name) : $(this);
         fields.each((i, field) => markField(field));
