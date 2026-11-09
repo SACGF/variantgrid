@@ -176,7 +176,8 @@ class AllVariantsGrid(AbstractVariantGrid):
                                  contig_ids=filters.get("contig_ids"),
                                  non_standard_contigs=filters.get("non_standard_contigs", False),
                                  gene_symbols=filters.get("gene_symbols"),
-                                 variant_types=filters.get("variant_types")),
+                                 variant_types=filters.get("variant_types"),
+                                 position_range=filters.get("position_range")),
             Variant.get_no_reference_q(),
         ]
         if min_count := int(filters.get("min_count") or 0):

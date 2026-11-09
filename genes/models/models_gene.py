@@ -22,9 +22,10 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.db import models
-from django.db.models import QuerySet, TextField
+from django.db.models import IntegerField, QuerySet, TextField
 from django.db.models.deletion import CASCADE, SET_NULL
-from django.db.models.functions import Collate, Upper
+from django.db.models.fields.json import KeyTextTransform, KeyTransform
+from django.db.models.functions import Cast, Collate, Upper
 from django.db.models.query_utils import Q
 from django.urls.base import reverse
 from model_utils.models import TimeStampedModel
@@ -1180,6 +1181,20 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     @staticmethod
     def _sum_intervals(intervals: list[tuple]):
         return sum(b - a for a, b in intervals)
+
+    @classmethod
+    def get_gene_version_ids_in_region(cls, genome_build: GenomeBuild, contig: Contig,
+                                       start: int, end: int) -> QuerySet:
+        """ Distinct gene_version_ids of the build's transcripts on contig overlapping start-end
+            (1-based inclusive, as Cytoband / Locus). The span is the cdot exons' first start and last end,
+            which are 0-based half-open - so a transcript overlaps when exon_start < end and exon_end >= start.
+            Coordinates are only in the JSON, a scan of a whole chromosome's transcripts is ~130ms (#2723) """
+        exons = KeyTransform("exons", KeyTransform(genome_build.name, KeyTransform("genome_builds", "data")))
+        tx_start = Cast(KeyTextTransform(0, KeyTransform(0, exons)), IntegerField())
+        tx_end = Cast(KeyTextTransform(1, KeyTransform(-1, exons)), IntegerField())
+        qs = cls.objects.filter(genome_build=genome_build, contig=contig)
+        qs = qs.alias(tx_start=tx_start, tx_end=tx_end).filter(tx_start__lt=end, tx_end__gte=start)
+        return qs.order_by().values_list("gene_version_id", flat=True).distinct()
 
     @classmethod
     def data_is_current_cdot_format(cls, genome_build: Optional['GenomeBuild'] = None) -> bool:

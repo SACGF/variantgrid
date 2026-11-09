@@ -1,0 +1,53 @@
+{% load ui_utils %}
+{% load ui_help %}
+{% comment %}
+    The All Variants grid's controls below the chromosome buttons, read by js/variantopedia/variants.js.
+    Shared by the All Variants page and the contig page (which has no gene symbol form, its grid locked
+    to one contig). Pass filters= the grid's initial filters.
+{% endcomment %}
+<style>
+    .filter-button-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
+    }
+    .filter-button-group > label.btn {
+        border-radius: 4px;
+    }
+</style>
+{% labelled label="Variant Type" %}
+    <div class="filter-button-group">
+        <div class="filter-button-group btn-group-toggle" data-toggle="buttons">
+            {% for variant_type, label in variant_types %}
+                <label class="btn btn-outline-primary btn-sm{% if variant_type in filters.variant_types %} active{% endif %}">
+                    <input class="variant-type-filter" type="checkbox" name="variant_type"
+                           value="{{ variant_type }}" autocomplete="off"
+                           {% if variant_type in filters.variant_types %}checked{% endif %}> {{ label }}
+                </label>
+            {% endfor %}
+        </div>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="variant-type-all">All</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="variant-type-none">None</button>
+    </div>
+{% endlabelled %}
+
+{% if gene_symbol_form %}
+    {% labelled label="Gene Symbols" %}
+        {{ gene_symbol_form.gene_symbols }}
+        {% if gene_symbol_aliases %}
+            {% page_help_embedded page_id='variantopedia/all_variants_gene_aliases' title='Gene Symbol Aliases' %}
+                {% for symbol, aliases in gene_symbol_aliases.items %}
+                    <p>Also searching aliases of {{ symbol }}: {{ aliases|join:", " }}</p>
+                {% endfor %}
+            {% end_page_help_embedded %}
+        {% endif %}
+    {% endlabelled %}
+{% endif %}
+
+{% labelled label="Min sample count" %}
+    <input id='min_count' type='number' min='0' name='min_count' style='max-width: 200px'
+           class="form-control" value="{{ filters.min_count|default:0 }}" />
+    {% field_help %}
+        0 = any, including variants not observed in any sample
+    {% end_field_help %}
+{% endlabelled %}

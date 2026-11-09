@@ -267,8 +267,18 @@ class GenesColumns(DatatableConfig[ReleaseGeneVersion]):
 
     def filter_queryset(self, qs: QuerySet[ReleaseGeneVersion]) -> QuerySet[ReleaseGeneVersion]:
         if contig_id := self.get_query_param("contig_id"):
-            gene_versions = TranscriptVersion.objects.filter(contig_id=contig_id).values_list("gene_version_id",
-                                                                                              flat=True)
+            # Not 'start' - that's the DataTables page offset
+            start = self.get_query_param("region_start")
+            end = self.get_query_param("region_end")
+            if start and end:
+                contig = get_object_or_404(Contig, pk=contig_id)
+                genome_build = GenomeBuild.get_name_or_alias(self.get_query_param("genome_build_name"))
+                # Evaluated once here, rather than the JSON scan running again for the count and the page
+                gene_versions = list(TranscriptVersion.get_gene_version_ids_in_region(genome_build, contig,
+                                                                                      int(start), int(end)))
+            else:
+                gene_versions = TranscriptVersion.objects.filter(contig_id=contig_id).values_list("gene_version_id",
+                                                                                                  flat=True)
             qs = qs.filter(gene_version__in=gene_versions)
 
         if column := self.get_query_param("column"):
