@@ -64,6 +64,13 @@ class OverlapContributionAdmin(AuditlogHistoryAdminMixin, ModelAdminBasics):
     def triage_state_formatted(self, obj: OverlapContribution):
         return obj.triage_state_obj
 
+    @admin_action("refresh")
+    def refresh(self, request, queryset: QuerySet[OverlapContribution]):
+        for obj in queryset.iterator():
+            if cg := obj.classification_grouping:
+                OverlapServices.update_classification_grouping_overlap_contribution(cg)
+
+
 
 @admin.register(OverlapContributionNextStep)
 class OverlapContributionNextStepAdmin(ModelAdminBasics):
