@@ -89,6 +89,7 @@ $(document).ready(function() {
                 title: "Say this classification is what the tag was asking for", text: "Clear tag"
             }));
         }
+        restartPopulatingPolls();  // The new record gets its own wait, whatever an earlier one used up
         reloadWhenDone = true;
     }
 
@@ -201,19 +202,37 @@ $(document).ready(function() {
 
     // A record created from the queue only reaches Classifications once celery has published it. A timer
     // outliving its tab (replaced by some other reload) lets the newer tab do the polling
-    if (container.data("populating")) {
-        const polls = (tabPane.data("populatingPolls") || 0) + 1;
-        if (polls <= POPULATING_MAX_POLLS) {
-            tabPane.data("populatingPolls", polls);
-            setTimeout(function() {
-                if ($.contains(document, container[0])) {
-                    reloadTab();
-                }
-            }, POPULATING_POLL_MS);
-        }
+    const populating = Number(container.data("populating"));
+    const populatingLabel = `${populating} classification${populating === 1 ? "" : "s"}`;
+    const populatingPolls = (tabPane.data("populatingPolls") || 0) + 1;
+    // A report built now would silently lack the populating records, so the build button waits with the polling
+    const waitingOnPopulating = populating > 0 && populatingPolls <= POPULATING_MAX_POLLS;
+    if (waitingOnPopulating) {
+        tabPane.data("populatingPolls", populatingPolls);
+        setTimeout(function() {
+            if ($.contains(document, container[0])) {
+                reloadTab();
+            }
+        }, POPULATING_POLL_MS);
+    } else if (populating) {
+        // Celery is slow or down - building is allowed again, saying what it will leave out
+        $(".populating-status", container).text("Still populating \u2013 ").append(
+            $("<a>", {href: "#", class: "populating-recheck", text: "check again"}));
+        $("#populating-warning", container).removeClass("d-none")
+            .text(`${populatingLabel} still populating \u2013 not included in a report built now`);
     } else {
         tabPane.data("populatingPolls", 0);
     }
+
+    function restartPopulatingPolls() {
+        tabPane.data("populatingPolls", 0);
+    }
+
+    container.on("click", ".populating-recheck", function(event) {
+        event.preventDefault();
+        restartPopulatingPolls();
+        reloadTab();
+    });
 
     $("#classify-modal").on("hidden.bs.modal", function() {
         wizard = null;
@@ -224,9 +243,13 @@ $(document).ready(function() {
 
     function updateReportSelection() {
         const selected = $(".report-select:checked", container).length;
-        $("#report-selected-count", container).text(`${selected} selected`);
-        $("#build-case-report", container).prop("disabled", selected === 0)
-            .text(`Build multiple variant report (${selected})`);
+        const button = $("#build-case-report", container);
+        if (waitingOnPopulating) {
+            button.prop("disabled", true).text(`Waiting for ${populatingLabel} to populate\u2026`)
+                .prepend($("<i>", {class: "fas fa-spinner fa-spin mr-1"}));
+        } else {
+            button.prop("disabled", selected === 0).text(`Build multiple variant report (${selected})`);
+        }
     }
 
     container.on("change", ".report-select", updateReportSelection);
