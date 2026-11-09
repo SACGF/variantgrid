@@ -75,21 +75,42 @@ function showKaryomappingQCGraph(selector, contigQC) {
         {name: 'Father', key: 'father', color: '#1f77b4'},
         {name: 'Mother', key: 'mother', color: '#d62728'},
     ];
-    const data = parents.map(parent => ({
-        x: contigs,
-        y: contigQC.map(c => c[parent.key + '_percent']),
-        customdata: contigQC.map(c => [c[parent.key + '_in_phase'], c[parent.key + '_out_of_phase']]),
-        hovertemplate: parent.name + ' %{x}: %{y:.1f}% in phase (%{customdata[0]} in / %{customdata[1]} out)<extra></extra>',
-        name: parent.name,
-        type: 'bar',
-        marker: {color: parent.color},
-    }));
+    const data = [];
+    const zeroMarkDepth = 3;
+    for (const parent of parents) {
+        const percents = contigQC.map(c => c[parent.key + '_percent']);
+        const customdata = contigQC.map(c => [c[parent.key + '_in_phase'], c[parent.key + '_out_of_phase']]);
+        data.push({
+            x: contigs,
+            y: percents,
+            customdata: customdata,
+            hovertemplate: parent.name + ' %{x}: %{y:.1f}% in phase (%{customdata[0]} in / %{customdata[1]} out)<extra></extra>',
+            name: parent.name,
+            type: 'bar',
+            offsetgroup: parent.key,
+            marker: {color: parent.color},
+        });
+        // A 0% bar has no height, so draw a stub hanging below the axis, flush with 0 - 0% is the strongest
+        // UPD / deletion signal, and must not look like a chromosome with no informative sites (null, nothing drawn)
+        data.push({
+            x: contigs,
+            y: percents.map(p => (p === 0 ? zeroMarkDepth : null)),
+            base: -zeroMarkDepth,
+            customdata: customdata,
+            hovertemplate: parent.name + ' %{x}: 0% in phase (%{customdata[0]} in / %{customdata[1]} out)<extra></extra>',
+            name: parent.name,
+            type: 'bar',
+            offsetgroup: parent.key,
+            marker: {color: parent.color},
+            showlegend: false,
+        });
+    }
 
     const layout = {
         title: {text: 'Proband in phase with each parent, per chromosome'},
         barmode: 'group',
         xaxis: {type: 'category', title: {text: 'Chromosome'}},
-        yaxis: {range: [0, 100], title: {text: '% of parent het sites in phase'}},
+        yaxis: {range: [-zeroMarkDepth, 100], title: {text: '% of parent het sites in phase'}},
         shapes: [{
             type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 50, y1: 50,
             line: {dash: 'dash', color: '#6c757d', width: 1},
