@@ -216,6 +216,7 @@ URLS_NAME_REGISTER.update({  # Disable selected snpdb urls
     "genes": False,
     "gene_grid": False,
     "gene_wiki": False,
+    "gene_symbol_matching": False,
 
     # Variants
     "variants": False,

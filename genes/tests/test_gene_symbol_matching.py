@@ -47,7 +47,7 @@ class TestGeneSymbolMatching(TestCase):
 
     @override_settings(VARIANT_GENE_LEVEL_ENABLED=False)
     def test_page_leaves_out_features_the_deployment_hides(self):
-        """ Shariant has no gene lists or gene level variants, so the page mustn't send users looking for them """
+        """ Without gene lists or gene level variants, the page mustn't send users looking for them """
         url_name_visible = defaultdict(lambda: False, get_visible_url_names(), gene_lists=False)
         self.client.force_login(self.user)
         with patch("snpdb.processors.get_visible_url_names", return_value=url_name_visible):
