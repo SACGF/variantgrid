@@ -6,7 +6,8 @@ from typing import Optional, Union
 
 from django.conf import settings
 from django.contrib.auth.models import User
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
+from django.db.models.functions import Length
 from django.urls import reverse
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
@@ -398,6 +399,71 @@ def search_variant_symbolic(search_input: SearchInputInstance):
     return yield_search_variant_match(search_input, VariantCoordinate.from_symbolic_match)
 
 
+# What the Variant column writes for a variant (VariantGridFormat.representativeVariantLabel in
+# variantgrid_formats.js), so a label read off a grid finds that variant again. An SV is led by the genes it
+# spans ("FGF3", "FGF3, FGF4", "FGF3 +4 genes") or by its contig and a count ("chr11 +5 genes"), or with
+# neither a pick nor a contig to lead, the count alone ("5 genes")
+VARIANT_LABEL_NAMED_LEAD = r"[\w.\-]+(?:,\s*[\w.\-]+)*(?:\s+\+\d+\s+genes)?"
+VARIANT_LABEL_LEAD = rf"(?:\d+\s+genes|{VARIANT_LABEL_NAMED_LEAD})"
+_LABEL_CHROM = r"((?:chr)?(?:MT|[XYM]|\d+))"
+_LABEL_ALLELE = r"([GATC]+|\[\d+bp\])"
+_ABBREVIATED_ALLELE_PATTERN = re.compile(r"^\[(\d+)bp\]$", re.IGNORECASE)
+# An allele over 10 bases is written as its length: "chr1:44827846 A>[23bp]"
+VARIANT_LABEL_ABBREVIATED_PATTERN = re.compile(
+    rf"^(?=.*\[\d+bp\]){_LABEL_CHROM}\s*:\s*(\d+)\s*{_LABEL_ALLELE}>{_LABEL_ALLELE}$", re.IGNORECASE)
+# A symbolic variant is written as its span (position to position + |SVLEN|), its kind on a badge beside it
+VARIANT_LABEL_SPAN_PATTERN = re.compile(
+    rf"^(?:{VARIANT_LABEL_LEAD}\s+)?{_LABEL_CHROM}\s*:\s*(\d+)\s*-\s*(\d+)$", re.IGNORECASE)
+
+
+def _label_allele_q(seq_path: str, length_path: str, allele: str) -> Q:
+    if m := _ABBREVIATED_ALLELE_PATTERN.match(allele):
+        return Q(**{length_path: int(m.group(1))})
+    return Q(**{seq_path: allele.upper()})
+
+
+@search_receiver(
+    search_type=Variant,
+    pattern=VARIANT_LABEL_ABBREVIATED_PATTERN,
+    sub_name="Variant label (allele length)",
+    example=SearchExample(
+        note="A long allele given by its length, as the Variant column writes it",
+        examples=["1:44827846 A>[23bp]"]
+    )
+)
+def search_variant_label_abbreviated(search_input: SearchInputInstance):
+    label_chrom, position, ref, alt = search_input.match.groups()
+    for genome_build in search_input.genome_builds:
+        chrom = format_chrom(label_chrom, genome_build.reference_fasta_has_chr)
+        yield get_visible_variants(search_input, genome_build).filter(
+            Variant.get_chrom_q(chrom), locus__position=position,
+        ).annotate(
+            ref_length=Length("locus__ref__seq"), alt_length=Length("alt__seq"),
+        ).filter(
+            _label_allele_q("locus__ref__seq", "ref_length", ref),
+            _label_allele_q("alt__seq", "alt_length", alt),
+        )
+
+
+@search_receiver(
+    search_type=Variant,
+    pattern=VARIANT_LABEL_SPAN_PATTERN,
+    sub_name="Variant label (structural variant span)",
+    example=SearchExample(
+        note="A structural variant's span, as the Variant column writes it",
+        examples=["chr7:107690218-107715442", "SLC26A4 chr7:107690218-107715442"]
+    )
+)
+def search_variant_label_span(search_input: SearchInputInstance):
+    label_chrom, start, end = search_input.match.groups()
+    size = int(end) - int(start)
+    for genome_build in search_input.genome_builds:
+        chrom = format_chrom(label_chrom, genome_build.reference_fasta_has_chr)
+        yield get_visible_variants(search_input, genome_build).filter(
+            Variant.get_chrom_q(chrom), locus__position=start, alt__seq__startswith="<", svlen__in=[size, -size],
+        )
+
+
 @search_receiver(
     search_type=Variant,
     pattern=DBSNP_PATTERN,
@@ -441,7 +507,7 @@ def _yield_results_from_hgvs(search_input, genome_build, matcher, hgvs_string) -
             yield SearchResult(create_manual)
 
 
-DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")
+DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})\s*(\d+)$")
 
 
 @search_receiver(
@@ -450,7 +516,7 @@ DB_PREFIX_PATTERN = re.compile(fr"^(v|{settings.VARIANT_VCF_DB_PREFIX})(\d+)$")
     sub_name="VCF ID",
     example=SearchExample(
         note="Provide the variant ID as it appears in VCF exports",
-        examples=["v42", f"{settings.VARIANT_VCF_DB_PREFIX}4638674"]
+        examples=["v42", "v 42", f"{settings.VARIANT_VCF_DB_PREFIX}4638674"]
     )
 )
 def search_variant_id(search_input: SearchInputInstance):

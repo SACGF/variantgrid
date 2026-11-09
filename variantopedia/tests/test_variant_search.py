@@ -17,12 +17,18 @@ from snpdb.search import (
     SearchResult,
     SearchResultMatchStrength,
 )
-from snpdb.tests.utils.vcf_testing_utils import create_mock_allele, slowly_create_test_variant
+from snpdb.tests.utils.vcf_testing_utils import (
+    create_mock_allele,
+    slowly_create_test_variant,
+    slowly_create_test_variant_from_coordinate,
+)
 from variantopedia.signals.variant_search import (
     _alt_description,
     _alt_mismatch_message,
     search_allele_id,
     search_variant_id,
+    search_variant_label_abbreviated,
+    search_variant_label_span,
     yield_search_variant_match,
 )
 
@@ -150,3 +156,30 @@ class VariantSearchUnknownContigTestCase(TestCase):
         [response] = list(yield_search_variant_match(search_input, VariantCoordinate.from_variant_match))
         self.assertIsInstance(response, SearchMessageOverall)
         self.assertIn("'MT'", response.message)
+
+
+class VariantLabelSearchTestCase(TestCase):
+    """ What the Variant column writes for a variant finds it again (#2696) """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.admin = User.objects.create_superuser(username="variant_label_search_admin")
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        get_fake_annotation_version(cls.grch37)
+        cls.insertion = slowly_create_test_variant("3", 5000, "A", "A" + "C" * 22, cls.grch37)
+        cls.other_insertion = slowly_create_test_variant("3", 5000, "A", "A" + "C" * 21, cls.grch37)
+        cls.deletion = slowly_create_test_variant_from_coordinate(
+            VariantCoordinate(chrom="3", position=6000, ref="N", alt="<DEL>", svlen=-1000), cls.grch37)
+        cls.duplication = slowly_create_test_variant_from_coordinate(
+            VariantCoordinate(chrom="3", position=6000, ref="N", alt="<DUP>", svlen=2000), cls.grch37)
+
+    def _found(self, receiver, search_string) -> set[int]:
+        search_input = SearchInput(user=self.admin, search_string=search_string, genome_build_preferred=self.grch37)
+        return {result.preview.obj.pk for result in receiver.search(search_input).results}
+
+    def test_abbreviated_allele_matches_by_length(self):
+        self.assertEqual(self._found(search_variant_label_abbreviated, "chr3:5000 A>[23bp]"), {self.insertion.pk})
+
+    def test_span_matches_symbolic_variant_ending_there(self):
+        self.assertEqual(self._found(search_variant_label_span, "chr3:6000-7000"), {self.deletion.pk})
+        self.assertEqual(self._found(search_variant_label_span, "GATA2, RPN1 chr3:6000-8000"), {self.duplication.pk})
