@@ -139,8 +139,8 @@ class SampleOption:
             return not_called
         if not self.sample.has_genotype:
             call = "called"  # a caller with no GT (eg TSO 500 fusions) only writes rows for what it called
-        elif self.sample_genotype.zygosity == Zygosity.UNKNOWN_ZYGOSITY:
-            return not_called  # ./.
+        elif self.sample_genotype.zygosity in (Zygosity.UNKNOWN_ZYGOSITY, Zygosity.MISSING):
+            return not_called  # ./. or, in a multi-sample VCF, a sample the caller left at reference
         else:
             call = Zygosity.display(self.sample_genotype.zygosity)
         vaf = self.sample_genotype.allele_frequency

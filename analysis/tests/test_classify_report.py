@@ -1,4 +1,5 @@
 import json
+import re
 
 from auditlog.models import LogEntry
 from django.contrib.auth.models import User
@@ -550,6 +551,35 @@ class CreateClassificationForCaseTest(ClassifyReportTestCase):
 
         self.assertContains(response, reverse("create_classification_for_variant_tag",
                                               kwargs={"variant_tag_id": self.variant_tag.pk}))
+
+    def _patient_dialog_html(self, variant_tag) -> str:
+        """ The dialog for a case of all three samples - the choice of sample is the whole point of it """
+        patient = self._patient_for(self.proband, "Grouped")
+        Sample.objects.filter(pk__in=[self.mother.pk, self.father.pk]).update(patient=patient)
+        url = reverse("classify_report_tag_dialog",
+                      kwargs={"case_type": "patient", "case_id": patient.pk, "variant_tag_id": variant_tag.pk})
+        return self.client.get(url).content.decode()
+
+    def test_dialog_offers_the_carriers_and_greys_out_the_rest(self):
+        html = self._patient_dialog_html(self._create_variant_tag(analysis=self._create_cohort_analysis()))
+
+        called, not_called = re.search(r'<optgroup label="Called in">(.*?)</optgroup>.*?'
+                                       r'<optgroup label="Not called in"[^>]*\bdisabled[^>]*>(.*?)</optgroup>',
+                                       html, re.DOTALL).groups()
+        self.assertIn(f'value="{self.proband.pk}"', called)
+        self.assertNotIn(f'value="{self.mother.pk}"', called)
+        self.assertIn(f'value="{self.mother.pk}"', not_called)
+        self.assertIn(f'value="{self.father.pk}"', not_called)
+        self.assertIn("allow-uncalled-samples", html)
+
+    def test_dialog_keeps_a_chosen_non_carrier_selectable(self):
+        """ The tagging names the mother, who didn't call the variant - her option can't sit in a disabled group """
+        html = self._patient_dialog_html(self._create_variant_tag(analysis=self._create_cohort_analysis(),
+                                                                  sample=self.mother))
+
+        self.assertRegex(html, rf'(?s)<optgroup label="Not called in"(?![^>]*disabled)[^>]*>.*?'
+                               rf'value="{self.mother.pk}" selected')
+        self.assertNotIn("allow-uncalled-samples", html)
 
     def test_a_somatic_tag_is_not_offered_a_germline_record(self):
         somatic_tag = create_classify_queue_tag("SomaticToDo", AlleleOriginBucket.SOMATIC)

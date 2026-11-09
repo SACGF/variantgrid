@@ -144,6 +144,7 @@ def classify_report_tag_dialog(request, case_type: str, case_id: int, variant_ta
     variant_tag = VariantTag.get_for_user(request.user, variant_tag_id)
     row = case.queue_row(variant_tag)
     sample_options = case.sample_options(row)
+    selected_sample_option = next((option for option in sample_options if option.selected), None)
 
     genome_build = variant_tag.genome_build
     vts = VariantTranscriptSelections(variant_tag.variant, genome_build)
@@ -190,7 +191,12 @@ def classify_report_tag_dialog(request, case_type: str, case_id: int, variant_ta
         "lab_error": lab_error,
         "lab_form": lab_form,
         "sample_options": sample_options,
-        "selected_sample_option": next((option for option in sample_options if option.selected), None),
+        # The samples the variant was called in are the choice; the rest sit greyed out below them until asked for,
+        # so a case with several samples can't slip a non-carrier onto the record with one misclick
+        "carrier_options": [option for option in sample_options if option.carries],
+        "other_options": [option for option in sample_options if not option.carries],
+        "selected_sample_option": selected_sample_option,
+        "uncalled_sample_selected": selected_sample_option is not None and not selected_sample_option.carries,
         "comparison": comparison,
         "compare_url": compare_url,
         "uncopyable": uncopyable,
