@@ -50,14 +50,14 @@
                     <td class="dt-c_hgvs">{% if record.c_hgvs %}{% hgvs record.c_hgvs %}{% elif record.variant_coordinate %}{{ record.variant_coordinate }}{% else %}<span class="no-value">-</span>{% endif %}</td>
                     <td class="dt-clinical_significance text-center">
                         {% if record.clinical_significance %}
-                            <span class="c-pill cs cs-{{ record.clinical_significance }}">{{ record.clinical_significance | ekey:"clinical_significance" }}</span>
+                            <span class="c-pill cs cs-{{ record.clinical_significance.lower }}">{{ record.clinical_significance | ekey:"clinical_significance" }}</span>
                         {% else %}
                             <span class="no-value">-</span>
                         {% endif %}
                     </td>
                     <td class="dt-clinical_significance text-center">
                         {% if record.somatic_clinical_significance %}
-                            <span class="c-pill cs cs-{{ record.somatic_clinical_significance }}">{{ record.somatic_clinical_significance | ekey:"somatic:clinical_significance" }}</span>
+                            <span class="c-pill cs cs-{{ record.somatic_clinical_significance.lower }}">{{ record.somatic_clinical_significance | ekey:"somatic:clinical_significance" }}</span>
                         {% else %}
                             <span class="no-value">-</span>
                         {% endif %}
