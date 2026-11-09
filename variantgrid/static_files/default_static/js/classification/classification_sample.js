@@ -2,12 +2,12 @@
 /* global $, Cookies */
 
 /**
- * The Sample card on the classification form and its Change sample dialog - @see views_classification_sample.py
- * The dialog is only on the page for a user who may reassign, otherwise sampleSelectId is empty.
- * @param {{panelUrl: string, sampleSelectId: string}} options
+ * The classification form's Change sample dialog - @see views_classification_sample.py
+ * Opened by the #sample-change-open button vc_form.js puts in the summary card's Sample row, only for a user
+ * who may reassign (the only page this script is on).
+ * @param {{sampleUrl: string, sampleSelectId: string}} options
  */
 function initClassificationSample(options) {
-    const card = $('#vcform-sample');
     const modal = $('#sample-change-modal');
     const sampleSelect = $(document.getElementById(options.sampleSelectId));
     const preview = $('#sample-change-preview', modal);
@@ -15,12 +15,6 @@ function initClassificationSample(options) {
     const overrideRow = $('#sample-change-override-row', modal);
     const override = $('#sample-change-override', modal);
     const confirmButton = $('#sample-change-confirm', modal);
-
-    $('.card-body', card).load(options.panelUrl, function(response, status) {
-        if (status === 'error') {
-            $(this).html('<span class="text-muted">Sample unavailable.</span>');
-        }
-    });
 
     function updateConfirm() {
         const ready = $('#sample-change-preview-ready', preview);
@@ -38,7 +32,7 @@ function initClassificationSample(options) {
             return;
         }
         preview.html('<span class="text-muted">Loading…</span>');
-        preview.load(options.panelUrl + '?' + $.param({sample_id: sampleId}), function(response, status) {
+        preview.load(options.sampleUrl + '?' + $.param({sample_id: sampleId}), function(response, status) {
             if (status === 'error') {
                 preview.html('<div class="alert alert-danger">Could not load the changes for this sample.</div>');
             }
@@ -61,7 +55,8 @@ function initClassificationSample(options) {
         sampleSelect.select2('open');
     });
 
-    card.on('click', '#sample-change-open', function() {
+    // vc_form.js re-renders the summary card, so the button is bound by delegation
+    $('#vcform-summary').on('click', '#sample-change-open', function() {
         modal.modal('show');
     });
     sampleSelect.on('change', loadPreview);
@@ -83,7 +78,7 @@ function initClassificationSample(options) {
         if (override.prop('checked')) {
             data.confirm_no_genotype = 'on';
         }
-        $.post(options.panelUrl, data, function() {
+        $.post(options.sampleUrl, data, function() {
             window.location.reload();
         }).fail(function() {
             confirmButton.text('Confirm');
