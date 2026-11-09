@@ -110,8 +110,8 @@ VARIANT_TYPE_LABELS = {
     VariantType.COMPLEX: "Complex sub",
     VariantType.SYMBOLIC: "Structural",
     VariantType.FUSION: "Fusion",
-    VariantType.COPY_NUMBER: "Copy number",
-    VariantType.SPLICE: "Splicing",
+    VariantType.COPY_NUMBER: "Gene copy number",
+    VariantType.SPLICE: "Gene splice",
 }
 
 # The types offered on the All Variants page - reference variants are always excluded there, and the
