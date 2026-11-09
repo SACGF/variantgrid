@@ -4,10 +4,14 @@ from django.core.exceptions import PermissionDenied
 from django.test import TestCase
 from django.urls import reverse
 
+from classification.autopopulate_evidence_keys.evidence_from_sample_and_patient import (
+    get_evidence_fields_for_sample_and_patient,
+)
 from classification.enums import SpecialEKeys, SubmissionSource
 from classification.models import Classification, ClassificationModification
 from classification.sample_reassignment import reassign_sample, sample_reassignment_preview
 from classification.tests.models.test_utils import ClassificationTestUtils
+from patients.models.models_patient import Patient
 from snpdb.enums import AlleleOriginBucket, VariantOrigin
 from snpdb.fake_data import create_fake_cohort, make_cohort_genotype
 from snpdb.models import GenomeBuild, LabHead
@@ -28,6 +32,8 @@ class SampleReassignmentTest(TestCase):
         cohort = create_fake_cohort(self.head, genome_build)
         samples = {cs.sample.name: cs.sample for cs in cohort.cohortsample_set.select_related("sample")}
         self.proband = samples["proband"]
+        self.proband.patient = Patient.objects.create(first_name="PROBAND", last_name="PATIENT")
+        self.proband.save()
         self.mother = samples["mother"]
         make_cohort_genotype(cohort.cohort_genotype_collection, self.variant, "EO.")
         self.uncalled = create_fake_cohort(self.head, genome_build, name="other").cohortsample_set.first().sample
@@ -36,10 +42,9 @@ class SampleReassignmentTest(TestCase):
             user=self.head, lab=self.lab, variant=self.variant, sample=self.proband,
             source=SubmissionSource.VARIANT_GRID,
             data={
-                SpecialEKeys.SAMPLE_ID: "proband",
-                SpecialEKeys.PATIENT_ID: "patient_1",
-                SpecialEKeys.ZYGOSITY: "heterozygous",
+                **get_evidence_fields_for_sample_and_patient(self.variant, self.proband).data,
                 SpecialEKeys.ALLELE_ORIGIN: "germline",
+                SpecialEKeys.CAPTURE_METHOD: "typed by the curator",
             })
         # published, so the reassignment is a modification of its own rather than folded into this one
         self.classification.publish_latest(self.head)
@@ -62,7 +67,7 @@ class SampleReassignmentTest(TestCase):
                                                source=SubmissionSource.API, data={})
         self.assertFalse(classification.can_reassign_sample(self.head))
 
-    def test_preview_overwrites_and_clears_sample_keys_but_keeps_allele_origin(self):
+    def test_preview_overwrites_and_clears_sample_keys_but_keeps_allele_origin_and_curated_keys(self):
         preview = sample_reassignment_preview(self.classification, self.mother, self.head)
 
         changes = self._changes(preview)
@@ -72,6 +77,8 @@ class SampleReassignmentTest(TestCase):
         self.assertIsNone(changes[SpecialEKeys.PATIENT_ID].new)
         # mother asserts no allele origin, so the curator's stands
         self.assertNotIn(SpecialEKeys.ALLELE_ORIGIN, changes)
+        # neither sample supplies a capture method, so the curator's stands
+        self.assertNotIn(SpecialEKeys.CAPTURE_METHOD, changes)
         self.assertFalse(preview.allele_origin_bucket_changes)
 
     def test_preview_reports_the_bucket_change_to_a_somatic_sample(self):
@@ -100,6 +107,7 @@ class SampleReassignmentTest(TestCase):
         self.assertEqual("homozygous", self.classification.get(SpecialEKeys.ZYGOSITY))
         self.assertIsNone(self.classification.get(SpecialEKeys.PATIENT_ID))
         self.assertEqual("germline", self.classification.get(SpecialEKeys.ALLELE_ORIGIN))
+        self.assertEqual("typed by the curator", self.classification.get(SpecialEKeys.CAPTURE_METHOD))
         self.assertEqual(modification_count + 1,
                          ClassificationModification.objects.filter(classification=self.classification).count())
 
