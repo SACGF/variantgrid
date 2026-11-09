@@ -94,6 +94,8 @@ DEBUG = False  # Development environments opt-in via their env_developers settin
 # If SEND_EMAILS is False, all emails that would go through EmailLog will still be record but wont be sent
 # Good for test environments where you don't want to spam test accounts
 SEND_EMAILS = False
+# Email the recipient of each new inbox message (e.g. "VCF import complete"), as well as showing it in the inbox
+USER_MESSAGES_EMAIL_NOTIFY = False
 # Hosts/domain names that are valid for this site; required if DEBUG is False
 # See https://docs.djangoproject.com/en/1.5/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = ["localhost"]

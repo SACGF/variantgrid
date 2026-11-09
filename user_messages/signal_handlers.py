@@ -6,11 +6,11 @@ from email_manager.models.email_model import EmailLog
 def email_new_message_handler(sender, instance, created, **kwargs):
     """
     On a newly created message, email the recipient via the logged EmailLog infrastructure
-    (honours ``settings.SEND_EMAILS``). Disable with ``settings.USER_MESSAGES_EMAIL_NOTIFY = False``.
+    (honours ``settings.SEND_EMAILS``). Enable with ``settings.USER_MESSAGES_EMAIL_NOTIFY = True``.
     """
     if not created:
         return
-    if not getattr(settings, 'USER_MESSAGES_EMAIL_NOTIFY', True):
+    if not settings.USER_MESSAGES_EMAIL_NOTIFY:
         return
 
     recipient = instance.recipient

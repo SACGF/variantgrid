@@ -24,7 +24,7 @@ emails every superuser (batch mode) when `is_communication` and `settings.ADMIN_
 discordance or weekly updates, from `settings.DISCORDANCE_EMAIL`; the Monday `discordance-emails-weekly` beat entry in
 `variantgrid/celery.py` runs `classification/tasks/classification_summary_email_tasks.py:send_summary_emails`, which calls
 `send_summary_email_to_user` per opted-in user and skips anyone without an active lab; `user_messages/signal_handlers.py:email_new_message_handler`
-emails a new inbox message; `variantgrid/views.py:keycloak_admin` sends the welcome email as the `pre_password_reset`
+emails a new inbox message when `settings.USER_MESSAGES_EMAIL_NOTIFY` is on (off by default); `variantgrid/views.py:keycloak_admin` sends the welcome email as the `pre_password_reset`
 callback of `snpdb/keycloak.py:Keycloak.add_user`; and MME match notifications go through the same path
 (`snpdb/checks.py:check_feature_dependencies` is a system check that fails `MME_ENABLED` unless `MME_FROM_EMAIL` and
 `SEND_EMAILS` are both set, precisely because `send_mail` is silently a no-op otherwise, and
