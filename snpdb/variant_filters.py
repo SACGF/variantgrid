@@ -321,8 +321,11 @@ def get_contig_ids_for_gene_symbols(genome_build: GenomeBuild, gene_symbols: Opt
 def get_variant_filter_q(genome_build: GenomeBuild, annotation_version: AnnotationVersion, *,
                          contig_ids: Optional[Iterable[int]] = None, non_standard_contigs: bool = False,
                          gene_symbols: Optional[Iterable[Any]] = None,
-                         variant_types: Optional[Iterable[str]] = None) -> Q:
-    """ The standard variant filters composed into a single Q """
+                         variant_types: Optional[Iterable[str]] = None,
+                         position_range: Optional[tuple[int, int]] = None) -> Q:
+    """ The standard variant filters composed into a single Q. position_range (1-based inclusive, eg a
+        cytoband) narrows the contigs to that stretch - gene-level variants' positions are gene IDs, so
+        a range leaves out the gene-level contig """
     contig_id_list = list(contig_ids or [])
     variant_type_list = list(variant_types) if variant_types is not None else None
     if gene_symbols:
@@ -331,11 +334,13 @@ def get_variant_filter_q(genome_build: GenomeBuild, annotation_version: Annotati
         # Without it a gene with no chromosome chosen scans the whole build instead of the gene bounds.
         contig_id_list.extend(get_contig_ids_for_gene_symbols(genome_build, gene_symbols))
         contig_id_list.extend(get_gene_level_contig_ids(genome_build))
-    if contig_id_list or non_standard_contigs:
+    if (contig_id_list or non_standard_contigs) and not position_range:
         contig_id_list = get_contig_ids_for_variant_types(genome_build, contig_id_list, variant_type_list)
 
     filter_list = [get_contigs_q(genome_build, contig_ids=contig_id_list,
                                  non_standard_contigs=non_standard_contigs)]
+    if position_range:
+        filter_list.append(Q(locus__position__range=tuple(position_range)))
     if (q_genes := get_gene_symbols_q(annotation_version, gene_symbols)) is not None:
         filter_list.append(q_genes)
     if (q_types := get_variant_types_q(variant_type_list)) is not None:

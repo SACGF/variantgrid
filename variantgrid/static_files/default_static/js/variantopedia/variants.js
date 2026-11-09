@@ -1,7 +1,9 @@
 // @ts-check
-// variantopedia/templates/variantopedia/variants.html
+// variantopedia/templates/variantopedia/variants.html, snpdb/templates/snpdb/genomics/view_contig.html
 // What the grid is showing - the controls only become this when Search is clicked. Set by initAllVariants
 let gridExtraFilters = null;
+// Filters the page sets rather than the controls (the contig page's contig and band) - @see setAllVariantsLockedFilters
+let allVariantsLockedFilters = {};
 
 function getAlignmentFiles() {
     return [];
@@ -34,25 +36,29 @@ function setChecked(input, checked) {
 
 function readFilters() {
     const contigIds = checkedValues(".contig-filter").map(Number);
-    return {
+    return Object.assign({
         contig_ids: contigIds,
         non_standard_contigs: $("#non-standard-contigs").is(":checked"),
         gene_symbols: $("#id_gene_symbols").val() || [],
         variant_types: checkedValues(".variant-type-filter"),
         min_count: Number($("#min_count").val()) || 0,
-    };
+    }, allVariantsLockedFilters);
 }
 
 function describeFilters(filters, numVariantTypes) {
     const parts = [];
+    // The contig page has no chromosome buttons - its contig is in the page heading
     const contigNames = filters.contig_ids.map(function(contigId) {
         return $(".contig-filter[value='" + contigId + "']").data("contig-name");
-    });
+    }).filter(Boolean);
     if (filters.non_standard_contigs) {
         contigNames.push("non-standard contigs");
     }
     if (contigNames.length) {
         parts.push("chromosomes: " + contigNames.join(", "));
+    }
+    if (filters.position_range) {
+        parts.push("positions: " + filters.position_range.map((p) => p.toLocaleString()).join("-"));
     }
     if (filters.gene_symbols.length) {
         parts.push("genes: " + filters.gene_symbols.join(", "));
@@ -122,7 +128,17 @@ function runSearch(options) {
     gridExtraFilters = filters;
     showFilters(filters, options.numVariantTypes);
     showPendingSearch();
-    saveFilters(options.genomeBuildName, filters);
+    if (options.saveFilters !== false) {
+        saveFilters(options.genomeBuildName, filters);
+    }
+    filterGrid();
+}
+
+// Replaces the page-set filters and refilters the grid, keeping the controls' part of what it shows
+function setAllVariantsLockedFilters(lockedFilters, numVariantTypes) {
+    allVariantsLockedFilters = lockedFilters;
+    gridExtraFilters = Object.assign({}, gridExtraFilters, lockedFilters);
+    showFilters(gridExtraFilters, numVariantTypes);
     filterGrid();
 }
 
@@ -161,9 +177,12 @@ function setCheckedAll(selector, checked) {
     showPendingSearch();
 }
 
-/* options: initialFilters, genomeBuildName, defaultContigId, numVariantTypes */
+/* options: initialFilters, genomeBuildName, defaultContigId, numVariantTypes,
+   lockedFilters (merged over the controls, eg {contig_ids: [1]}), saveFilters (default true - the
+   All Variants page remembers the user's last search) */
 function initAllVariants(options) {
     gridExtraFilters = options.initialFilters;
+    allVariantsLockedFilters = options.lockedFilters || {};
     $(document).ready(() => setupAllVariantsControls(options));
 }
 

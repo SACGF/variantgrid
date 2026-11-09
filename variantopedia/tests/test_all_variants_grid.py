@@ -241,6 +241,19 @@ class AllVariantsGridFilterTest(TestCase):
                                               "variant_types": [VariantType.SNV]})
         self.assertNotIn(self.fusion_variant.pk, variant_ids)
 
+    def test_position_range_filter(self):
+        """ A band is a position range on the contig - gene-level variants' positions are gene IDs, so
+            they're never in one, even with their type selected """
+        position = self.variant.locus.position
+        for position_range, expected in [((position - 10, position), True), ((position + 1, position + 10), False)]:
+            with self.subTest(position_range=position_range):
+                variant_ids = self._grid_variant_ids({"contig_ids": [self.contig.pk],
+                                                      "variant_types": [VariantType.SNV, VariantType.FUSION],
+                                                      "position_range": position_range})
+                self.assertEqual(expected, self.variant.pk in variant_ids)
+                self.assertNotIn(self.fusion_variant.pk, variant_ids)
+                self.assertNotIn(self.other_variant.pk, variant_ids)
+
     def test_default_filters_pick_chr21(self):
         filters = get_default_all_variants_filters(self.genome_build)
         contig_21 = self.genome_build.standard_contigs.get(name="21")

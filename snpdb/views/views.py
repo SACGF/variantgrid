@@ -29,6 +29,8 @@ from snpdb.models import (
     Wiki,
 )
 from snpdb.models.models_genome import Cytoband
+from snpdb.models.models_user_settings import get_igv_data
+from snpdb.variant_filters import get_default_all_variants_filters, get_variant_type_choices
 from user_messages.models import Message
 
 
@@ -144,6 +146,10 @@ def view_contig(request, contig_accession):
         for cytoband in cytobands:
             cytoband.in_selected_band = cytoband_interval.start <= cytoband.start and cytoband.end <= cytoband_interval.end
 
+    selected_interval = None
+    if cytoband_interval:
+        selected_interval = {"start": cytoband_interval.start, "end": cytoband_interval.end}
+
     context = {
         "contig": contig,
         "genome_build": genome_build,
@@ -151,7 +157,28 @@ def view_contig(request, contig_accession):
         "band": band,
         "cytoband_interval": cytoband_interval,
         "cytobands": cytobands,
+        "contig_page_data": {
+            "contigId": contig.pk,
+            "contigName": contig.name,
+            "contigLabel": contig.ucsc_name or contig.name,
+            "contigLength": contig.length,
+            "band": band if selected_interval else None,
+            "selectedInterval": selected_interval,
+            "cytobands": [{"name": c.name, "start": c.start, "end": c.end, "stain": c.stain} for c in cytobands],
+        },
     }
+    if has_annotation:
+        # The All Variants grid, locked to this contig - not saved as the user's All Variants page filters
+        position_range = [selected_interval["start"], selected_interval["end"]] if selected_interval else None
+        locked_filters = {"contig_ids": [contig.pk], "position_range": position_range}
+        variant_types = get_variant_type_choices()
+        context["contig_page_data"]["numVariantTypes"] = len(variant_types)
+        context.update({
+            "variant_types": variant_types,
+            "all_variants_filters": get_default_all_variants_filters(genome_build) | locked_filters,
+            "all_variants_locked_filters": locked_filters,
+            "igv_data": get_igv_data(request.user, genome_build=genome_build),
+        })
     return render(request, "snpdb/genomics/view_contig.html", context)
 
 

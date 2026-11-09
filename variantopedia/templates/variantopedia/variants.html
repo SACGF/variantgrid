@@ -27,15 +27,6 @@
     </script>
     <style>
         {% render_node_count_styles %}
-
-        .filter-button-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 2px;
-        }
-        .filter-button-group > label.btn {
-            border-radius: 4px;
-        }
     </style>
 {% endblock head %}
 {% block container_table_content %}
@@ -64,40 +55,7 @@
                     </div>
                 {% endlabelled %}
 
-                {% labelled label="Variant Type" %}
-                    <div class="filter-button-group">
-                        <div class="filter-button-group btn-group-toggle" data-toggle="buttons">
-                            {% for variant_type, label in variant_types %}
-                                <label class="btn btn-outline-primary btn-sm{% if variant_type in initial_filters.variant_types %} active{% endif %}">
-                                    <input class="variant-type-filter" type="checkbox" name="variant_type"
-                                           value="{{ variant_type }}" autocomplete="off"
-                                           {% if variant_type in initial_filters.variant_types %}checked{% endif %}> {{ label }}
-                                </label>
-                            {% endfor %}
-                        </div>
-                        <button type="button" class="btn btn-outline-secondary btn-sm" id="variant-type-all">All</button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm" id="variant-type-none">None</button>
-                    </div>
-                {% endlabelled %}
-
-                {% labelled label="Gene Symbols" %}
-                    {{ gene_symbol_form.gene_symbols }}
-                    {% if gene_symbol_aliases %}
-                        {% page_help_embedded page_id='variantopedia/all_variants_gene_aliases' title='Gene Symbol Aliases' %}
-                            {% for symbol, aliases in gene_symbol_aliases.items %}
-                                <p>Also searching aliases of {{ symbol }}: {{ aliases|join:", " }}</p>
-                            {% endfor %}
-                        {% end_page_help_embedded %}
-                    {% endif %}
-                {% endlabelled %}
-
-                {% labelled label="Min sample count" %}
-                    <input id='min_count' type='number' min='0' name='min_count' style='max-width: 200px'
-                           class="form-control" value="{{ initial_filters.min_count|default:0 }}" />
-                    {% field_help %}
-                        0 = any, including variants not observed in any sample
-                    {% end_field_help %}
-                {% endlabelled %}
+                {% include "variantopedia/all_variants/filter_controls.html" with filters=initial_filters %}
 
                 {% labelled label="" %}
                     <button class="btn btn-outline-primary" id='search-button'>Search</button>

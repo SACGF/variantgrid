@@ -8,7 +8,7 @@ from annotation.models import GeneAnnotation
 from genes.enums import AnnotationConsortium
 from genes.fake_data import create_fake_gene_version, create_fake_transcript_version
 from genes.grids import GenesColumns
-from genes.models import ReleaseGeneVersion
+from genes.models import ReleaseGeneVersion, TranscriptVersion
 from library.django_utils.django_partition import temporary_db_table
 from snpdb.models import GenomeBuild
 
@@ -22,7 +22,7 @@ class GenesDatatableTests(TestCase):
         cls.user = User.objects.get_or_create(username="genes_datatable_user")[0]
         cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
         get_fake_annotation_version(cls.genome_build)
-        create_fake_transcript_version(cls.genome_build)
+        cls.transcript_version = create_fake_transcript_version(cls.genome_build)
 
     def _config(self, **params) -> GenesColumns:
         url = reverse('genes_datatable', kwargs={"genome_build_name": self.genome_build.name})
@@ -70,3 +70,28 @@ class GenesDatatableTests(TestCase):
         self.assertEqual(columns["gene_version__version"].label, "Version")
         self.assertTrue(config.table_class)
         self.assertTrue(config.default_column_width)
+
+    def test_gene_version_ids_in_region_boundaries(self):
+        """ cdot exons are 0-based half-open, regions (cytobands) 1-based inclusive. The fake transcript's
+            exons span [34787800, 35049344), ie 1-based 34787801-35049344 """
+        tv = self.transcript_version
+        for start, end, overlaps in [(1, 34787800, False), (1, 34787801, True),
+                                     (35049344, 40000000, True), (35049345, 40000000, False),
+                                     (34900000, 34900001, True)]:
+            with self.subTest(start=start, end=end):
+                gene_version_ids = TranscriptVersion.get_gene_version_ids_in_region(self.genome_build, tv.contig,
+                                                                                    start, end)
+                self.assertEqual(overlaps, tv.gene_version_id in set(gene_version_ids))
+
+    def test_contig_region_filter(self):
+        """ region_start/region_end narrow a contig's genes to a band ('start' is the DataTables offset) """
+        tv = self.transcript_version
+        release = get_fake_annotation_version(self.genome_build).gene_annotation_version.gene_annotation_release
+        ReleaseGeneVersion.objects.get_or_create(release=release, gene_version=tv.gene_version)
+        for region, expected in [({}, {"RUNX1"}),
+                                 ({"region_start": 34800000, "region_end": 34800100}, {"RUNX1"}),
+                                 ({"region_start": 1, "region_end": 1000}, set())]:
+            with self.subTest(region=region):
+                config = self._config(contig_id=tv.contig_id, **region)
+                qs = config.filter_queryset(ReleaseGeneVersion.objects.filter(release=release))
+                self.assertEqual(expected, set(qs.values_list("gene_version__gene_symbol", flat=True)))
