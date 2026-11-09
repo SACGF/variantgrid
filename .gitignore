@@ -60,3 +60,4 @@ CLAUDE.local.md
 /.claude/hooks/post-tool-call.py
 /.claude/settings.local.json
 scripts/browser/shots/
+investigation/
