@@ -8,6 +8,7 @@ from snpdb.cytobands import CytobandRange, parse_cytoband
 from snpdb.enums import CytobandLevel
 from snpdb.models import GenomeBuild
 from snpdb.models.models_genome import Cytoband
+from snpdb.models.models_user_settings import UserSettingsOverride
 from snpdb.search import search_data
 
 
@@ -113,6 +114,15 @@ class CytobandSearchAndPageTest(TestCase):
         urls = {r.preview.internal_url for r in search_data(self.user, "chr11p15").results}
         contig_11 = self.grch38.chrom_contig_mappings["11"]
         self.assertIn(Cytoband.objects.get(contig=contig_11, name="p15").get_absolute_url(), urls)
+
+    def test_search_opens_the_preferred_build(self):
+        for genome_build in [GenomeBuild.grch37(), self.grch38]:
+            UserSettingsOverride.objects.update_or_create(user=self.user,
+                                                          defaults={"default_genome_build": genome_build})
+            contig_11 = genome_build.chrom_contig_mappings["11"]
+            result = search_data(self.user, "11p13").single_preferred_result()
+            self.assertEqual(result.preview.internal_url,
+                             Cytoband.objects.get(contig=contig_11, name="p13").get_absolute_url())
 
     def test_search_ignores_ranges(self):
         self.assertEqual(search_data(self.user, "11p13-p12").results, [])

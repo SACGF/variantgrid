@@ -428,6 +428,10 @@ class Contig(models.Model, PreviewModelMixin):
     def get_absolute_url(self):
         return reverse("view_contig", kwargs={"contig_accession": self.refseq_accession})
 
+    @classmethod
+    def preview_one_per_build(cls) -> bool:
+        return True
+
     def get_genome_builds(self, require_annotation=True) -> Iterable[GenomeBuild]:
         if require_annotation:
             builds = GenomeBuild.builds_with_annotation()
@@ -498,6 +502,10 @@ class Cytoband(models.Model, PreviewModelMixin):
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-ruler-horizontal"
+
+    @classmethod
+    def preview_one_per_build(cls) -> bool:
+        return True
 
     @property
     def preview(self) -> PreviewData:

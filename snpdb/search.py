@@ -792,6 +792,10 @@ class SearchResponsesCombined:
 
         # Put in set to merge identical results (based off Preview) from diff genome builds
         auto_open_results = {result for result in self.results if not result.genome_build_mismatch_blocks_auto_open}
+        # The same contig/cytoband found in every build: open the preferred build's one
+        if any(result.preview.one_per_build and not result.genome_build_mismatch for result in auto_open_results):
+            auto_open_results = {result for result in auto_open_results
+                                 if not (result.preview.one_per_build and result.genome_build_mismatch)}
 
         # alternatively if we only have 1 match, return it
         if len(auto_open_results) == 1:
