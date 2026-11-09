@@ -31,6 +31,7 @@ class ManualVariantEntryCollectionSerializer(serializers.ModelSerializer):
     first_variant_annotation_status = serializers.SerializerMethodField()
     created = TimestampField()
     is_ready = serializers.SerializerMethodField()
+    sample = serializers.SerializerMethodField()
 
     class Meta:
         model = ManualVariantEntryCollection
@@ -56,6 +57,15 @@ class ManualVariantEntryCollectionSerializer(serializers.ModelSerializer):
         if ar := obj.first_variant_annotation_run():
             annotation_status = ar.get_status_display()
         return annotation_status
+
+    def get_sample(self, obj: ManualVariantEntryCollection) -> Optional[dict]:
+        """ Only for a collection created as a sample, once its VCF has been made """
+        if sample := obj.sample:
+            return {"id": sample.pk,
+                    "name": sample.name,
+                    "import_status": sample.import_status,
+                    "import_status_display": sample.get_import_status_display()}
+        return None
 
     def get_is_ready(self, obj: ManualVariantEntryCollection) -> bool:
         ready = False

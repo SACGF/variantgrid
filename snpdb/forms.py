@@ -782,6 +782,11 @@ class CustomColumnsCollectionForm(forms.ModelForm):
 class ManualVariantEntryForm(forms.Form):
     variants_text = forms.CharField(widget=forms.Textarea(attrs={'placeholder': 'Variants...'}), required=True)
     genome_build = forms.ChoiceField(widget=forms.RadioSelect)
+    create_as_sample = forms.BooleanField(required=False, label="Create as sample",
+                                          widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+                                          help_text="Import the variants as a VCF with one sample, to analyse them")
+    sample_name = forms.CharField(required=False, max_length=200,
+                                  widget=forms.TextInput(attrs={'placeholder': 'Sample name...'}))
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user")
@@ -806,6 +811,8 @@ class ManualVariantEntryForm(forms.Form):
                         msg += " (remember to only enter one variant per line)"
                     raise forms.ValidationError(msg)
 
+        if cleaned_data.get("create_as_sample") and not cleaned_data.get("sample_name"):
+            self.add_error("sample_name", "A sample needs a name")
         return cleaned_data
 
 

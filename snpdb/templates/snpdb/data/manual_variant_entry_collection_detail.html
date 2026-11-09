@@ -6,6 +6,13 @@
     </a>
 {% endif %}
 
+{% if mvec.sample %}
+    <div>
+        Sample: <a class="hover-link" href="{% url 'view_sample' mvec.sample.pk %}">{{ mvec.sample.name }}</a>
+        ({{ mvec.sample.get_import_status_display }})
+        - <a class="hover-link" href="{% url 'view_sample' mvec.sample.pk %}#create-analyses">create an analysis</a>
+    </div>
+{% endif %}
 
 {% if mvec.manualvariantentry_set.exists %}
     <table>

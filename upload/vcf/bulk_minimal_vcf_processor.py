@@ -41,6 +41,7 @@ class BulkMinimalVCFProcessor(AbstractBulkVCFProcessor):
             self.process_modified_imported_variants(variant_ids_by_hash)
 
         self.set_max_variant(self.variant_hashes, variant_ids)
+        self.batch_variant_ids_known(self.variant_hashes, variant_ids)
         self.variant_hashes = []
         return variant_ids_by_hash
 

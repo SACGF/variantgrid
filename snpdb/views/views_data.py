@@ -15,7 +15,7 @@ from django.http import HttpRequest
 from django.http.response import (
     HttpResponseRedirect,
 )
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.template.defaultfilters import pluralize
 from django.utils.html import format_html
 
@@ -89,7 +89,8 @@ from snpdb.sample_file_path import (
 )
 from snpdb.tasks.vcf_archive_tasks import archive_vcf_task
 from snpdb.views.vcf_cohort_page import vcf_cohort_page_context
-from upload.models import UploadedVCF
+from upload.enums import UploadedFileTypes
+from upload.models import UploadedManualVariantEntryCollection, UploadedVCF
 from upload.uploaded_file_type import retry_upload_pipeline
 from upload.views.views_json import get_remaining_annotation_runs
 
@@ -754,11 +755,18 @@ def manual_variant_entry(request):
                 variants_text = form.cleaned_data['variants_text']
                 genome_build_pk = form.cleaned_data['genome_build']
                 genome_build = GenomeBuild.objects.get(pk=genome_build_pk)
+                sample_name = None
+                if form.cleaned_data['create_as_sample']:
+                    sample_name = form.cleaned_data['sample_name']
                 try:
-                    create_manual_variants(request.user, genome_build, variants_text)
+                    mvec = create_manual_variants(request.user, genome_build, variants_text,
+                                                  sample_name=sample_name)
                 except ValueError as ve:
                     messages.add_message(request, messages.ERROR, ve)
                     valid = False
+                else:
+                    if sample_name:
+                        return redirect('watch_manual_variant_entry', pk=mvec.pk)
                 form = forms.ManualVariantEntryForm(None, user=request.user)  # Reset form
 
             add_save_message(request, valid, "Manually entered variants")
@@ -780,6 +788,9 @@ def watch_manual_variant_entry(request, pk):
     # TODO: Quick redirect to variant if it's already ready
 
     mvec_data = ManualVariantEntryCollectionSerializer(mvec).data
+    as_sample = UploadedManualVariantEntryCollection.objects.filter(
+        collection=mvec, file_upload__file_type=UploadedFileTypes.MANUAL_VARIANT_ENTRY_SAMPLE).exists()
     context = {"mvec": mvec,
+               "as_sample": as_sample,
                "initial_json": json.dumps(mvec_data)}
     return render(request, 'snpdb/data/watch_manual_variant_entry.html', context=context)

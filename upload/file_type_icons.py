@@ -49,6 +49,8 @@ FILE_TYPE_ICONS: dict[UploadedFileTypes, FileTypeIcon] = {
     UploadedFileTypes.LIFTOVER: FileTypeIcon(symbol="file-icon-liftover"),
     UploadedFileTypes.MANUAL_VARIANT_ENTRY: FileTypeIcon(symbol=_VCF.symbol,
                                                          badge=FileTypeIcon(fa="fa-solid fa-pen", css="file-type-badge-manual")),
+    UploadedFileTypes.MANUAL_VARIANT_ENTRY_SAMPLE: FileTypeIcon(symbol=_VCF.symbol,
+                                                                badge=FileTypeIcon(fa="fa-solid fa-pen", css="file-type-badge-manual")),
     UploadedFileTypes.PED: FileTypeIcon(symbol="node-icon-pedigree"),
     UploadedFileTypes.PATIENT_RECORDS: FileTypeIcon(fa="fa-solid fa-users"),
     UploadedFileTypes.VARIANT_CLASSIFICATIONS: FileTypeIcon(fa="fa-solid fa-clipboard-check"),

@@ -92,6 +92,10 @@ class AbstractBulkVCFProcessor(abc.ABC):
                     if current is None or max_returned_variant_id > current:
                         self.max_variant_id_by_pipeline_type[pipeline_type.value] = max_returned_variant_id
 
+    def batch_variant_ids_known(self, variant_hashes, variant_ids):  # noqa: B027 - optional hook
+        """ Called once per batch with the ids of its variants (inserted or already present), in
+            variant_hashes order - extend to link other records to the variants """
+
     def get_max_variant_id_by_pipeline_type(self) -> dict[str, int]:
         """ {pipeline_type: max_variant_id}. Empty dict means it was never set (no variants, or reference only) """
 
