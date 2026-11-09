@@ -108,6 +108,9 @@ class ImportCreateVCFModelForGenotypeVCFTask(ImportVCFStepTask):
                                           script=calculate_mutational_signature_task_class_name)
 
 
+# "Genotype VCF" in the upload code is the import that builds the sample side (VCF, Samples, Cohort and a
+# CohortGenotype row per variant), not a VCF with GT calls - a sites-only VCF comes this way too, written with
+# unknown zygosity by BulkNoGenotypeVCFProcessor. The rename is #2721
 class ImportCreateVCFModelForManualVariantEntryTask(ImportCreateVCFModelForGenotypeVCFTask):
     """ Manual Variant Entry "create as sample": the VCF and its one Sample, linked to the collection.
         The sample is a list of variants to look at together, not an individual, so it gets no mutational
