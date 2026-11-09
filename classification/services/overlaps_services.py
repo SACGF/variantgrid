@@ -22,7 +22,7 @@ from classification.enums import TestingContextBucket, OverlapStatus, OverlapSna
 from classification.models import ClassificationResultValue, OverlapContributionStatus, \
     OverlapContribution, OverlapEntrySourceTextChoices, Overlap, OverlapType, OverlapContributionNextStep, \
     TriageDecision, EffectiveDate, TriageComment, EffectiveDateType, OverlapDiscordanceNotification, \
-    DiscordanceReport, ClassificationImportRun, EvidenceKeyMap
+    DiscordanceReport, ClassificationImportRun
 from classification.enums.overlaps_enums import TriageStatus
 from classification.services.overlap_calculator import overlap_calculator_for_value_type, OVERLAP_CLIN_SIG_ENABLED
 import json
@@ -106,7 +106,6 @@ class OverlapServices:
         for value_type in value_types:
             calc = overlap_calculator_for_value_type(value_type)
             value = calc.value_from_summary(classification_grouping.latest_cached_summary_obj)
-            is_comparable = calc.is_comparable_value(value)
             is_shared = classification_grouping.share_level_obj.is_discordant_level
 
             contribution: OverlapContributionStatus
@@ -114,8 +113,6 @@ class OverlapServices:
                 contribution = OverlapContributionStatus.NO_VALUE
             elif not is_shared:
                 contribution = OverlapContributionStatus.NOT_SHARED
-            elif not is_comparable:
-                contribution = OverlapContributionStatus.NON_COMPARABLE_VALUE
             else:
                 contribution = OverlapContributionStatus.CONTRIBUTING
 
@@ -186,8 +183,7 @@ class OverlapServices:
         if expert_panel := clinvar_record_collection.expert_panel:
 
             value = expert_panel.clinical_significance
-            is_relevant_value = EvidenceKeyMap.clinical_significance_to_bucket().get(value) is not None
-            contribution_enum = OverlapContributionStatus.CONTRIBUTING if is_relevant_value else OverlapContributionStatus.NON_COMPARABLE_VALUE
+            contribution_enum = OverlapContributionStatus.CONTRIBUTING
             effective_date = EffectiveDate.from_datetime(
                 expert_panel.date_last_evaluated or expert_panel.date_clinvar_updated, EffectiveDateType.CURATED)
 

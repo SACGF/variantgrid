@@ -165,7 +165,9 @@ expert panel enters the same machinery as a contribution through
 `classification/services/overlaps_services.py:OverlapServices.update_clinvar_overlap_contribution`.
 
 The verdict comes from `classification/services/overlap_calculator.py:OverlapCalculatorBase.calculate_entries`, which
-sorts the contributions into contributing, non-comparable and unshared, applies any pending (amend) value and can force
+takes the shared contributions, applies any pending (amend) value, grades only those whose effective value is
+comparable (`is_comparable_value`: Drug Response or Risk Factor is shown in the overlap but never agrees or disagrees)
+and can force
 an override status such as continued discordance or "confident vs ClinVar".
 `classification/services/overlap_calculator.py:overlap_calculator_for_value_type` picks the grader:
 `classification/services/overlap_calculator.py:OverlapCalculatorOncPath.calculate_status_for_multiple_entries` for

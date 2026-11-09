@@ -40,7 +40,6 @@ from classification.models import (
     OverlapContributionNextStep,
     classification_flag_types,
 )
-from classification.services.overlap_calculator import overlap_calculator_for_value_type
 from classification.services.overlaps_services import OverlapPageDetails, OverlapServices
 from flags.enums import FlagStatus
 from flags.models import Flag, FlagType
@@ -274,7 +273,6 @@ class Command(BaseCommand):
         if grouping.allele_origin_bucket == AlleleOriginBucket.SOMATIC:
             value_types = [ClassificationResultValue.ONC_PATH, ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE]
         for value_type in value_types:
-            calc = overlap_calculator_for_value_type(value_type)
             all_classifications = grouping.classificationgroupingentry_set.values_list("classification", flat=True)
             all_modifications = ClassificationModification.objects.filter(classification_id__in=all_classifications, published=True, share_level__in=ShareLevel.DISCORDANT_LEVEL_KEYS).order_by('created')
 
@@ -299,7 +297,7 @@ class Command(BaseCommand):
                 this_modification_date = modification.created
 
                 if this_value != last_value or this_curation_date != last_curation_date:
-                    contribution_status = OverlapContributionStatus.CONTRIBUTING if calc.is_comparable_value(this_value) else OverlapContributionStatus.NON_COMPARABLE_VALUE
+                    contribution_status = OverlapContributionStatus.CONTRIBUTING
                     audit_context = {"migration": True, "timestamp": this_modification_date}
                     with set_extra_data(audit_context):
                         if not overlap_contribution:
