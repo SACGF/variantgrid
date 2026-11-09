@@ -142,7 +142,7 @@ def view_contig(request, contig_accession):
             cytoband_interval = cytoband_range.get_interval(genome_build)
 
     # The file's bands - the levels above them are generated, with no stain
-    cytobands = list(Cytoband.objects.filter(contig=contig).exclude(stain="").select_related("contig").order_by("start"))
+    cytobands = list(Cytoband.get_file_bands(contig))
     if cytoband_interval:
         for cytoband in cytobands:
             cytoband.in_selected_band = cytoband_interval.start <= cytoband.start and cytoband.end <= cytoband_interval.end

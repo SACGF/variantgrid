@@ -32,6 +32,7 @@
             {% render_node_count_styles %}
         </style>
     {% endif %}
+    <script src="{% static 'js/snpdb/ideogram.js' %}"></script>
     <script src="{% static 'js/snpdb/view_contig.js' %}"></script>
     <script>
         initViewContig({{ contig_page_data|jsonify }});

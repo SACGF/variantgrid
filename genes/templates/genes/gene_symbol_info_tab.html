@@ -9,6 +9,8 @@
     {% endlabelled %}
     {% if hgnc %}
     {% labelled label="Approved Name" help=annotation_description.hgnc_name %}{{ hgnc.approved_name }}{% endlabelled %}
+    {% elif gene_description %}
+    {% labelled label="Name" %}{{ gene_description }}{% endlabelled %}
     {% endif %}
     {% labelled label="Summary" help=annotation_description.refseq_gene_summary %}{{ gene_summary }}{% endlabelled %}
 

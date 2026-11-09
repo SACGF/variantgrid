@@ -499,6 +499,19 @@ class Cytoband(models.Model, PreviewModelMixin):
     # For a queryset filtered to one build: contig order, then position with each parent (wider) before its children
     GENOME_BUILD_ORDERING = ("contig__genomebuildcontig__order", "start", "-end", Length("name"))
 
+    @staticmethod
+    def get_file_bands(contig: Contig) -> QuerySet['Cytoband']:
+        """ The finest level - the bands in the cytoband file, ordered by position. The generated levels have no stain """
+        return Cytoband.objects.filter(contig=contig).exclude(stain="").select_related("contig").order_by("start")
+
+    @staticmethod
+    def get_band_range_name(cytobands: list['Cytoband']) -> Optional[str]:
+        """ eg 'q21.1' or 'q21.1-q21.2', which view_contig takes as ?band= - from bands ordered by position """
+        if not cytobands:
+            return None
+        first, last = cytobands[0].name, cytobands[-1].name
+        return first if first == last else f"{first}-{last}"
+
     @classmethod
     def preview_icon(cls) -> str:
         return "fa-solid fa-ruler-horizontal"

@@ -11,7 +11,6 @@
 {% load datatable_tags %}
 {% load gene_disease_tags %}
 {% load panel_app_tags %}
-{% load gene_symbol_tags %}
 {% load gnomad_gene_constraint_tags %}
 {% load settings_tags %}
 {% load classification_tags %}
@@ -41,72 +40,16 @@
             show_igv_links : false,
             open_variant_details_in_new_window: true,
         };
-
-        let geneClassificationsGridParams = {};
-        let geneVariantsGridParams = {};
-
-        function load_classifications_hotspot_graph(geneSymbol) {
-            let url = Urls.classifications_gene_symbol_hotspot_graph("{{ genome_build.pk }}", geneSymbol);
-            $('#classifications-hotspot-graph-container').load(url, function() {
-                $(".hotspot-graph", this).attr("hotspot_graph_click_func", "viewGeneClassificationsHotspotGraphClickFunc");
-            });
-        }
-
-        function load_hotspot_graph(geneSymbol) {
-            let url = Urls.gene_symbol_hotspot_graph("{{ genome_build.pk }}", geneSymbol);
-            $('#hotspot-graph-container').load(url, function() {
-                $(".hotspot-graph", this).attr("hotspot_graph_click_func", "viewGeneHotspotGraphClickFunc");
-            });
-        }
-
-        function showTranscripts() {
-            $("#show-transcripts-link").hide();
-            $("#transcripts").slideDown();
-        }
-
-        function viewGeneHotspotGraphClickFunc(transcript_version_id, text, protein_position) {
-            $("#gene-variants-grid-filtering-message").empty().html("Filtering to " + text).parent().show();
-            geneVariantsGridParams["protein_position"] = protein_position;
-            geneVariantsGridParams["protein_position_transcript_version_id"] = transcript_version_id;
-            reloadGeneVariantsTable();
-        }
-
-        function viewGeneClassificationsHotspotGraphClickFunc(transcript_version_id, text, protein_position) {
-            $("#gene-classifications-grid-filtering-message").empty().html("Filtering to " + text).parent().show();
-            geneClassificationsGridParams["protein_position"] = protein_position;
-            geneClassificationsGridParams["protein_position_transcript_version_id"] = transcript_version_id;
-            classificationGroupingRedraw();
-        }
-
-        $(document).ready(() => {
-            EKeys.load().then(eKeys => {
-                {% settings_value 'VARIANT_DETAILS_QUICK_LINKS_ALLOW_LIST' as quick_links_allow_list %}
-                {% settings_value 'VARIANT_DETAILS_QUICK_LINKS_BLOCK_LIST' as quick_links_block_list %}
-                const allowList = {{ quick_links_allow_list | jsonify }};
-                const blockList = {{ quick_links_block_list | jsonify }};
-                let vcLinks = new VCLinks(eKeys);
-                let links = vcLinks.generateLinks({gene_symbol: "{{gene_symbol}}"});
-                links = vcLinks.filterLinks(links, false, allowList, blockList);
-
-                let geneLinks = links.filter(link => link.geneLink);
-                let geneAnchors = geneLinks.map(link => link.asAnchor("bootstrap"));
-                $('#gene-quick-links').html($("<ul>", {class:"list-group", html:geneAnchors}));
-            });
-
-            {% if show_classifications_hotspot_graph %}
-                load_classifications_hotspot_graph("{{ gene_symbol }}");
-            {% endif %}
-            {% if show_hotspot_graph %}
-                load_hotspot_graph("{{ gene_symbol }}");
-            {% endif %}
-
-            {% if has_gene_coverage and url_name_visible.gene_symbol_coverage_collection_graphs %}
-                let gcContainer = $("#qc-gene-coverage-graph-container");
-                gcContainer.html('<i class="fa fa-spinner"></i>');
-                gcContainer.load("{% url 'gene_symbol_coverage_collection_graphs' genome_build.name gene_symbol.pk %}");
-            {% endif %}
-        });
     </script>
+    <script src="{% static 'js/snpdb/ideogram.js' %}"></script>
+    <script src="{% static 'js/genes/view_gene_symbol.js' %}"></script>
+    <script>
+        initViewGeneSymbol({{ gene_symbol_page_data|jsonify }});
+    </script>
+    <style>
+        #gene-symbol-ideogram .ideogram-band { cursor: pointer; }
+        #gene-symbol-ideogram .ideogram-label { font-size: 10px; fill: #555; }
+    </style>
 {% endblock head %}
 {% block content %}
 	<div class="container">
@@ -196,13 +139,11 @@
         {% endif %}
 
         {% if show_annotation %}
-            {% if gene_summary %}
                 <div class="card mt-4">
                     <div class="card-header">Summary</div>
                     <div class="card-body">
-                        {% hgnc_tag hgnc annotation_description %}
+                        {% include "genes/gene_symbol_summary_rows.html" %}
                         {% if hgnc %}
-                        {% labelled label="Location" help=annotation_description.band %}{{ hgnc.location }}{% endlabelled %}
                         {% labelled label="Gene Groups" help=annotation_description.gene_family_description %}
                             {{ hgnc.gene_groups }}
                             {% if hgnc.gene_group_id_list %}
@@ -248,7 +189,6 @@
 
                     </div>
                 </div>
-            {% endif %}
 
             {% if dbnsfp_gene_annotation %}
                 <div class="card mt-4">
@@ -370,7 +310,7 @@
             <div class="card mt-4">
                 <div class="card-header">Summary</div>
                 <div class="card-body">
-                    {% hgnc_tag hgnc annotation_description %}
+                    {% include "genes/gene_symbol_summary_rows.html" %}
                     {% if hgnc %}
                         {% labelled label="Ontology Links" help="Shows links to ontology terms within our system for "|add:gene_symbol.symbol %}
                             <a href="{{ hgnc.get_absolute_url }}">{{ site_name }} HGNC:{{ hgnc.pk }}</a>
@@ -398,19 +338,6 @@
     <div class="container mt-4">
         <h4>Classification Records</h4>
         <p>Filtering on gene symbols : <span class="text-monospace">{% for symbol in gene_symbol.alias_meta.alias_symbol_strs %}{% if not forloop.first %}, {% endif %}{{ symbol }}{% endfor %}</span> and associated alleles and transcripts.</p>
-
-        <script>
-        function classificationGroupingFilterExtra(data, type) {
-            data.gene_symbol = "{{ gene_symbol }}";
-            Object.assign(data, geneClassificationsGridParams);
-        }
-
-        function clearGeneClassificationsGrid() {
-            geneClassificationsGridParams = {};
-            classificationGroupingRedraw();
-            $("#gene-classifications-grid-filtering-message").empty().parent().hide();
-        }
-        </script>
 
         {% if show_classifications_hotspot_graph %}
             <div id='classifications-hotspot-graph-container'></div>
@@ -470,39 +397,6 @@
                     <span class="filter-message" id="gene-variants-grid-filtering-message"></span>
                     <a class='hover-link' href="javascript:clearGeneVariantsGrid()">Show all...</a>
                 </span>
-                <script>
-                    // Called by DataTables before each ajax call - the grid class reads them as extra_filters
-                    function geneVariantsDatatableFilter(data) {
-                        data["extra_filters"] = JSON.stringify(geneVariantsGridParams);
-                        data["show_clinvar"] = $("#gene-variants-show-clinvar").is(":checked");
-                    }
-
-                    function reloadGeneVariantsTable() {
-                        const table = $("#gene-variants-datatable");
-                        if ($.fn.DataTable.isDataTable(table)) {
-                            table.DataTable().ajax.reload();
-                        }
-                    }
-
-                    function clearGeneVariantsGrid() {
-                        geneVariantsGridParams = {};
-                        clearTagCountsSummary(GENE_VARIANTS_TAG_COUNTS);
-                        reloadGeneVariantsTable();
-                        $("#gene-variants-grid-filtering-message").empty().parent().hide();
-                    }
-
-                    function geneVariantsTagsChanged(tagIds) {
-                        geneVariantsGridParams = tagIds.length ? {"tags": tagIds} : {};
-                        reloadGeneVariantsTable();
-                    }
-
-                    const GENE_VARIANTS_TAG_COUNTS = "[data-tag-counts-summary]";
-
-                    $(document).ready(() => {
-                        setupTagCountsSummary(GENE_VARIANTS_TAG_COUNTS, geneVariantsTagsChanged);
-                        $("#gene-variants-show-clinvar").change(reloadGeneVariantsTable);
-                    });
-                </script>
                 {% tag_counts_summary genome_build=genome_build gene_symbol=gene_symbol %}
                 <table id="gene-variants-datatable" class="sticky-header"
                        data-datatable-url="{% url 'gene_symbol_variants_grid' gene_symbol=gene_symbol.pk genome_build_name=genome_build.name %}"
@@ -515,12 +409,6 @@
         {% if gene_in_gene_lists %}
             <h4 class="mt-4">Gene Lists containing {{ gene_symbol }}</h4>
 
-            <script>
-                function geneListsDatatableFilter(data) {
-                    data.gene_symbol = "{{ gene_symbol  }}";
-                    data.page_id = "gene_symbol";
-                }
-            </script>
             <table id="gene-lists-datatable" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'gene_lists_datatable' %}" data-datatable-data="geneListsDatatableFilter"></table>
 
         {% endif %}

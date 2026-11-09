@@ -9,7 +9,9 @@ from typing import Optional, Union
 from django.conf import settings
 from django.db.models import QuerySet
 from django.db.models.query_utils import Q
+from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import urlencode
 
 from analysis.models import VariantTag
 from annotation.models import Citation
@@ -31,13 +33,15 @@ from genes.models import (
     GeneVersion,
     GnomADGeneConstraint,
     PanelAppServer,
+    TranscriptVersion,
 )
 from library.utils import defaultdict_to_dict
 from ontology.enums import OntologyService
 from ontology.models import OntologySnake, OntologyTerm
 from snpdb.models import Sample, VariantGridColumn, VariantZygosityCountCollection
-from snpdb.models.models_genome import GenomeBuild
+from snpdb.models.models_genome import Contig, Cytoband, GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
+from snpdb.serializers import ContigSerializer, CytobandSerializer
 from snpdb.variant_queries import get_has_classifications_q, get_variant_queryset_for_gene_symbol
 
 
@@ -68,6 +72,53 @@ class HasVariants:
 
     def __bool__(self):
         return self.has_variants
+
+
+@dataclass
+class GeneLocation:
+    """ Where a symbol's transcripts are in one build: start/end 1-based inclusive """
+    genome_build: GenomeBuild
+    contig: Contig
+    start: int
+    end: int
+    contig_cytobands: list[Cytoband]  # the file's bands, in position order
+
+    @cached_property
+    def cytobands(self) -> list[Cytoband]:
+        """ The bands the transcripts overlap """
+        return [c for c in self.contig_cytobands if c.start <= self.end and c.end >= self.start]
+
+    @property
+    def band(self) -> Optional[str]:
+        """ eg 'q21.1-q21.2' """
+        return Cytoband.get_band_range_name(self.cytobands)
+
+    @property
+    def cytoband_label(self) -> Optional[str]:
+        """ eg '1q21.1-q21.2' """
+        if band := self.band:
+            return f"{self.contig.name}{band}"
+        return None
+
+    @property
+    def coordinates_label(self) -> str:
+        return f"{self.contig.ucsc_name or self.contig.name}:{self.start:,}-{self.end:,}"
+
+    @property
+    def contig_url(self) -> str:
+        url = reverse("view_contig", kwargs={"contig_accession": self.contig.refseq_accession})
+        if band := self.band:
+            url += "?" + urlencode({"band": band})
+        return url
+
+    def ideogram_data(self) -> dict:
+        """ For view_gene_symbol.js - the gene's contig and all its file bands """
+        return {
+            "contig": ContigSerializer(self.contig).data,
+            "contigUrl": reverse("view_contig", kwargs={"contig_accession": self.contig.refseq_accession}),
+            "cytobands": CytobandSerializer(self.contig_cytobands, many=True).data,
+            "marker": {"start": self.start, "end": self.end, "label": self.coordinates_label},
+        }
 
 
 class GeneSymbolViewInfo:
@@ -112,6 +163,43 @@ class GeneSymbolViewInfo:
         if refseq_gene := Gene.objects.filter(annotation_consortium=AnnotationConsortium.REFSEQ,
                                               geneversion__gene_symbol=self.gene_symbol).first():
             return refseq_gene.summary
+        return None
+
+    @cached_property
+    def gene_description(self) -> Optional[str]:
+        """ The gene annotation's description (eg 'putative protein FAM90A9P') - the name for a non-HGNC gene """
+        gv_qs = self.gene_symbol.geneversion_set.exclude(description__isnull=True).exclude(description="")
+        gv_qs = gv_qs.order_by("-version")
+        gene_version = None
+        if self.desired_genome_build:
+            gene_version = gv_qs.filter(genome_build=self.desired_genome_build).first()
+        if gene_version is None:
+            gene_version = gv_qs.first()
+        return gene_version.description if gene_version else None
+
+    @cached_property
+    def gene_biotypes(self) -> list[str]:
+        """ GeneVersion.biotype is a comma separated list, eg 'lncRNA, lnc_RNA, ncRNA' """
+        gv_qs = self.gene_symbol.geneversion_set.filter(genome_build=self.genome_build, biotype__isnull=False)
+        biotypes = set()
+        for biotype in gv_qs.values_list("biotype", flat=True).distinct():
+            biotypes.update(b.strip() for b in biotype.split(","))
+        return sorted(biotypes)
+
+    @cached_property
+    def gene_location(self) -> Optional[GeneLocation]:
+        if not self.gene_version:
+            return None
+        if span := TranscriptVersion.get_gene_symbol_span(self.genome_build, self.gene_symbol):
+            contig, start, end = span
+            return GeneLocation(genome_build=self.genome_build, contig=contig, start=start, end=end,
+                                contig_cytobands=list(Cytoband.get_file_bands(contig)))
+        return None
+
+    @cached_property
+    def ideogram_data(self) -> Optional[dict]:
+        if self.gene_location and self.gene_location.cytobands:
+            return self.gene_location.ideogram_data()
         return None
 
     @cached_property

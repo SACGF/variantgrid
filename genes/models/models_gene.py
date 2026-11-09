@@ -22,7 +22,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.db import models
-from django.db.models import IntegerField, QuerySet, TextField
+from django.db.models import Count, IntegerField, Max, Min, QuerySet, TextField
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.fields.json import KeyTextTransform, KeyTransform
 from django.db.models.functions import Cast, Collate, Upper
@@ -1189,12 +1189,31 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
             (1-based inclusive, as Cytoband / Locus). The span is the cdot exons' first start and last end,
             which are 0-based half-open - so a transcript overlaps when exon_start < end and exon_end >= start.
             Coordinates are only in the JSON, a scan of a whole chromosome's transcripts is ~130ms (#2723) """
-        exons = KeyTransform("exons", KeyTransform(genome_build.name, KeyTransform("genome_builds", "data")))
-        tx_start = Cast(KeyTextTransform(0, KeyTransform(0, exons)), IntegerField())
-        tx_end = Cast(KeyTextTransform(1, KeyTransform(-1, exons)), IntegerField())
         qs = cls.objects.filter(genome_build=genome_build, contig=contig)
-        qs = qs.alias(tx_start=tx_start, tx_end=tx_end).filter(tx_start__lt=end, tx_end__gte=start)
+        qs = qs.alias(**cls._exon_span(genome_build)).filter(tx_start__lt=end, tx_end__gte=start)
         return qs.order_by().values_list("gene_version_id", flat=True).distinct()
+
+    @classmethod
+    def get_gene_symbol_span(cls, genome_build: GenomeBuild,
+                             gene_symbol: 'GeneSymbol') -> Optional[tuple[Contig, int, int]]:
+        """ (contig, start, end) - 1-based inclusive - spanning the symbol's transcripts in the build, on the contig
+            most of them are on (a PAR gene also has Y copies) """
+        qs = cls.objects.filter(genome_build=genome_build, gene_version__gene_symbol=gene_symbol)
+        qs = qs.alias(**cls._exon_span(genome_build)).values("contig")
+        qs = qs.annotate(start=Min("tx_start"), end=Max("tx_end"), num_transcripts=Count("pk"))
+        if span := qs.order_by("-num_transcripts", "contig").first():
+            contig = Contig.objects.get(pk=span["contig"])
+            return contig, span["start"] + 1, span["end"]  # cdot exons are 0-based half-open
+        return None
+
+    @staticmethod
+    def _exon_span(genome_build: GenomeBuild) -> dict:
+        """ tx_start/tx_end from the cdot exons - 0-based half-open """
+        exons = KeyTransform("exons", KeyTransform(genome_build.name, KeyTransform("genome_builds", "data")))
+        return {
+            "tx_start": Cast(KeyTextTransform(0, KeyTransform(0, exons)), IntegerField()),
+            "tx_end": Cast(KeyTextTransform(1, KeyTransform(-1, exons)), IntegerField()),
+        }
 
     @classmethod
     def data_is_current_cdot_format(cls, genome_build: Optional['GenomeBuild'] = None) -> bool:
