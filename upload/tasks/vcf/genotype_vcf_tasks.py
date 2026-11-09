@@ -48,7 +48,12 @@ from variantgrid.celery import app
 
 
 class ImportCreateVCFModelForGenotypeVCFTask(ImportVCFStepTask):
-    """ Create VCF model from header """
+    """ Creates the VCF model from the header, plus its Cohort and CohortGenotypeCollection, and schedules the
+        steps run once the variants are annotated.
+
+        "Genotype VCF" in the upload code is the import that builds the sample side - VCF, Samples, Cohort and a
+        CohortGenotype row per variant - rather than a VCF with GT calls. A sites-only VCF comes this way too,
+        its rows written with unknown zygosity by BulkNoGenotypeVCFProcessor. The rename is #2721 """
 
     def process_items(self, upload_step):
         vcf_filename = upload_step.input_filename
@@ -108,9 +113,6 @@ class ImportCreateVCFModelForGenotypeVCFTask(ImportVCFStepTask):
                                           script=calculate_mutational_signature_task_class_name)
 
 
-# "Genotype VCF" in the upload code is the import that builds the sample side (VCF, Samples, Cohort and a
-# CohortGenotype row per variant), not a VCF with GT calls - a sites-only VCF comes this way too, written with
-# unknown zygosity by BulkNoGenotypeVCFProcessor. The rename is #2721
 class ImportCreateVCFModelForManualVariantEntryTask(ImportCreateVCFModelForGenotypeVCFTask):
     """ Manual Variant Entry "create as sample": the VCF and its one Sample, linked to the collection.
         The sample is a list of variants to look at together, not an individual, so it gets no mutational

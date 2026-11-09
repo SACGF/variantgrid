@@ -514,8 +514,7 @@ class ManualVariantEntryImportFactory(AbstractVCFImportTaskFactory):
 
 class ManualVariantEntrySampleImportFactory(GenotypeVCFImportFactory):
     """ Manual Variant Entry "create as sample" - the standard VCF import (VCF, one Sample named after the
-        upload, cohort genotypes), still linking each record to its ManualVariantEntry. "Genotype" here means
-        the sample-side import rather than GT calls, which these records don't have (rename: #2721).
+        upload, cohort genotypes), still linking each record to its ManualVariantEntry.
 
         The sample is a list of variants to examine together rather than an individual, so none of the
         per-sample steps (zygosity counts, locus counts, somalier, mutational signatures) run """
