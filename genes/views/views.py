@@ -57,6 +57,7 @@ from snpdb.graphs import graphcache
 from snpdb.models import Sample
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_user_settings import UserSettings
+from variantgrid.perm_path import url_name_enabled
 
 
 def genes(request, genome_build_name=None):
@@ -176,8 +177,11 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
             "dbnsfp_gene_annotation",
             "gene_symbol",
             "gene_external_urls",
+            "gene_biotypes",
             "gene_constraint",
+            "gene_description",
             "gene_in_gene_lists",
+            "gene_location",
             "gene_summary",
             "genome_build",
             "has_classified_variants",
@@ -187,6 +191,7 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
             "panel_app_servers",
             "omim_and_hpo_for_gene",
             "has_variants",
+            "ideogram_data",
             "show_classifications_hotspot_graph",
             "show_hotspot_graph",
             "unmatched_classifications",
@@ -195,8 +200,28 @@ def view_gene_symbol(request, gene_symbol: str, genome_build_name: Optional[str]
     )
     context["show_wiki"] = settings.VIEW_GENE_WIKI
     context["show_annotation"] = settings.VARIANT_DETAILS_SHOW_ANNOTATION
+    context["gene_symbol_page_data"] = _gene_symbol_page_data(view_info)
 
     return render(request, "genes/view_gene_symbol.html", context)
+
+
+def _gene_symbol_page_data(view_info: GeneSymbolViewInfo) -> dict:
+    """ The options for view_gene_symbol.js initViewGeneSymbol """
+    gene_coverage_url = None
+    if view_info.has_gene_coverage and url_name_enabled("gene_symbol_coverage_collection_graphs"):
+        gene_coverage_url = reverse("gene_symbol_coverage_collection_graphs",
+                                    kwargs={"genome_build_name": view_info.genome_build.name,
+                                            "gene_symbol": view_info.gene_symbol.pk})
+    return {
+        "geneSymbol": view_info.gene_symbol.symbol,
+        "genomeBuildName": view_info.genome_build.name,
+        "quickLinksAllowList": settings.VARIANT_DETAILS_QUICK_LINKS_ALLOW_LIST,
+        "quickLinksBlockList": settings.VARIANT_DETAILS_QUICK_LINKS_BLOCK_LIST,
+        "showClassificationsHotspotGraph": view_info.show_classifications_hotspot_graph(),
+        "showHotspotGraph": view_info.show_hotspot_graph(),
+        "geneCoverageUrl": gene_coverage_url,
+        "ideogram": view_info.ideogram_data,
+    }
 
 
 @dataclass(frozen=True)
@@ -364,6 +389,7 @@ def gene_symbol_info_tab(request, gene_symbol, tool_tips):
         view_info,
         [
             "annotation_description",
+            "gene_description",
             "gene_summary",
             "gene_symbol",
             "hgnc",

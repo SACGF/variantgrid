@@ -123,6 +123,8 @@ export default [
                 VCTable: "readonly", // classification/vc_table.js
                 Flags: "readonly", // flags.js
                 VCLinks: "readonly", // vc_links.js
+                Ideogram: "readonly", // snpdb/ideogram.js
+                SVG_NS: "readonly", // global.js
                 // cross-execution state in fragment-loaded files: these scripts are
                 // re-executed on AJAX load, so the state must stay a plain assignment
                 // (a top-level let/const would throw on re-execution)

@@ -1,0 +1,25 @@
+{% load ui_utils %}
+{% load gene_symbol_tags %}
+{% if ideogram_data %}
+    <div id="gene-symbol-ideogram" class="mb-2"></div>
+{% endif %}
+{% if not hgnc and gene_description %}
+    {% labelled label="Name" %}{{ gene_description }}{% endlabelled %}
+{% endif %}
+{% hgnc_tag hgnc annotation_description %}
+{% if gene_biotypes %}
+    {% labelled label="Biotype" %}{{ gene_biotypes|join:", " }}{% endlabelled %}
+{% endif %}
+{% labelled label="Location" help=annotation_description.band %}
+    {% if gene_location %}
+        <a href="{{ gene_location.contig_url }}">{{ gene_location.cytoband_label|default:gene_location.contig.name }}</a>
+        <span class="text-monospace">{{ gene_location.coordinates_label }}</span> ({{ gene_location.genome_build }})
+        {% if hgnc.location and hgnc.location != gene_location.cytoband_label %}
+            <span class="text-muted">&middot; HGNC: {{ hgnc.location }}</span>
+        {% endif %}
+    {% elif hgnc.location %}
+        {{ hgnc.location }}
+    {% else %}
+        <span class="no-value">-</span>
+    {% endif %}
+{% endlabelled %}
