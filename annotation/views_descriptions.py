@@ -3,14 +3,11 @@ from collections import defaultdict
 
 from django.conf import settings
 from django.shortcuts import render
-from django.views.decorators.cache import cache_page
-from django.views.decorators.vary import vary_on_cookie
 
 from annotation import annotsv_columns, vep_columns
 from annotation.enums import ColumnAnnotationCategory, VariantAnnotationPipelineType
 from annotation.models import VariantAnnotationVersion
 from annotation.vep_annotation import VEPConfig
-from library.constants import WEEK_SECS
 from library.unit_percent import get_allele_frequency_formatter
 from snpdb.enums import ColumnAnnotationLevel
 from snpdb.grid_columns.composite_examples import (
@@ -136,8 +133,6 @@ def _member_role(member) -> str:
     return "sort" if member.in_sort_menu else "hover"
 
 
-@cache_page(WEEK_SECS)
-@vary_on_cookie  # the information isn't actually different per user, but hack to avoid showing other user's email/notifications etc in the top right
 def view_annotation_descriptions(request, genome_build_name=None):
     genome_build = UserSettings.get_genome_build_or_default(request.user, genome_build_name)
     variantgrid_columns_by_annotation_level = defaultdict(list)
