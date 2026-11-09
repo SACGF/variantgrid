@@ -1046,12 +1046,19 @@ const VCForm = (function() {
                 }
             }
 
-            if (this.record.sample_id) {
-                const href = Urls.view_sample(this.record.sample_id);
-                let sampleElement = $('<a>', {class:'hover-link', text: this.record.sample_name, href:href});
-                sampleElement = $('<span>', {html: [
-                    sampleElement,
-                ]});
+            if (this.record.sample_id || this.canReassignSample) {
+                const sampleElement = $('<span>');
+                if (this.record.sample_id) {
+                    const href = Urls.view_sample(this.record.sample_id);
+                    $('<a>', {class:'hover-link', text: this.record.sample_name, href:href}).appendTo(sampleElement);
+                } else {
+                    $('<span>', {class: 'text-muted', text: 'No sample'}).appendTo(sampleElement);
+                }
+                if (this.canReassignSample) {
+                    // opens the Change sample dialog - classification/classification_sample.js
+                    $('<button>', {type: 'button', id: 'sample-change-open', class: 'btn btn-link btn-sm p-0 ml-2 align-baseline',
+                        text: this.record.sample_id ? 'Change' : 'Assign'}).appendTo(sampleElement);
+                }
                 appendLabelHeading('Sample', sampleElement);
             }
 
@@ -1318,6 +1325,7 @@ const VCForm = (function() {
             jLinks = $(params.links);
             jShareButtons = $(params.shareButtons);
             this.userAdmin = params.userAdmin;
+            this.canReassignSample = params.canReassignSample || false;
             this.lab_record_id = params.lab_record_id;
             this.citations = params.citations;
             this.conditionResolution = params.conditionResolution;

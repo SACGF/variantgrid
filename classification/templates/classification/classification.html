@@ -19,13 +19,13 @@
 {% compress js %}
 <script src="{% static 'js/vc_form.js' %}"></script>
 {% endcompress %}
-{% if sample_panel_enabled %}
+{% if sample_change_form %}
 <script src="{% static 'js/classification/classification_sample.js' %}"></script>
-{% if sample_change_form %}{{ sample_change_form.media }}{% endif %}
+{{ sample_change_form.media }}
 <script>
     $(document).ready(() => initClassificationSample({
-        panelUrl: "{% url 'classification_sample' classification_id=vc.pk %}",
-        sampleSelectId: "{{ sample_change_form.sample.auto_id|default:'' }}",
+        sampleUrl: "{% url 'classification_sample' classification_id=vc.pk %}",
+        sampleSelectId: "{{ sample_change_form.sample.auto_id }}",
     }));
 </script>
 {% endif %}
@@ -41,6 +41,7 @@
             vcform.init(
                 {
                     userAdmin: {{ user.is_superuser | jsonify }},
+                    canReassignSample: {{ sample_change_form | yesno:"true,false" }},
                     lab_record_id: "{{ record.lab_record_id }}",
                     genomeBuild: "{{ genome_build.pk }}",
                     // citations: new Citations($('#citations')),
@@ -319,13 +320,6 @@
                 <div class="card-header">Criteria Summary</div>
                 <div class="card-body no-padding summary-crit" id="vcform-crit-table"></div>
             </div>
-
-            {% if sample_panel_enabled %}
-                <div id="vcform-sample" class="card m-2">
-                    <div class="card-header">Sample</div>
-                    <div class="card-body"><span class="text-muted">Loading…</span></div>
-                </div>
-            {% endif %}
 
             {% if gene_consensus_enabled %}
                 {# Hidden until the panel says there's something to reuse - see views_gene_consensus.py #}

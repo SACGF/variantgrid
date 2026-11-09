@@ -1,9 +1,9 @@
 """
-The Sample card on the classification form: the record's sample, and for a lab head the dialog that moves it to
-another sample (classification/sample_reassignment.py).
+The classification form's Change sample dialog, opened from the summary card's Sample row: a lab head moves the
+record to another sample (classification/sample_reassignment.py).
 
-Entry points: classification_sample_panel (the card, the dialog's preview with ?sample_id=, and the POST that
-reassigns), reached at classification_sample.
+Entry points: classification_sample_panel (the dialog's preview with ?sample_id=, and the POST that reassigns),
+reached at classification_sample.
 """
 from django.core.exceptions import PermissionDenied
 from django.http import Http404
@@ -29,21 +29,16 @@ def classification_sample_panel(request: HttpRequest, classification_id: int) ->
     if request.method == "POST":
         return _reassign(request, classification)
 
-    if sample_id := request.GET.get("sample_id"):
-        sample = get_object_or_404(Sample, pk=int(sample_id))
-        context = {"classification": classification}
-        try:
-            context["preview"] = sample_reassignment_preview(classification, sample, request.user)
-        except PermissionDenied as pd:
-            context["error"] = str(pd)
-        return render(request, 'classification/sample_change_preview.html', context)
-
-    context = {
-        "classification": classification,
-        "sample": classification.sample,
-        "can_reassign": classification.can_reassign_sample(request.user),
-    }
-    return render(request, 'classification/sample_card.html', context)
+    sample_id = request.GET.get("sample_id")
+    if not sample_id:
+        raise Http404("No sample was chosen")
+    sample = get_object_or_404(Sample, pk=int(sample_id))
+    context = {"classification": classification}
+    try:
+        context["preview"] = sample_reassignment_preview(classification, sample, request.user)
+    except PermissionDenied as pd:
+        context["error"] = str(pd)
+    return render(request, 'classification/sample_change_preview.html', context)
 
 
 def _reassign(request: HttpRequest, classification: Classification) -> HttpResponseBase:

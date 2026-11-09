@@ -503,7 +503,6 @@ def view_classification(request: HttpRequest, classification_id: str):
         # Card body is loaded lazily - the gene candidates are a query the page shouldn't wait on
         'gene_consensus_enabled': settings.CLASSIFICATION_GENE_CONSENSUS and vc.can_write(request.user)
                                   and bool(classification_gene_symbol(vc)),
-        'sample_panel_enabled': vc.variant_id is not None and vc.can_write(request.user),
         'sample_change_form': _sample_change_form(vc, request.user, genome_build),
         'sample_change_patient_id': vc.sample.patient_id if vc.sample else None,
         'sync_statuses': classification_sync_status(vc),
@@ -512,7 +511,8 @@ def view_classification(request: HttpRequest, classification_id: str):
 
 
 def _sample_change_form(vc: Classification, user: User, genome_build: GenomeBuild) -> Optional[SampleChoiceForm]:
-    """ The Sample card's dialog, for the users who may move the record to another sample """
+    """ The Change sample dialog, opened from the summary card's Sample row, for the users who may move the
+        record to another sample """
     if not vc.can_reassign_sample(user):
         return None
     form = SampleChoiceForm(genome_build=genome_build, prefix="reassign")
