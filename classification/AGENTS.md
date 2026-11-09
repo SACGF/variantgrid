@@ -14,6 +14,7 @@ Start with:
   Pages and grids show it, never the `p_hgvs` evidence, by passing it to `HGVSDisplay(p_hgvs=...)` from the same build as the c.HGVS (an imported c.HGVS takes the imported build's: `ImportedAlleleInfo.imported_hgvs_display`); `to_json` and the `p_hgvs` template tag put it inline after the c. nomen, short with the full form as tooltip, gated on `CLASSIFICATION_GRID_SHOW_PHGVS` (#19).
 - models/clinical_context_models.py + models/discordance_models.py — ClinicalContext, DiscordanceStatus, DiscordanceReport.
 - models/classification_inserter.py — BulkClassificationInserter, the one write path shared by the API, file imports and sync.
+- sample_reassignment.py — the one way a record changes sample (lab heads, the form's Sample card): re-points `Classification.sample` and re-populates the sample-derived evidence keys.
 Patterns here:
 - Evidence is JSON keyed by EvidenceKey.key; each value is a blob of value/note/explain/db_refs/validation
   (models/evidence_key.py:VCBlobDict). Read it with models/evidence_mixin.py:EvidenceMixin.get and name keys via

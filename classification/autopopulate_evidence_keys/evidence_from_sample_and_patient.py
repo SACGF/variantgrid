@@ -10,6 +10,31 @@ from snpdb.enums import VariantOrigin
 from snpdb.models import Sample, SampleGenotype
 from snpdb.models.models_variant import Variant
 
+# Every key get_evidence_fields_for_sample_and_patient (and the extraction / patient helpers it calls) can set
+SAMPLE_EVIDENCE_KEYS = (
+    SpecialEKeys.SAMPLE_ID,
+    SpecialEKeys.ALLELE_ORIGIN,
+    SpecialEKeys.PATIENT_ID,
+    SpecialEKeys.FAMILY_ID,
+    SpecialEKeys.SPECIMEN_ID,
+    SpecialEKeys.SAMPLE_TYPE,
+    SpecialEKeys.AGE,
+    SpecialEKeys.NUCLEIC_ACID_SOURCE,
+    SpecialEKeys.ZYGOSITY,
+    SpecialEKeys.ALLELE_DEPTH,
+    SpecialEKeys.READ_DEPTH,
+    SpecialEKeys.PHRED_LIKELIHOOD,
+    SpecialEKeys.GENOTYPE_QUALITY,
+    SpecialEKeys.ALLELE_FREQUENCY,
+    SpecialEKeys.VCF_FILTER,
+    SpecialEKeys.FOLD_CHANGE,
+    SpecialEKeys.COPY_NUMBER,
+    SpecialEKeys.CAPTURE_METHOD,
+    SpecialEKeys.SEQUENCING_PLATFORM,
+    SpecialEKeys.SEX,
+    SpecialEKeys.ANCESTRY,
+)
+
 
 def get_zygosity(sample_genotype: SampleGenotype) -> Optional[str]:
     """ returns Homozygous/het/hem """

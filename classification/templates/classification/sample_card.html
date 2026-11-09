@@ -1,0 +1,10 @@
+{# Body of the Sample card on the classification form - @see views_classification_sample.py #}
+{% if sample %}
+    <div><a class="hover-link" href="{% url 'view_sample' sample_id=sample.pk %}">{{ sample.name }}</a></div>
+    <div class="text-muted small">{{ sample.vcf }}</div>
+{% else %}
+    <div class="text-muted">No sample</div>
+{% endif %}
+{% if can_reassign %}
+    <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="sample-change-open">Change sample</button>
+{% endif %}

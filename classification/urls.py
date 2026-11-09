@@ -96,6 +96,7 @@ from classification.views.views_case_report import (
     case_report_rebuild,
     view_case_report,
 )
+from classification.views.views_classification_sample import classification_sample_panel
 from classification.views.views_gene_consensus import gene_consensus_panel
 from classification.views.views_hgvs_resolution_tool import hgvs_resolution_tool
 from classification.views.views_uploaded_classifications_unmapped import (
@@ -132,6 +133,8 @@ urlpatterns = [
 
     path('classification/<int:classification_id>/gene_consensus', gene_consensus_panel,
          name='classification_gene_consensus'),
+    path('classification/<int:classification_id>/sample', classification_sample_panel,
+         name='classification_sample'),
 
     # A built case report - the case it belongs to is on the Classify & Report tab (analysis/urls.py)
     path('case_report/<int:case_report_id>', view_case_report, name='view_case_report'),

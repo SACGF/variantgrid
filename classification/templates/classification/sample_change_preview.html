@@ -1,0 +1,33 @@
+{# What moving the record to the chosen sample would change - @see sample_reassignment.py #}
+{% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+{% else %}
+    <div id="sample-change-preview-ready" data-has-genotype="{{ preview.has_genotype|yesno:'true,false' }}">
+        {% if not preview.has_genotype %}
+            <div class="alert alert-warning">This sample has no genotype call for this variant. The genotype fields will be cleared.</div>
+        {% endif %}
+        {% if preview.allele_origin_bucket_changes %}
+            <div class="alert alert-info">
+                Allele origin changes from <strong>{{ preview.allele_origin_bucket_before.label }}</strong>
+                to <strong>{{ preview.allele_origin_bucket_after.label }}</strong>.
+            </div>
+        {% endif %}
+        {% if preview.changes %}
+            <p>Re-populating from <strong>{{ preview.sample.name }}</strong> changes:</p>
+            <table class="table table-sm">
+                <thead><tr><th>Field</th><th>Current</th><th>New</th></tr></thead>
+                <tbody>
+                {% for change in preview.changes %}
+                    <tr>
+                        <td>{{ change.label }}</td>
+                        <td>{% if change.current is None %}<span class="text-muted">-</span>{% else %}{{ change.current }}{% endif %}</td>
+                        <td>{% if change.new is None %}<span class="text-muted">cleared</span>{% else %}{{ change.new }}{% endif %}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Re-populating from <strong>{{ preview.sample.name }}</strong> changes no fields.</p>
+        {% endif %}
+    </div>
+{% endif %}
