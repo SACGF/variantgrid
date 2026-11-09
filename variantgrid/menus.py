@@ -106,8 +106,7 @@ MENUS: tuple[Menu, ...] = (
         MenuItem('evidence_keys', title="Evidence Keys", icon=HELP_ICON),
     ), pages=('create_classification_for_variant', 'create_classification_for_variant_tag',
               'create_classification_from_hgvs', 'internal_lab_download', 'lab_gene_classification_counts')),
-    # Symbol Matching keeps the menu in the top bar on a deployment that hides the other Genes pages
-    Menu('genes', 'Genes', 'gene_lists', top_bar_fallback='gene_symbol_matching', items=(
+    Menu('genes', 'Genes', 'gene_lists', items=(
         MenuItem('genes', pages=('genome_build_genes',)),
         MenuItem('canonical_transcripts', pages=('view_canonical_transcript_collection',)),
         MenuItem('gene_grid', pages=('passed_gene_grid',)),

@@ -25,7 +25,7 @@ class MenuRegistryTest(SimpleTestCase):
     def test_url_names_resolve(self):
         url_names = {k for k in get_resolver().reverse_dict.keys() if isinstance(k, str)}
         for menu in MENUS:
-            declared = list(menu.pages) + [name for name in (menu.url_name, menu.top_bar_fallback) if name]
+            declared = list(menu.pages) + ([menu.url_name] if menu.url_name else [])
             for item in menu.items:
                 declared.extend(item.pages)
                 if not item.href:
