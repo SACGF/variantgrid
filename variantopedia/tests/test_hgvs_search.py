@@ -15,6 +15,7 @@ from variantopedia.signals.hgvs_search import (
     _contig_not_in_build_message,
     _gene_symbol_search_message,
     _hgvs_nomenclature_error_message,
+    _hgvs_strings_for_variant_label,
     _search_hgvs_using_gene_symbol,
     _transcript_substitution_messages,
 )
@@ -142,3 +143,31 @@ class SearchHGVSTranscriptMissingFromBuildTestCase(TestCase):
         search_results = self._search(self.t2t)
         errors = [(m.message, r.preview.genome_builds) for r in search_results.results for m in r.messages]
         self.assertEqual(errors, [(self.MISSING_MESSAGE, {self.t2t})])
+
+
+class VariantLabelHGVSTestCase(TestCase):
+    """ The Variant column's label leads HGVS with a gene, the genes an SV spans or the contig (#2696) """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        create_gata2_transcript_version(cls.grch37)
+
+    def _hgvs(self, label: str) -> list[str]:
+        return _hgvs_strings_for_variant_label(label, self.grch37)
+
+    def test_genomic_change_goes_on_the_contig(self):
+        self.assertEqual(self._hgvs("chr3 g.128198980A>G"), ["NC_000003.11:g.128198980A>G"])
+        self.assertEqual(self._hgvs("chrMT m.5782_13922del"), ["NC_012920.1:m.5782_13922del"])
+        self.assertEqual(self._hgvs("chr3 +5 genes g.128198980_128199980del"), ["NC_000003.11:g.128198980_128199980del"])
+
+    def test_genomic_change_goes_on_the_genes_contig(self):
+        self.assertEqual(self._hgvs("GATA2, RPN1 +3 genes g.128198980_128199980del"),
+                         ["NC_000003.11:g.128198980_128199980del"])
+
+    def test_transcript_change_keeps_the_first_gene(self):
+        self.assertEqual(self._hgvs("GATA2, RPN1 c.1113dup"), ["GATA2:c.1113dup"])
+
+    def test_hgvs_that_is_not_a_label_is_unchanged(self):
+        for hgvs in ["GATA2 c.1113dup", "NM_001145661.2(GATA2):c.1113dup", "NM_001145661.2:c.1113dup"]:
+            self.assertEqual(self._hgvs(hgvs), [hgvs])

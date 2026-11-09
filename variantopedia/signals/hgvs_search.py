@@ -1,6 +1,7 @@
 """ Variant search by HGVS (the search_hgvs receiver): resolves c./n./g. HGVS through HGVSMatcher, retrying c. on a
-    non-coding transcript as n., falls back to a gene symbol's MANE transcripts when no transcript is given, and
-    reports what was substituted (transcript version, reference, normalisation) as search messages """
+    non-coding transcript as n., falls back to a gene symbol's MANE transcripts when no transcript is given, reads
+    the Variant column's gene- or contig-led HGVS ("chr11 +5 genes g.1_2del") back onto its contig, and reports
+    what was substituted (transcript version, reference, normalisation) as search messages """
 import itertools
 import logging
 import re
@@ -28,6 +29,7 @@ from genes.hgvs.hgvs_converter import HgvsMatchRefAllele, HGVSNonCodingTranscrip
 from genes.hgvs.hgvs_matcher import VariantCoordinateAndDetails
 from genes.models import MANE, BadTranscript, MissingTranscript, TranscriptVersion
 from library.enums.log_level import LogLevel
+from library.genomics import format_chrom
 from library.log_utils import report_exc_info
 from snpdb.models import (
     HGVS_UNCLEANED_PATTERN,
@@ -46,6 +48,7 @@ from snpdb.search import (
 )
 from snpdb.variant_coordinate_search import get_results_from_variant_coordinate
 from variantopedia.signals.variant_search import (
+    VARIANT_LABEL_NAMED_LEAD,
     VariantExtra,
     get_visible_variants,
     yield_no_results_for_variant_coordinate,
@@ -163,6 +166,38 @@ def _get_search_hgvs_gene_symbol_transcripts(hgvs_matcher: HGVSMatcher, gene_sym
     return candidates, has_non_mane_transcripts
 
 
+# The Variant column (VariantGridFormat.representativeVariantLabel) leads HGVS with what a reader calls the row - the
+# gene, the genes an SV spans or the contig - and gives the change without its accession: "chr11 +5 genes g.1_2del"
+VARIANT_LABEL_HGVS_PATTERN = re.compile(rf"^({VARIANT_LABEL_NAMED_LEAD})\s+([cgmn]\..*)$")
+
+
+def _label_reference_contigs(reference: str, genome_build: GenomeBuild) -> list[Contig]:
+    """ The contig a label's lead names, or the contigs a gene symbol lead's transcripts are on """
+    chrom_contig_mappings = genome_build.chrom_contig_mappings
+    for chrom in (reference, format_chrom(reference, False), format_chrom(reference, True)):
+        if contig := chrom_contig_mappings.get(chrom):
+            return [contig]
+    contigs = set()
+    for tv in TranscriptVersion.objects.filter(genome_build=genome_build, gene_version__gene_symbol_id=reference):
+        contigs.update(tv.get_contigs())
+    return sorted(contigs, key=lambda c: c.pk)
+
+
+def _hgvs_strings_for_variant_label(search_string: str, genome_build: GenomeBuild) -> list[str]:
+    """ The HGVS a Variant column label stands for: its first gene or contig is the reference, and a g./m. change
+        goes on that contig's accession (or a gene's contig), as a genomic change on a gene symbol means nothing """
+    if not (m := VARIANT_LABEL_HGVS_PATTERN.match(search_string)):
+        return [search_string]
+    lead, change = m.groups()
+    reference = re.split(r"[,\s]", lead, maxsplit=1)[0]
+    if change[0] in "gm":
+        if contigs := _label_reference_contigs(reference, genome_build):
+            return [f"{contig.refseq_accession}:{change}" for contig in contigs]
+    if reference != lead:
+        return [f"{reference}:{change}"]
+    return [search_string]
+
+
 @search_receiver(
     search_type=Variant,
     pattern=HGVS_UNCLEANED_PATTERN,
@@ -182,11 +217,14 @@ def search_hgvs(search_input: SearchInputInstance) -> Iterable[SearchResult]:
         results = []
         error_message = None
         try:
-            results =_search_hgvs(hgvs_string=search_input.search_string, user=search_input.user,
-                                  genome_build=genome_build,
-                                  visible_variants=get_visible_variants(search_input, genome_build),
-                                  classify=search_input.classify)
-            results = list(results)  # read iterator to trigger exceptions
+            for hgvs_string in _hgvs_strings_for_variant_label(search_input.search_string, genome_build):
+                if hgvs_string != search_input.search_string:
+                    results.append(SearchMessageOverall(f'Searched "{search_input.search_string}" as "{hgvs_string}"',
+                                                        severity=LogLevel.INFO))
+                results.extend(_search_hgvs(hgvs_string=hgvs_string, user=search_input.user,
+                                            genome_build=genome_build,
+                                            visible_variants=get_visible_variants(search_input, genome_build),
+                                            classify=search_input.classify))
             resolved_in_a_build = True
         except MissingTranscript as e:
             # Transcript isn't in every build (eg Ensembl in T2T) - only an error if no build resolved

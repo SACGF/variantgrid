@@ -1009,6 +1009,8 @@ registerDomProcessor('[data-variant-kind-alt]', (node) => {
 // plain string for the link tooltip. Every key may be undefined on a row cached before these fields
 // existed - each step checks and falls through, ending at the VariantGrid id. rowData is keyed the
 // way the grid's Variant column is - the variant page's locus table sends the same keys
+// Variant search reads each label back (VARIANT_LABEL_* in variantopedia/signals/variant_search.py and
+// hgvs_search.py), so a new form here needs a search that finds it
 VariantGridFormat.representativeVariantLabel = (variantId, rowData) => {
     const chrom = rowData["locus__contig__name"];
     const position = rowData["locus__position"];
