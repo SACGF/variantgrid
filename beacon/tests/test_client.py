@@ -175,19 +175,20 @@ class BeaconQueryGatingTestCase(TestCase):
         self.assertEqual(eligible["seq"]["start"], 999)  # 1-based -> 0-based
         self.assertEqual(eligible["seq"]["alternateBases"], "T")
 
-    def test_cnv_deletion_routes_to_cnv_node_as_range_query(self):
-        variant = self._variant(is_symbolic=True, chrom="9", position=21967752,
-                                ref="N", alt="<DEL>", svlen=-27549, end=21995301)
+    def test_cnv_deletion_routes_to_cnv_node_as_bracket_query(self):
+        variant = self._variant(is_symbolic=True, chrom="1", position=155209999,
+                                ref="N", alt="<DEL>", svlen=-20001, end=155230000)
         eligible = _eligible_queries(variant, self.grch38, self.both_nodes)
         self.assertEqual(list(eligible), ["cnv"])
         params = eligible["cnv"]
-        self.assertEqual(params["start"], 21967751)  # 0-based
-        self.assertEqual(params["end"], 21995301)    # position + abs(svlen)
         self.assertEqual(params["variantType"], "EFO:0030067")  # <DEL> -> copy number loss
-        self.assertNotIn("referenceBases", params)   # a range query, not an exact-allele one
-        # Only similar-sized events: not every arm-level loss overlapping the span
-        self.assertEqual(params["variantMinLength"], 13774)
-        self.assertEqual(params["variantMaxLength"], 55098)
+        self.assertNotIn("referenceBases", params)   # a span query, not an exact-allele one
+        # 0-based span 155209998-155230000 (20,002 bp) at 80% reciprocal overlap: a breakpoint may move
+        # 20% of our length inwards and 25% outwards, and the length 0.8x-1.25x ours
+        self.assertEqual(params["start"], "155204998,155213998")
+        self.assertEqual(params["end"], "155226000,155235000")
+        self.assertEqual(params["variantMinLength"], 16002)
+        self.assertEqual(params["variantMaxLength"], 25002)
 
     def test_cnv_duplication_maps_to_gain(self):
         variant = self._variant(is_symbolic=True, chrom="2", position=15940550,

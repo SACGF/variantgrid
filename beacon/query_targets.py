@@ -8,6 +8,7 @@ settings.BEACON_QUERY_NODES selects its target via `type` (and may restrict `ass
 gate the variant passes, plus a reason for each one it skipped, so a variant page shows only the
 Beacons that apply to that variant and why the rest did not.
 """
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional
@@ -51,17 +52,20 @@ class SnvBeaconTarget(BeaconQueryTarget):
 
 
 class CnvBeaconTarget(BeaconQueryTarget):
-    """ Copy-number Beacons (bycon/progenetix et al.): a symbolic <DEL>/<DUP> becomes a range
-        query for copy-number events of that class overlapping the variant's span and of a similar
-        length. The per-sample copy number (on CohortGenotype) stays internal - only the public
-        span and copy-number class leave. """
+    """ Copy-number Beacons (bycon/progenetix et al.): a symbolic <DEL>/<DUP> becomes a bracket
+        query for copy-number events of that class that roughly match the variant's span. The
+        per-sample copy number (on CohortGenotype) stays internal - only the public span and
+        copy-number class leave. """
 
     domain = "copy-number DEL/DUP variant"
 
     # A bare range query counts every overlapping event, which for a cancer copy-number Beacon is
-    # dominated by arm-level and whole-chromosome losses/gains. Bounding the length to within this
-    # factor of ours keeps the count to events comparable to the queried one.
-    LENGTH_RATIO = 2
+    # dominated by arm-level and whole-chromosome losses/gains. Matching is the same reciprocal
+    # overlap as gnomAD-SV annotation (ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION). A Beacon only returns
+    # a count, so the query carries the bounds that overlap implies: each breakpoint within the shift
+    # it allows, and the length within MIN_RECIPROCAL_OVERLAP..1/MIN_RECIPROCAL_OVERLAP of ours. That
+    # is slightly looser than the overlap itself where both breakpoints are near their limits.
+    MIN_RECIPROCAL_OVERLAP = 0.8
 
     # VG symbolic alt -> GA4GH/EFO copy-number class (validated live against progenetix).
     VARIANT_TYPE_EFO = {
@@ -82,21 +86,27 @@ class CnvBeaconTarget(BeaconQueryTarget):
 
     def build_params(self, variant, genome_build) -> dict:
         vc = variant.coordinate
-        length = abs(vc.svlen)
+        start = vc.position - 1  # 1-based -> 0-based
+        end = vc.end             # position + abs(svlen)
+        length = end - start
+        overlap = self.MIN_RECIPROCAL_OVERLAP
+        # Moving a breakpoint inwards shrinks the overlap against our length, outwards against theirs
+        inwards = int(length * (1 - overlap))
+        outwards = int(length * (1 - overlap) / overlap)
         return {
             "referenceName": vc.chrom.replace("chr", ""),
             "assemblyId": genome_build.name,
-            "start": vc.position - 1,  # 1-based -> 0-based
-            "end": vc.end,             # position + abs(svlen)
+            # Beacon v2 bracket query: an event whose start and end each fall in the given range
+            "start": f"{max(0, start - outwards)},{start + inwards}",
+            "end": f"{end - inwards},{end + outwards}",
             "variantType": self._efo(vc),
-            "variantMinLength": max(1, length // self.LENGTH_RATIO),
-            "variantMaxLength": length * self.LENGTH_RATIO,
+            "variantMinLength": math.ceil(length * overlap),
+            "variantMaxLength": int(length / overlap),
         }
 
     def describe(self, params: dict) -> str:
         event = self.EFO_LABELS[params["variantType"]]
-        return (f"{event} events of {params['variantMinLength']:,}-{params['variantMaxLength']:,} bp "
-                "overlapping this variant")
+        return f"{event} events with at least {self.MIN_RECIPROCAL_OVERLAP:.0%} reciprocal overlap"
 
 
 TARGETS: dict[str, BeaconQueryTarget] = {
