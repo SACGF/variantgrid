@@ -68,7 +68,7 @@
     {% endlabelled %}
     {% labelled label="Involved Labs" %}
         {% for lab_contact in overlap_details.involved_labs %}
-            <div>{% lab lab_contact.lab show_contact_link=True contact_subject=lab_contact.contact_subject %}</div>
+            <div>{% lab lab_contact.lab show_contact_link=True contact_subject=lab_contact.contact_subject contact_body=lab_contact.contact_body %}</div>
         {% endfor %}
         {% comment %}Add a warning if ClinVar is in the list of labs, they wont be diffed{% endcomment %}
     {% endlabelled %}
