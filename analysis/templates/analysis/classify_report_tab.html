@@ -26,7 +26,7 @@
 
     <div class="container-fluid mt-2">
         <div class="row mb-3">
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <div class="card h-100">
                     <div class="card-body py-2">
                         <div class="text-muted small">Tags to action</div>
@@ -38,21 +38,12 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <div class="card h-100">
                     <div class="card-body py-2">
                         <div class="text-muted small">Classifications on this case</div>
                         <div class="h4 mb-0">{{ classification_modifications|length }}</div>
                         <div class="text-muted small">created from the tags below</div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card h-100">
-                    <div class="card-body py-2">
-                        <div class="text-muted small">Report</div>
-                        <div class="h4 mb-0" id="report-selected-count">0 selected</div>
-                        <div class="text-muted small">select classifications, then build</div>
                     </div>
                 </div>
             </div>
@@ -184,7 +175,7 @@
                             <td><a class="classification-link" href="{{ classification.get_absolute_url }}" target="_blank">{{ classification.friendly_label }}</a></td>
                             <td>{{ classification.sample.name }}</td>
                             <td></td>
-                            <td class="report-status"><i class="fas fa-spinner fa-spin mr-1"></i>Populating&hellip;</td>
+                            <td class="report-status populating-status"><i class="fas fa-spinner fa-spin mr-1"></i>Populating&hellip;</td>
                         </tr>
                     {% endfor %}
                     {% if not report_candidates and not populating_classifications %}
@@ -198,6 +189,7 @@
                             <button type="button" class="btn btn-primary btn-sm mr-3" id="build-case-report"
                                     data-dialog-url="{% url 'case_report_build_dialog' case_type case_id %}">Build multiple variant report</button>
                             <span class="text-muted small">Template: {{ case_report_templates|join:", " }}</span>
+                            <span class="text-danger small ml-3 d-none" id="populating-warning"></span>
                         {% else %}
                             <span class="text-muted small">No multiple variant report template has been configured</span>
                         {% endif %}
