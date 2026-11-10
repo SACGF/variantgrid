@@ -7,6 +7,8 @@
    options.roleShapeClasses to the class that picks which shape the role is drawn as - the Duo symbol
    draws a parent and a sibling and hides all but the one picked (see --pedigree-* in
    uicore/tags/svg_icon_sprite.html).
+   options.parentRoleSexes maps a parent role to the sex it implies - a sample given a role its sex
+   contradicts gets a note in its row's '.role-sex-warning', and can still be submitted.
    options.autoAssignRoles maps a sex to the role a sample of that sex takes once the proband is
    chosen - pass it where sex, plus what is left over, decide the rest. options.autoAffectedRoles
    lists the roles that tick their own affected box when picked, for the ones usually affected. */
@@ -15,12 +17,21 @@ const FAMILY_PROBAND = 'P';
 function setupFamilyRoles(sampleSexes, options) {
     const roleClasses = options.roleClasses || {};
     const roleShapeClasses = options.roleShapeClasses || {};
+    const parentRoleSexes = options.parentRoleSexes || {};
     const autoAssignRoles = options.autoAssignRoles;
     const autoAffectedRoles = options.autoAffectedRoles || [];
     const roleSelects = $("select", ".sample-select");
 
     function affectedCheckbox(i) {
         return $("#id_sample_" + (i + 1) + "_affected");
+    }
+
+    function showRoleSexWarning(i, role) {
+        const sexes = sampleSexes[i];
+        const roleSex = parentRoleSexes[role];
+        const contradicts = Boolean(roleSex) && sexes["sex"] !== 'U' && sexes["sex"] !== roleSex;
+        const warning = roleSelects.eq(i).closest(".sample-select").find(".role-sex-warning");
+        warning.text(contradicts ? "This sample looks " + sexes["sex_label"].toLowerCase() : "").toggle(contradicts);
     }
 
     function setRole(i, role) {
@@ -62,6 +73,7 @@ function setupFamilyRoles(sampleSexes, options) {
             const role = $(this).val();
             const checkbox = affectedCheckbox(i);
             const isProband = role === FAMILY_PROBAND;
+            showRoleSexWarning(i, role);
             // The proband is affected by definition, so say so rather than offering a switch
             checkbox.prop("disabled", isProband).prop("checked", isProband || checkbox.is(":checked"));
             checkbox.closest(".custom-switch").toggle(!isProband);

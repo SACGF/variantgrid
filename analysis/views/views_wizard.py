@@ -31,7 +31,7 @@ def _sample_sexes(samples: list[Sample]) -> list[dict]:
     """ The proband and the roles on offer are picked client side, so hand the JS every sample's sexes """
     return [{"patient_sex": s.patient_sex.value, "patient_sex_label": s.patient_sex.label,
              "detected_sex": s.detected_sex.value, "detected_sex_label": s.detected_sex.label,
-             "sex": _confident_sex(s).value}
+             "sex": _confident_sex(s).value, "sex_label": _confident_sex(s).label}
             for s in samples]
 
 
@@ -73,11 +73,6 @@ class FamilyWizardView(FormView):
         self.sample_sexes = _sample_sexes(self.samples)
         return super().dispatch(request, *args, **kwargs)
 
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs["sample_sexes"] = [Sex(ss["sex"]) for ss in self.sample_sexes]
-        return kwargs
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         form = context["form"]
@@ -99,6 +94,7 @@ class FamilyWizardView(FormView):
             "role_help": self.role_help,
             "role_options": {"roleClasses": self.role_classes,
                              "roleShapeClasses": self.role_shape_classes,
+                             "parentRoleSexes": {role: sex for sex, role in form.PARENT_ROLE_BY_SEX.items()},
                              "autoAssignRoles": self.auto_assign_roles,
                              "autoAffectedRoles": self.auto_affected_roles},
         })

@@ -53,7 +53,8 @@ Patterns here:
   `analysis/models/nodes/filters/venn_node.py:VennNodeCache` keyed on the two parent NodeVersions.
 - The Duo/Trio/Quad wizards are one view and one template: `analysis/views/views_wizard.py:FamilyWizardView` +
   `analysis/templates/analysis/family_wizard.html`, driven by the subclass's `family_*`/`role_*` attributes. A sample's
-  role says which family member it is (Mother/Father/Proband/Sibling), and the sample's sex narrows the roles on offer
+  role says which family member it is (Mother/Father/Proband/Sibling), and every role is open to every sample - a parent
+  role the sample's sex contradicts is a warning in the row, as that sex is often a chrX guess
   (`analysis/forms/forms.py:FamilyWizardForm`) - a Duo stores its relative's role as the Duo's relationship.
 - Duo/Trio/Quad differ only in their family: each node's `FAMILY_SHAPE`
   (`analysis/models/nodes/family_inheritance.py:FamilyShape` - the FK to the family and its members in order, each with

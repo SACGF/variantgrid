@@ -33,7 +33,7 @@ DETECTED_SEX_HELP = (
     "Sex called from the sample's chrX hom/het genotype ratio - males are hemizygous so have almost "
     f"no heterozygous chrX calls. Above {CHRX_MALE_MIN_HOM_HET_RATIO} is male, below "
     f"{CHRX_FEMALE_MAX_HOM_HET_RATIO} is female, in between is unknown, and it takes at least "
-    f"{MIN_CHRX_VARIANTS_FOR_SEX_GUESS} chrX calls to call it at all."
+    f"{MIN_CHRX_VARIANTS_FOR_SEX_GUESS} chrX calls to call it at all. Structural variants aren't counted."
 )
 
 

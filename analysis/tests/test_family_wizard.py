@@ -32,27 +32,8 @@ class ConfidentSexTest(TestCase):
 
 
 class TrioWizardFormTest(TestCase):
-    FEMALE_MALE_UNKNOWN = [Sex.FEMALE, Sex.MALE, Sex.UNKNOWN]
-
     def _form(self, data=None):
-        return UserTrioWizardForm(data, sample_sexes=self.FEMALE_MALE_UNKNOWN)
-
-    def test_sex_narrows_the_roles_on_offer(self):
-        form = self._form()
-        female_roles = [value for value, _ in form.fields["sample_1"].choices]
-        male_roles = [value for value, _ in form.fields["sample_2"].choices]
-        unknown_roles = [value for value, _ in form.fields["sample_3"].choices]
-
-        self.assertEqual(["", TrioSample.MOTHER, TrioSample.PROBAND], female_roles)
-        self.assertEqual(["", TrioSample.FATHER, TrioSample.PROBAND], male_roles)
-        self.assertEqual(["", TrioSample.MOTHER, TrioSample.FATHER, TrioSample.PROBAND], unknown_roles)
-
-    def test_female_cannot_be_posted_as_father(self):
-        form = self._form({"sample_1": TrioSample.FATHER,
-                           "sample_2": TrioSample.MOTHER,
-                           "sample_3": TrioSample.PROBAND})
-        self.assertFalse(form.is_valid())
-        self.assertIn("sample_1", form.errors)
+        return UserTrioWizardForm(data)
 
     def test_proband_is_affected_without_being_ticked(self):
         form = self._form({"sample_1": TrioSample.MOTHER,
@@ -73,18 +54,12 @@ class TrioWizardFormTest(TestCase):
 
 
 class QuadWizardFormTest(TestCase):
-    def test_sibling_is_open_to_either_sex(self):
-        form = UserQuadWizardForm(sample_sexes=[Sex.FEMALE, Sex.MALE, Sex.UNKNOWN, Sex.FEMALE])
-        female_roles = [value for value, _ in form.fields["sample_1"].choices]
-        self.assertEqual(["", QuadSample.MOTHER, QuadSample.PROBAND, QuadSample.SIBLING], female_roles)
-
     def test_affected_by_role_covers_the_sibling(self):
         form = UserQuadWizardForm({"sample_1": QuadSample.MOTHER,
                                    "sample_2": QuadSample.FATHER,
                                    "sample_3": QuadSample.PROBAND,
                                    "sample_4": QuadSample.SIBLING,
-                                   "sample_4_affected": "on"},
-                                  sample_sexes=[Sex.FEMALE, Sex.MALE, Sex.UNKNOWN, Sex.FEMALE])
+                                   "sample_4_affected": "on"})
         self.assertTrue(form.is_valid(), form.errors)
         self.assertTrue(form.affected_by_role[QuadSample.SIBLING])
         self.assertFalse(form.affected_by_role[QuadSample.MOTHER])
@@ -93,22 +68,13 @@ class QuadWizardFormTest(TestCase):
 class DuoWizardFormTest(TestCase):
     """ The relative's role is which relative they are, so the Duo's relationship comes off the select """
 
-    def _form(self, data=None, sample_sexes=None):
-        return UserDuoWizardForm(data, sample_sexes=sample_sexes or [Sex.FEMALE, Sex.MALE])
-
-    def test_sex_narrows_the_parent_roles_but_leaves_sibling_to_either(self):
-        form = self._form()
-        female_roles = [value for value, _ in form.fields["sample_1"].choices]
-        male_roles = [value for value, _ in form.fields["sample_2"].choices]
-
-        self.assertEqual(["", DuoSample.MOTHER, DuoSample.SIBLING, DuoSample.PROBAND], female_roles)
-        self.assertEqual(["", DuoSample.FATHER, DuoSample.SIBLING, DuoSample.PROBAND], male_roles)
+    def _form(self, data=None):
+        return UserDuoWizardForm(data)
 
     def test_relative_role_and_affected_come_off_the_form(self):
         form = self._form({"sample_1": DuoSample.FATHER,
                            "sample_2": DuoSample.PROBAND,
-                           "sample_1_affected": "on"},
-                          sample_sexes=[Sex.MALE, Sex.FEMALE])
+                           "sample_1_affected": "on"})
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual({DuoSample.FATHER: True, DuoSample.PROBAND: True}, form.affected_by_role)
         self.assertEqual(DuoSample.FATHER, form.relative_role)
