@@ -12,8 +12,10 @@ import tempfile
 from datetime import timedelta
 from unittest import mock
 
+from django.contrib.auth.models import User
 from django.test import TestCase
 from django.test.utils import override_settings
+from django.urls import reverse
 from django.utils import timezone
 
 from annotation.annotation_run_files import get_annotsv_dir
@@ -203,6 +205,17 @@ class AnnotationRunCleanupTestCase(TestCase):
             with self.assertRaises(ValueError) as cm:
                 annotation_run_retry(run, upload_only=True)
             self.assertIn("no longer exists", str(cm.exception))
+
+    def test_upload_only_retry_offered_only_while_annotated_file_exists(self):
+        self.client.force_login(User.objects.create_superuser("annotation_run_admin"))
+        with tempfile.TemporaryDirectory() as tmp_dir, \
+                override_settings(ANNOTATION_VCF_DUMP_DIR=tmp_dir):
+            run, _, _ = self._run_with_output(tmp_dir)
+            url = reverse("view_annotation_run", kwargs={"annotation_run_id": run.pk})
+            self.assertTrue(self.client.get(url).context["can_retry_annotation_run_upload"])
+
+            remove_annotation_run_output(run)
+            self.assertFalse(self.client.get(url).context["can_retry_annotation_run_upload"])
 
 
 @override_settings(**get_fake_annotation_settings_dict(columns_version=2))
