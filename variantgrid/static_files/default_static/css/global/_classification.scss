@@ -353,6 +353,9 @@ a .c-hgvs-body {
 }
 
 .c-hgvs-body {
+	// td.dt-c_hgvs sets break-all; let only the nomen break mid-word, or Firefox strands the colon on its own line
+	word-break: normal;
+
 	.bracket {
 		margin-left: 2pt;
 		margin-right: 2pt;
@@ -378,7 +381,6 @@ a .c-hgvs-body {
 	.c-hgvs-transcript,
 	.c-hgvs-gene-symbol-b {
 		white-space: nowrap;
-		word-break: normal;
 	}
 
 	.c-hgvs-nomen {
