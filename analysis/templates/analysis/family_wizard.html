@@ -137,6 +137,11 @@ function setProbandPhenoText() {
                                 <td class='sample-select role-cell'>
                                     {{ row.role_field }}{{ row.role_field.errors }}
                                     <div class="role-sex-warning text-warning small" style="display: none;"></div>
+                                    {% if row.withheld_roles %}
+                                    <div class="text-muted small">
+                                        Not {{ row.withheld_roles }}: <a href="{{ row.sample.patient.get_absolute_url }}">patient record</a> says {{ row.sample.patient_sex.label }}
+                                    </div>
+                                    {% endif %}
                                 </td>
                                 <td class='sample-affected affected-cell'>
                                     <div class="custom-control custom-switch">

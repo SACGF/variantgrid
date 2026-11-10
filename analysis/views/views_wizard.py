@@ -16,15 +16,12 @@ from snpdb.models import Cohort, Duo, Quad, Sample, Trio
 
 
 def _confident_sex(sample: Sample) -> Sex:
-    """ The sex we'll hold the wizard's roles to: the patient record, or the chrX call when there is no
-        record. Disagreement means we don't know - the proband sex mismatch warning asks about that """
+    """ The sex the wizard works from: the patient record, or the chrX call when the record has none.
+        The record wins a disagreement - it is the one a person can correct """
     patient_sex = sample.patient_sex
-    detected_sex = sample.detected_sex
-    if patient_sex == Sex.UNKNOWN:
-        return detected_sex
-    if detected_sex in (Sex.UNKNOWN, patient_sex):
+    if patient_sex != Sex.UNKNOWN:
         return patient_sex
-    return Sex.UNKNOWN
+    return sample.detected_sex
 
 
 def _sample_sexes(samples: list[Sample]) -> list[dict]:
@@ -73,13 +70,20 @@ class FamilyWizardView(FormView):
         self.sample_sexes = _sample_sexes(self.samples)
         return super().dispatch(request, *args, **kwargs)
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["patient_sexes"] = [sample.patient_sex for sample in self.samples]
+        return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         form = context["form"]
         sample_rows = []
         for i, sample in enumerate(self.samples, start=1):
+            withheld_roles = form.roles_withheld_for_sex(sample.patient_sex)
             sample_rows.append({"sample": sample,
                                 "index": i,
+                                "withheld_roles": " or ".join(role.label for role in withheld_roles),
                                 "role_field": form[f"sample_{i}"],
                                 "affected_field": form[f"sample_{i}_affected"]})
         context.update({

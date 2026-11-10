@@ -27,13 +27,29 @@ class ConfidentSexTest(TestCase):
     def test_falls_back_to_detected_sex(self):
         self.assertEqual(Sex.MALE, _confident_sex(self._sample(Sex.UNKNOWN, Sex.MALE)))
 
-    def test_disagreement_leaves_every_role_open(self):
-        self.assertEqual(Sex.UNKNOWN, _confident_sex(self._sample(Sex.FEMALE, Sex.MALE)))
+    def test_patient_record_wins_a_disagreement(self):
+        self.assertEqual(Sex.FEMALE, _confident_sex(self._sample(Sex.FEMALE, Sex.MALE)))
 
 
 class TrioWizardFormTest(TestCase):
-    def _form(self, data=None):
-        return UserTrioWizardForm(data)
+    def _form(self, data=None, patient_sexes=None):
+        return UserTrioWizardForm(data, patient_sexes=patient_sexes)
+
+    def test_patient_sex_withholds_the_other_parents_role(self):
+        form = self._form(patient_sexes=[Sex.FEMALE, Sex.MALE, Sex.UNKNOWN])
+        female_roles, male_roles, unknown_roles = ([value for value, _ in form.fields[f].choices]
+                                                   for f in form.SAMPLE_FIELDS)
+        self.assertEqual(["", TrioSample.MOTHER, TrioSample.PROBAND], female_roles)
+        self.assertEqual(["", TrioSample.FATHER, TrioSample.PROBAND], male_roles)
+        self.assertEqual(["", TrioSample.MOTHER, TrioSample.FATHER, TrioSample.PROBAND], unknown_roles)
+
+    def test_female_patient_cannot_be_posted_as_father(self):
+        form = self._form({"sample_1": TrioSample.FATHER,
+                           "sample_2": TrioSample.MOTHER,
+                           "sample_3": TrioSample.PROBAND},
+                          patient_sexes=[Sex.FEMALE, Sex.UNKNOWN, Sex.UNKNOWN])
+        self.assertFalse(form.is_valid())
+        self.assertIn("sample_1", form.errors)
 
     def test_proband_is_affected_without_being_ticked(self):
         form = self._form({"sample_1": TrioSample.MOTHER,

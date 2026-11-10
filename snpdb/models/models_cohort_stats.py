@@ -26,8 +26,10 @@ from snpdb.models.models_vcf import SampleStatsCodeVersion
 
 # Targeted panels can have too few chrX calls for the hom/het ratio to mean anything
 MIN_CHRX_VARIANTS_FOR_SEX_GUESS = 30
-CHRX_FEMALE_MAX_HOM_HET_RATIO = 0.2
-CHRX_MALE_MIN_HOM_HET_RATIO = 0.8
+# A female's chrX has about as many hom alt calls as het, a male's hets are only pseudoautosomal or
+# miscalled so hom outnumbers them many times over. The gap between is unknown: we only call when sure
+CHRX_FEMALE_MAX_HOM_HET_RATIO = 1.5
+CHRX_MALE_MIN_HOM_HET_RATIO = 5
 
 DETECTED_SEX_HELP = (
     "Sex called from the sample's chrX hom/het genotype ratio - males are hemizygous so have almost "

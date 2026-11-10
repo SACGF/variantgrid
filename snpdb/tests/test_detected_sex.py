@@ -24,13 +24,13 @@ class TestChrXSexGuess(TestCase):
         return CohortGenotypeStats(x_hom_count=x_hom_count, x_het_count=x_het_count)
 
     def test_female_ratio(self):
-        self.assertEqual(Sex.FEMALE, self._stats(10, 200).chrx_sex_guess)
+        self.assertEqual(Sex.FEMALE, self._stats(200, 200).chrx_sex_guess)
 
     def test_male_ratio(self):
         self.assertEqual(Sex.MALE, self._stats(200, 10).chrx_sex_guess)
 
     def test_ambiguous_ratio_unknown(self):
-        self.assertEqual(Sex.UNKNOWN, self._stats(100, 200).chrx_sex_guess)
+        self.assertEqual(Sex.UNKNOWN, self._stats(300, 100).chrx_sex_guess)
 
     def test_below_minimum_count_unknown(self):
         """ Targeted panels have too few chrX calls for the ratio to mean anything """

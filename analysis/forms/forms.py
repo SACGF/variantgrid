@@ -380,8 +380,9 @@ def _family_role_widget() -> forms.Select:
 
 class FamilyWizardForm(forms.Form):
     """ Give each of a cohort's samples a role in the family, and say which of them are affected.
-        Every role is open to every sample: a sample's sex is often a guess off its chrX calls, so a
-        parent role that contradicts it (PARENT_ROLE_BY_SEX) is warned about client side, not refused """
+        Pass patient_sexes (one Sex per sample, in field order): a sample is refused the parent role
+        its patient record's sex contradicts (PARENT_ROLE_BY_SEX), as the record is there to be
+        corrected. A sex only guessed from chrX calls refuses nothing - it is warned about client side """
     ROLE_ENUM: type[models.TextChoices]
     SAMPLE_FIELDS: list[str] = []
     PARENT_ROLE_BY_SEX: dict = {}
@@ -390,12 +391,21 @@ class FamilyWizardForm(forms.Form):
     proband_sex = forms.ChoiceField(choices=[("", "---")] + [(s, Sex(s).label) for s in Sex.FILLED_IN_CHOICES],
                                     required=False, widget=_family_role_widget())
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, patient_sexes=None, **kwargs):
         super().__init__(*args, **kwargs)
-        # Roles start blank so no two samples hold the same one until they're picked
-        for field_name in self.SAMPLE_FIELDS:
+        sexes = patient_sexes or [Sex.UNKNOWN] * len(self.SAMPLE_FIELDS)
+        for field_name, sex in zip(self.SAMPLE_FIELDS, sexes):
             field = self.fields[field_name]
-            field.choices = [BLANK_ROLE, *field.choices]
+            withheld = self.roles_withheld_for_sex(sex)
+            # Roles start blank so no two samples hold the same one until they're picked
+            field.choices = [BLANK_ROLE, *[(value, label) for value, label in field.choices if value not in withheld]]
+
+    @classmethod
+    def roles_withheld_for_sex(cls, sex: Sex) -> list:
+        """ The other sex's parent role - proband and sibling are open to anyone """
+        if sex not in cls.PARENT_ROLE_BY_SEX:
+            return []
+        return [role for other_sex, role in cls.PARENT_ROLE_BY_SEX.items() if other_sex != sex]
 
     def clean(self):
         cleaned_data = super().clean()
