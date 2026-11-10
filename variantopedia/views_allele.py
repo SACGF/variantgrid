@@ -48,7 +48,7 @@ def view_allele(request, allele_id: int):
     link_allele_to_existing_variants(allele, AlleleConversionTool.CLINGEN_ALLELE_REGISTRY)
     ClinVarRecordCollection.set_allele_for_variants(allele)
 
-    overlaps = Overlap.objects.filter(allele=allele, overlap_type=OverlapType.SINGLE_CONTEXT, valid=True, overlap_status__gte=OverlapStatus.SINGLE_SUBMITTER)
+    overlaps = Overlap.objects.filter(allele=allele, overlap_type=OverlapType.SINGLE_CONTEXT, valid=True, overlap_status__gte=OverlapStatus.NO_COUNTING_CONTRIBUTIONS)
     overlaps = list(sorted(overlaps, key=lambda overlap: (overlap.testing_contexts_objs[0], overlap.value_type)))
 
     cross_overlaps = Overlap.objects.filter(allele=allele, overlap_type=OverlapType.CROSS_CONTEXT, valid=True, overlap_status__gte=OverlapStatus.SINGLE_SUBMITTER)
