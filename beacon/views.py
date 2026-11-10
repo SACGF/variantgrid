@@ -30,6 +30,7 @@ def external_beacons(request, variant_id: int, genome_build_name: str):
 
     evaluations = evaluate_queries(variant, genome_build, settings.BEACON_QUERY_NODES)
     eligible = {e.node_id: e.params for e in evaluations if e.eligible}
+    descriptions = {e.node_id: e.description for e in evaluations if e.eligible}
     skipped = [e for e in evaluations if not e.eligible]
 
     fresh = {}
@@ -37,15 +38,17 @@ def external_beacons(request, variant_id: int, genome_build_name: str):
         node_ids = list(eligible)
         cutoff = timezone.now() - timedelta(days=settings.BEACON_QUERY_CACHE_DAYS)
         fresh = {c.node_id: c for c in BeaconQueryCache.objects.filter(
-            variant=variant, node_id__in=node_ids, created__gte=cutoff)}
+            variant=variant, node_id__in=node_ids, created__gte=cutoff)
+            if c.params == eligible[c.node_id]}
 
         stale = {nid: eligible[nid] for nid in node_ids if nid not in fresh}
         if stale:
             for result in query_nodes(stale):
                 cache, _ = BeaconQueryCache.objects.update_or_create(
                     variant=variant, node_id=result["node_id"],
-                    defaults={"exists": result["exists"], "count": result["count"],
-                              "error": result["error"], "created": timezone.now()})
+                    defaults={"params": stale[result["node_id"]], "exists": result["exists"],
+                              "count": result["count"], "error": result["error"],
+                              "created": timezone.now()})
                 fresh[result["node_id"]] = cache
 
     rows = []
@@ -54,6 +57,7 @@ def external_beacons(request, variant_id: int, genome_build_name: str):
         rows.append({
             "node_id": node_id,
             "base_url": node.get("base_url", ""),
+            "description": descriptions[node_id],
             "cache": fresh.get(node_id),
         })
 

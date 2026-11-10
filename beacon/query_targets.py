@@ -32,6 +32,10 @@ class BeaconQueryTarget(ABC):
     def build_params(self, variant: Variant, genome_build: GenomeBuild) -> dict:
         """ The g_variants query params to send (only a public coordinate leaves). """
 
+    def describe(self, params: dict) -> str:
+        """ What a count from this query means, shown on the variant page. """
+        return ""
+
 
 class SnvBeaconTarget(BeaconQueryTarget):
     """ Sequence Beacons: an exact referenceBases/alternateBases coordinate query. """
@@ -48,16 +52,25 @@ class SnvBeaconTarget(BeaconQueryTarget):
 
 class CnvBeaconTarget(BeaconQueryTarget):
     """ Copy-number Beacons (bycon/progenetix et al.): a symbolic <DEL>/<DUP> becomes a range
-        query for any copy-number event of that class overlapping the variant's span. The
-        per-sample copy number (on CohortGenotype) stays internal - only the public span and
-        copy-number class leave. """
+        query for copy-number events of that class overlapping the variant's span and of a similar
+        length. The per-sample copy number (on CohortGenotype) stays internal - only the public
+        span and copy-number class leave. """
 
     domain = "copy-number DEL/DUP variant"
+
+    # A bare range query counts every overlapping event, which for a cancer copy-number Beacon is
+    # dominated by arm-level and whole-chromosome losses/gains. Bounding the length to within this
+    # factor of ours keeps the count to events comparable to the queried one.
+    LENGTH_RATIO = 2
 
     # VG symbolic alt -> GA4GH/EFO copy-number class (validated live against progenetix).
     VARIANT_TYPE_EFO = {
         VCFSymbolicAllele.DEL: "EFO:0030067",  # copy number loss
         VCFSymbolicAllele.DUP: "EFO:0030070",  # copy number gain
+    }
+    EFO_LABELS = {
+        "EFO:0030067": "copy number loss",
+        "EFO:0030070": "copy number gain",
     }
 
     def _efo(self, vc) -> Optional[str]:
@@ -69,13 +82,21 @@ class CnvBeaconTarget(BeaconQueryTarget):
 
     def build_params(self, variant, genome_build) -> dict:
         vc = variant.coordinate
+        length = abs(vc.svlen)
         return {
             "referenceName": vc.chrom.replace("chr", ""),
             "assemblyId": genome_build.name,
             "start": vc.position - 1,  # 1-based -> 0-based
             "end": vc.end,             # position + abs(svlen)
             "variantType": self._efo(vc),
+            "variantMinLength": max(1, length // self.LENGTH_RATIO),
+            "variantMaxLength": length * self.LENGTH_RATIO,
         }
+
+    def describe(self, params: dict) -> str:
+        event = self.EFO_LABELS[params["variantType"]]
+        return (f"{event} events of {params['variantMinLength']:,}-{params['variantMaxLength']:,} bp "
+                "overlapping this variant")
 
 
 TARGETS: dict[str, BeaconQueryTarget] = {
@@ -93,6 +114,7 @@ class NodeEligibility:
     eligible: bool
     params: Optional[dict] = None
     reason: Optional[str] = None
+    description: str = ""
 
 
 def evaluate_queries(variant: Variant, genome_build: GenomeBuild, node_configs: dict) -> list[NodeEligibility]:
@@ -118,6 +140,7 @@ def evaluate_queries(variant: Variant, genome_build: GenomeBuild, node_configs: 
             results.append(NodeEligibility(node_id, node_type, False,
                                            reason=f"only queried for a {target.domain}"))
             continue
-        results.append(NodeEligibility(node_id, node_type, True,
-                                       params=target.build_params(variant, genome_build)))
+        params = target.build_params(variant, genome_build)
+        results.append(NodeEligibility(node_id, node_type, True, params=params,
+                                       description=target.describe(params)))
     return results

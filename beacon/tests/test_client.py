@@ -123,6 +123,18 @@ class ExternalBeaconsViewTestCase(TestCase):
             self.client.get(self._url())
             self.assertEqual(mock_get.call_count, first_call_count)
 
+    def test_cache_from_a_different_query_is_refreshed(self):
+        """ A row cached from an earlier form of the query (e.g. before CNV length bounds) is a
+            miss, so the page never shows a count for a query it no longer sends. """
+        BeaconQueryCache.objects.create(variant=self.variant, node_id="nodeA", exists=True, count=4057,
+                                        params={"referenceName": "3", "start": 999})
+        payload = {"responseSummary": {"exists": True, "numTotalResults": 40}}
+        self.client.force_login(self.user)
+        with patch("beacon.client.requests.get", return_value=_mock_response(payload)):
+            self.client.get(self._url())
+        cache = BeaconQueryCache.objects.get(variant=self.variant, node_id="nodeA")
+        self.assertEqual(cache.count, 40)
+
     @override_settings(BEACON_OUTBOUND_ENABLED=False)
     def test_disabled_returns_empty(self):
         self.client.force_login(self.user)
@@ -173,6 +185,9 @@ class BeaconQueryGatingTestCase(TestCase):
         self.assertEqual(params["end"], 21995301)    # position + abs(svlen)
         self.assertEqual(params["variantType"], "EFO:0030067")  # <DEL> -> copy number loss
         self.assertNotIn("referenceBases", params)   # a range query, not an exact-allele one
+        # Only similar-sized events: not every arm-level loss overlapping the span
+        self.assertEqual(params["variantMinLength"], 13774)
+        self.assertEqual(params["variantMaxLength"], 55098)
 
     def test_cnv_duplication_maps_to_gain(self):
         variant = self._variant(is_symbolic=True, chrom="2", position=15940550,

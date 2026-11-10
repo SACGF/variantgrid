@@ -19,6 +19,9 @@
                             {% else %}
                                 {{ row.node_id }}
                             {% endif %}
+                            {% if row.description %}
+                                <div class="text-muted small">{{ row.description }}</div>
+                            {% endif %}
                         </td>
                         {% if row.cache.error %}
                             <td colspan="2" class="text-muted">unavailable</td>
