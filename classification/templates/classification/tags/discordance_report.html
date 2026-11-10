@@ -1,6 +1,6 @@
 {% load ui_utils %}
-{% comment %}{% if dr.clinical_context.name != "default" %}{{ dr.clinical_context.name }}{% endif %} -- this is usually redundant {% endcomment %}
-<span {% if not discordance_report.is_active %}style="opacity:0.5"{% endif %}>
+{% comment %}All discordance reports can be considered legacy now, so gray them out{% endcomment %}
+<span style="opacity:0.5">
 <i class="fa-solid fa-arrow-down-up-across-line preview-icon"></i>
 <a href="{% url 'discordance_report' discordance_report.pk %}" class="hover-link">DR_{{ discordance_report.pk }}</a>
 <strong>{{ discordance_report.status }}</strong>
