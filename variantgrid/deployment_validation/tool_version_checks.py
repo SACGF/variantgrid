@@ -1,6 +1,7 @@
 """
 deployment_check "Tool versions": every external binary the server shells out to, checked the way it is
-used. check_tool_versions is the entry point; check_vcf_split_pipe runs the real VCF import split stage
+used. check_tool_versions is the entry point (it also warns about AnnotSV bundle files that cost memory);
+check_vcf_split_pipe runs the real VCF import split stage
 (GNU split --filter | bash | bgzip) on a tiny VCF, since a tool missing inside that filter only fails
 at import time rather than on the command line.
 """
@@ -14,6 +15,10 @@ import tempfile
 
 from django.conf import settings
 
+from annotation.annotsv_regulatory_elements import (
+    sort_instructions,
+    unsorted_regulatory_element_files,
+)
 from pedigree.graphs.pedigree_chart import get_ped_parser_command
 from snpdb.models import SomalierConfig
 from upload.vcf.vcf_preprocess import get_bcftools_tool_version, get_split_vcf_command
@@ -89,6 +94,14 @@ def check_vcf_split_pipe() -> bool:
     return True
 
 
+def check_annotsv_regulatory_elements_sorted() -> dict:
+    """ A warning, not invalid: AnnotSV runs either way, at 1.4 GB more per run on unsorted files (#2749) """
+    check = {"valid": True}
+    if unsorted := unsorted_regulatory_element_files():
+        check["warning"] = sort_instructions(unsorted)
+    return check
+
+
 def check_tool_versions() -> dict:
     # If it returns True then everything is good, exception or anything else, bad
     tools = {
@@ -137,5 +150,8 @@ def check_tool_versions() -> dict:
             "valid": valid,
             "fix": instructions,
         }
+
+    if settings.ANNOTATION_ANNOTSV_ENABLED:
+        tool_versions["AnnotSV regulatory elements sorted"] = check_annotsv_regulatory_elements_sorted()
 
     return tool_versions

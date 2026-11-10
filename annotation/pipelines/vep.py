@@ -112,10 +112,12 @@ class VEPRunner(AnnotationPipelineRunner):
             # of letting the losing worker annotate to completion and double-write the reassigned run's state.
             process_callback = lease_heartbeat.set_process if lease_heartbeat else None
             try:
-                return_code, std_out, std_err = execute_cmd(cmd, process_callback=process_callback)
+                cmd_output = execute_cmd(cmd, process_callback=process_callback)
             finally:
                 if lease_heartbeat:
                     lease_heartbeat.set_process(None)  # drop the finished handle so a later tick can't kill anything
+            return_code, std_out, std_err = cmd_output
+            annotation_run.tool_peak_memory_mb = cmd_output.max_rss_mb
             # VEP can produce enormous output (>1GB) for large batches - PostgreSQL has a 1GB field limit
             max_output = 1_000_000
             annotation_run.pipeline_stdout = std_out[:max_output] if std_out else std_out

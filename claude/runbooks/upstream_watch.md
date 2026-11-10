@@ -15,6 +15,7 @@ column (the fifth `|`-separated field), so keep the table shape.
 | Pre-112 VEP fasta | Shariant and runx1db2 moving to VEP >= 112 (Ensembl/ensembl-vep#1635 fixed in 112) | 2026-11-03 | 2027-02-03 |
 | MaveDB stripped file | every deployment running MaveDB on a VEP_plugins `release/116` checkout from 2026-09-01 (Ensembl/VEP_plugins#853) | 2026-11-03 | 2027-02-03 |
 | gnomAD SV overlap via two `--custom` | Ensembl/ensembl-vep#1989 (`coords=2`, `show_overlaps`) for #1645 | 2026-11-03 | 2027-02-03 |
+| AnnotSV regulatory element sort | lgmgeo/AnnotSV#356 fixed in a released Annotations_Human bundle | 2026-11-10 | 2026-12-10 |
 | uv cooldown exceptions | the 7-day cooldown passing the pinned cutoffs in `uv.toml` | 2026-11-04 | 2026-11-06 |
 
 ## uv cooldown exceptions
@@ -121,3 +122,34 @@ its coordinates (Ensembl/ensembl-vep#1645, open; the feature is Ensembl/ensembl-
 Check: `gh pr view 1989 --repo Ensembl/ensembl-vep --json state,mergedAt -q '"\(.state) \(.mergedAt)"'`. When resolved (in a release
 deployments run): replace the two customs with one and drop the stitching in `SVOverlapProcessor`, then delete this
 row.
+
+## AnnotSV regulatory element sort
+
+The `Annotations_Human` 3.5 bundle ships unsorted `*.sorted.bed` regulatory element files for GRCh38 and CHM13
+(GRCh37's are sorted). AnnotSV's `bedtools intersect -sorted` fails on them and it falls back, without a message,
+to an intersect that loads the file: 1.4 GB per run instead of a few MB (#2749). Until a bundle ships them sorted,
+each deployment sorts its own copy (`annotation/annotsv_regulatory_elements.py`: a manual migration step for
+existing deployments, a `deployment_check` warning for new servers and bundles), per file, as the files' owner:
+
+```bash
+LC_ALL=C sort -k1,1 -k2,2n <file> > <file>.tmp && mv <file>.tmp <file>
+```
+
+over `<ANNOTATION_ANNOTSV_ANNOTATIONS_DIR>/Annotations_Human/FtIncludedInSV/RegulatoryElements/{GRCh38,CHM13}/*.sorted.bed`.
+The output TSV is byte-identical either way.
+
+Check:
+
+```bash
+gh issue view 356 --repo lgmgeo/AnnotSV --json state,closedAt -q '"\(.state) \(.closedAt)"'
+```
+
+and, when a newer bundle than 3.5 is out, on a fresh copy of it (prints nothing when sorted):
+
+```bash
+for f in Annotations_Human/FtIncludedInSV/RegulatoryElements/{GRCh38,CHM13}/*.sorted.bed; do LC_ALL=C sort -c -k1,1 -k2,2n "$f"; done
+```
+
+When resolved (a released bundle passes that loop): take the sort out of the AnnotSV install paragraph in
+`claude/guides/operations.md` and delete this row. The `deployment_check` warning stays - it is cheap and catches a
+bundle that regresses.

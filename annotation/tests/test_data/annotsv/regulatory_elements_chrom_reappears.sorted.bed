@@ -1,0 +1,8 @@
+1	100	200	ABC_enhancer	GENE1
+1	500	700	ABC_enhancer	GENE2
+10	50	90	ABC_enhancer	GENE3
+2	300	400	ABC_enhancer	GENE4
+2	1000	1100	ABC_enhancer	GENE5
+2_KI270879v1_alt	10	20	ABC_enhancer	GENE6
+2	2000	2100	ABC_enhancer	GENE7
+3	9	19	ABC_enhancer	GENE8

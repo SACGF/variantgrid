@@ -172,6 +172,12 @@ instead of plain collectstatic on a dev box.
 `vg status` reports free space on each. The root filesystem on vg-test2 is small (about 30 GB) and usually above 85 %;
 large scratch output belongs under `/data`.
 
+Installing an AnnotSV annotations bundle (`ANNOTATION_ANNOTSV_ANNOTATIONS_DIR`) ends with sorting its regulatory
+element files, or every AnnotSV run on GRCh38 and T2T takes 1.4 GB more: `manage.py deployment_check` warns with
+the shell line for each unsorted file, to run as the files' owner on the machine that holds them (the directory is
+read-only to VariantGrid on some deployments). `annotation/annotsv_regulatory_elements.py` has the why;
+`claude/runbooks/upstream_watch.md` says when the step can go.
+
 ## Scale <a id="scale"></a>
 
 The numbers that decide whether a design works. vg-test2 today (from `vg status`): snpdb 175 GB, 16.7 M variants, 15.8 M

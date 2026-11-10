@@ -206,6 +206,13 @@ class AnnotationRun(TimeStampedModel):
     # #1646: variants to process, pre-counted off-thread by count_annotation_runs (null until counted;
     # 0 finishes an empty run without a dump). Reset to null when a merge grows the range lock.
     count = models.IntegerField(null=True)
+    # #2749: longest variant the run processes - abs(svlen) for a symbolic variant, otherwise the longer of
+    # its ref and alt sequences. Set with `count`, and reset with it.
+    max_variant_length = models.IntegerField(null=True)
+    # #2749: peak resident memory (MB) of the largest single process the tool ran - VEP or one of its forks,
+    # AnnotSV or its bedtools. Set whether the tool succeeded or failed; NULL until a tool has run, and for
+    # pipelines that run no subprocess.
+    tool_peak_memory_mb = models.IntegerField(null=True)
     dump_count = models.IntegerField(null=True)
     annotated_count = models.IntegerField(null=True)
     celery_task_logs = models.JSONField(null=False, default=dict)  # Key=task_id, so we keep logs from multiple runs
@@ -343,6 +350,7 @@ class AnnotationRun(TimeStampedModel):
         self.dump_end = None
         self.dump_count = None
         self.count = None
+        self.max_variant_length = None
         self.save()  # get_status() -> CREATED
 
     def reset_for_retry(self):
@@ -389,6 +397,7 @@ class AnnotationRun(TimeStampedModel):
         self.dump_end = None
         self.dump_count = None
         self.count = None
+        self.max_variant_length = None
         self.save()  # get_status() -> CREATED
 
     def is_upload_resumable(self, now=None) -> bool:

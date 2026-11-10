@@ -1,5 +1,9 @@
 import logging
+import os
+import signal
 import subprocess
+import threading
+import time
 from dataclasses import dataclass
 from typing import Optional
 
@@ -11,6 +15,9 @@ class CmdOutput(FormerTuple):
     return_code: int
     std_out: Optional[str]
     std_err: Optional[str]
+    # Peak resident memory of the largest single process the command ran (itself or a descendant it
+    # waited for). Not part of the tuple, so `return_code, std_out, std_err = execute_cmd(...)` still works
+    max_rss_mb: Optional[int] = None
 
     @property
     def as_tuple(self) -> tuple:
@@ -33,6 +40,59 @@ def format_called_process_error(e: subprocess.CalledProcessError) -> str:
     return message
 
 
+def kill_process_tree(process: subprocess.Popen):
+    """ SIGKILL a process started by execute_cmd along with everything it started: execute_cmd gives each
+        command its own process group, so a tool's children (AnnotSV's bedtools, VEP's forks, the later
+        stages of a shell pipeline) go with it rather than outliving the run that started them (#2749) """
+    if process.returncode is None:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
+def _communicate_with_rusage(process: subprocess.Popen, timeout: Optional[float]):
+    """ Popen.communicate, except the child is reaped with os.wait4 - the only call that hands back its
+        resource usage, which Popen does not keep. Returns (std_out, std_err, rusage, timed_out); rusage is
+        None if something else reaped the child first. """
+    outputs = {}
+
+    def _read(name, pipe):
+        outputs[name] = pipe.read()
+        pipe.close()
+
+    readers = [threading.Thread(target=_read, args=(name, pipe), daemon=True)
+               for name, pipe in (("std_out", process.stdout), ("std_err", process.stderr))]
+    for reader in readers:
+        reader.start()
+
+    deadline = None if timeout is None else time.monotonic() + timeout
+    timed_out = False
+    rusage = None
+    try:
+        for reader in readers:
+            reader.join(None if deadline is None else max(0.0, deadline - time.monotonic()))
+        wait_flags = 0 if deadline is None else os.WNOHANG
+        while True:
+            pid, wait_status, rusage = os.wait4(process.pid, wait_flags)
+            if pid == process.pid:
+                process.returncode = os.waitstatus_to_exitcode(wait_status)
+                break
+            if time.monotonic() >= deadline:
+                # Kill then drain - the pipes only reach EOF once the whole tree has let go of them
+                timed_out = True
+                kill_process_tree(process)
+                wait_flags = 0
+            else:
+                time.sleep(0.05)
+    except ChildProcessError:
+        rusage = None
+        process.wait()
+    for reader in readers:
+        reader.join()
+    return outputs["std_out"], outputs["std_err"], rusage, timed_out
+
+
 def execute_cmd(cmd: list, **kwargs) -> CmdOutput:
     # The shell=True branch is opt-in and currently used by exactly one caller
     # (snpdb.bcftools_liftover) to build a trusted, server-side command pipeline -
@@ -40,37 +100,33 @@ def execute_cmd(cmd: list, **kwargs) -> CmdOutput:
     # user-controlled values with shell=True.
     #
     # process_callback (#1658): optional callable invoked with the live Popen right after it starts,
-    # so a caller (e.g. the annotation lease heartbeat on a separate thread) can .kill() the subprocess
-    # while communicate() blocks here - the resulting non-zero return_code lets the caller abort cleanly.
+    # so a caller (e.g. the annotation lease heartbeat on a separate thread) can kill_process_tree() it
+    # while this blocks - the resulting non-zero return_code lets the caller abort cleanly.
     process_callback = kwargs.pop("process_callback", None)
     # timeout (#720): seconds to wait before killing the subprocess, as subprocess.run's timeout. Callers
     # get whatever was written before the kill plus a non-zero return_code, so a timeout needs no branch
     # of its own on top of the return_code handling they already have. Default None = wait forever.
     timeout = kwargs.pop("timeout", None)
+    # Its own session, so its own process group: what kill_process_tree signals
+    kwargs["start_new_session"] = True
     if kwargs.pop("shell", False):
         command = ' '.join(cmd)
         logging.info('About to call %s', command)
-        pipes = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
-        logging.info('Completed')
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
     else:
         logging.info('About to call %s', cmd)
-        pipes = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
 
     if process_callback is not None:
-        process_callback(pipes)
+        process_callback(process)
 
-    try:
-        std_out, std_err = pipes.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        # Kill then drain - a bare kill() leaves the pipes unread and the child a zombie. The second
-        # communicate() has no timeout on purpose: the process is already killed, so it returns as soon
-        # as the OS closes its end.
-        pipes.kill()
-        std_out, std_err = pipes.communicate()
+    std_out, std_err, rusage, timed_out = _communicate_with_rusage(process, timeout)
+    if timed_out:
         logging.warning("Command timed out after %ss: %s", timeout, cmd)
 
     return CmdOutput(
-        return_code=pipes.returncode,
+        return_code=process.returncode,
         std_out=std_out.decode() if std_out else None,
-        std_err=std_err.decode() if std_err else None
+        std_err=std_err.decode() if std_err else None,
+        max_rss_mb=rusage.ru_maxrss // 1024 if rusage else None,  # Linux reports KB
     )

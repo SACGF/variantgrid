@@ -15,6 +15,7 @@ from functools import reduce
 from typing import Optional, TypeVar
 
 from django.db.models import Model, QuerySet
+from django.db.models.functions import Greatest, Length
 from django.db.models.functions.math import Abs
 from django.db.models.query_utils import Q
 
@@ -25,6 +26,10 @@ from annotation.models.models_annotation_version import AnnotationVersion
 from library.django_utils.data_archive_mixin import DataArchivedError
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
 from snpdb.models import GenomeBuild, Variant
+
+# #2749: a variant's length whichever way it is represented - abs(svlen) for a symbolic alt, the longer of ref
+# and alt for explicit sequence (GREATEST skips the NULL svlen of an explicit variant)
+VARIANT_LENGTH = Greatest(Abs("svlen"), Length("locus__ref__seq"), Length("alt__seq"))
 
 
 def filter_vep_sv_max_size(qs: QuerySet[Variant], sv_max_size: int, too_long: bool) -> QuerySet[Variant]:

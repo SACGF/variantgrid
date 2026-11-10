@@ -148,6 +148,40 @@ class AnnotSVPipelineTestCase(TestCase):
         self.assertIn(STANDARD, blocking_pipeline_types())
         self.assertIn(STRUCTURAL, blocking_pipeline_types())
 
+    def _count(self, annotation_run):
+        token = f"{COUNT_LEASE_PREFIX}test"  # lease it to the count lane, as _dispatch_counts would
+        AnnotationRun.objects.filter(pk=annotation_run.pk).update(
+            leased_by=token, lease_expires=timezone.now() + timedelta(seconds=60))
+        count_annotation_runs([annotation_run.pk], token)
+        annotation_run.refresh_from_db()
+
+    def test_count_records_longest_variant_symbolic_or_explicit(self):
+        """ #2749: a symbolic variant's length is its svlen; an explicit one has no svlen and is measured
+            on its sequences. The longest of either kind is what explains a run that struggled. """
+        deletion = slowly_create_test_variant_from_coordinate(
+            VariantCoordinate(chrom="1", position=200000, ref="A", alt=VCFSymbolicAllele.DEL, svlen=-5_000),
+            self.grch37)
+        explicit_insertion = slowly_create_test_variant("1", 300000, "A", "A" + "C" * 6_000, self.grch37)
+        lock = AnnotationRangeLock.objects.create(version=self.vav, min_variant=deletion,
+                                                  max_variant=explicit_insertion, count=2)
+        sv_run, _ = self._make_runs(lock)
+        standard_run = AnnotationRun.objects.create(annotation_range_lock=lock, pipeline_type=STANDARD)
+        self._count(sv_run)
+        self._count(standard_run)
+        self.assertEqual((sv_run.count, sv_run.max_variant_length), (1, 5_000))
+        self.assertEqual((standard_run.count, standard_run.max_variant_length), (1, 6_001))
+
+        longer_deletion = slowly_create_test_variant_from_coordinate(
+            VariantCoordinate(chrom="1", position=400000, ref="A", alt=VCFSymbolicAllele.DEL, svlen=-50_000),
+            self.grch37)
+        lock.max_variant = longer_deletion
+        lock.save()
+        _reset_run_counts_after_extend(lock)
+        sv_run.refresh_from_db()
+        self.assertIsNone(sv_run.max_variant_length)
+        self._count(sv_run)
+        self.assertEqual((sv_run.count, sv_run.max_variant_length), (2, 50_000))
+
     def _finish_vep_runs(self, lock):
         for pipeline_type in (STANDARD, STRUCTURAL, VariantAnnotationPipelineType.GENE_LEVEL):
             run = AnnotationRun.objects.create(annotation_range_lock=lock, pipeline_type=pipeline_type)

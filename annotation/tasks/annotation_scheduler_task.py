@@ -8,10 +8,10 @@ import celery
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Exists, F, OuterRef, Q
+from django.db.models import Count, Exists, F, Max, OuterRef, Q
 from django.utils import timezone
 
-from annotation.annotation_version_querysets import get_variants_qs_for_annotation
+from annotation.annotation_version_querysets import VARIANT_LENGTH, get_variants_qs_for_annotation
 from annotation.annotation_versions import (
     get_annotation_range_lock_and_unannotated_count,
     merge_pending_range_locks,
@@ -201,8 +201,9 @@ def count_annotation_runs(annotation_run_ids, lease_token):
             # selection (eg VEP's SV size cap, which a supplementary pipeline over the same variants does
             # not apply).
             runner = get_runner(annotation_run.pipeline_type)
-            count = runner.get_variants_qs(annotation_run).count()
-            update = {"count": count}
+            update = runner.get_variants_qs(annotation_run).aggregate(
+                count=Count("pk"), max_variant_length=Max(VARIANT_LENGTH))
+            count = update["count"]
             if count == 0:
                 try:
                     runner.handle_empty_dump(annotation_run)
@@ -722,7 +723,7 @@ def subdivide_annotation_run_range(annotation_run: AnnotationRun,
         new_lock = _split_range_lock(arl)
         # A pending run's pre-count (#1646) was of the whole range
         AnnotationRun.objects.filter(pk__in=[run.pk for run in kept_runs],
-                                     status=AnnotationStatus.CREATED).update(count=None)
+                                     status=AnnotationStatus.CREATED).update(count=None, max_variant_length=None)
         bottom_half_run = None
         for run in replaced_runs:
             new_run = AnnotationRun.objects.create(annotation_range_lock=arl, pipeline_type=run.pipeline_type,
