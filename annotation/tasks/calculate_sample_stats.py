@@ -41,7 +41,7 @@ from snpdb.models.models import CodeVersion
 
 # Bump when a change alters what the stats count - readers treat rows from older versions as stale
 # and enqueue a recompute (@see snpdb/views/views_data.py:_sample_stats)
-SAMPLE_STATS_CODE_VERSION = 6
+SAMPLE_STATS_CODE_VERSION = 7
 
 
 @celery.shared_task
@@ -69,6 +69,7 @@ def get_sample_stats_code_version() -> SampleStatsCodeVersion:
         4 - fusions_count, and gene-level variants left out of VCFLengthStats
         5 - Per-sample totals and chrX hom only count the sample's own variant calls (#2087)
         6 - ClinVar pathogenic counts ClinVar's somatic tier and oncogenicity as well (#2662)
+        7 - chrX hom/het (the sex guess) leaves out structural variants
     """
     code_version, _ = SampleStatsCodeVersion.objects.get_or_create(name="SampleStats",
                                                                    version=SAMPLE_STATS_CODE_VERSION,
@@ -293,6 +294,7 @@ class VariantFlags(NamedTuple):
     clinvar: bool
     clinvar_pathogenic: bool
     is_x: bool
+    is_structural: bool
     passing_filter: bool
 
 
@@ -310,11 +312,13 @@ _BOOLEAN_FLAGS_SQL = {
                           "OR coalesce(v.clinvar_somatic_tier IN (%s, %s, %s), false) "
                           "OR coalesce(v.clinvar_highest_oncogenicity, 0) >= %s",
     "is_x": "v.contig = %s",
+    # Symbolic, or a sequence-resolved allele as long as the ones we'd store symbolically
+    "is_structural": "v.alt_seq LIKE '<%%>' OR abs(length(v.ref_seq) - length(v.alt_seq)) >= %s",
     "passing_filter": "coalesce(v.cohort_filters, '') = ''",
 }
 BOOLEAN_FLAGS_PARAMS = [PathogenicityImpact.HIGH, PathogenicityImpact.MODERATE,
                         Pathogenicity.LIKELY_PATHOGENIC, *SomaticClinicalSignificance.TIER_1_AND_2_VALUES,
-                        ClinVarOncogenicity.LIKELY_ONCOGENIC, "X"]
+                        ClinVarOncogenicity.LIKELY_ONCOGENIC, "X", settings.VARIANT_SYMBOLIC_ALT_SIZE]
 assert tuple(_BOOLEAN_FLAGS_SQL) == VariantFlags._fields[2:]
 
 # Grouping on one integer is much cheaper than on each flag. Bit i is boolean flag i, the bits above
@@ -333,7 +337,8 @@ def decode_flags(symbolic_alt: Optional[str], flag_bits: int) -> VariantFlags:
 
 # Fields a zygosity counts into: total, high/moderate impact, OMIM, ClinVar pathogenic, chrX.
 # chrX hom/het is the sex guess (@see CohortGenotypeStats.chrx_sex_guess). A hom ref call says nothing
-# about hemizygosity, and in a joint-called VCF it's another sample's variant, so it has no chrX field
+# about hemizygosity, and in a joint-called VCF it's another sample's variant, so it has no chrX field.
+# Structural variants are left out of it: SV callers genotype chrX as diploid whatever the sex
 _ZYGOSITY_FIELDS = {
     Zygosity.HOM_ALT: ("hom_count", "hom_high_or_moderate_count", "hom_omim_phenotype_count",
                        "hom_clinvar_pathogenic_count", "x_hom_count"),
@@ -416,7 +421,7 @@ def add_count(counter: list[int], flags: VariantFlags, zygosity: str, n: int,
     zygosity_fields = _ZYGOSITY_FIELD_INDEXES.get(zygosity, _ZYGOSITY_FIELD_INDEXES[Zygosity.UNKNOWN_ZYGOSITY])
     for slot in zygosity_slots:
         counter[zygosity_fields[slot]] += n
-    if count_chrx and flags.is_x and (x_field := zygosity_fields[4]) is not None:
+    if count_chrx and flags.is_x and not flags.is_structural and (x_field := zygosity_fields[4]) is not None:
         counter[x_field] += n
 
 

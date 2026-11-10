@@ -378,18 +378,11 @@ def _family_role_widget() -> forms.Select:
     return forms.Select(attrs={"class": "custom-select custom-select-sm"})
 
 
-def _roles_for_sex(choices, sex: Sex, parent_role_by_sex: dict) -> list:
-    """ A sample's sex rules out the other parent's role - proband and sibling are open to anyone.
-        Roles start blank so no two samples hold the same one until they're picked """
-    if sex in parent_role_by_sex:
-        excluded = {role for other_sex, role in parent_role_by_sex.items() if other_sex != sex}
-        choices = [(value, label) for value, label in choices if value not in excluded]
-    return [BLANK_ROLE, *choices]
-
-
 class FamilyWizardForm(forms.Form):
     """ Give each of a cohort's samples a role in the family, and say which of them are affected.
-        Pass sample_sexes (one Sex per sample, in field order) to keep a female off Father """
+        Pass patient_sexes (one Sex per sample, in field order): a sample is refused the parent role
+        its patient record's sex contradicts (PARENT_ROLE_BY_SEX), as the record is there to be
+        corrected. A sex only guessed from chrX calls refuses nothing - it is warned about client side """
     ROLE_ENUM: type[models.TextChoices]
     SAMPLE_FIELDS: list[str] = []
     PARENT_ROLE_BY_SEX: dict = {}
@@ -398,12 +391,21 @@ class FamilyWizardForm(forms.Form):
     proband_sex = forms.ChoiceField(choices=[("", "---")] + [(s, Sex(s).label) for s in Sex.FILLED_IN_CHOICES],
                                     required=False, widget=_family_role_widget())
 
-    def __init__(self, *args, sample_sexes=None, **kwargs):
+    def __init__(self, *args, patient_sexes=None, **kwargs):
         super().__init__(*args, **kwargs)
-        sexes = sample_sexes or [Sex.UNKNOWN] * len(self.SAMPLE_FIELDS)
+        sexes = patient_sexes or [Sex.UNKNOWN] * len(self.SAMPLE_FIELDS)
         for field_name, sex in zip(self.SAMPLE_FIELDS, sexes):
             field = self.fields[field_name]
-            field.choices = _roles_for_sex(field.choices, sex, self.PARENT_ROLE_BY_SEX)
+            withheld = self.roles_withheld_for_sex(sex)
+            # Roles start blank so no two samples hold the same one until they're picked
+            field.choices = [BLANK_ROLE, *[(value, label) for value, label in field.choices if value not in withheld]]
+
+    @classmethod
+    def roles_withheld_for_sex(cls, sex: Sex) -> list:
+        """ The other sex's parent role - proband and sibling are open to anyone """
+        if sex not in cls.PARENT_ROLE_BY_SEX:
+            return []
+        return [role for other_sex, role in cls.PARENT_ROLE_BY_SEX.items() if other_sex != sex]
 
     def clean(self):
         cleaned_data = super().clean()

@@ -16,22 +16,19 @@ from snpdb.models import Cohort, Duo, Quad, Sample, Trio
 
 
 def _confident_sex(sample: Sample) -> Sex:
-    """ The sex we'll hold the wizard's roles to: the patient record, or the chrX call when there is no
-        record. Disagreement means we don't know - the proband sex mismatch warning asks about that """
+    """ The sex the wizard works from: the patient record, or the chrX call when the record has none.
+        The record wins a disagreement - it is the one a person can correct """
     patient_sex = sample.patient_sex
-    detected_sex = sample.detected_sex
-    if patient_sex == Sex.UNKNOWN:
-        return detected_sex
-    if detected_sex in (Sex.UNKNOWN, patient_sex):
+    if patient_sex != Sex.UNKNOWN:
         return patient_sex
-    return Sex.UNKNOWN
+    return sample.detected_sex
 
 
 def _sample_sexes(samples: list[Sample]) -> list[dict]:
     """ The proband and the roles on offer are picked client side, so hand the JS every sample's sexes """
     return [{"patient_sex": s.patient_sex.value, "patient_sex_label": s.patient_sex.label,
              "detected_sex": s.detected_sex.value, "detected_sex_label": s.detected_sex.label,
-             "sex": _confident_sex(s).value}
+             "sex": _confident_sex(s).value, "sex_label": _confident_sex(s).label}
             for s in samples]
 
 
@@ -75,7 +72,7 @@ class FamilyWizardView(FormView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs["sample_sexes"] = [Sex(ss["sex"]) for ss in self.sample_sexes]
+        kwargs["patient_sexes"] = [sample.patient_sex for sample in self.samples]
         return kwargs
 
     def get_context_data(self, **kwargs):
@@ -83,8 +80,10 @@ class FamilyWizardView(FormView):
         form = context["form"]
         sample_rows = []
         for i, sample in enumerate(self.samples, start=1):
+            withheld_roles = form.roles_withheld_for_sex(sample.patient_sex)
             sample_rows.append({"sample": sample,
                                 "index": i,
+                                "withheld_roles": " or ".join(role.label for role in withheld_roles),
                                 "role_field": form[f"sample_{i}"],
                                 "affected_field": form[f"sample_{i}_affected"]})
         context.update({
@@ -99,6 +98,7 @@ class FamilyWizardView(FormView):
             "role_help": self.role_help,
             "role_options": {"roleClasses": self.role_classes,
                              "roleShapeClasses": self.role_shape_classes,
+                             "parentRoleSexes": {role: sex for sex, role in form.PARENT_ROLE_BY_SEX.items()},
                              "autoAssignRoles": self.auto_assign_roles,
                              "autoAffectedRoles": self.auto_affected_roles},
         })

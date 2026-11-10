@@ -5,6 +5,7 @@ insertion nor a deletion, and it is a class of its own rather than the SNP fallb
 A sample's totals count only its own variant calls - in a multi-sample VCF a row it is hom ref, no-call
 or missing for is another sample's variant, which still shows in its per-zygosity tallies (#2087).
 """
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 
@@ -20,7 +21,11 @@ from snpdb.models import (
     CohortGenotypeStats,
     GenomeBuild,
 )
-from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from snpdb.models.models_variant import VariantCoordinate
+from snpdb.tests.utils.vcf_testing_utils import (
+    slowly_create_test_variant,
+    slowly_create_test_variant_from_coordinate,
+)
 
 
 class SampleStatsVariantClassTest(TestCase):
@@ -86,3 +91,18 @@ class SampleStatsVariantClassTest(TestCase):
         stats = self._stats_by_sample_name()["proband"]
         self.assertEqual(1, stats.variant_count)
         self.assertEqual(1, stats.snp_count)
+
+    def test_structural_variants_stay_out_of_the_chrx_sex_guess(self):
+        """ SV callers genotype chrX as diploid whatever the sex, so their hom/het ratio isn't a sex signal """
+        proband_het = Zygosity.HET + Zygosity.MISSING + Zygosity.MISSING
+        symbolic_del = slowly_create_test_variant_from_coordinate(
+            VariantCoordinate(chrom="X", position=5000, ref="N", alt="<DEL>", svlen=-2000), self.genome_build)
+        long_insertion = slowly_create_test_variant("X", 9000, "A", "A" + "T" * settings.VARIANT_SYMBOLIC_ALT_SIZE,
+                                                    self.genome_build)
+        self._add_genotype(symbolic_del, proband_het)
+        self._add_genotype(long_insertion, proband_het)
+        self._add_genotype(slowly_create_test_variant("X", 1000, "A", "AT", self.genome_build), proband_het)
+
+        proband = self._stats_by_sample_name()["proband"]
+        self.assertEqual(3, proband.het_count)
+        self.assertEqual(1, proband.x_het_count)
