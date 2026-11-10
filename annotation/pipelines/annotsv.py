@@ -79,13 +79,15 @@ class AnnotSVRunner(AnnotationPipelineRunner):
         # losing worker run to completion against a range the new attempt now owns.
         process_callback = lease_heartbeat.set_process if lease_heartbeat else None
         try:
-            return_code, std_out, std_err = execute_cmd(
+            cmd_output = execute_cmd(
                 cmd, process_callback=process_callback,
                 timeout=settings.ANNOTATION_ANNOTSV_TIMEOUT_SECONDS)
         finally:
             if lease_heartbeat:
                 lease_heartbeat.set_process(None)  # drop the finished handle so a later tick can't kill anything
 
+        return_code, std_out, std_err = cmd_output
+        annotation_run.tool_peak_memory_mb = cmd_output.max_rss_mb
         max_output = 1_000_000
         annotation_run.pipeline_stdout = std_out[:max_output] if std_out else std_out
         annotation_run.pipeline_stderr = std_err[:max_output] if std_err else std_err

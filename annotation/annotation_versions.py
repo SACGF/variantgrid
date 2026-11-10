@@ -244,6 +244,7 @@ def _reset_run_counts_after_extend(range_lock: AnnotationRangeLock):
             run.reopen_to_created()  # -> CREATED, count=None
         elif run.count is not None:
             run.count = None
+            run.max_variant_length = None
             run.save()
 
 

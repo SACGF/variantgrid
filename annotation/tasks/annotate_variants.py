@@ -30,6 +30,7 @@ from eventlog.models import create_event
 from library.django_utils.rollbar_middleware import RollbarIgnoreException
 from library.enums.log_level import LogLevel
 from library.log_utils import get_traceback, log_traceback, report_message
+from library.utils.os_utils import kill_process_tree
 
 # #2667: kick the single-authority dispatcher by name to avoid importing annotation_scheduler_task
 # (which imports this module). Mirror of analysis _trigger_rescheduling (#346).
@@ -134,12 +135,12 @@ class AnnotationRunLeaseHeartbeat:
             cleanly - without writing results over the new owner's run. Best-effort; already-exited is a no-op. """
         with self._process_lock:
             process = self._process
-        if process is None or process.poll() is not None:
+        if process is None or process.returncode is not None:
             return
         logging.warning("Lease heartbeat: killing subprocess for reclaimed AnnotationRun %s (task %s)",
                         self.annotation_run.pk, self.task_id)
         try:
-            process.kill()
+            kill_process_tree(process)
         except Exception:
             log_traceback()
 

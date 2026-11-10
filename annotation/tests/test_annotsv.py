@@ -36,6 +36,7 @@ from annotation.vep_annotation import (
     vep_dict_to_variant_annotation_version_kwargs,
 )
 from genes.enums import AnnotationConsortium
+from library.utils.os_utils import CmdOutput
 from snpdb.grids import render_annotsv_pathogenic_overlaps
 from snpdb.models import Variant, VariantGridColumn
 from snpdb.models.models_genome import GenomeBuild
@@ -262,7 +263,7 @@ class TestRunAnnotsvSubprocessMocked(TestCase):
             svinput = cmd[cmd.index("-SVinputFile") + 1]
             with open(get_annotsv_tsv_filename(svinput, output_dir), "w", encoding="utf-8") as f:
                 f.write("AnnotSV_ID\n")
-            return 0, "ok", ""
+            return CmdOutput(return_code=0, std_out="ok", std_err="")
 
         with tempfile.TemporaryDirectory() as dump_dir:
             with override_settings(ANNOTATION_VCF_DUMP_DIR=dump_dir), \

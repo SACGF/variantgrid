@@ -439,7 +439,8 @@ ANNOTATION_MIN_FREE_DISK_GIGS = 1
 ANNOTATION_ANNOTSV_ENABLED = False
 ANNOTATION_ANNOTSV_BIN = "/data/annotation/AnnotSV/bin/AnnotSV"
 # Passed as -annotationsDir: the directory *containing* Annotations_Human (and Annotations_Exomiser),
-# ie <install>/share/AnnotSV - not Annotations_Human itself
+# ie <install>/share/AnnotSV - not Annotations_Human itself. Its regulatory element files need sorting after
+# install (#2749): deployment_check prints the commands
 ANNOTATION_ANNOTSV_ANNOTATIONS_DIR = "/data/annotation/AnnotSV/share/AnnotSV"
 # Map our genome build name -> AnnotSV's -genomeBuild value. A build absent from here is one this
 # AnnotSV cannot annotate, so the runs page offers no registration for it and the scheduler skips it.
