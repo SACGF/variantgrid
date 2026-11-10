@@ -369,7 +369,7 @@ class OverlapDownloadRow(ExportRow):
 
     @export_column("Values")
     def values(self):
-        return ", ".join(self.overlap.relevant_values())
+        return ", ".join([val.value for val in self.overlap.relevant_values()])
 
     @export_column("Next Step", categories={"outstanding": True})
     def next_step(self):

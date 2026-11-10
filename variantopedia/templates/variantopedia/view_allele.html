@@ -123,7 +123,7 @@
                                                 <td>{% timestamp allele_liftover.liftover.created show_micro=True %}</td>
                                                 <td>{{ allele_liftover.liftover.get_conversion_tool_display }}</td>
                                                 <td>{{ allele_liftover.get_status_display }}</td>
-                                                <td><a href="{{ allele_liftover.liftover.get_absolute_url }}" class="hover-link">View LiftoverRun {{ allele_liftover.liftover_id }}</a></a></td>
+                                                <td><a href="{{ allele_liftover.liftover.get_absolute_url }}" class="hover-link">View LiftoverRun {{ allele_liftover.liftover_id }}</a></td>
                                                 <td>{{ allele_liftover.data_tidy|enrich|dash_if_empty }}</td>
                                                 <td>{{ allele_liftover.error_tidy|enrich|dash_if_empty }}</td>
                                             </tr>
@@ -300,14 +300,20 @@
                     {% endifchanged %}</td>
                     <td>{% ifchanged overlap.testing_context_obj %}<a class="filter-link" onclick="filterTestingContext('{{ overlap.testing_context_obj }}', '{{ overlap.testing_context_obj.label }}')">{{ overlap.testing_context_obj.label }}</a>{% endifchanged %}</td>
                     <td>{{ overlap.value_type_label }}</td>
-                    <td>{% for value in overlap.relevant_values %}{% if not forloop.first %}, {% endif %}{{ value }}{% endfor %}</td>
+                    <td>{% for value in overlap.relevant_values %}{% if not forloop.first %}, {% endif %}
+                        <span class="{% if not value.is_comparable %}no-value{% endif %}" {% if value.label %}title="{{ value.label }}"{% endif %}>{{ value.value }}</span>
+                    {% endfor %}</td>
                     <td class="font-weight-bold">
-                        {% comment %}show_link_if_discordant{% endcomment %}
                         {% overlap_state overlap show_link_single_context=True %}
-                    {% comment %}
-                    {% if overlap.overlap_status.is_attention %}<a class="hover-link text-danger" href="{{ overlap.get_absolute_url }}">{{ overlap.overlap_status_label }}{% if overlap.overlap_status_obj.value == 90 %} <i class="fa-solid fa-kit-medical"></i>{% endif %}</a>
-                    {% else %}<span class="text-success">{{ overlap.overlap_status_label }}{% endif %}
-                    {% endcomment %}
+                        {% if overlap.has_clinvar_expert_panel %}
+                            <span class="text-muted">|</span>
+                            <div class="d-inline-block mr-2 hover-detail" style="font-size:8pt; letter-spacing: -1px" title="Includes ClinVar Expert Panel">
+                                <i class="fa-solid fa-star text-success" style="margin:0"></i>
+                                <i class="fa-solid fa-star text-success" style="margin:0"></i>
+                                <i class="fa-solid fa-star text-success" style="margin:0"></i>
+                                <i class="fa-regular fa-star" style="opacity:0.25; margin:0"></i>
+                            </div>
+                        {% endif %}
                     </td>
                 </tr>
             {% endfor %}
@@ -316,8 +322,11 @@
                     <td class="allele-origin-C">{% if forloop.first %}Cross Contexts{% endif %}</td>
                     <td></td>
                     <td>{{ overlap.value_type_label }}</td>
-                    <td>{% for value in overlap.relevant_values %}{% if not forloop.first %}, {% endif %}{{ value }}{% endfor %}</td>
-                    <td class="font-weight-bold">{% overlap_state overlap show_link_single_context=False %}</td>
+                    <td>{% for value in overlap.relevant_values %}{% if not forloop.first %}, {% endif %}
+                        <span class="{% if not value.is_comparable %}no-value{% endif %}" {% if value.label %}title="{{ value.label }}"{% endif %}>{{ value.value }}</span>
+                    {% endfor %}</td>
+                    <td class="font-weight-bold">{% overlap_state overlap show_link_single_context=False %}
+                    </td>
                     {% comment %}
                     <td class="font-weight-bold"><span class="{% if overlap.overlap_status_obj.is_attention %}text-danger{% else %}text-success{% endif %}">{{ overlap.overlap_status_label }}</td>
                     {% endcomment %}
