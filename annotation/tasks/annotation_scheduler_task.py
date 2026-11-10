@@ -11,7 +11,7 @@ from django.db import transaction
 from django.db.models import Count, Exists, F, Max, OuterRef, Q
 from django.utils import timezone
 
-from annotation.annotation_version_querysets import VARIANT_LENGTH, get_variants_qs_for_annotation
+from annotation.annotation_version_querysets import get_variants_qs_for_annotation
 from annotation.annotation_versions import (
     get_annotation_range_lock_and_unannotated_count,
     merge_pending_range_locks,
@@ -202,7 +202,7 @@ def count_annotation_runs(annotation_run_ids, lease_token):
             # not apply).
             runner = get_runner(annotation_run.pipeline_type)
             update = runner.get_variants_qs(annotation_run).aggregate(
-                count=Count("pk"), max_variant_length=Max(VARIANT_LENGTH))
+                count=Count("pk"), max_variant_length=Max(Variant.get_length_expression()))
             count = update["count"]
             if count == 0:
                 try:

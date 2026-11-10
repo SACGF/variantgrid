@@ -69,7 +69,7 @@ Patterns here:
   `gene_annotation --new-releases` → promote. Non-VEP tools: `create_new_annotation_pipeline_version`.
 Gotchas:
 - AnnotSV's memory is its bundle, not its input: an unsorted `*.sorted.bed` regulatory element file makes every run load it (1.4 GB, #2749),
-  whatever the SVs. annotation/annotsv_regulatory_elements.py finds them; AnnotationRun.tool_peak_memory_mb and max_variant_length are on the run page.
+  whatever the SVs. annotation/annotsv_annotation.py:get_annotsv_unsorted_regulatory_element_files finds them; AnnotationRun.tool_peak_memory_mb and max_variant_length are on the run page.
 - Call NCBI E-utilities through `library/entrez.py` (`efetch`, `esearch`, `esummary`, `epost`), keeping Bio only to parse: `Bio.Entrez.efetch` etc.
   open urllib with no timeout (`Entrez.timeout` is not read), so a stalled NCBI hangs the web worker (#2440).
 - VEP's RefSeq cache names mitochondrial transcripts after the gene ('ND4.1'), never a real accession: the inserter links them to cdot's 'fake-rna-ND4' (annotation/vcf_files/bulk_vep_vcf_annotation_inserter.py:BulkVEPVCFAnnotationInserter._get_transcript_id_and_transcript_version_id), ahead of a gene-named 'ND4.1' row a pre-cdot import may have left (no genome_builds data), and stores hgvs_c as the 'NC_012920.1:m.' HGVS. tRNA/rRNA rows stay unlinked - cdot has nothing for them.

@@ -15,9 +15,9 @@ import tempfile
 
 from django.conf import settings
 
-from annotation.annotsv_regulatory_elements import (
-    sort_instructions,
-    unsorted_regulatory_element_files,
+from annotation.annotsv_annotation import (
+    get_annotsv_sort_regulatory_elements_script,
+    get_annotsv_unsorted_regulatory_element_files,
 )
 from pedigree.graphs.pedigree_chart import get_ped_parser_command
 from snpdb.models import SomalierConfig
@@ -97,8 +97,9 @@ def check_vcf_split_pipe() -> bool:
 def check_annotsv_regulatory_elements_sorted() -> dict:
     """ A warning, not invalid: AnnotSV runs either way, at 1.4 GB more per run on unsorted files (#2749) """
     check = {"valid": True}
-    if unsorted := unsorted_regulatory_element_files():
-        check["warning"] = sort_instructions(unsorted)
+    if unsorted := get_annotsv_unsorted_regulatory_element_files():
+        check["warning"] = (f"{len(unsorted)} AnnotSV regulatory element file(s) are not sorted. Run as the owner "
+                            f"of the annotation files:\n{get_annotsv_sort_regulatory_elements_script()}")
     return check
 
 

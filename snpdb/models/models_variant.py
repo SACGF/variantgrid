@@ -24,6 +24,7 @@ from django.db import IntegrityError, models, transaction
 from django.db.models import Exists, OuterRef, QuerySet, Value
 from django.db.models.deletion import CASCADE, DO_NOTHING
 from django.db.models.fields import TextField
+from django.db.models.functions import Abs, Greatest
 from django.db.models.functions.text import Concat, Length
 from django.db.models.query_utils import FilteredRelation, Q
 from django.dispatch import receiver
@@ -844,6 +845,12 @@ class Variant(PreviewModelMixin, models.Model):
     @staticmethod
     def get_symbolic_q() -> Q:
         return Q(svlen__isnull=False)
+
+    @staticmethod
+    def get_length_expression() -> Greatest:
+        """ A variant's length however it is represented: abs(svlen) for a symbolic alt, the longer of ref and
+            alt for explicit sequence (GREATEST skips the NULL svlen of an explicit variant) """
+        return Greatest(Abs("svlen"), Length("locus__ref__seq"), Length("alt__seq"))
 
     @staticmethod
     def get_gene_level_q(path_to_variant: str = "") -> Q:

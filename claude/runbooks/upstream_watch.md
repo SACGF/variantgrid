@@ -125,17 +125,19 @@ row.
 
 ## AnnotSV regulatory element sort
 
-The `Annotations_Human` 3.5 bundle ships unsorted `*.sorted.bed` regulatory element files for GRCh38 and CHM13
-(GRCh37's are sorted). AnnotSV's `bedtools intersect -sorted` fails on them and it falls back, without a message,
+The `Annotations_Human` 3.5 bundle ships unsorted `*.sorted.bed` regulatory element files: ABC and EnhancerAtlas for GRCh38 and
+CHM13, miRTargetLink for CHM13 and (ENSEMBL only) GRCh37. AnnotSV's `bedtools intersect -sorted` fails on them and it falls back, without a message,
 to an intersect that loads the file: 1.4 GB per run instead of a few MB (#2749). Until a bundle ships them sorted,
-each deployment sorts its own copy (`annotation/annotsv_regulatory_elements.py`: a manual migration step for
-existing deployments, a `deployment_check` warning for new servers and bundles), per file, as the files' owner:
+each deployment sorts its own copy (`annotation/annotsv_annotation.py:get_annotsv_sort_regulatory_elements_script`: printed by a manual migration
+step for existing deployments and by a `deployment_check` warning for new servers and bundles), per file, as the
+files' owner:
 
 ```bash
 LC_ALL=C sort -k1,1 -k2,2n <file> > <file>.tmp && mv <file>.tmp <file>
 ```
 
-over `<ANNOTATION_ANNOTSV_ANNOTATIONS_DIR>/Annotations_Human/FtIncludedInSV/RegulatoryElements/{GRCh38,CHM13}/*.sorted.bed`.
+over `<ANNOTATION_ANNOTSV_ANNOTATIONS_DIR>/Annotations_Human/FtIncludedInSV/RegulatoryElements/*/*.sorted.bed`,
+and only those: re-sorting the bundle's other bed files changes AnnotSV's output.
 The output TSV is byte-identical either way.
 
 Check:
@@ -147,7 +149,7 @@ gh issue view 356 --repo lgmgeo/AnnotSV --json state,closedAt -q '"\(.state) \(.
 and, when a newer bundle than 3.5 is out, on a fresh copy of it (prints nothing when sorted):
 
 ```bash
-for f in Annotations_Human/FtIncludedInSV/RegulatoryElements/{GRCh38,CHM13}/*.sorted.bed; do LC_ALL=C sort -c -k1,1 -k2,2n "$f"; done
+for f in Annotations_Human/FtIncludedInSV/RegulatoryElements/*/*.sorted.bed; do LC_ALL=C sort -c -s -k1,1 -k2,2n "$f"; done
 ```
 
 When resolved (a released bundle passes that loop): take the sort out of the AnnotSV install paragraph in

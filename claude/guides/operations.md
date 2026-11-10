@@ -174,8 +174,8 @@ large scratch output belongs under `/data`.
 
 Installing an AnnotSV annotations bundle (`ANNOTATION_ANNOTSV_ANNOTATIONS_DIR`) ends with sorting its regulatory
 element files, or every AnnotSV run on GRCh38 and T2T takes 1.4 GB more: `manage.py deployment_check` warns with
-the shell line for each unsorted file, to run as the files' owner on the machine that holds them (the directory is
-read-only to VariantGrid on some deployments). `annotation/annotsv_regulatory_elements.py` has the why;
+the shell to run, as the files' owner on the machine that holds them (the directory is read-only to VariantGrid on
+some deployments). `annotation/annotsv_annotation.py:get_annotsv_unsorted_regulatory_element_files` has the why;
 `claude/runbooks/upstream_watch.md` says when the step can go.
 
 ## Scale <a id="scale"></a>
