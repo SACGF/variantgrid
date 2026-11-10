@@ -1,4 +1,5 @@
 import logging
+import os
 from collections import Counter, defaultdict
 
 from django.contrib import messages
@@ -280,7 +281,10 @@ def view_annotation_run(request, annotation_run_id):
         annotation_range_lock=annotation_run.annotation_range_lock,
         pipeline_type=annotation_run.pipeline_type).exclude(pk=annotation_run.pk)
     can_retry_annotation_run = not other_annotation_runs_qs.exists()
-    can_retry_annotation_run_upload = can_retry_annotation_run and annotation_run.vcf_annotated_filename
+    # The annotated file is removed once a run imports successfully, leaving its name on the row
+    annotated_filename = annotation_run.vcf_annotated_filename
+    can_retry_annotation_run_upload = bool(can_retry_annotation_run and annotated_filename
+                                           and os.path.exists(annotated_filename))
     can_subdivide_annotation_run = False
     if arl := annotation_run.annotation_range_lock:
         can_subdivide_annotation_run = arl.can_subdivide()
