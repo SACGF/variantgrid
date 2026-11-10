@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from functools import cached_property, reduce
 from typing import Any, Optional, Self
 
@@ -556,26 +557,44 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
             parts.append(tumor_type_category)
         return " ".join(parts) + f" : {OverlapStatus(self.overlap_status).label}"
 
-    def relevant_values(self) -> list[str]:
-        relevant_values = set()
+    @dataclass(frozen=True)
+    class RelevantValue:
+        value: str
+        label: Optional[str]
+        is_comparable: bool = True
+
+        def __str__(self) -> str:
+            return self.value
+
+    def relevant_values(self) -> list[RelevantValue]:
+        from classification.services.overlap_calculator import OverlapCalculatorOncPath, OverlapCalculatorClinSig
+        relevant_value_strs = set()
         for entry in self.contributions.all():
             if entry.contribution_status == OverlapContributionStatus.CONTRIBUTING:
-                relevant_values.add(entry.effective_value)
+                relevant_value_strs.add(entry.effective_value)
 
         if self.value_type == ClassificationResultValue.ONC_PATH:
-            return list(val.replace('_', '-') for val in EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).sort_values(relevant_values))
+            return [
+                Overlap.RelevantValue(
+                    value=val.replace('_', '-'),
+                    label=EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).pretty_value(val),
+                    is_comparable=OverlapCalculatorOncPath.is_comparable_value(val)) for val in EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).sort_values(relevant_value_strs)]
         elif self.value_type == ClassificationResultValue.SOMATIC_CLINICAL_SIGNIFICANCE:
             tier_1_or_2 = False
-            if "tier_1_or_2" in relevant_values:
-                relevant_values.remove("tier_1_or_2")
+            if "tier_1_or_2" in relevant_value_strs:
+                relevant_value_strs.remove("tier_1_or_2")
                 tier_1_or_2 = True
             somatic_clin_sig_e_key = EvidenceKeyMap.cached_key(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE)
-            sorted_values = somatic_clin_sig_e_key.sort_values(relevant_values)[::-1]
+            sorted_values = somatic_clin_sig_e_key.sort_values(relevant_value_strs)[::-1]
             if tier_1_or_2:
                 sorted_values.append("tier_1_or_2")
 
-            result = [somatic_clin_sig_e_key.pretty_value(val) for val in sorted_values]
-            return result
+            return [
+                Overlap.RelevantValue(
+                    value=somatic_clin_sig_e_key.pretty_value(val),
+                    label=None,  # tier values are already the right label
+                    is_comparable=OverlapCalculatorClinSig.is_comparable_value(val)) for val in sorted_values
+                ]
         else:
             return []
 
