@@ -29,6 +29,7 @@ import json
 from library.django_utils import get_url_from_view_path
 from eventlog.notifications import NotificationBuilder
 from library.log_utils import report_exc_info
+from library.utils import first
 from library.utils.collection_utils import batch_iterator
 from review.models import Review, ReviewableModelMixin
 from snpdb.lab_picker import LabPickerData
@@ -688,6 +689,7 @@ class OverlapContributionPerspective:
 class LabContext:
     lab: LabLike
     contact_subject: Optional[str]
+    contact_body: Optional[str]
 
 
 @dataclass(frozen=True)
@@ -723,15 +725,23 @@ class OverlapPageDetails:
     def involved_labs(self) -> list[LabContext]:
         labs: set[LabContext] = set()
         for overlap_contribution in self.overlap.contributions:
-            subject = None
+            subject = f"Discordance Update for (OV_{self.overlap.pk})"
+            overlap_link = get_url_from_view_path(self.overlap.get_absolute_url())
+
+            c_hgvs = None
             if lab := overlap_contribution.lab:
                 genome_build = UserSettings.get_for(lab=lab).default_genome_build
-                subject = f"{settings.SITE_NAME} record : {self.overlap.hgvs(lab=lab, genome_build=genome_build)}"
+                c_hgvs = self.overlap.hgvs(lab=lab, genome_build=genome_build)
+            if not c_hgvs:
+                c_hgvs = first(self.overlap.hgvses)
+
+            body = f"In regards to {c_hgvs} {self.overlap.testing_context_full} {overlap_link}\n\n"
 
             labs.add(
                 LabContext(
                     lab=overlap_contribution.lab_like,
-                    contact_subject=subject
+                    contact_subject=subject,
+                    contact_body=body
                 )
             )
         return list(sorted(labs, key=lambda x: x.lab))
