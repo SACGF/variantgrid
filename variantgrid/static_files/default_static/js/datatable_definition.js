@@ -1058,23 +1058,31 @@ TableFormat.deleteRow = function(data, type, row) {
     if (!data) {
         return '';
     }
-    return $('<button>', {
-        type: 'button',
-        class: 'btn btn-sm btn-danger dt-delete-row',
-        'data-url': data,
-        html: $('<i>', {class: 'fas fa-trash'})
+    return $('<span>', {
+        class: 'position-relative d-inline-block',
+        html: $('<button>', {
+            type: 'button',
+            class: 'btn btn-sm btn-danger dt-delete-row',
+            'data-url': data,
+            html: $('<i>', {class: 'fas fa-trash'})
+        })
     }).prop('outerHTML');
 };
 
 const DT_DELETE_CONFIRM_MS = 200;
 
-/* Delete asks Yes / No beside the button (or, in a row-actions menu, below the item) rather than in a
-   browser confirm() popup, sliding open like the delete box on a settings page's permissions tab.
+const DT_DELETE_CONFIRM_BESIDE_BUTTON = 'dt-delete-confirm position-absolute bg-white border rounded shadow-sm p-1 mr-1 text-nowrap';
+
+/* Delete asks Yes / No rather than in a browser confirm() popup, sliding open like the delete box on a
+   settings page's permissions tab. In a row-actions menu it opens below the item; beside a button it
+   floats over the cells to its left, as delete is a grid's last column and anything opening to the right
+   lands outside the visible part of a wide grid.
    It stays until one is clicked. Clicks are kept from bubbling so a row-actions menu stays open */
 function openDeleteRowConfirm(trigger) {
     const inMenu = trigger.closest('.dropdown-menu').length > 0;
     const confirmBox = $(inMenu ? '<div>' : '<span>', {
-        class: inMenu ? 'dt-delete-confirm px-4 py-1 text-nowrap' : 'dt-delete-confirm ml-1 text-nowrap',
+        class: inMenu ? 'dt-delete-confirm px-4 py-1 text-nowrap' : DT_DELETE_CONFIRM_BESIDE_BUTTON,
+        css: inMenu ? {} : {right: '100%', top: '50%', transform: 'translateY(-50%)', 'z-index': 10},
         html: [
             $('<span>', {class: 'mr-1', text: 'Delete?'}),
             $('<button>', {type: 'button', class: 'btn btn-sm btn-danger dt-delete-confirm-yes', text: 'Yes'}),
