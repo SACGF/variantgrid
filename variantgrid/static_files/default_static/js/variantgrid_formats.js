@@ -1053,12 +1053,13 @@ VariantGridFormat.representativeVariantLabel = (variantId, rowData) => {
               + (p ? ` <span class='rv-hgvs-p'>${escapeHtml(p.change)}</span>` : '') + '</span>';
         return {html: html, title: hgvsC + (hgvsP ? " " + hgvsP : "") + _svGenesTitle(sv)};
     }
-    // 2. g.HGVS (no transcript - an SV, intergenic, or annotation not run yet for this variant). The
-    // lead slot is what a reader calls the row: an SV over a gene is an event on that gene ("FGF3
-    // amplification"), so its symbol leads the way it does above - or its genes, when it spans several;
-    // otherwise the contig stands in. Either way the accession moves to line 2
+    // 2. g.HGVS (no transcript - intergenic, or annotation not run yet for this variant). The lead slot
+    // is what a reader calls the row: a symbolic alt over a gene is an event on that gene, so its symbol
+    // leads the way it does above - or its genes, when it spans several; otherwise the contig stands in.
+    // Either way the accession moves to line 2. An SV skips to its span (3): its g.HGVS is the same
+    // coordinates plus the type the kind badge shows, and with genes leading it would not name the contig
     const g = _splitHgvs(hgvsG);
-    if (g && g.change.length <= REPRESENTATIVE_MAX_HGVS_CHARS) {
+    if (g && g.change.length <= REPRESENTATIVE_MAX_HGVS_CHARS && !_isStructuralAlt(alt)) {
         const sv = (alt != null && String(alt).startsWith("<"))
                  ? _svGeneLead(symbol, overlappingSymbols, _contigLabel(chrom)) : {lead: null, genes: null};
         const lead = sv.lead || _contigLabel(chrom);
