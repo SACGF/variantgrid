@@ -71,6 +71,13 @@ function renderChip(chip) {
 	if (chip.count) {
 		$("<span/>", {class: "node-chip-count", text: "\u00d7" + chip.count}).appendTo(label);
 	}
+	// Only colour fits on the card - the hover card spells each one out (renderHoverCardChip)
+	if (chip.dots && chip.dots.length) {
+		const dots = $("<span/>", {class: "node-chip-dots"}).appendTo(label);
+		for (const dot of chip.dots) {
+			$("<span/>", {class: "node-chip-dot " + dot.css_class}).appendTo(dots);
+		}
+	}
 	if (group) {
 		$.each(chip.children, function() { span.append(renderChip(this)); });
 	}
@@ -194,7 +201,15 @@ function nodeHoverCardTitle(node) {
 
 // A chip's title is its full text (an untruncated name, the long form of an abbreviation), so it goes under the pill
 function renderHoverCardChip(chip) {
-	const li = $("<li/>").append(renderChip(Object.assign({}, chip, {children: []})));
+	const li = $("<li/>").append(renderChip(Object.assign({}, chip, {children: [], dots: []})));
+	// A chip's dots as the chips themselves, in the same colours, so the dots on the card can be read
+	if (chip.dots && chip.dots.length) {
+		const dots = $("<div/>", {class: "node-hover-card-chip-dots"}).appendTo(li);
+		for (const dot of chip.dots) {
+			$("<span/>", {class: "node-hover-card-dot"}).append(
+				renderChip(dot), $("<span/>", {class: "node-hover-card-dot-detail", text: dot.title})).appendTo(dots);
+		}
+	}
 	if (chip.title && chip.title !== chip.text) {
 		const detail = $("<div/>", {class: "node-hover-card-chip-detail"}).appendTo(li);
 		for (const line of chip.title.split("\n").filter(Boolean)) {

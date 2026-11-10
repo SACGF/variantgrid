@@ -48,6 +48,7 @@ from analysis.related_analyses import get_related_analysis_details_for_samples
 from analysis.templatetags.related_analyses_tags import analysis_templates_tag
 from analysis.views.views import CreateClassificationForVariantTagView
 from annotation.fake_data import get_fake_annotation_version
+from annotation.tasks.calculate_sample_stats import calculate_cohort_stats
 from genes.models import GeneList, SampleGeneList
 from library.django_utils import FakeRequest
 from library.django_utils.django_partition import temporary_db_table
@@ -67,7 +68,11 @@ from snpdb.models import (
     Tag,
     VCFFilter,
 )
-from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from snpdb.models.models_variant import VariantCoordinate
+from snpdb.tests.utils.vcf_testing_utils import (
+    slowly_create_test_variant,
+    slowly_create_test_variant_from_coordinate,
+)
 from snpdb.views.datatable_view import CellData
 
 
@@ -541,6 +546,30 @@ class TestSampleNodeLevels(SampleNodeLevelsTestCase):
         patient_chips = self._node(SampleSourceLevel.PATIENT, self.patient).get_node_chips()
         self.assertEqual([c.text for c in patient_chips],
                          [self.specimen.reference_id, self.blood_specimen.reference_id, "VCF"])
+
+    def test_vcf_chip_dots_tell_callers_with_the_same_sample_name_apart(self):
+        """ #2759 - every DRAGEN VCF names the sample alike, so the dots say which caller's calls a node reads.
+            Symbolic alts in a VCF with a copy number field are a CNV caller's """
+        VCF.objects.filter(pk=self.cnv_sample.vcf_id).update(copy_number_field="CN")
+        symbolic_del = slowly_create_test_variant_from_coordinate(
+            VariantCoordinate(chrom="3", position=5000, ref="N", alt="<DEL>", svlen=-2000), self.grch37)
+        self._add_genotype(self.cnv_cgc, symbolic_del, "E", ad=20, dp=40)
+        # Before stats there is nothing to say
+        self.assertEqual((), self._node(SampleSourceLevel.SAMPLE, self.cnv_sample).get_node_chips()[0].dots)
+
+        annotation_version = get_fake_annotation_version(self.grch37)
+        for sample in (self.snv_sample, self.cnv_sample):
+            calculate_cohort_stats(sample.vcf.cohort, annotation_version)
+
+        cnv_chip = self._node(SampleSourceLevel.SAMPLE, self.cnv_sample).get_node_chips()[0]
+        self.assertEqual(["Small", "CNV"], [dot.text for dot in cnv_chip.dots])
+        self.assertEqual("1 call", cnv_chip.dots[1].title)
+
+        # Two VCFs on one chip: the dots are both files', the hover says which file holds what
+        vcf_chip = self._extraction_node().get_node_chips()[0].children[0]
+        self.assertEqual(["Small", "CNV"], [dot.text for dot in vcf_chip.dots])
+        self.assertEqual({f"{self.snv_sample.vcf} - Small", f"{self.cnv_sample.vcf} - Small, CNV"},
+                         set(vcf_chip.title.split("\n")))
 
     def test_warning_chip_counts_what_the_group_left_out(self):
         """ Six months later, why does this node return fewer rows - because a VCF was archived """

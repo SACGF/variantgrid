@@ -32,6 +32,9 @@ class NodeChip:
     row_break: bool = False  # draw this chip and the ones after it on a new line
     # Chips nested the way the relations are - a specimen wrapping its extractions wrapping their VCFs
     children: tuple["NodeChip", ...] = ()
+    # Drawn as coloured dots inside the chip, and as the chips themselves on the hover card, which is
+    # where the colours are learnt - what kinds of call a VCF chip's files hold (#2759)
+    dots: tuple["NodeChip", ...] = ()
 
 
 def truncate_name_line(text: str, max_length: int = NAME_LINE_MAX_LENGTH) -> str:
