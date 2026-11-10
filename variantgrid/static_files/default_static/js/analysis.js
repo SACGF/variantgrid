@@ -593,7 +593,7 @@ function ajaxError(event, jqxhr, settings, thrownError) {
 
             // Try and fix state up a bit
             if (rj.deleted_nodes) {
-                deleteNodesFromDOM(rj.deleted_nodes, []);
+                deleteNodesFromDOM(rj.deleted_nodes);
             }
 
             return;

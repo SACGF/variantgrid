@@ -511,7 +511,7 @@ function setupNodeGrid(config_url, handler_url, analysisId, nodeId, versionId, u
         },
         onData: function(json) {
             if (json.non_fatal && json.deleted_nodes) {
-                deleteNodesFromDOM(json.deleted_nodes, []);
+                deleteNodesFromDOM(json.deleted_nodes);
                 if (json.message) {
                     $("#node-editor-container").text(json.message);
                 }

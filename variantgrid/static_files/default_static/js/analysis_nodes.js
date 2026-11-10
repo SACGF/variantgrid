@@ -573,7 +573,7 @@ function fadeOutAndRemoveNode(node) {
 }
 
 
-function deleteNodesFromDOM(nodes, data) {
+function removeNodesFromDOM(nodes) {
     let clearGridAndEditor = false;
 
     // Start every fade before anything else, so the transition isn't held up by the tear down below
@@ -605,21 +605,30 @@ function deleteNodesFromDOM(nodes, data) {
         if (clearGridAndEditor) {
             loadNodeData(); // empty
         }
-        update_dirty_nodes(data);
     }, 0);
 }
 
 
+function deleteNodesFromDOM(nodes) {
+	// For nodes the server has already deleted: detaching them bumped their children's versions
+	removeNodesFromDOM(nodes);
+	checkAndMarkDirtyNodes();
+}
+
+
 function deleteNodes(nodes) {
-	// Remove from the page straight away - the server call only tells us which other nodes became dirty
-	deleteNodesFromDOM(nodes, []);
+	// Remove from the page straight away. The children's versions are bumped by the delete, so only check them
+	// once it has committed
+	removeNodesFromDOM(nodes);
 
 	const data = 'nodes=' + encodeURIComponent(JSON.stringify(nodes));
 	$.ajax({
 	    type: "POST",
 	    data: data,
 	    url: Urls.nodes_delete(ANALYSIS_ID),
-	    success: update_dirty_nodes,
+	    success: function() {
+	        checkAndMarkDirtyNodes();
+	    },
 	});
 }
 
