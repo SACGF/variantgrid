@@ -49,7 +49,7 @@ class OverlapOverrideStatus(IntegerChoices):
 
 class OverlapStatus(IntegerChoices):
     NO_CONTRIBUTIONS = 0, "No contributions"
-    NO_COUNTING_CONTRIBUTIONS = 10, "No counting contributions" # used if only Risk Factor or Drug Risk
+    NO_COUNTING_CONTRIBUTIONS = 10, "No comparable contributions" # used if only Risk Factor or Drug Risk
     SINGLE_SUBMITTER = 20, "Single submitter"
     EXACT_AGREEMENT = 30, "Exact agreement"
     TERMINOLOGY_DIFFERENCES = 40, "Terminology differences"  # e.g. P vs O
