@@ -46,6 +46,10 @@
     display: none;
 }
 
+#family-name-group {
+    max-width: 40em;
+}
+
 #form-submitted-dialog {
     text-align: center;
 }
@@ -57,58 +61,15 @@
 <script src="{% static 'js/patient_phenotype.js' %}"></script>
 <script src="{% static 'js/proband_sex_mismatch.js' %}"></script>
 <script src="{% static 'js/family_wizard_roles.js' %}"></script>
-<script>
-const patient_description_results = {{ patient_description_results | jsonify }};
-const sample_sexes = {{ sample_sexes | jsonify }};
-
-function setProbandPhenoText() {
-    const pp = $("#proband-phenos");
-    pp.empty();
-    const displayedTerms = new Set();
-
-    $("select", ".sample-select").each(function(i) {
-        if ($(this).val() === 'P') {
-            const results = patient_description_results[i][1];
-            if (results) {
-                $("#proband-text").html("Using proband phenotypes:");
-                for (let m = 0; m < results.length; ++m) {
-                    const result = results[m];
-                    const ontologyService = result["ontology_service"];
-                    const resultMatch = result["match"];
-                    if (!displayedTerms.has(resultMatch) && (ontologyService === 'HPO' || ontologyService === 'OMIM')) {
-                        pp.append($("<li>").text(resultMatch));
-                        displayedTerms.add(resultMatch);
-                    }
-                }
-            }
-        }
-    });
-}
-</script>
+<script src="{% static 'js/analysis/family_wizard.js' %}"></script>
 {% endblock head %}
 
 {% block jsdocumentready %}
-
-    for (let i = 0; i < patient_description_results.length; ++i) {
-        const pdr = patient_description_results[i];
-        const phenotypeText = pdr[0];
-        const phenotypeMatches = pdr[1];
-
-        if (phenotypeText) {
-            const resultSelector = $("#patient-results-" + (i + 1));
-            displayPhenotypeMatches(resultSelector, phenotypeText, phenotypeMatches);
-        }
-    }
-
-    setupProbandSexMismatch(sample_sexes);
-
-    $("#create-family-button").click(function() {
-        setProbandPhenoText();
-        $("#form-submitted-dialog").modal("show");
+    initFamilyWizard({
+        patientDescriptionResults: {{ patient_description_results | jsonify }},
+        sampleSexes: {{ sample_sexes | jsonify }},
+        roleOptions: {{ role_options | jsonify }},
     });
-
-    setupFamilyRoles(sample_sexes, {{ role_options | jsonify }});
-
 {% endblock jsdocumentready %}
 
 {% block container_table_content %}
@@ -183,6 +144,20 @@ function setProbandPhenoText() {
             {% endfor %}
             </ul>
         {% endif %}
+
+        <div id="family-name-group" class="form-group">
+            <label for="{{ form.name.id_for_label }}">Name</label>
+            {{ form.name }}{{ form.name.errors }}
+            {% if name_suggestions %}
+            <div class="small mt-1">
+                <span class="text-muted">Suggestions:</span>
+                {% for suggestion in name_suggestions %}
+                    <a href="#" class="family-name-suggestion" data-name="{{ suggestion }}">{{ suggestion }}</a>{% if not forloop.last %} ·{% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            <small class="form-text text-muted">Leave blank to name it after the samples' roles and the cohort.</small>
+        </div>
 
         <button id='create-family-button' class="btn btn-primary"><i class="fas fa-plus-circle"></i> Create {{ family_name }}</button>
     </form>
