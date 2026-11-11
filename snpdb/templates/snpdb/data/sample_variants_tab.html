@@ -24,7 +24,7 @@
         variantTagsReadOnly = true;
 
         $(document).ready(function() {
-            initSampleVariantsTab({{ sample.pk }}, {{ analysis.pk }}, {{ analysis.version }});
+            initSampleVariantsTab({{ sample.pk }}, {{ analysis.pk }}, {{ analysis.version }}, {{ cache_version }});
         });
         </script>
         <h3>Analysis: {{ analysis }}</h3>

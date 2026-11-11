@@ -1,6 +1,7 @@
 import importlib
 import inspect
 import logging
+from urllib.parse import urlencode
 
 import pandas as pd
 from django.conf import settings
@@ -229,6 +230,7 @@ def node_data_grid(request, analysis_id, analysis_version, node_id, node_version
         "grid_auto_load_max_variants_display": max_variants_display,
         "grid_sorting_disabled": grid_sorting_disabled,
         "grid_sort_max_variants": grid_sort_max_variants,
+        "cache_version": settings.CACHE_VERSION,
     }
     return render(request, 'analysis/node_data/node_data_grid.html', context)
 
@@ -397,9 +399,11 @@ def node_load(request, analysis_id, node_id):
             view_name = "node_data_grid"
         else:
             view_name = "node_async_wait"
-        url = reverse(view_name, kwargs=kwargs)
+        # Everything under it is cached in the browser for a week - a CACHE_VERSION bump changes the URLs (#382)
+        params = {"cache_version": settings.CACHE_VERSION}
         if node.cloned_from:
-            url += f"?cloned_from={node.cloned_from}"
+            params["cloned_from"] = node.cloned_from
+        url = reverse(view_name, kwargs=kwargs) + "?" + urlencode(params)
         return HttpResponseRedirect(url)
     except NonFatalNodeError as e:
         errors = [str(e)]

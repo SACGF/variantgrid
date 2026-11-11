@@ -1,6 +1,6 @@
 // @ts-check
 // snpdb/templates/snpdb/data/sample_variants_tab.html
-/* global setupNodeGrid */ // grid.js
+/* global setupNodeGrid, cacheVersionedUrl */ // grid.js
 /* global AnalysisDownloadTracker */ // analysis_downloads.js
 /* global AnalysisMessagePoller */ // analysis_updates.js
 /* global analysisDownloadTracker:writable */ // read via getAnalysisWindow() in grid.js
@@ -12,11 +12,11 @@ function on_error_function() {
     console.log("on_error_function");
 }
 
-function showNodeGrid(analysisId, analysisVersion, nodeStatus) {
+function showNodeGrid(analysisId, analysisVersion, cacheVersion, nodeStatus) {
     const nodeId = nodeStatus.id;
     const version = nodeStatus.version;
 
-    const config_url = Urls.node_grid_config(analysisId, analysisVersion, nodeId, version, "default");
+    const config_url = cacheVersionedUrl(Urls.node_grid_config(analysisId, analysisVersion, nodeId, version, "default"), cacheVersion);
     const handler_url = Urls.node_grid_handler(analysisId);
     const unique_code = "sample-variants-grid";  // ok to be constant on this page
     function noOp() {};
@@ -24,7 +24,7 @@ function showNodeGrid(analysisId, analysisVersion, nodeStatus) {
                   noOp, gridLoadError, on_error_function);
 }
 
-function initSampleVariantsTab(sampleId, analysisId, analysisVersion) {
+function initSampleVariantsTab(sampleId, analysisId, analysisVersion, cacheVersion) {
     // Every grid on this page is this sample's, so its pills are read against them
     nodeProbandSampleId = sampleId;
     // The CSV/VCF exports run as Celery jobs then hand back a file - see analysis_downloads.js
@@ -41,7 +41,7 @@ function initSampleVariantsTab(sampleId, analysisId, analysisVersion) {
                 id: 'grid-' + nodeId,
                 class: 'grid'
             }).appendTo(gridContainer);
-            messagePoller.observe_node(nodeId, "ready", (nodeStatus) => showNodeGrid(analysisId, analysisVersion, nodeStatus));
+            messagePoller.observe_node(nodeId, "ready", (nodeStatus) => showNodeGrid(analysisId, analysisVersion, cacheVersion, nodeStatus));
         }
     });
     messagePoller.update_loop();

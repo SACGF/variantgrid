@@ -1,7 +1,7 @@
 // @ts-check
 // analysis/templates/analysis/node_data/node_data_grid.html
 /* global nodeId:writable, nodeAlignmentsDict:writable */
-/* global registerNodeGridDownloadButton, nodeGridHasData, export_grid, setupNodeGrid, gridLoadError, loadNodeGridData */ // grid.js
+/* global registerNodeGridDownloadButton, nodeGridHasData, export_grid, setupNodeGrid, gridLoadError, loadNodeGridData, cacheVersionedUrl */ // grid.js
 /* global isHorizontalMode, resizeGrid, bottomPaneGridHidden, showGridLoadingOverlay, registerDeferredGridLoad */ // analysis.js
 /* global GRID */ // analysis/analysis_editor_and_grid.js
 /* global revealSelectedTab */ // analysis/templates/analysis/node_editors/grid_editor.html
@@ -139,10 +139,10 @@ function nodeDataGridReady(gridData) {
     // Need to capture unique code and pass to functions as pages may be redefined by further DOM manipulation before load()s etc come back
     const unique_code = gridNodeId + "_" + nodeVersion;
 
-    const node_view_url = Urls.node_view(analysisId, gridData.analysisVersion, gridNodeId, nodeVersion, gridData.extraFilters);
+    const node_view_url = cacheVersionedUrl(Urls.node_view(analysisId, gridData.analysisVersion, gridNodeId, nodeVersion, gridData.extraFilters), gridData.cacheVersion);
     load_node_editor(node_view_url, unique_code);
 
-    const config_url = Urls.node_grid_config(analysisId, gridData.analysisVersion, gridNodeId, nodeVersion, gridData.extraFilters);
+    const config_url = cacheVersionedUrl(Urls.node_grid_config(analysisId, gridData.analysisVersion, gridNodeId, nodeVersion, gridData.extraFilters), gridData.cacheVersion);
     const handler_url = Urls.node_grid_handler(analysisId);
     // Re-show instantly if this exact node-version was already loaded this session (page cache hit).
     const aWin = getAnalysisWindow();

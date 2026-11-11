@@ -479,6 +479,14 @@ function gridCompleteExtra() {
 }
 
 
+/* The node views and grid endpoints are cached in the browser for a week, so their URLs carry
+   settings.CACHE_VERSION - bumping it makes every client fetch them again (#382). The row requests
+   get it from the definition's postData (@see VariantGrid.post_data) */
+function cacheVersionedUrl(url, cacheVersion) {
+    return url + "?" + EncodeQueryData({cache_version: cacheVersion});
+}
+
+
 /* The analysis node grid. Two endpoints: config_url answers the table definition (columns, widths,
    renderers - it varies by node version, so it caches with the node) and the handler serves the rows
    for the whole analysis. The node's own state - node_id, version_id, ccc_id, ccc_version_id,
