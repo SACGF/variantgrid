@@ -37,6 +37,13 @@ from snpdb.enums import AssemblyMoleculeType, CytobandLevel, SequenceRole
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_REFSEQ_ACCESSION
 from snpdb.genome.fasta_index import load_genome_fasta_index
 
+# chrX's pseudoautosomal regions (1-based, inclusive) are diploid in males too, so their hets say nothing about sex
+CHRX_PSEUDOAUTOSOMAL_REGIONS = {
+    "GRCh37": [(60_001, 2_699_520), (154_931_044, 155_260_560)],
+    "GRCh38": [(10_001, 2_781_479), (155_701_383, 156_030_895)],
+    "T2T-CHM13v2.0": [(1, 2_394_410), (153_925_835, 154_259_566)],
+}
+
 
 class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
     """ There is only 1 patch version of a genome build on the system

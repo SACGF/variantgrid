@@ -8,7 +8,7 @@ import celery
 import numpy as np
 from django.conf import settings
 from django.db import connection, transaction
-from django.db.models import F, Q
+from django.db.models import BooleanField, ExpressionWrapper, F, Q, Value
 
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
 from annotation.enums import ClinVarOncogenicity, Pathogenicity, PathogenicityImpact
@@ -38,10 +38,11 @@ from snpdb.models import (
     Zygosity,
 )
 from snpdb.models.models import CodeVersion
+from snpdb.models.models_genome import CHRX_PSEUDOAUTOSOMAL_REGIONS
 
 # Bump when a change alters what the stats count - readers treat rows from older versions as stale
 # and enqueue a recompute (@see snpdb/views/views_data.py:_sample_stats)
-SAMPLE_STATS_CODE_VERSION = 8
+SAMPLE_STATS_CODE_VERSION = 9
 
 
 @celery.shared_task
@@ -71,6 +72,7 @@ def get_sample_stats_code_version() -> SampleStatsCodeVersion:
         6 - ClinVar pathogenic counts ClinVar's somatic tier and oncogenicity as well (#2662)
         7 - chrX hom/het (the sex guess) leaves out structural variants
         8 - structural_count, gene_copy_number_count and gene_splice_count (#2759)
+        9 - chrX hom/het leaves out the pseudoautosomal regions (#2745)
     """
     code_version, _ = SampleStatsCodeVersion.objects.get_or_create(name="SampleStats",
                                                                    version=SAMPLE_STATS_CODE_VERSION,
@@ -298,6 +300,7 @@ class VariantFlags(NamedTuple):
     clinvar: bool
     clinvar_pathogenic: bool
     is_x: bool
+    is_pseudoautosomal: bool
     is_structural: bool
     passing_filter: bool
 
@@ -316,6 +319,7 @@ _BOOLEAN_FLAGS_SQL = {
                           "OR coalesce(v.clinvar_somatic_tier IN (%s, %s, %s), false) "
                           "OR coalesce(v.clinvar_highest_oncogenicity, 0) >= %s",
     "is_x": "v.contig = %s",
+    "is_pseudoautosomal": "v.pseudoautosomal",
     # Symbolic, or a sequence-resolved allele as long as the ones we'd store symbolically
     "is_structural": "v.alt_seq LIKE '<%%>' OR abs(length(v.ref_seq) - length(v.alt_seq)) >= %s",
     "passing_filter": "coalesce(v.cohort_filters, '') = ''",
@@ -342,7 +346,8 @@ def decode_flags(symbolic_alt: Optional[str], flag_bits: int) -> VariantFlags:
 # Fields a zygosity counts into: total, high/moderate impact, OMIM, ClinVar pathogenic, chrX.
 # chrX hom/het is the sex guess (@see CohortGenotypeStats.chrx_sex_guess). A hom ref call says nothing
 # about hemizygosity, and in a joint-called VCF it's another sample's variant, so it has no chrX field.
-# Structural variants are left out of it: SV callers genotype chrX as diploid whatever the sex
+# Structural variants are left out of it (SV callers genotype chrX as diploid whatever the sex), as are
+# the pseudoautosomal regions, where males are diploid
 _ZYGOSITY_FIELDS = {
     Zygosity.HOM_ALT: ("hom_count", "hom_high_or_moderate_count", "hom_omim_phenotype_count",
                        "hom_clinvar_pathogenic_count", "x_hom_count"),
@@ -443,7 +448,8 @@ def add_count(counter: list[int], flags: VariantFlags, zygosity: str, n: int,
     zygosity_fields = _ZYGOSITY_FIELD_INDEXES.get(zygosity, _ZYGOSITY_FIELD_INDEXES[Zygosity.UNKNOWN_ZYGOSITY])
     for slot in zygosity_slots:
         counter[zygosity_fields[slot]] += n
-    if count_chrx and flags.is_x and not flags.is_structural and (x_field := zygosity_fields[4]) is not None:
+    is_sex_signal = flags.is_x and not (flags.is_pseudoautosomal or flags.is_structural)
+    if count_chrx and is_sex_signal and (x_field := zygosity_fields[4]) is not None:
         counter[x_field] += n
 
 
@@ -471,6 +477,7 @@ def get_cohort_rows_queryset(cgc: CohortGenotypeCollection, annotation_version: 
         "clinvar_highest_oncogenicity": "clinvar__highest_oncogenicity",
         "cohort_filters": f"{cgc.cohortgenotype_alias}__filters",
     }
+    expressions = {"pseudoautosomal": _pseudoautosomal_expression(cgc.cohort.genome_build)}
     if with_gene:
         columns["gene"] = "variantannotation__gene_id"
     if with_vcf_stats:
@@ -480,7 +487,17 @@ def get_cohort_rows_queryset(cgc: CohortGenotypeCollection, annotation_version: 
             "hgvs_g": "variantannotation__hgvs_g",
             "vep_skipped_reason": "variantannotation__vep_skipped_reason",
         })
-    return qs.values(**{alias: F(path) for alias, path in columns.items()})
+    return qs.values(**{alias: F(path) for alias, path in columns.items()}, **expressions)
+
+
+def _pseudoautosomal_expression(genome_build):
+    regions = CHRX_PSEUDOAUTOSOMAL_REGIONS.get(genome_build.name)
+    if not regions:
+        return Value(False)
+    in_region_q = Q()
+    for start, end in regions:
+        in_region_q |= Q(locus__position__range=(start, end))
+    return ExpressionWrapper(Q(locus__contig__name="X") & in_region_q, output_field=BooleanField())
 
 
 def _count_cohort_stats(cohort: Cohort, cgc: CohortGenotypeCollection, annotation_version: AnnotationVersion,

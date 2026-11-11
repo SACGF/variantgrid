@@ -13,7 +13,10 @@ from annotation.fake_data import get_fake_annotation_version
 from annotation.tasks.calculate_sample_stats import calculate_cohort_stats
 from genes.enums import GeneCopyNumberEventKind
 from genes.tests.gene_fusion_test_utils import create_gene_fusion
-from genes.tests.gene_level_test_utils import create_gene_copy_number_event, create_splice_event_variant
+from genes.tests.gene_level_test_utils import (
+    create_gene_copy_number_event,
+    create_splice_event_variant,
+)
 from patients.enums import Zygosity
 from snpdb.enums import VariantContent
 from snpdb.fake_data import create_fake_cohort
@@ -24,6 +27,7 @@ from snpdb.models import (
     CohortGenotypeStats,
     GenomeBuild,
 )
+from snpdb.models.models_genome import CHRX_PSEUDOAUTOSOMAL_REGIONS
 from snpdb.models.models_variant import VariantCoordinate
 from snpdb.tests.utils.vcf_testing_utils import (
     slowly_create_test_variant,
@@ -125,4 +129,15 @@ class SampleStatsVariantClassTest(TestCase):
 
         proband = self._stats_by_sample_name()["proband"]
         self.assertEqual(3, proband.het_count)
+        self.assertEqual(1, proband.x_het_count)
+
+    def test_pseudoautosomal_regions_stay_out_of_the_chrx_sex_guess(self):
+        """ Males are diploid in the PARs, so a het there isn't evidence of a second X """
+        proband_het = Zygosity.HET + Zygosity.MISSING + Zygosity.MISSING
+        par1_start, par1_end = CHRX_PSEUDOAUTOSOMAL_REGIONS[self.genome_build.name][0]
+        self._add_genotype(slowly_create_test_variant("X", par1_start, "A", "G", self.genome_build), proband_het)
+        self._add_genotype(slowly_create_test_variant("X", par1_end + 1, "A", "G", self.genome_build), proband_het)
+
+        proband = self._stats_by_sample_name()["proband"]
+        self.assertEqual(2, proband.het_count)
         self.assertEqual(1, proband.x_het_count)

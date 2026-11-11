@@ -16,7 +16,30 @@ column (the fifth `|`-separated field), so keep the table shape.
 | MaveDB stripped file | every deployment running MaveDB on a VEP_plugins `release/116` checkout from 2026-09-01 (Ensembl/VEP_plugins#853) | 2026-11-03 | 2027-02-03 |
 | gnomAD SV overlap via two `--custom` | Ensembl/ensembl-vep#1989 (`coords=2`, `show_overlaps`) for #1645 | 2026-11-03 | 2027-02-03 |
 | AnnotSV regulatory element sort | lgmgeo/AnnotSV#356 fixed in a released Annotations_Human bundle | 2026-11-10 | 2026-12-10 |
+| chrX PAR table | a bioutils release with `bioutils.par` that installs on Python 3.14 (0.6.2 caps `<3.14`, biocommons/bioutils#97) | 2026-11-11 | 2026-12-11 |
 | uv cooldown exceptions | the 7-day cooldown passing the pinned cutoffs in `uv.toml` | 2026-11-04 | 2026-11-06 |
+
+## chrX PAR table
+
+`snpdb/models/models_genome.py:CHRX_PSEUDOAUTOSOMAL_REGIONS` hardcodes chrX's pseudoautosomal regions for the sex guess
+(#2745). `bioutils.par` (biocommons/bioutils#88) has the same regions for GRCh37, GRCh38 and T2T-CHM13v2.0, keyed by
+our `GenomeBuild` names, but 0.6.2 declares `requires-python <3.14` (biocommons/bioutils#97; lifted on main by
+biocommons/bioutils#98, so far only in the 0.6.3a0 prerelease).
+
+Check:
+
+```bash
+gh release list --repo biocommons/bioutils --limit 3
+curl -s https://pypi.org/pypi/bioutils/json | python3 -c "import json,sys; i=json.load(sys.stdin)['info']; print(i['version'], i['requires_python'])"
+```
+
+When resolved (a final release with `bioutils.par` and no `<3.14` cap): bump `bioutils` (it is transitive, so add it to
+`requirements.in`) and recompile both requirements files (root `AGENTS.md`, Python packages). Build
+`annotation/tasks/calculate_sample_stats.py:_pseudoautosomal_expression`'s ranges from
+`bioutils.par.get_par_map(genome_build.name)["X"].values()` as `(start + 1, end)` (bioutils is interbase, the
+`position__range` lookup 1-based inclusive), returning `Value(False)` on the `ValueError` for a build with no PAR data.
+Delete `CHRX_PSEUDOAUTOSOMAL_REGIONS`, point `test_pseudoautosomal_regions_stay_out_of_the_chrx_sex_guess` at
+`get_par_map`, and delete this row.
 
 ## uv cooldown exceptions
 
