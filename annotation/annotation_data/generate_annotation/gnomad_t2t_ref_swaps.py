@@ -148,10 +148,8 @@ COUNT_SUFFIXES = [""] + [f"_{pop}" for pop in SUB_POPS] + ["_XY"]
 def _t2t_info(filter_value: str, grch38_info: dict) -> dict:
     """ OUTPUT_INFO keys, missing unless set """
     out = dict.fromkeys(OUTPUT_INFO, ".")
-    if "non_par" in grch38_info:
-        out["non_par"] = None
-    else:
-        del out["non_par"]
+    # gnomad_data.py writes the GRCh38 flag as non_par=True / non_par=. (no header line, so a bare flag breaks bcftools)
+    out["non_par"] = "True" if "non_par" in grch38_info else "."
     out["gnomad_filtered"] = "0" if filter_value in ("PASS", ".") else "1"
     return out
 
@@ -197,7 +195,7 @@ def lifted_info(info: dict, filter_value: str) -> dict:
 
 
 def _format_info(info: dict) -> str:
-    return ";".join(k if v is None else f"{k}={v}" for k, v in info.items())
+    return ";".join(f"{k}={v}" for k, v in info.items())
 
 
 def write_swaps(args):
