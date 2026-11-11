@@ -236,7 +236,13 @@ $(document).ready(function() {
 
     $("#classify-modal").on("hidden.bs.modal", function() {
         wizard = null;
-        if (reloadWhenDone) {
+    });
+
+    // Any dialog on the page holds a reload off (reloadTab tests the backdrop), so any closing runs it - a poll
+    // deferred under, say, New Patient would otherwise end the populating poll chain. Bound to the document with
+    // a namespace so the closure of the tab reloaded last is the one that answers
+    $(document).off("hidden.bs.modal.classifyReport").on("hidden.bs.modal.classifyReport", function() {
+        if (reloadWhenDone && $.contains(document, container[0])) {
             reloadTab();
         }
     });
@@ -322,11 +328,5 @@ $(document).ready(function() {
         }).fail(function() {
             window.alert("Could not save the report ID.");
         });
-    });
-
-    $("#case-report-modal").on("hidden.bs.modal", function() {
-        if (reloadWhenDone) {
-            reloadTab();
-        }
     });
 });
