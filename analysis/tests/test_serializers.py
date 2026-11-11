@@ -10,37 +10,52 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.utils import timezone
 
-from analysis.analysis_import_export import analysis_export_to_dict, analysis_import
+from analysis.analysis_import_export import (
+    NON_PORTABLE_NODE_CONFIG,
+    analysis_export_to_dict,
+    analysis_import,
+)
 from analysis.enums import AnalysisTemplateType
 from analysis.forms.forms import CreateAnalysisTemplateForm
 from analysis.models import (
+    AllVariantsNode,
     Analysis,
     AnalysisEdge,
     AnalysisVariable,
+    ClassificationsNode,
     FilterNode,
     FilterNodeItem,
     GeneListNode,
+    IntersectionNode,
     MergeNode,
     MOINode,
     PhenotypeNode,
     SampleNode,
+    TagNode,
     VennNode,
 )
 from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.sources.sample_node import SampleNodeSampleFilter
+from analysis.serializers import AnalysisNodeSerializer
 from annotation.fake_data import get_fake_annotation_version
+from eventlog.models import Event
 from genes.fake_data import create_fake_transcript_version
-from genes.models import GeneList, GeneListGeneSymbol, ImportStatus
+from genes.models import GeneList, GeneListGeneSymbol, ImportStatus, PanelAppPanel, PanelAppServer
 from library.utils import get_all_subclasses
 from ontology.enums import OntologyService
 from ontology.models import OntologyImport, OntologyTerm
-from snpdb.enums import BuiltInFilters
+from snpdb.enums import BuiltInFilters, CytobandLevel
 from snpdb.fake_data import create_fake_cohort
-from snpdb.models import GenomeBuild, UserSettings
+from snpdb.models import GenomeBuild, Lab, Organization, Tag, UserSettings
+from snpdb.models.models_genome import Cytoband
 
 
 def _round_trip(user, genome_build, annotation_version, analysis):
     """Export analysis to JSON file, import it back, return the new Analysis."""
-    analysis_dict = analysis_export_to_dict(analysis)
+    return _import_dict(user, genome_build, annotation_version, analysis_export_to_dict(analysis))
+
+
+def _import_dict(user, genome_build, annotation_version, analysis_dict):
     with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
         json.dump(analysis_dict, f)
         fname = f.name
@@ -49,6 +64,29 @@ def _round_trip(user, genome_build, annotation_version, analysis):
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
+class TestNodeSerializerCoverage(TestCase):
+    # A node's relations into analysis that aren't its config
+    NOT_CONFIG = {
+        "_parents", "analysisnode_child", "analysisnode_parent",  # Edges - exported alongside the nodes
+        "left_parent_node", "right_parent_node",  # VennNode parents - remapped onto the imported nodes
+        "nodeversion_set", "analysisnodeallelesource_set", "varianttag_set", "nodevariant_set",
+    }
+
+    def test_every_node_config_table_is_exported(self):
+        """ A node child table needs nesting in its serializer, or a reason it can't be, or exports
+            silently lose it (#2773) """
+        for label, serializer in AnalysisNodeSerializer.get_node_serializers().items():
+            model = serializer.Meta.model
+            for relation in model._meta.related_objects:
+                if relation.related_model._meta.app_label != "analysis":
+                    continue
+                accessor = relation.get_accessor_name()
+                if accessor in self.NOT_CONFIG or accessor in NON_PORTABLE_NODE_CONFIG:
+                    continue
+                with self.subTest(node=label, relation=accessor):
+                    self.assertIn(accessor, serializer.Meta.fields)
+
+
 class TestAnalysisRoundTrip(TestCase):
     @classmethod
     def setUpTestData(cls):
@@ -177,6 +215,73 @@ class TestAnalysisRoundTrip(TestCase):
         imported_labels = Counter(n._meta.label for n in imported.analysisnode_set.select_subclasses())
         self.assertEqual(imported_labels, expected_labels)
         self.assertEqual(AnalysisEdge.objects.filter(child__analysis=imported).count(), len(nodes) - 1)
+
+    def _make_child_table_nodes(self):
+        analysis = self._make_analysis()
+        contig = self.grch37.chrom_contig_mappings["22"]
+        cytoband = Cytoband.objects.get_or_create(contig=contig, name="q11.2", defaults={
+            "level": CytobandLevel.SUB_BAND, "start": 1, "end": 100, "stain": "gneg"})[0]
+        tag = Tag.objects.get_or_create(pk="test_serializer_tag")[0]
+        organization = Organization.objects.get_or_create(name="test_serializer_org",
+                                                          group_name="test_serializer_org")[0]
+        lab = Lab.objects.get_or_create(name="test_serializer_lab", organization=organization, city="Adelaide",
+                                        group_name="test_serializer_org/test_serializer_lab")[0]
+        server = PanelAppServer.objects.order_by("pk").first()
+        panel = PanelAppPanel.objects.create(server=server, panel_id=99999, name="Test panel", disease_group="",
+                                             disease_sub_group="", status="public", current_version="1.0")
+
+        all_variants_node = AllVariantsNode.objects.create(analysis=analysis)
+        all_variants_node.allvariantsnodecontig_set.create(contig=contig)
+        intersection_node = IntersectionNode.objects.create(analysis=analysis)
+        intersection_node.intersectionnodecontig_set.create(contig=contig)
+        intersection_node.intersectionnodecytoband_set.create(cytoband=cytoband)
+        tag_node = TagNode.objects.create(analysis=analysis)
+        tag_node.tagnodetag_set.create(tag=tag)
+        classifications_node = ClassificationsNode.objects.create(analysis=analysis)
+        classifications_node.classificationsnodelab_set.create(lab=lab)
+        gene_list_node = GeneListNode.objects.create(analysis=analysis)
+        gene_list_node.genelistnodepanelapppanel_set.create(panel_app_panel=panel)
+        return analysis
+
+    def test_node_child_tables_round_trip(self):
+        """ Config kept in child tables comes back by natural key (#2773) """
+        analysis = self._make_child_table_nodes()
+        original_export = analysis_export_to_dict(analysis)
+        PanelAppPanel.objects.filter(panel_id=99999).delete()  # The import creates it on a system without it
+        imported = _import_dict(self.user, self.grch37, self.annotation_version, original_export)
+
+        def node_config(analysis_dict):
+            ignore = {"id", "analysis", "genelistnodegenelist_set"}
+            return sorted(({k: v for k, v in n["fields"].items() if k not in ignore} for n in analysis_dict["nodes"]),
+                          key=lambda fields: json.dumps(fields, sort_keys=True))
+
+        imported_export = analysis_export_to_dict(imported)
+        self.assertEqual(node_config(original_export), node_config(imported_export))
+        self.assertEqual(GeneListNode.objects.get(analysis=imported).genelistnodepanelapppanel_set.count(), 1)
+
+    def test_import_warns_about_config_it_cannot_bring(self):
+        analysis = self._make_child_table_nodes()
+        cohort = create_fake_cohort(self.user, self.grch37)
+        sample = cohort.get_samples().first()
+        sample_node = SampleNode.objects.create(analysis=analysis, sample=sample)
+        SampleNodeSampleFilter.objects.create(node=sample_node, sample=sample, min_ad=5)
+
+        analysis_dict = analysis_export_to_dict(analysis)
+        for node_record in analysis_dict["nodes"]:
+            fields = node_record["fields"]
+            if "classificationsnodelab_set" in fields:
+                fields["classificationsnodelab_set"] = [{"lab": "no_such_org/no_such_lab"}]
+            if "tagnodetag_set" in fields:
+                fields["tagnodetag_set"] = [{"tag": "no_such_tag"}]
+
+        imported = _import_dict(self.user, self.grch37, self.annotation_version, analysis_dict)
+
+        self.assertFalse(ClassificationsNode.objects.get(analysis=imported).classificationsnodelab_set.exists())
+        self.assertFalse(TagNode.objects.get(analysis=imported).tagnodetag_set.exists())
+        details = Event.objects.get(user=self.user, name="analysis_import").details
+        self.assertIn("no_such_org/no_such_lab", details)
+        self.assertIn("no_such_tag", details)
+        self.assertIn("per sample filters", details)
 
     def test_server_references_are_stripped(self):
         analysis = self._make_analysis()
