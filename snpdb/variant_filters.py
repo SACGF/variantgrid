@@ -16,7 +16,7 @@ from annotation.models import AnnotationVersion, VariantGeneOverlap, VariantTran
 from genes.models import Gene, GeneSymbol
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
 from snpdb.enums import SequenceRole
-from snpdb.models.models_genome import Contig, GenomeBuild
+from snpdb.models.models_genome import Contig, Cytoband, GenomeBuild
 from snpdb.models.models_user_settings import AllVariantsFilter
 from snpdb.models.models_variant import Sequence, Variant, get_base_and_reference_sequence_ids
 
@@ -230,6 +230,16 @@ def get_contig_ids_for_variant_types(genome_build: GenomeBuild, contig_ids: Iter
     if contig_id_list and (not variant_types or set(variant_types) & set(GENE_LEVEL_VARIANT_TYPES)):
         contig_id_list.extend(get_gene_level_contig_ids(genome_build))
     return contig_id_list
+
+
+def get_cytobands_q(cytobands: Iterable[Cytoband]) -> Optional[Q]:
+    """ Variants starting in any of the bands, or None for no bands. Gene-level variants' positions are gene IDs,
+        so a band never matches one """
+    q_list = [Q(locus__contig_id=cytoband.contig_id, locus__position__gte=cytoband.start,
+                locus__position__lte=cytoband.end) for cytoband in cytobands]
+    if q_list:
+        return reduce(operator.or_, q_list)
+    return None
 
 
 def get_contigs_q(genome_build: GenomeBuild, contig_ids: Optional[Iterable[int]] = None,
