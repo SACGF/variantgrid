@@ -3,15 +3,16 @@ from types import SimpleNamespace
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from analysis.enums import DuoSample, QuadSample, TrioSample
 from analysis.forms import UserDuoWizardForm, UserQuadWizardForm, UserTrioWizardForm
-from analysis.views.views_wizard import _confident_sex
+from analysis.views.views_wizard import _confident_sex, family_name_suggestions
 from library.django_utils.unittest_utils import URLTestCase
 from patients.enums import Sex
 from snpdb.enums import DuoRelationship
 from snpdb.fake_data import create_fake_duo
-from snpdb.models import Duo, GenomeBuild
+from snpdb.models import VCF, Duo, GenomeBuild, Sample
 
 
 class ConfidentSexTest(TestCase):
@@ -29,6 +30,34 @@ class ConfidentSexTest(TestCase):
 
     def test_patient_record_wins_a_disagreement(self):
         self.assertEqual(Sex.FEMALE, _confident_sex(self._sample(Sex.FEMALE, Sex.MALE)))
+
+
+class FamilyNameSuggestionsTest(TestCase):
+    """ #2760 - the VCF's name when it holds just the family, then what the sample names share """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.get_or_create(username='testuser_family_name')[0]
+
+    def _samples(self, vcf_name: str, sample_names: list[str], extra_samples: int = 0) -> list[Sample]:
+        vcf = VCF.objects.create(name=vcf_name, genotype_samples=len(sample_names) + extra_samples,
+                                 genome_build=GenomeBuild.grch38(), user=self.user, date=timezone.now())
+        samples = [Sample.objects.create(name=name, vcf=vcf) for name in sample_names]
+        for i in range(extra_samples):
+            Sample.objects.create(name=f"other_{i}", vcf=vcf)
+        return samples
+
+    def test_vcf_named_without_extension_then_common_sample_name(self):
+        samples = self._samples("run7_trio.vcf.gz", ["FAM123_P", "FAM123_M", "FAM123_F"])
+        self.assertEqual(["run7_trio", "FAM123"], family_name_suggestions(samples))
+
+    def test_vcf_with_other_samples_is_not_suggested(self):
+        samples = self._samples("run7_batch.vcf.gz", ["FAM123_P", "FAM123_M", "FAM123_F"], extra_samples=5)
+        self.assertEqual(["FAM123"], family_name_suggestions(samples))
+
+    def test_short_common_part_is_not_a_name(self):
+        samples = self._samples("batch.vcf", ["AB_S1", "CD_S2", "EF_S3"], extra_samples=1)
+        self.assertEqual([], family_name_suggestions(samples))
 
 
 class TrioWizardFormTest(TestCase):
@@ -143,3 +172,12 @@ class DuoWizardViewTest(URLTestCase):
         self.assertEqual(duo.relationship, DuoRelationship.SIBLING)
         self.assertTrue(duo.relative_is_sibling)
         self.assertTrue(duo.relative_affected)
+
+    def test_post_uses_typed_name_or_falls_back_to_roles(self):
+        self._post_roles(DuoSample.FATHER, name=" FAM123 ")
+        self.assertEqual("FAM123", Duo.objects.get(cohort=self.cohort).name)
+        Duo.objects.filter(cohort=self.cohort).delete()
+
+        self._post_roles(DuoSample.FATHER, name="")
+        # The fixture names its relative sample "mother", whatever role it is posted as
+        self.assertEqual(f"mother/proband from {self.cohort}", Duo.objects.get(cohort=self.cohort).name)

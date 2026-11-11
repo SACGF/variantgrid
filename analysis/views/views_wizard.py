@@ -4,15 +4,40 @@
     to trust for the proband) so they share FamilyWizardView and analysis/family_wizard.html - a
     subclass names the family, its form and how to make the object from the roles.
 """
+import re
+
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.shortcuts import redirect
 from django.views.generic import FormView
 
 from analysis.enums import DuoSample, QuadSample, TrioSample
 from analysis.forms import UserDuoWizardForm, UserQuadWizardForm, UserTrioWizardForm
+from library.utils.collection_utils import remove_duplicates_from_list
+from library.utils.text_utils import longest_common_substring
 from patients.enums import Sex
 from snpdb.enums import ImportStatus
 from snpdb.models import Cohort, Duo, Quad, Sample, Trio
+
+# Shorter than this, what the sample names share is a run or lane fragment ("_S", "L00") rather than a family
+FAMILY_NAME_MIN_COMMON_LENGTH = 4
+VCF_FILE_EXTENSIONS_RE = re.compile(r"(\.(vcf|bcf|gz|bgz))+$", re.IGNORECASE)
+NAME_SEPARATORS = "_-. "
+
+
+def family_name_suggestions(samples: list[Sample]) -> list[str]:
+    """ Names for the family better than the roles-and-cohort default: the VCF's, when it was called on
+        just these samples, then whatever the sample names have in common (#2760) """
+    suggestions = []
+    vcfs = {sample.vcf for sample in samples}
+    if len(vcfs) == 1:
+        vcf = vcfs.pop()
+        if vcf.name and vcf.sample_set.count() == len(samples):
+            if vcf_name := VCF_FILE_EXTENSIONS_RE.sub("", vcf.name):
+                suggestions.append(vcf_name)
+    common = longest_common_substring([sample.name for sample in samples]).strip(NAME_SEPARATORS)
+    if len(common) >= FAMILY_NAME_MIN_COMMON_LENGTH:
+        suggestions.append(common)
+    return remove_duplicates_from_list(suggestions)
 
 
 def _confident_sex(sample: Sample) -> Sex:
@@ -68,7 +93,14 @@ class FamilyWizardView(FormView):
         sample_ids = [kwargs[f"sample{i}_id"] for i in range(1, len(self.form_class.SAMPLE_FIELDS) + 1)]
         self.samples = [Sample.get_for_user(request.user, sample_id) for sample_id in sample_ids]
         self.sample_sexes = _sample_sexes(self.samples)
+        self.name_suggestions = family_name_suggestions(self.samples)
         return super().dispatch(request, *args, **kwargs)
+
+    def get_initial(self):
+        initial = super().get_initial()
+        if self.name_suggestions:
+            initial["name"] = self.name_suggestions[0]
+        return initial
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -90,6 +122,7 @@ class FamilyWizardView(FormView):
             "cohort": self.cohort,
             "sample_rows": sample_rows,
             "sample_sexes": self.sample_sexes,
+            "name_suggestions": self.name_suggestions,
             "patient_description_results": [_patient_description_results(s) for s in self.samples],
             "family_name": self.family_name,
             "family_icon": self.family_icon,
@@ -109,12 +142,16 @@ class FamilyWizardView(FormView):
                           for sample, role in zip(self.samples, form.roles)}
         # Roles are declared parents first, so the name reads down the pedigree
         names = "/".join(cohort_samples[role].name for role in form.ROLE_ENUM if role in cohort_samples)
+        name = form.cleaned_data["name"].strip()
         proband_sex = form.cleaned_data["proband_sex"] or None
-        defaults = {"name": f"{names} from {self.cohort}", "proband_sex": proband_sex}
+        defaults = {"name": name or f"{names} from {self.cohort}", "proband_sex": proband_sex}
 
         family, created = self.get_or_create_family(form, cohort_samples, defaults)
-        if not created and family.proband_sex != proband_sex:
+        if not created:
+            # The same roles find the family made before - what was asked for this time wins
             family.proband_sex = proband_sex
+            if name:
+                family.name = name
             family.save()
         return redirect(family)
 

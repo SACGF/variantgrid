@@ -7,6 +7,19 @@ from collections.abc import Callable, Collection
 from typing import Any, Optional
 
 
+def longest_common_substring(strings: Collection[str]) -> str:
+    """ The longest run of characters every string contains - the first found, if several tie """
+    if not strings:
+        return ""
+    shortest = min(strings, key=len)
+    for length in range(len(shortest), 0, -1):
+        for start in range(len(shortest) - length + 1):
+            candidate = shortest[start:start + length]
+            if all(candidate in s for s in strings):
+                return candidate
+    return ""
+
+
 def pretty_label(label: str) -> str:
     label = label.replace('_', ' ')
     tidied = ''

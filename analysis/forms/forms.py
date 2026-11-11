@@ -387,6 +387,8 @@ class FamilyWizardForm(forms.Form):
     SAMPLE_FIELDS: list[str] = []
     PARENT_ROLE_BY_SEX: dict = {}
 
+    # Blank names the family after its members' roles and the cohort
+    name = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "form-control"}))
     # Only asked for when the patient record and the sample's detected sex disagree
     proband_sex = forms.ChoiceField(choices=[("", "---")] + [(s, Sex(s).label) for s in Sex.FILLED_IN_CHOICES],
                                     required=False, widget=_family_role_widget())
