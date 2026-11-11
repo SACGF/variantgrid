@@ -304,13 +304,17 @@ def view_annotation_run(request, annotation_run_id):
 def retry_annotation_run(request, annotation_run_id, upload_only=False):
     """ Deletes - then re-tries using annotation lock """
     annotation_run = get_object_or_404(AnnotationRun, pk=annotation_run_id)
-    annotation_run = annotation_run_retry(annotation_run, upload_only=upload_only)
+    try:
+        annotation_run = annotation_run_retry(annotation_run, upload_only=upload_only)
+    except ValueError as e:
+        # #2765: the page offering this retry can be stale (import since finished, double submit)
+        messages.add_message(request, messages.ERROR, str(e), extra_tags='import-message')
+        return redirect(annotation_run)
 
     msg = 'Re-trying annotation'
     if upload_only:
         msg += " (upload only)"
-    status = messages.INFO
-    messages.add_message(request, status, msg, extra_tags='import-message')
+    messages.add_message(request, messages.INFO, msg, extra_tags='import-message')
     return redirect(annotation_run)
 
 

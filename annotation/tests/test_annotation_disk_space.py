@@ -12,6 +12,7 @@ import tempfile
 from datetime import timedelta
 from unittest import mock
 
+from django.contrib import messages
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.test.utils import override_settings
@@ -216,6 +217,20 @@ class AnnotationRunCleanupTestCase(TestCase):
 
             remove_annotation_run_output(run)
             self.assertFalse(self.client.get(url).context["can_retry_annotation_run_upload"])
+
+    def test_stale_upload_only_retry_redirects_with_error(self):
+        self.client.force_login(User.objects.create_superuser("annotation_run_admin"))
+        with tempfile.TemporaryDirectory() as tmp_dir, \
+                override_settings(ANNOTATION_VCF_DUMP_DIR=tmp_dir):
+            run, _, _ = self._run_with_output(tmp_dir)
+            remove_annotation_run_output(run)
+
+            url = reverse("retry_annotation_run_upload", kwargs={"annotation_run_id": run.pk})
+            response = self.client.post(url, follow=True)
+            self.assertRedirects(response, run.get_absolute_url())
+            error_messages = [str(m) for m in response.context["messages"] if m.level == messages.ERROR]
+            self.assertEqual(len(error_messages), 1)
+            self.assertIn("no longer exists", error_messages[0])
 
 
 @override_settings(**get_fake_annotation_settings_dict(columns_version=2))
