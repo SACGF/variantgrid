@@ -79,6 +79,10 @@ anyway. A third pipeline type (`VariantAnnotationPipelineType.GENE_LEVEL`) compu
 from the gene identity instead, writing the `VariantGeneOverlap` rows for every gene named that make
 gene lists and comp-het work.
 
+A chromosome, cytoband or typed region can't match a gene-level variant by position, so the region
+filters place one by its genes instead: it is in a region when one of its genes is (#2769),
+@see `snpdb.variant_filters.get_regions_q`. A BED file intersection still never matches one.
+
 Most VCF-writing paths need no check of their own: they build their contig list from
 `GenomeBuild.standard_contigs`, which filters on `SequenceRole.ASSEMBLED_MOLECULE`, so the gene-level
 contig is excluded before anything asks for a reference base. The analysis node export is the
