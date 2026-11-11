@@ -810,8 +810,8 @@ div.node-overlay {
 
 .design-a-node .node-counts-strip {
 	position: relative;
-	/* One count row, reserved whether the node is loading, invalid or showing counts, so the card
-	   doesn't resize (and drag jsPlumb connections around) when the update lands */
+	/* Every built-in count and the tag row are laid out whether the node is loading, invalid or showing
+	   counts, so the card doesn't resize (and drag jsPlumb connections around) when the update lands */
 	min-height: 14px;
 	border-top: 1px solid #e4e7ec;
 }
@@ -842,7 +842,6 @@ span.node-counts {
 
 .node-count {
 	flex: 1 0 45%;
-	display: none;
 	height: 14px;
 	line-height: 12px;
 	text-align: center;
@@ -852,10 +851,21 @@ span.node-counts {
 	overflow: hidden;
 }
 
+/* A zero count holds its slot rather than disappearing, and there are no variants to click through to */
+.node-counts .node-count.zero-count {
+	opacity: .35;
+	pointer-events: none;
+}
+
 /* Tag counts sit below the built-in counts, behind a tag icon so it's clear they're tags */
 .node-tag-counts {
 	align-items: center;
+	min-height: 12px;
 	border-top: 1px dotted #e4e7ec;
+}
+
+.node-tag-counts.no-tag-counts {
+	visibility: hidden;
 }
 
 .node-tag-counts .tag-counts-icon {
@@ -867,8 +877,9 @@ span.node-counts {
 }
 
 /* A tag count is a handful of variants at most, so pack them in at their own width - a node with
-   a dozen tags reads as a row of colours rather than six rows of two */
+   a dozen tags reads as a row of colours rather than six rows of two. Hidden until it has variants */
 .node-tag-counts .node-count {
+	display: none;
 	flex: 0 0 auto;
 	height: 12px;
 	line-height: 12px;
