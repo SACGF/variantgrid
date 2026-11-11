@@ -23,6 +23,11 @@ Patterns here:
   `_get_arg_q_dict_from_parents_and_node` only when the node combines parents itself
   (`analysis/models/nodes/filters/venn_node.py:VennNode`). A pass-through node returns False from `modifies_parents` to
   reuse the parent's counts and cache (`analysis/models/nodes/filters/gene_list_node.py:GeneListNode.modifies_parents`).
+- A node setting kept in a child table is copied by `save_clone` but only exported if its serializer nests it, by natural
+  key (contig name, tag id, lab group name) since an import may be on another system or build
+  (`analysis/serializers.py:AllVariantsNodeSerializer`). One keyed by the server's own samples, cohorts or VCFs goes in
+  `analysis/analysis_import_export.py:NON_PORTABLE_NODE_CONFIG` instead, so the import warns. `TestNodeSerializerCoverage`
+  fails on a child table that is in neither.
 - A count badge (a `BuiltInFilters` label) is a node configuration, declared in that node class's
   `COUNT_LABEL_FIELDS`: `analysis/models/nodes/analysis_node.py:AnalysisNode.count_label_node` builds it - the badge's
   count is its Q, the badge click drops it - and `AnalysisNode.matches_count_label` lets a node configured that way
