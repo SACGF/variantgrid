@@ -223,6 +223,11 @@ quick fix"). A question that comes in while you are already implementing is a qu
 of instruction: answer it, then carry on with the implementation. Once told to do something, finish it before
 reporting back.
 
+### A caveat comes with a fix
+When a change has a side effect worth reporting (a deployment has to re-run something, a check now fails, a cost
+someone pays), say what would remove it alongside the caveat - often the existing code that causes it is stricter
+than it needs to be - or say why nothing does.
+
 ### Testing
 `claude/guides/testing.md` has the base classes and the fixture index.
 
