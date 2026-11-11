@@ -26,7 +26,7 @@ NAME_SEPARATORS = "_-. "
 
 def family_name_suggestions(samples: list[Sample]) -> list[str]:
     """ Names for the family better than the roles-and-cohort default: the VCF's, when it was called on
-        just these samples, then whatever the sample names have in common (#2760) """
+        just these samples, then the whole words the sample names have in common (#2760) """
     suggestions = []
     vcfs = {sample.vcf for sample in samples}
     if len(vcfs) == 1:
@@ -34,7 +34,8 @@ def family_name_suggestions(samples: list[Sample]) -> list[str]:
         if vcf.name and vcf.sample_set.count() == len(samples):
             if vcf_name := VCF_FILE_EXTENSIONS_RE.sub("", vcf.name):
                 suggestions.append(vcf_name)
-    common = longest_common_substring([sample.name for sample in samples]).strip(NAME_SEPARATORS)
+    common = longest_common_substring([sample.name for sample in samples],
+                                      separators=NAME_SEPARATORS).strip(NAME_SEPARATORS)
     if len(common) >= FAMILY_NAME_MIN_COMMON_LENGTH:
         suggestions.append(common)
     return remove_duplicates_from_list(suggestions)

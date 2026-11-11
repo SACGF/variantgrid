@@ -59,6 +59,15 @@ class FamilyNameSuggestionsTest(TestCase):
         samples = self._samples("batch.vcf", ["AB_S1", "CD_S2", "EF_S3"], extra_samples=1)
         self.assertEqual([], family_name_suggestions(samples))
 
+    def test_sequential_sample_numbers_share_no_name(self):
+        samples = self._samples("batch.vcf", ["SMP5477Ab", "SMP5478Ab", "SMP5479Ab", "SMP5480Ab"], extra_samples=1)
+        self.assertEqual([], family_name_suggestions(samples))
+
+    def test_common_part_is_whole_words(self):
+        samples = self._samples("batch.vcf", ["run7_FAM123_P_S1", "run7_FAM123_M_S2", "run7_FAM123_F_S3"],
+                                extra_samples=1)
+        self.assertEqual(["run7_FAM123"], family_name_suggestions(samples))
+
 
 class TrioWizardFormTest(TestCase):
     def _form(self, data=None, patient_sexes=None):
