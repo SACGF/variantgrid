@@ -215,7 +215,9 @@ Patterns here:
   action), then the nodes reload as the new owner (#2325).
 Gotchas:
 - A filter over an annotation column the version doesn't populate (`VariantAnnotationVersion.visible_columns` - T2T has
-  no dbNSFP or conservation scores, #2787) matches nothing rather than everything, so a node skips it and says so in
+  no dbNSFP, COSMIC count or conservation scores, #2787) matches nothing rather than everything. The editor doesn't
+  offer it, except while the node has a value for it (copied from another build), so it can be cleared
+  (`analysis/models/nodes/filters/damage_node.py:DamageNode.shows_filter`); the node skips that value and says so in
   `get_warnings` (`analysis/models/nodes/filters/damage_node.py:DamageNode._filter_column_applied`).
 - Walk ancestors / descendants / roots with `analysis/models/nodes/analysis_node.py:AnalysisDag` (one edge query, pks),
   not recursive `parents()` calls. `parents()` returns base `AnalysisNode` rows, which never `==` a subclass instance -

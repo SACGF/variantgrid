@@ -61,7 +61,7 @@ class _RawScoreSliderMixin:
         return {t.raw_field for t in DamageNode(analysis=self.analysis).get_raw_score_tools()}
 
     def _pred_fields(self) -> set[str]:
-        return {t.pred_field for t in DamageNode(analysis=self.analysis).get_pred_tools()}
+        return {t.pred_field for t in DamageNode(analysis=self.analysis).get_editor_pred_tools()}
 
     def _editor_html(self) -> str:
         node = DamageNode.objects.create(analysis=self.analysis)

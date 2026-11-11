@@ -66,6 +66,13 @@ class ConservationNode(AnalysisNode):
         visible_columns = self.vav.visible_columns
         return {f: allow_null for f, allow_null in fields.items() if f in visible_columns}
 
+    def has_conservation_scores(self) -> bool:
+        return bool(self.get_individual_field_names_allow_null())
+
+    def has_saved_filter(self) -> bool:
+        """ A filter set on the node, whether or not this version can apply it (eg copied from GRCh38 onto T2T) """
+        return self.use_individual_sliders or self.any_scaled_min > 0.0
+
     def _get_individual_scores(self) -> dict[str, tuple[float, bool]]:
         scores = {}
         for f, allow_null in self.get_individual_field_names_allow_null().items():
@@ -92,11 +99,12 @@ class ConservationNode(AnalysisNode):
 
     def get_warnings(self) -> list[str]:
         warnings = super().get_warnings()
-        if not self.get_individual_field_names_allow_null():
+        if self.has_saved_filter() and not self.has_conservation_scores():
             warnings.append(
                 f"Conservation filter is NOT being applied: there are no conservation scores (GERP++, phyloP, "
                 f"phastCons) on {self.vav.genome_build} / VEP {self.vav.vep} / columns_version "
-                f"{self.vav.columns_version}, so every variant passes."
+                f"{self.vav.columns_version}, so every variant passes. Set the slider to 0 and untick "
+                "'Use individual sliders' to clear it."
             )
         if self.modifies_parents() and not self.vav.backfilled_sv_conservation:
             warnings.append(
@@ -108,7 +116,7 @@ class ConservationNode(AnalysisNode):
         return warnings
 
     def modifies_parents(self):
-        if not self.get_individual_field_names_allow_null():
+        if not self.has_conservation_scores():
             return False
         if self.use_individual_sliders:
             for field_name, (score, _allow_null) in self._get_individual_scores().items():
@@ -137,7 +145,7 @@ class ConservationNode(AnalysisNode):
         return reduce(operator.or_, q_list)
 
     def _get_filtering_description(self):
-        if not self.get_individual_field_names_allow_null():
+        if not self.has_conservation_scores():
             return ["No conservation scores on this build"]
         filtering = []
         if self.use_individual_sliders:

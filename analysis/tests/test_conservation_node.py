@@ -1,11 +1,15 @@
 from unittest.mock import patch
 
+from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
+from django.test.client import Client
+from django.urls.base import reverse
 
 from analysis.models.nodes.filters.conservation_node import ConservationNode
 from analysis.tests.utils import AnalysisSetupMixin
 from annotation.fake_data import create_fake_variant_annotation, create_fake_variants
 from annotation.models import VariantAnnotation, VariantAnnotationVersion
+from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.models import Variant
 
 GERP = VariantAnnotation.CONSERVATION_SCORES["gerp_pp_rs"]
@@ -88,3 +92,29 @@ class TestConservationNode(AnalysisSetupMixin, TestCase):
             node = ConservationNode(analysis=self.analysis, any_scaled_min=0.9)
             self.assertFalse(node.modifies_parents())
             self.assertTrue([w for w in node.get_warnings() if "Conservation filter is NOT being applied" in w])
+            self.assertFalse(ConservationNode(analysis=self.analysis).get_warnings())
+
+    def _editor_html(self, **node_kwargs) -> str:
+        user = User.objects.get(username=f"test_{self.__class__.__name__}")
+        assign_permission_to_user_and_groups(user, self.analysis)
+        node = ConservationNode.objects.create(analysis=self.analysis, **node_kwargs)
+        client = Client()
+        client.force_login(user)
+        url = reverse("node_view", kwargs={"analysis_id": self.analysis.pk, "analysis_version": self.analysis.version,
+                                           "node_id": node.pk, "node_version": node.version,
+                                           "extra_filters": "default"})
+        response = client.get(url)
+        self.assertEqual(200, response.status_code)
+        return response.content.decode()
+
+    def test_editor_without_conservation_scores_offers_no_sliders(self):
+        with patch.object(VariantAnnotationVersion, "visible_columns", frozenset()):
+            html = self._editor_html()
+        self.assertIn("has no conservation scores", html)
+        self.assertNotIn('id="any_scaled_min-slider"', html)
+
+    def test_editor_without_conservation_scores_shows_saved_filter_to_clear(self):
+        with patch.object(VariantAnnotationVersion, "visible_columns", frozenset()):
+            html = self._editor_html(any_scaled_min=0.9)
+        self.assertIn('id="any_scaled_min-slider"', html)
+        self.assertNotIn('id="gerp_pp_rs-slider"', html)

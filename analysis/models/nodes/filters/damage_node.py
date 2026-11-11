@@ -331,10 +331,40 @@ class DamageNode(AnalysisNode):
         visible_columns = self.analysis.annotation_version.variant_annotation_version.visible_columns
         return [t for t in TOOLS if t.raw_field in visible_columns]
 
-    def get_pred_tools(self) -> list[PathogenicityTool]:
-        """ Tools offering a categorical prediction dropdown on this annotation version """
+    def shows_filter(self, column: str, value) -> bool:
+        """ Whether the editor draws the widget for a filter over column: where the version populates it, or where
+            the node already has a value for it (eg copied from a GRCh38 analysis onto T2T - #2787), so that value
+            can be seen and cleared. get_warnings says it isn't being applied """
         visible_columns = self.analysis.annotation_version.variant_annotation_version.visible_columns
-        return [t for t in TOOLS if t.pred_field in visible_columns]
+        return column in visible_columns or (value is not None and value is not False and value != "")
+
+    def get_editor_raw_score_tools(self) -> list[PathogenicityTool]:
+        return [t for t in TOOLS if t.raw_field and self.shows_filter(t.raw_field,
+                                                                      getattr(self, t.node_threshold_field))]
+
+    def get_editor_pred_tools(self) -> list[PathogenicityTool]:
+        """ Tools offering a categorical prediction dropdown on this annotation version """
+        return [t for t in TOOLS if t.pred_field and self.shows_filter(t.pred_field, getattr(self, t.pred_field))]
+
+    def get_editor_rankscore_tools(self) -> list[PathogenicityTool]:
+        """ Rankscore sliders (columns v2 on) - those the version populates, plus any the node has a value for """
+        if self.columns_version < 2 or not self.show_rankscore_sliders():
+            return []
+        visible_rankscores = set(self._rankscore_fields()) & self.analysis.annotation_version.variant_annotation_version.visible_columns
+        return [t for t in TOOLS if t.rankscore_field
+                and (t.rankscore_field in visible_rankscores or getattr(self, f"{t.rankscore_field}_min") is not None)]
+
+    def shows_damage_predictions(self) -> bool:
+        return self._has_prediction_data() or self.damage_predictions_min is not None
+
+    def shows_cosmic_count(self) -> bool:
+        return self.shows_filter("cosmic_count", self.cosmic_count_min)
+
+    def shows_aloft(self) -> bool:
+        return self.shows_filter("aloft_pred", self.aloft)
+
+    def shows_nmd_escaping_variant(self) -> bool:
+        return self.shows_filter("nmd_escaping_variant", self.nmd_escaping_variant)
 
     def _column_filters(self) -> list[_ColumnFilter]:
         """ The per-column filters this analysis's annotation version offers - gated off visible_columns
@@ -352,14 +382,21 @@ class DamageNode(AnalysisNode):
         return column_filters
 
     def has_alphagenome_splicing(self) -> bool:
-        return "alphagenome_splicing" in self.analysis.annotation_version.variant_annotation_version.visible_columns
+        return self.shows_filter("alphagenome_splicing", self.alphagenome_splicing_min)
 
     def has_splicevault(self) -> bool:
-        return ("splicevault_out_of_frame_events"
-                in self.analysis.annotation_version.variant_annotation_version.visible_columns)
+        return self.shows_filter("splicevault_out_of_frame_events", self.splicevault_out_of_frame)
 
     def has_utr_annotator(self) -> bool:
-        return "utr_annotator_annotation" in self.analysis.annotation_version.variant_annotation_version.visible_columns
+        return self.shows_filter("utr_annotator_annotation", self.utr_high_impact)
+
+    def _has_splice_scores(self) -> bool:
+        """ SpliceAI or dbscSNV - without either (T2T, #2787) the splicing threshold has nothing to compare, and
+            the filter only keeps splice-region indels """
+        visible_columns = self.analysis.annotation_version.variant_annotation_version.visible_columns
+        splice_score_columns = {"dbscsnv_ada_score", "dbscsnv_rf_score",
+                                *(ds for ds, _ in VariantAnnotation.SPLICEAI_DS_DP.values())}
+        return bool(splice_score_columns & visible_columns)
 
     @cached_property
     def has_gene_constraint(self) -> bool:
@@ -409,11 +446,11 @@ class DamageNode(AnalysisNode):
         return self.exclude_sv_artefact_regions and self._applies_annotsv()
 
     def _filter_column_applied(self, column: str) -> bool:
-        """ False where the column is licence-restricted data the version withholds (the editor hides its slider, so a
-            saved threshold can't be seen or changed - #2571), one the version doesn't populate at all (T2T has no
-            dbNSFP scores - #2787) or one the version is still waiting on a backfill for. The filter is skipped (and
-            get_warnings says so) rather than filtering on data the user can't see, or treating a null nobody could
-            have filled in as "not damaging" """
+        """ False where the column is licence-restricted data the version withholds (#2571), one the version doesn't
+            populate at all (T2T has no dbNSFP scores - #2787) or one the version is still waiting on a backfill for.
+            The editor only offers such a filter while the node has a value for it (shows_filter), so it can be
+            cleared. The filter is skipped (and get_warnings says so) rather than filtering on data the user can't
+            see, or treating a null nobody could have filled in as "not damaging" """
         vav = self.analysis.annotation_version.variant_annotation_version
         if column in vav.withheld_licence_restricted_columns or column not in vav.visible_columns:
             return False
@@ -504,8 +541,16 @@ class DamageNode(AnalysisNode):
             set_filters.extend((f"{tool.name} rankscore", tool.rankscore_field) for tool in TOOLS
                                if tool.rankscore_field in self._rankscore_fields()
                                and getattr(self, f"{tool.rankscore_field}_min") is not None)
+        set_filters.extend((f"{tool.name} prediction", tool.pred_field) for tool in TOOLS
+                           if tool.pred_field and getattr(self, tool.pred_field))
         if self.alphagenome_splicing_min is not None:
             set_filters.append(("AlphaGenome splicing", "alphagenome_splicing"))
+        if self.cosmic_count_min is not None:
+            set_filters.append(("COSMIC count", "cosmic_count"))
+        if self.aloft and self.columns_version >= 2:
+            set_filters.append(("ALoFT", "aloft_pred"))
+        if self.nmd_escaping_variant and self.columns_version >= 2:
+            set_filters.append(("NMD escaping variant", "nmd_escaping_variant"))
         if self.splicevault_out_of_frame:
             set_filters.append(("SpliceVault out of frame", "splicevault_out_of_frame_events"))
         if self.utr_high_impact:
@@ -549,6 +594,12 @@ class DamageNode(AnalysisNode):
                 f"{self.analysis.genome_build}."
             )
 
+        if self.splice_min is not None and not self._has_splice_scores():
+            warnings.append(
+                f"Splicing threshold is NOT being applied: there are no SpliceAI or dbscSNV scores on "
+                f"{vav.genome_build} / VEP {vav.vep} / columns_version {vav.columns_version}, so the splicing "
+                "filter only keeps indels in splice regions."
+            )
         if self.splice_min is not None and vav.uses_raw_spliceai:
             warnings.append(
                 "SpliceAI scores on this VariantAnnotationVersion are from the raw precomputed file "
@@ -570,6 +621,21 @@ class DamageNode(AnalysisNode):
                 return Q(**{f"{field}__gte": abs(threshold)}) | Q(**{f"{field}__lte": -abs(threshold)})
             case _:
                 return Q(**{f"{field}__gte": threshold})
+
+    def _splice_score_q_list(self, vav) -> list[Q]:
+        allow_null = self.splice_required and self.splice_allow_null
+        # SpliceAI: use the optimised spliceai_max_ds column when the VAV has been backfilled, otherwise fall
+        # back to the per-DS-field loop (pre-c6f3c4e6f). See VariantAnnotationVersion.backfilled_spliceai_max_ds.
+        if vav.backfilled_spliceai_max_ds:
+            spliceai_fields = ["spliceai_max_ds"]
+        else:
+            spliceai_fields = [ds for ds, _ in VariantAnnotation.SPLICEAI_DS_DP.values()]
+        q_list = []
+        for field in ["dbscsnv_ada_score", "dbscsnv_rf_score", *spliceai_fields]:
+            q_list.append(Q(**{f"variantannotation__{field}__gte": self.splice_min}))
+            if allow_null:
+                q_list.append(Q(**{f"variantannotation__{field}__isnull": True}))
+        return q_list
 
     def _get_node_q_hash(self) -> str:
         return str(self._get_node_q())
@@ -594,29 +660,10 @@ class DamageNode(AnalysisNode):
             # [consequence contains 'splice' OR not null splice region] AND [variant class not SNV]
             q_splice_indels = Q(variantannotation__consequence__contains='splice') | Q(variantannotation__splice_region__isnull=False)
             q_splice_indels &= Q(variantannotation__variant_class__ne="SN")
-            splicing_q_list.extend([
-                q_splice_indels,
-                Q(variantannotation__dbscsnv_ada_score__gte=self.splice_min),
-                Q(variantannotation__dbscsnv_rf_score__gte=self.splice_min),
-            ])
-            if self.splice_required and self.splice_allow_null:
-                splicing_q_list.extend([
-                    Q(variantannotation__dbscsnv_ada_score__isnull=True),
-                    Q(variantannotation__dbscsnv_rf_score__isnull=True),
-                ])
-
-            # SpliceAI: use the optimised spliceai_max_ds column when the VAV has
-            # been backfilled, otherwise fall back to the per-DS-field loop
-            # (pre-c6f3c4e6f). See VariantAnnotationVersion.backfilled_spliceai_max_ds.
-            if vav.backfilled_spliceai_max_ds:
-                splicing_q_list.append(Q(variantannotation__spliceai_max_ds__gte=self.splice_min))
-                if self.splice_required and self.splice_allow_null:
-                    splicing_q_list.append(Q(variantannotation__spliceai_max_ds__isnull=True))
-            else:
-                for _, (ds, _) in VariantAnnotation.SPLICEAI_DS_DP.items():
-                    splicing_q_list.append(Q(**{f"variantannotation__{ds}__gte": self.splice_min}))
-                    if self.splice_required and self.splice_allow_null:
-                        splicing_q_list.append(Q(**{f"variantannotation__{ds}__isnull": True}))
+            splicing_q_list.append(q_splice_indels)
+            # Without scores (T2T) allow null would let every variant through a required splicing filter
+            if self._has_splice_scores():
+                splicing_q_list.extend(self._splice_score_q_list(vav))
 
         if self.alphagenome_splicing_min is not None and self._filter_column_applied("alphagenome_splicing"):
             splicing_q_list.append(Q(variantannotation__alphagenome_splicing__gte=self.alphagenome_splicing_min))
@@ -684,7 +731,7 @@ class DamageNode(AnalysisNode):
                 # Categorical pred-field filters
                 for pred_field in TOOLS_BY_PRED_FIELD:
                     pred_value = getattr(self, pred_field)
-                    if pred_value:
+                    if pred_value and self._filter_column_applied(pred_field):
                         q_pred = Q(**{f"variantannotation__{pred_field}": pred_value})
                         if getattr(self, f"{pred_field}_required"):
                             if getattr(self, f"{pred_field}_allow_null"):
@@ -693,7 +740,7 @@ class DamageNode(AnalysisNode):
                         else:
                             or_filters.append(q_pred)
 
-            if self.nmd_escaping_variant:
+            if self.nmd_escaping_variant and self._filter_column_applied("nmd_escaping_variant"):
                 q_nmd = Q(variantannotation__nmd_escaping_variant=self.nmd_escaping_variant)
                 if self.nmd_escaping_variant_required:
                     and_filters.append(q_nmd)
@@ -714,7 +761,7 @@ class DamageNode(AnalysisNode):
                     else:
                         or_filters.append(q_ptc)
 
-            if self.aloft:
+            if self.aloft and self._filter_column_applied("aloft_pred"):
                 q_aloft = Q(variantannotation__aloft_high_confidence=True)
                 ALOFT_OPTIONS = {
                     ALoFTPredictionOptions.DAMAGING: [ALoFTPrediction.RECESSIVE, ALoFTPrediction.DOMINANT],
@@ -787,7 +834,7 @@ class DamageNode(AnalysisNode):
             and_filters.append(Q(**{f"variantannotation__{column}__isnull": True
                                     for column in ANNOTSV_ARTEFACT_REGION_COLUMNS}))
 
-        if self.cosmic_count_min is not None:
+        if self.cosmic_count_min is not None and self._filter_column_applied("cosmic_count"):
             q_cosmic_count = Q(variantannotation__cosmic_count__gte=self.cosmic_count_min)
             if self.cosmic_count_required:
                 and_filters.append(q_cosmic_count)

@@ -2,6 +2,8 @@ from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
+from django.test.client import Client
+from django.urls.base import reverse
 
 from analysis.models import Analysis
 from analysis.models.nodes.filters.damage_node import DamageNode
@@ -12,6 +14,7 @@ from annotation.fake_data import (
 )
 from annotation.models import VariantAnnotationVersion
 from annotation.pathogenicity_predictions import TOOLS, PathogenicityTool, RawScoreDirection
+from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.models.models_genome import GenomeBuild
 
 RAW_SCORE_TOOLS = [tool for tool in TOOLS if tool.raw_field]
@@ -148,3 +151,39 @@ class TestDamageNodeVersionWithoutPredictors(_ColumnsVersionMixin, TestCase):
             self.assertEqual(set(self.ROWS), self._filtered(node, set(self.ROWS)))
             self.assertEqual(2, len([w for w in node.get_warnings() if "NOT being applied" in w]))
             self.assertFalse(DamageNode(analysis=self.analysis).show_rankscore_sliders())
+
+    def test_required_splicing_without_splice_scores_does_not_pass_everything(self):
+        """ With no SpliceAI / dbscSNV, allow null would admit every variant - the splicing filter keeps only
+            splice-region indels instead (neither row is one) """
+        with patch.object(VariantAnnotationVersion, "visible_columns", frozenset()):
+            node = DamageNode(analysis=self.analysis, splice_min=0.5, splice_required=True, splice_allow_null=True)
+            self.assertEqual(set(), self._filtered(node, set(self.ROWS)))
+            self.assertTrue([w for w in node.get_warnings() if "Splicing threshold is NOT being applied" in w])
+
+    def _editor_html(self, **node_kwargs) -> str:
+        user = User.objects.get(username=f"test_{self.__class__.__name__}")
+        assign_permission_to_user_and_groups(user, self.analysis)
+        node = DamageNode.objects.create(analysis=self.analysis, **node_kwargs)
+        client = Client()
+        client.force_login(user)
+        url = reverse("node_view", kwargs={"analysis_id": self.analysis.pk, "analysis_version": self.analysis.version,
+                                           "node_id": node.pk, "node_version": node.version,
+                                           "extra_filters": "default"})
+        response = client.get(url)
+        self.assertEqual(200, response.status_code)
+        return response.content.decode()
+
+    def test_editor_hides_filters_without_data(self):
+        with patch.object(VariantAnnotationVersion, "visible_columns", frozenset({"nmd_escaping_variant"})):
+            html = self._editor_html()
+        for element_id in ["damage-predictions-slider", "cosmic-count-slider", "revel_rankscore-slider",
+                           "id_aloft", "show-individual-pathogenic-prediction"]:
+            self.assertNotIn(f'id="{element_id}"', html)
+        self.assertIn('id="id_nmd_escaping_variant"', html)
+
+    def test_editor_shows_saved_filter_without_data_so_it_can_be_cleared(self):
+        with patch.object(VariantAnnotationVersion, "visible_columns", frozenset()):
+            html = self._editor_html(revel_rankscore_min=0.5, cosmic_count_min=3)
+        self.assertIn('id="revel_rankscore-slider"', html)
+        self.assertIn('id="cosmic-count-slider"', html)
+        self.assertNotIn('id="vest4_rankscore-slider"', html)
