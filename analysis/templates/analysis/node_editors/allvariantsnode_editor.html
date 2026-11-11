@@ -17,6 +17,10 @@
         {{ form.contigs.errors }}{{ form.contigs }}
     </div>
     <div class="editor-row">
+        <label class="editor-label" for="{{ form.cytobands.id_for_label }}">Cytoband</label>
+        {{ form.cytobands.errors }}{{ form.cytobands }}
+    </div>
+    <div class="editor-row">
         <label class="editor-label" for="{{ form.gene_symbol.id_for_label }}">Gene</label>
         {{ form.gene_symbol.errors }}{{ form.gene_symbol }}
     </div>

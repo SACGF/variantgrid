@@ -41,6 +41,7 @@ NODE_GRID_RETRY_AFTER_SECS = 2
 # known set - node_grid_export builds its params from this list too, and the export path reads them
 # off the request.
 _NODE_GRID_ALLOWED_PARAMS = {
+    'cache_version',
     'ccc_id',
     'ccc_version_id',
     'extra_filters',

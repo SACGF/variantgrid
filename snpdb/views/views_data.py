@@ -654,7 +654,8 @@ def sample_variants_tab(request, sample_id):
     context = {
         'sample': sample,
         "analysis": analysis,
-        'output_node_form': AnalysisOutputNodeChoiceForm(analysis=analysis)
+        'output_node_form': AnalysisOutputNodeChoiceForm(analysis=analysis),
+        "cache_version": settings.CACHE_VERSION,
     }
     return render(request, 'snpdb/data/sample_variants_tab.html', context)
 

@@ -82,6 +82,7 @@ class AllVariantsNodeView(NodeView):
         if self.object.version == 0:
             form_initial["min_het_or_hom_count"] = 1
         form_initial["contigs"] = self.object.allvariantsnodecontig_set.all().values_list("contig", flat=True)
+        form_initial["cytobands"] = self.object.allvariantsnodecytoband_set.all().values_list("cytoband", flat=True)
         return form_initial
 
     def get_form_kwargs(self):

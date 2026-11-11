@@ -7,16 +7,34 @@ from collections.abc import Callable, Collection
 from typing import Any, Optional
 
 
-def longest_common_substring(strings: Collection[str]) -> str:
-    """ The longest run of characters every string contains - the first found, if several tie """
+def longest_common_substring(strings: Collection[str], separators: str = "") -> str:
+    """ The longest run of characters every string contains - the first found, if several tie.
+        With separators, the run must be whole words: in every string it starts and ends at one of
+        the separators or the string's edge, so "SMP5008"/"SMP5009" share nothing rather than "SMP500" """
     if not strings:
         return ""
     shortest = min(strings, key=len)
-    for length in range(len(shortest), 0, -1):
-        for start in range(len(shortest) - length + 1):
-            candidate = shortest[start:start + length]
-            if all(candidate in s for s in strings):
-                return candidate
+    if separators:
+        sep = re.escape(separators)
+        word_edges = {0, len(shortest)} | {m.start() for m in re.finditer(f"[{sep}]", shortest)} \
+            | {m.end() for m in re.finditer(f"[{sep}]", shortest)}
+        starts = ends = sorted(word_edges)
+
+        def contains(s: str, candidate: str) -> bool:
+            return re.search(f"(?:^|(?<=[{sep}])){re.escape(candidate)}(?:$|(?=[{sep}]))", s) is not None
+    else:
+        starts = range(len(shortest) + 1)
+        ends = starts
+
+        def contains(s: str, candidate: str) -> bool:
+            return candidate in s
+
+    candidates = sorted(((start, end) for start in starts for end in ends if end > start),
+                        key=lambda se: (se[0] - se[1], se[0]))
+    for start, end in candidates:
+        candidate = shortest[start:end]
+        if all(contains(s, candidate) for s in strings):
+            return candidate
     return ""
 
 

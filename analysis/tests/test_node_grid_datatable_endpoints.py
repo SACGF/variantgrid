@@ -9,6 +9,7 @@ import json
 from unittest.mock import patch
 from urllib.parse import parse_qsl, urlencode
 
+from django.test import override_settings
 from django.test.client import Client
 from django.urls.base import reverse
 
@@ -133,6 +134,7 @@ class NodeGridCacheKeyTest(NodeGridEndpointTestCase):
 
     # What DataTableDefinition.buildAjaxData emits for this grid, key sorted (@see cacheStableParams)
     CLIENT_PARAMS = [
+        ("cache_version", "57"),
         ("ccc_id", "1"),
         ("ccc_version_id", "2"),
         ("extra_filters", ""),
@@ -164,3 +166,18 @@ class NodeGridCacheKeyTest(NodeGridEndpointTestCase):
         url = _add_allowed_node_grid_params("/node_grid/handler/",
                                             dict(self.CLIENT_PARAMS + [("draw", "7")]))
         self.assertNotIn("draw", dict(parse_qsl(url.split("?")[1])))
+
+
+class ClientCacheVersionTest(NodeGridEndpointTestCase):
+    """ The node pages and grid are cached in the browser for a week, so bumping CACHE_VERSION has to
+        change the URLs the client asks for, not just flush the server cache (#382) """
+
+    @override_settings(CACHE_VERSION=999)
+    def test_cache_version_reaches_the_node_page_and_row_requests(self):
+        url = reverse("node_load", kwargs={"analysis_id": self.analysis.pk, "node_id": self.node.pk})
+        response = self.client.get(url)
+        self.assertEqual(302, response.status_code)
+        self.assertEqual("999", dict(parse_qsl(response.url.split("?", 1)[1]))["cache_version"])
+
+        post_data = self._config()["postData"]
+        self.assertEqual(999, post_data["cache_version"])

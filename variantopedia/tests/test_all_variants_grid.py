@@ -214,11 +214,13 @@ class AllVariantsGridFilterTest(TestCase):
         self.assertEqual(set(), variant_ids)
 
     def test_gene_level_types_select_their_own_kind(self):
-        for variant_type, variant in [(VariantType.FUSION, self.fusion_variant),
-                                      (VariantType.COPY_NUMBER, self.copy_number_variant),
-                                      (VariantType.SPLICE, self.splice_variant)]:
+        gene_level_variants = [self.fusion_variant, self.copy_number_variant, self.splice_variant]
+        for variant in gene_level_variants:
+            self._create_variant_gene_overlap(variant, self.gene)
+        for variant_type, variant in zip([VariantType.FUSION, VariantType.COPY_NUMBER, VariantType.SPLICE],
+                                         gene_level_variants):
             with self.subTest(variant_type=variant_type):
-                variant_ids = self._grid_variant_ids({"contig_ids": [self.contig.pk],
+                variant_ids = self._grid_variant_ids({"contig_ids": [self.gene_contig.pk],
                                                       "variant_types": [variant_type]})
                 self.assertEqual({variant.pk}, variant_ids)
 
@@ -228,22 +230,32 @@ class AllVariantsGridFilterTest(TestCase):
                                               "variant_types": [VariantType.SYMBOLIC]})
         self.assertEqual({self.deletion_variant.pk}, variant_ids)
 
-    def test_fusion_contig_passes_the_chromosome_filter(self):
-        """ The gene-level contig is not a chromosome anyone can tick, so ticking Fusion is what
-            lets it through - without that the contig filter hides every fusion """
-        variant_ids = self._grid_variant_ids({"contig_ids": [self.contig.pk],
-                                              "variant_types": [VariantType.FUSION, VariantType.SNV]})
-        self.assertIn(self.fusion_variant.pk, variant_ids)
-        self.assertIn(self.variant.pk, variant_ids)
+    def test_fusion_is_on_the_chromosome_of_its_gene(self):
+        """ #2769 - a fusion has no coordinate, so it passes the chromosome filter of one of its genes """
+        self._create_variant_gene_overlap(self.fusion_variant, self.gene)
+        filter_types = [VariantType.FUSION, VariantType.SNV]
+        for contig, expected in [(self.gene_contig, True), (self.contig, False)]:
+            with self.subTest(contig=contig.name):
+                variant_ids = self._grid_variant_ids({"contig_ids": [contig.pk], "variant_types": filter_types})
+                self.assertEqual(expected, self.fusion_variant.pk in variant_ids)
 
     def test_fusion_hidden_when_its_type_is_not_selected(self):
         variant_ids = self._grid_variant_ids({"contig_ids": [self.contig.pk],
                                               "variant_types": [VariantType.SNV]})
         self.assertNotIn(self.fusion_variant.pk, variant_ids)
 
+    def test_fusion_is_in_a_range_its_gene_overlaps(self):
+        self._create_variant_gene_overlap(self.fusion_variant, self.gene)
+        gene_start = self.gene_variant.locus.position
+        for position_range, expected in [((gene_start, gene_start + 10), True), ((1, 1000), False)]:
+            with self.subTest(position_range=position_range):
+                variant_ids = self._grid_variant_ids({"contig_ids": [self.gene_contig.pk],
+                                                      "variant_types": [VariantType.FUSION],
+                                                      "position_range": position_range})
+                self.assertEqual(expected, self.fusion_variant.pk in variant_ids)
+
     def test_position_range_filter(self):
-        """ A band is a position range on the contig - gene-level variants' positions are gene IDs, so
-            they're never in one, even with their type selected """
+        """ A band is a position range on the contig - a fusion with no gene in it isn't in it """
         position = self.variant.locus.position
         for position_range, expected in [((position - 10, position), True), ((position + 1, position + 10), False)]:
             with self.subTest(position_range=position_range):

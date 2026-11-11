@@ -21,6 +21,7 @@
         nodeProbandPatientId: {{ node_proband_patient_id|jsonify }},
         alignmentsDict: {{ alignments_dict|jsonify }},
         gridAutoLoad: {{ grid_auto_load|yesno:"true,false" }},
+        cacheVersion: {{ cache_version }},
     });
 </script>
 <div id="{{ node_id }}_{{ node_version }}">

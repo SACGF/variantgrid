@@ -1,10 +1,13 @@
-""" Q object builders for the standard "which variants?" filters - contigs, gene symbols and variant types.
+""" Q object builders for the standard "which variants?" filters - regions (contigs, bands, ranges), gene symbols
+    and variant types.
 
     Shared by the All Variants page grid (variantopedia.grids.AllVariantsGrid) and the analysis pipeline's
-    AllVariantsNode, so both compose the same queries.
+    AllVariantsNode and IntersectionNode, so they compose the same queries. get_regions_q is the one place a
+    region matches gene-level variants (by their genes).
 """
 import operator
 from collections.abc import Iterable
+from dataclasses import dataclass
 from functools import reduce
 from typing import Any, Optional
 
@@ -13,10 +16,10 @@ from django.contrib.auth.models import User
 from django.db.models import Max, Min, Q
 
 from annotation.models import AnnotationVersion, VariantGeneOverlap, VariantTranscriptAnnotation
-from genes.models import Gene, GeneSymbol
+from genes.models import Gene, GeneSymbol, TranscriptVersion
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt
 from snpdb.enums import SequenceRole
-from snpdb.models.models_genome import Contig, GenomeBuild
+from snpdb.models.models_genome import Contig, Cytoband, GenomeBuild
 from snpdb.models.models_user_settings import AllVariantsFilter
 from snpdb.models.models_variant import Sequence, Variant, get_base_and_reference_sequence_ids
 
@@ -221,27 +224,76 @@ def get_non_standard_contig_ids(genome_build: GenomeBuild) -> list[int]:
     return list(qs.values_list("pk", flat=True))
 
 
-def get_contig_ids_for_variant_types(genome_build: GenomeBuild, contig_ids: Iterable[int],
-                                     variant_types: Optional[Iterable[str]]) -> list[int]:
-    """ The gene-level contig is not a chromosome anyone can tick, so a gene-level type is what lets
-        it through - without it a contig selection hides every fusion whatever else is on. No types
-        selected is no restriction, as in get_variant_types_q, so that lets it through too (#2713) """
-    contig_id_list = list(contig_ids)
-    if contig_id_list and (not variant_types or set(variant_types) & set(GENE_LEVEL_VARIANT_TYPES)):
-        contig_id_list.extend(get_gene_level_contig_ids(genome_build))
-    return contig_id_list
+def includes_gene_level_types(variant_types: Optional[Iterable[str]]) -> bool:
+    """ No types selected is no restriction, as in get_variant_types_q (#2713) """
+    return not variant_types or bool(set(variant_types) & set(GENE_LEVEL_VARIANT_TYPES))
 
 
-def get_contigs_q(genome_build: GenomeBuild, contig_ids: Optional[Iterable[int]] = None,
-                  non_standard_contigs: bool = False) -> Q:
-    """ Restrict to the build's contigs, narrowed to a contig selection when there is one """
-    contig_id_list = list(contig_ids or [])
-    if non_standard_contigs:
-        contig_id_list.extend(get_non_standard_contig_ids(genome_build))
-    if contig_id_list:
-        # A gene's contigs can arrive twice (its own and the gene-level one) - keep the IN list unique
-        return Q(locus__contig_id__in=sorted(set(contig_id_list)))
-    return Variant.get_contigs_q(genome_build)
+@dataclass(frozen=True)
+class ContigRegion:
+    """ A whole contig, or start-end on it (1-based inclusive, as Locus and Cytoband) """
+    contig_id: int
+    start: Optional[int] = None
+    end: Optional[int] = None
+
+    @staticmethod
+    def from_cytoband(cytoband: Cytoband) -> 'ContigRegion':
+        return ContigRegion(cytoband.contig_id, cytoband.start, cytoband.end)
+
+    @property
+    def is_whole_contig(self) -> bool:
+        return self.start is None
+
+    def get_q(self) -> Q:
+        q = Q(locus__contig_id=self.contig_id)
+        if not self.is_whole_contig:
+            q &= Q(locus__position__gte=self.start, locus__position__lte=self.end)
+        return q
+
+
+def get_gene_level_variant_ids_in_regions(annotation_version: AnnotationVersion,
+                                          regions: Iterable[ContigRegion]) -> list[int]:
+    """ Gene-level variants with one of their genes (either partner of a fusion) in a region. Their position is a
+        gene ID, so they are placed by their VariantGeneOverlap rows and the genes' transcripts (#2769).
+        Gene-level variants are few, so this starts from their genes - starting from a chromosome's genes
+        scans millions of overlaps. One not yet annotated has no overlap rows, so matches no region """
+    genome_build = annotation_version.genome_build
+    overlaps = list(VariantGeneOverlap.objects.filter(
+        version=annotation_version.variant_annotation_version,
+        variant__locus__contig_id__in=get_gene_level_contig_ids(genome_build),
+    ).values_list("variant_id", "gene_id"))
+    if not overlaps:
+        return []
+    gene_ids = {gene_id for _, gene_id in overlaps}
+    q_list = []
+    for region in regions:
+        qs = TranscriptVersion.objects.filter(genome_build=genome_build, contig_id=region.contig_id,
+                                              gene_version__gene_id__in=gene_ids)
+        if not region.is_whole_contig:
+            qs = TranscriptVersion.filter_overlapping(qs, genome_build, region.start, region.end)
+        q_list.append(Q(pk__in=qs.values("pk")))
+    if not q_list:
+        return []
+    transcript_versions = TranscriptVersion.objects.filter(reduce(operator.or_, q_list))
+    genes_in_regions = set(transcript_versions.values_list("gene_version__gene_id", flat=True))
+    return sorted({variant_id for variant_id, gene_id in overlaps if gene_id in genes_in_regions})
+
+
+def get_regions_q(annotation_version: AnnotationVersion, regions: Iterable[ContigRegion],
+                  variant_types: Optional[Iterable[str]] = None) -> Optional[Q]:
+    """ Variants in any of the regions, or None for no regions. A gene-level variant (fusion etc - @see
+        snpdb.gene_level_variants) is in a region when one of its genes is """
+    regions = list(regions)
+    if not regions:
+        return None
+    whole_contig_ids = sorted({region.contig_id for region in regions if region.is_whole_contig})
+    q_list = [region.get_q() for region in regions if not region.is_whole_contig]
+    if whole_contig_ids:
+        q_list.append(Q(locus__contig_id__in=whole_contig_ids))
+    if includes_gene_level_types(variant_types):
+        if gene_level_variant_ids := get_gene_level_variant_ids_in_regions(annotation_version, regions):
+            q_list.append(Q(pk__in=gene_level_variant_ids))
+    return reduce(operator.or_, q_list)
 
 
 def resolve_gene_symbols(gene_symbols: Optional[Iterable[Any]]) -> list[GeneSymbol]:
@@ -324,23 +376,25 @@ def get_variant_filter_q(genome_build: GenomeBuild, annotation_version: Annotati
                          variant_types: Optional[Iterable[str]] = None,
                          position_range: Optional[tuple[int, int]] = None) -> Q:
     """ The standard variant filters composed into a single Q. position_range (1-based inclusive, eg a
-        cytoband) narrows the contigs to that stretch - gene-level variants' positions are gene IDs, so
-        a range leaves out the gene-level contig """
-    contig_id_list = list(contig_ids or [])
+        cytoband) narrows the contigs to that stretch """
     variant_type_list = list(variant_types) if variant_types is not None else None
-    if gene_symbols:
-        # A gene selection is a contig restriction of its own - the genes' contigs (so a gene on a
-        # chromosome the user hasn't ticked still shows) plus the gene-level contig its fusions are on.
-        # Without it a gene with no chromosome chosen scans the whole build instead of the gene bounds.
-        contig_id_list.extend(get_contig_ids_for_gene_symbols(genome_build, gene_symbols))
-        contig_id_list.extend(get_gene_level_contig_ids(genome_build))
-    if (contig_id_list or non_standard_contigs) and not position_range:
-        contig_id_list = get_contig_ids_for_variant_types(genome_build, contig_id_list, variant_type_list)
-
-    filter_list = [get_contigs_q(genome_build, contig_ids=contig_id_list,
-                                 non_standard_contigs=non_standard_contigs)]
     if position_range:
-        filter_list.append(Q(locus__position__range=tuple(position_range)))
+        start, end = position_range
+        regions = [ContigRegion(contig_id, start, end) for contig_id in contig_ids or []]
+    else:
+        regions = [ContigRegion(contig_id) for contig_id in contig_ids or []]
+        if non_standard_contigs:
+            regions.extend(ContigRegion(contig_id) for contig_id in get_non_standard_contig_ids(genome_build))
+        if gene_symbols:
+            # A gene selection is a contig restriction of its own - the genes' contigs (so a gene on a
+            # chromosome the user hasn't ticked still shows) plus the gene-level contig its fusions are on.
+            # Without it a gene with no chromosome chosen scans the whole build instead of the gene bounds.
+            gene_contig_ids = get_contig_ids_for_gene_symbols(genome_build, gene_symbols)
+            gene_contig_ids.extend(get_gene_level_contig_ids(genome_build))
+            regions.extend(ContigRegion(contig_id) for contig_id in gene_contig_ids)
+
+    q_regions = get_regions_q(annotation_version, regions, variant_type_list)
+    filter_list = [q_regions if q_regions is not None else Variant.get_contigs_q(genome_build)]
     if (q_genes := get_gene_symbols_q(annotation_version, gene_symbols)) is not None:
         filter_list.append(q_genes)
     if (q_types := get_variant_types_q(variant_type_list)) is not None:

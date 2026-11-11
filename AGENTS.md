@@ -265,6 +265,16 @@ Wait for a background job on its PID (`while kill -0 <pid>; do sleep 5; done`), 
 exits and `pkill` kills the shell running it (the hook refuses `pkill -f`). Before saying nothing is running, check
 every background shell and monitor the session started, not a guessed `pgrep`.
 
+### Worktrees
+Several sessions share a box's checkout, and on a shared box gunicorn and celery run from it, so never check out,
+switch or create a branch there - the other sessions' edits and commits land on whatever branch you left. Branch
+work goes in its own worktree from the checkout's root: `git worktree add ../variantgrid_wt_<issue> -b <issue>_<slug>
+origin/master`; a commit straight to master goes in one too when the checkout isn't on master. The worktree shares the
+virtualenv but not gitignored files: copy the box's settings module if it lives in `env_developers/`, run
+`manage.py collectstatic_js_reverse` before the first test run, give tests their own database
+(`claude/guides/testing.md`), and `collectstatic` there before a `vg page` or `runserver` (`STATIC_ROOT` is per
+checkout). `git worktree remove` it when the PR is up.
+
 ### Context handoff
 When asked for text to paste into a fresh session ("I'm going to clear context"), use the `/handoff` skill
 (`.claude/skills/handoff/SKILL.md`): everything durable goes into the repo, the issue or the PR first, then half a
@@ -285,6 +295,9 @@ The detail is `claude/guides/github.md`; these are the rules it rests on.
 - Issues go in the public `SACGF/variantgrid` with nothing identifying (no patient, lab or variant details, hostnames
   or config values); a security problem or one that needs those details goes in `SACGF/variantgrid_private`, which
   is issues only - never branch or push there. Suggest an issue in chat; create one only when told to.
+- Names from a deployment's data are identifying too - sample, patient, VCF, cohort and family names, case IDs - in
+  any public issue, PR or comment, agent-test results included: illustrate with invented names of the same shape
+  (`FAM123_P`, `SMP5008`…`SMP5010`). Fake data you created yourself (`agent_test_…`) is fine.
 - Private repos (`variantgrid_private`, `variantgrid_sapath`, the Shariant repos) carry patient and lab details: read
   only the issue I hand you, search one only when I ask you to, never `gh search --owner SACGF`.
 - Plans: `claude/plans/AGENTS.md`.

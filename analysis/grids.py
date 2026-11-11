@@ -142,6 +142,7 @@ class VariantGrid(AbstractVariantGrid):
         post_data['ccc_id'] = custom_columns_collection.pk
         post_data['ccc_version_id'] = custom_columns_collection.version_id
         post_data["extra_filters"] = self.extra_filters
+        post_data["cache_version"] = settings.CACHE_VERSION  # browser-cached for a week (#382)
 
         sample_ids = self.node.get_sample_ids_with_genotype()
         if sample_ids:

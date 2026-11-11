@@ -17,6 +17,8 @@ from analysis.models import (
 )
 from analysis.models.nodes.node_utils import reload_analysis_nodes
 from analysis.serializers import AnalysisNodeSerializer, AnalysisSerializer
+from eventlog.models import create_event
+from library.enums.log_level import LogLevel
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.enums import ZygosityRequirement
 
@@ -41,6 +43,14 @@ NON_PORTABLE_NODE_FIELDS = [
     "trio",
     "variant_collection",
 ]
+
+# Node config keyed by the exporting server's own cohorts, samples and VCFs - the node arrives without those,
+# so the rows are left out, and named in the export so the import can say what it didn't bring
+NON_PORTABLE_NODE_CONFIG = {
+    "cohortnodezygosityfilterscollection_set": "cohort zygosity filters",
+    "nodevcffilter_set": "VCF filters",
+    "samplenodesamplefilter_set": "per sample filters",
+}
 
 # Node PKs within the analysis being exported - remapped onto the new nodes after they're created
 INTERNAL_NODE_REFERENCE_FIELDS = ["left_parent", "right_parent"]
@@ -85,7 +95,11 @@ def analysis_export_to_dict(analysis: Analysis) -> dict:
         model_name = node._meta.label
         serializer = node_serializers.get(model_name, AnalysisNodeSerializer)
         fields = dict(serializer(node, exclude=NODE_EXCLUDE + NON_PORTABLE_NODE_FIELDS).data)
-        nodes.append({"model": model_name, "pk": node.pk, "fields": dict(fields)})
+        node_record = {"model": model_name, "pk": node.pk, "fields": dict(fields)}
+        if not_exported := [description for accessor, description in NON_PORTABLE_NODE_CONFIG.items()
+                            if hasattr(node, accessor) and getattr(node, accessor).exists()]:
+            node_record["not_exported"] = not_exported
+        nodes.append(node_record)
 
     analysis_data["nodes"] = nodes
     analysis_data["edges"] = json.loads(serialize('json', AnalysisEdge.objects.filter(child__analysis=analysis)))
@@ -110,14 +124,19 @@ def analysis_import(user: User, genome_build: Optional[GenomeBuild], filename,
         if Analysis.objects.filter(name=name, template_type=AnalysisTemplateType.TEMPLATE).exists():
             return None
 
-    analysis = _create_analysis(user, genome_build, annotation_version, analysis_json)
+    import_warnings = []
+    analysis = _create_analysis(user, genome_build, annotation_version, analysis_json, import_warnings)
+    if import_warnings:
+        details = f"Analysis {analysis.pk} '{analysis.name}' imported without:\n" + "\n".join(import_warnings)
+        create_event(user, "analysis_import", details, filename=filename, severity=LogLevel.WARNING)
     reload_analysis_nodes(analysis.pk)
     return analysis
 
 
 @transaction.atomic
 def _create_analysis(user: User, genome_build: Optional[GenomeBuild],
-                     annotation_version: Optional[AnnotationVersion], analysis_json: dict) -> Analysis:
+                     annotation_version: Optional[AnnotationVersion], analysis_json: dict,
+                     import_warnings: list[str]) -> Analysis:
     analysis_kwargs = analysis_json["analysis"]["fields"]
     exported_genome_build_name = analysis_kwargs.pop("genome_build", None)
     if genome_build is None:
@@ -137,6 +156,7 @@ def _create_analysis(user: User, genome_build: Optional[GenomeBuild],
     assign_permission_to_user_and_groups(user, analysis)
 
     node_serializers = AnalysisNodeSerializer.get_node_serializers()
+    serializer_context = {'user': user, "import_warnings": import_warnings}
 
     logging.info("Creating analysis: %s", analysis.pk)
     old_new_map = {}
@@ -159,10 +179,14 @@ def _create_analysis(user: User, genome_build: Optional[GenomeBuild],
             old_internal_references[old_pk] = internal_references
 
         serializer = node_serializers[model_name]
-        s = serializer(data=data, context={'user': user})
+        s = serializer(data=data, context=serializer_context)
         if not s.is_valid():
             raise ValueError(f"{model_name}: {s.errors}")
         node = s.save()
+        if not_exported := node_record.get("not_exported"):
+            # The exported name - a source node's is generated from the sample etc. it no longer has
+            import_warnings.append(f"{node._meta.verbose_name} '{data.get('name', '')}': {', '.join(not_exported)} "
+                                   "(they refer to the exporting server's own data)")
         old_new_map[old_pk] = node.pk
 
     for edge_record in analysis_json["edges"]:

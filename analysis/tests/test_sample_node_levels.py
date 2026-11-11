@@ -36,6 +36,7 @@ from analysis.models import (
     AnalysisTemplate,
     AnalysisTemplateVersion,
     AnalysisVariable,
+    CohortNode,
     GeneListNode,
     MOINode,
     NodeAlleleFrequencyFilter,
@@ -570,6 +571,17 @@ class TestSampleNodeLevels(SampleNodeLevelsTestCase):
         self.assertEqual(["Small", "CNV"], [dot.text for dot in vcf_chip.dots])
         self.assertEqual({f"{self.snv_sample.vcf} - Small", f"{self.cnv_sample.vcf} - Small, CNV"},
                          set(vcf_chip.title.split("\n")))
+
+        # A cohort spanning both callers' samples reads each one's contents from its original VCF
+        cohort = Cohort.objects.create(name="agent_cohort_2759", user=self.user, genome_build=self.grch37,
+                                       import_status=ImportStatus.SUCCESS)
+        for i, sample in enumerate((self.snv_sample, self.cnv_sample)):
+            CohortSample.objects.create(cohort=cohort, sample=sample, sort_order=i,
+                                        cohort_genotype_packed_field_index=i)
+        cohort_chip = CohortNode.objects.create(analysis=self.analysis, cohort=cohort).get_node_chips()[0]
+        self.assertEqual(2, cohort_chip.count)
+        self.assertEqual(["Small", "CNV"], [dot.text for dot in cohort_chip.dots])
+        self.assertEqual(set(vcf_chip.title.split("\n")), set(cohort_chip.title.split("\n")))
 
     def test_warning_chip_counts_what_the_group_left_out(self):
         """ Six months later, why does this node return fewer rows - because a VCF was archived """

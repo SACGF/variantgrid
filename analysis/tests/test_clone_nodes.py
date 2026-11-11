@@ -6,6 +6,7 @@ from django.urls import reverse
 
 from analysis.models import (
     AlleleFrequencyNode,
+    AllVariantsNode,
     Analysis,
     AnalysisNode,
     AnalysisNodeCountConfiguration,
@@ -184,6 +185,14 @@ class TestCloneAnalysisNodes(TestCase):
         intersection_node = IntersectionNode.objects.get(pk=intersection_node.pk)  # cytobands is cached
         clone = intersection_node.save_clone()
         self.assertEqual([inc.cytoband for inc in clone.intersectionnodecytoband_set.all()], [cytoband])
+
+    def test_clone_all_variants_node_cytobands(self):
+        all_variants_node = AllVariantsNode.objects.create(analysis=self.analysis)
+        cytoband = Cytoband.objects.filter(contig__genomebuildcontig__genome_build=self.analysis.genome_build).first()
+        all_variants_node.allvariantsnodecytoband_set.create(cytoband=cytoband)
+        all_variants_node = AllVariantsNode.objects.get(pk=all_variants_node.pk)  # cytobands is cached
+        clone = all_variants_node.save_clone()
+        self.assertEqual([avc.cytoband for avc in clone.allvariantsnodecytoband_set.all()], [cytoband])
 
     def test_clone_moi_node(self):
         # TODO: Need to also test patient setup w/ontology etc
