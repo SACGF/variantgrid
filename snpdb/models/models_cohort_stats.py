@@ -21,7 +21,7 @@ from django.db.models.query_utils import Q
 from model_utils.models import TimeStampedModel
 
 from patients.enums import Sex
-from snpdb.enums import ImportStatus
+from snpdb.enums import ImportStatus, VariantContent
 from snpdb.models.models_vcf import SampleStatsCodeVersion
 
 # Targeted panels can have too few chrX calls for the hom/het ratio to mean anything
@@ -56,6 +56,10 @@ class CohortGenotypeStats(TimeStampedModel):
     insertions_count = models.IntegerField(default=0)
     deletions_count = models.IntegerField(default=0)
     fusions_count = models.IntegerField(default=0)  # gene-level events, @see snpdb.gene_level_variants
+    # The class counts above fold these in with SNVs and indels, so they're counted again on their own
+    structural_count = models.IntegerField(default=0)  # symbolic alts with coordinates (<DEL>, <DUP>, <INV>...)
+    gene_copy_number_count = models.IntegerField(default=0)
+    gene_splice_count = models.IntegerField(default=0)
     ref_count = models.IntegerField(default=0)
     het_count = models.IntegerField(default=0)
     hom_count = models.IntegerField(default=0)
@@ -84,9 +88,25 @@ class CohortGenotypeStats(TimeStampedModel):
         ]
         indexes = [models.Index(fields=["sample", "passing_filter"])]
 
+    # The first SAMPLE_STATS_CODE_VERSION to count structural_count / gene_copy_number_count / gene_splice_count
+    VARIANT_CONTENTS_STATS_VERSION = 8
+
     @property
     def total_count(self):
         return self.variant_count
+
+    def get_variant_contents(self, has_copy_number: bool) -> dict[VariantContent, int]:
+        """ Count per kind of call, leaving out the kinds with none. has_copy_number (the VCF declares a
+            copy number field) is what makes its structural variants a CNV caller's rather than an SV caller's """
+        gene_level_count = self.fusions_count + self.gene_copy_number_count + self.gene_splice_count
+        counts = {
+            VariantContent.SMALL: self.variant_count - self.structural_count - gene_level_count,
+            VariantContent.CNV if has_copy_number else VariantContent.SV: self.structural_count,
+            VariantContent.FUSION: self.fusions_count,
+            VariantContent.GENE_COPY_NUMBER: self.gene_copy_number_count,
+            VariantContent.SPLICE: self.gene_splice_count,
+        }
+        return {content: count for content, count in counts.items() if count}
 
     def count_for_zygosity(self, zygosity_ref, zygosity_het, zygosity_hom, zygosity_unk, label=None):
         count = 0

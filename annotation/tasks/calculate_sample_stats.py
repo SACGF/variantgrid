@@ -41,7 +41,7 @@ from snpdb.models.models import CodeVersion
 
 # Bump when a change alters what the stats count - readers treat rows from older versions as stale
 # and enqueue a recompute (@see snpdb/views/views_data.py:_sample_stats)
-SAMPLE_STATS_CODE_VERSION = 7
+SAMPLE_STATS_CODE_VERSION = 8
 
 
 @celery.shared_task
@@ -70,6 +70,7 @@ def get_sample_stats_code_version() -> SampleStatsCodeVersion:
         5 - Per-sample totals and chrX hom only count the sample's own variant calls (#2087)
         6 - ClinVar pathogenic counts ClinVar's somatic tier and oncogenicity as well (#2662)
         7 - chrX hom/het (the sex guess) leaves out structural variants
+        8 - structural_count, gene_copy_number_count and gene_splice_count (#2759)
     """
     code_version, _ = SampleStatsCodeVersion.objects.get_or_create(name="SampleStats",
                                                                    version=SAMPLE_STATS_CODE_VERSION,
@@ -184,6 +185,9 @@ _COUNTER_FIELDS = (
     "insertions_count",
     "deletions_count",
     "fusions_count",
+    "structural_count",
+    "gene_copy_number_count",
+    "gene_splice_count",
     "ref_count",
     "het_count",
     "hom_count",
@@ -377,6 +381,22 @@ def _variant_class_field(flags: VariantFlags) -> str:
     return "insertions_count"
 
 
+_GENE_LEVEL_KIND_FIELDS = {
+    GeneLevelSymbolicAlt.GAIN: "gene_copy_number_count",
+    GeneLevelSymbolicAlt.LOSS: "gene_copy_number_count",
+    GeneLevelSymbolicAlt.SPLICE: "gene_splice_count",
+}
+
+
+def _symbolic_kind_field(flags: VariantFlags) -> Optional[str]:
+    """ The count a symbolic alt adds to on top of its class count - fusions already have one of their own """
+    if not (alt := flags.symbolic_alt):
+        return None
+    if gene_level := GeneLevelSymbolicAlt.parse(alt):
+        return _GENE_LEVEL_KIND_FIELDS.get(gene_level[0])
+    return "structural_count"
+
+
 def _dbsnp_class_field(flags: VariantFlags) -> Optional[str]:
     if flags.is_snp:
         return "snp_dbsnp_count"
@@ -391,6 +411,8 @@ def _dbsnp_class_field(flags: VariantFlags) -> Optional[str]:
 def _flag_field_indexes(flags: VariantFlags) -> tuple[list[int], list[int]]:
     """ (fields a row with a call adds to, impact/OMIM/ClinVar slots of _ZYGOSITY_FIELDS it adds to) """
     totals = [_FIELD_INDEX["variant_count"], _FIELD_INDEX[_variant_class_field(flags)]]
+    if symbolic_kind_field := _symbolic_kind_field(flags):
+        totals.append(_FIELD_INDEX[symbolic_kind_field])
     if flags.dbsnp:
         totals.append(_FIELD_INDEX["variant_dbsnp_count"])
         if dbsnp_class_field := _dbsnp_class_field(flags):
@@ -602,7 +624,7 @@ def persist_cohort_stats(cgc, annotation_version, code_version, has_filters,
 
     GENOTYPE_FIELDS = (
         "variant_count", "snp_count", "insertions_count", "deletions_count", "fusions_count",
-        "ref_count", "het_count", "hom_count", "unk_count",
+        "structural_count", "gene_copy_number_count", "gene_splice_count", "ref_count", "het_count", "hom_count", "unk_count",
         "x_hom_count", "x_het_count", "x_unk_count",
     )
     VARIANT_ANN_FIELDS = (

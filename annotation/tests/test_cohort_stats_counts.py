@@ -144,7 +144,7 @@ class CohortStatsCountsTest(TestCase):
         }, counts[("mother", False)])
         # A MNV is counted as an insertion but has no dbSNP class, a symbolic <DEL> is a deletion
         self.assertEqual({
-            "variant_count": 5, "snp_count": 2, "insertions_count": 1, "deletions_count": 2,
+            "variant_count": 5, "snp_count": 2, "insertions_count": 1, "deletions_count": 2, "structural_count": 1,
             "het_count": 3, "hom_count": 2, "unk_count": 5, "x_het_count": 1, "x_unk_count": 1,
             "variant_dbsnp_count": 3, "snp_dbsnp_count": 1, "deletions_dbsnp_count": 1,
             "het_high_or_moderate_count": 1, "unk_high_or_moderate_count": 1,
@@ -157,7 +157,7 @@ class CohortStatsCountsTest(TestCase):
         # Every row, under its highest-priority zygosity: hom > het > ref > unk
         self.assertEqual({
             "variant_count": 10, "snp_count": 5, "insertions_count": 2, "deletions_count": 2, "fusions_count": 1,
-            "het_count": 6, "hom_count": 4, "x_hom_count": 1, "x_het_count": 1,
+            "structural_count": 1, "het_count": 6, "hom_count": 4, "x_hom_count": 1, "x_het_count": 1,
             "variant_dbsnp_count": 4, "snp_dbsnp_count": 2, "deletions_dbsnp_count": 1,
             "het_high_or_moderate_count": 2, "gene_count": 1, "het_omim_phenotype_count": 3,
             "clinvar_count": 3, "het_clinvar_pathogenic_count": 1, "hom_clinvar_pathogenic_count": 1,

@@ -1,4 +1,5 @@
 import operator
+from collections import Counter, defaultdict
 from functools import cached_property, reduce
 from typing import Optional
 
@@ -44,8 +45,10 @@ from patients.sample_grouping import (
     get_sample_group,
     get_specimen_label,
 )
+from snpdb.enums import VariantContent
 from snpdb.grid_columns.grid_sample_columns import get_copy_number_annotation
 from snpdb.models import Sample
+from snpdb.models.models_cohort_stats import CohortGenotypeStats
 
 
 class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
@@ -559,10 +562,12 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         deceased = "-deceased" if patient.deceased else ""
         return f"node-icon-sample-{sex}{deceased}"
 
-    @cache_memoize(DAY_SECS, args_rewrite=lambda s: (s.pk, s.version))
+    # The prefix names the shape stored, so a deploy that changes it doesn't read a day old one
+    @cache_memoize(DAY_SECS, prefix="SampleNode._get_card_data.vcf_ids",
+                   args_rewrite=lambda s: (s.pk, s.version))
     def _get_card_data(self) -> dict:
         """ Everything the canvas card draws that needs the database - the pedigree badge, and the
-            specimen -> extraction -> VCF names tree of what the node actually reads.
+            specimen -> extraction -> VCF tree of what the node actually reads, each VCF as (pk, name).
 
             Memoized together because get_rendering_dict runs for every node on every analysis
             render, and walking to the patient is up to three FK hops """
@@ -570,31 +575,58 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         specimens = {}
         unlinked_vcfs = []
         for sample in group.samples:
-            vcf_name = str(sample.vcf)
+            vcf = (sample.vcf_id, str(sample.vcf))
             if extraction := sample.extraction:
                 specimen = extraction.specimen
                 specimen_data = specimens.setdefault(specimen.pk, {
                     "label": get_specimen_label(specimen), "title": str(specimen), "extractions": {}})
                 extraction_data = specimen_data["extractions"].setdefault(extraction.pk, {
                     "label": get_extraction_label(extraction), "title": str(extraction), "vcfs": []})
-                if vcf_name not in extraction_data["vcfs"]:  # A caller can have several samples
-                    extraction_data["vcfs"].append(vcf_name)
+                if vcf not in extraction_data["vcfs"]:  # A caller can have several samples
+                    extraction_data["vcfs"].append(vcf)
             else:
-                unlinked_vcfs.append(vcf_name)
+                unlinked_vcfs.append(vcf)
 
         return {
             "patient_badge": self._get_patient_badge(),
-            "sample_vcf": str(self.sample.vcf) if self.sample else None,
+            "sample_vcf": (self.sample.vcf_id, str(self.sample.vcf)) if self.sample else None,
             "specimens": [dict(sp, extractions=list(sp["extractions"].values())) for sp in specimens.values()],
             "unlinked_vcfs": remove_duplicates_from_list(unlinked_vcfs),
             "warnings": group.warnings,
         }
 
-    @classmethod
-    def _vcf_chip(cls, vcf_names: list[str]) -> NodeChip:
-        """ Always one chip - a card has no room for a pill per caller, and the names are the hover """
-        return NodeChip(text="VCF", icon=cls.VCF_CHIP_ICON, title="\n".join(vcf_names),
-                        count=len(vcf_names) if len(vcf_names) > 1 else None)
+    @cached_property
+    def _vcf_contents(self) -> dict[int, dict[VariantContent, int]]:
+        """ vcf_id -> kinds of call its samples in this node hold. Read fresh rather than memoized with the card,
+            as the stats that say it land after the node is made. A sample whose stats predate the counts
+            leaves its VCF without dots until they're recomputed """
+        stats_qs = CohortGenotypeStats.objects.filter(
+            sample__in=self.get_source_samples(), filter_key__isnull=True, passing_filter=False,
+            code_version__version__gte=CohortGenotypeStats.VARIANT_CONTENTS_STATS_VERSION)
+        # Latest per sample - a reload in place keeps the collection, so there is normally just one
+        stats_qs = stats_qs.select_related("sample__vcf").order_by("sample_id", "-pk").distinct("sample_id")
+        contents = defaultdict(Counter)
+        for stats in stats_qs:
+            vcf = stats.sample.vcf
+            contents[vcf.pk].update(stats.get_variant_contents(has_copy_number=bool(vcf.copy_number_field)))
+        return contents
+
+    def _vcf_chip(self, vcfs: list[tuple[int, str]]) -> NodeChip:
+        """ Always one chip - a card has no room for a pill per caller, so the names are the hover, each with
+            what it holds, and the chip's dots are what the files hold between them """
+        lines = []
+        totals = Counter()
+        for vcf_id, name in vcfs:
+            contents = self._vcf_contents.get(vcf_id, {})
+            totals.update(contents)
+            if len(vcfs) > 1 and contents:
+                name += " - " + ", ".join(VariantContent(c).label for c in VariantContent if c in contents)
+            lines.append(name)
+        dots = tuple(NodeChip(text=content.label, css_class=f"variant-content-{content.value}",
+                              title=f"{totals[content]:,} {'call' if totals[content] == 1 else 'calls'}")
+                     for content in VariantContent if content in totals)
+        return NodeChip(text="VCF", icon=self.VCF_CHIP_ICON, title="\n".join(lines),
+                        count=len(vcfs) if len(vcfs) > 1 else None, dots=dots)
 
     @classmethod
     def _group_chips(cls, items: list[dict], level: str, chip_func) -> tuple[NodeChip, ...]:
@@ -604,15 +636,13 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
                              count=len(items), title="\n".join(i["title"] for i in items)),)
         return tuple(chip_func(item) for item in items)
 
-    @classmethod
-    def _extraction_chip(cls, extraction_data: dict) -> NodeChip:
-        return NodeChip(text=extraction_data["label"], icon=cls.SOURCE_LEVEL_ICONS[SampleSourceLevel.EXTRACTION].fa,
-                        title=extraction_data["title"], children=(cls._vcf_chip(extraction_data["vcfs"]),))
+    def _extraction_chip(self, extraction_data: dict) -> NodeChip:
+        return NodeChip(text=extraction_data["label"], icon=self.SOURCE_LEVEL_ICONS[SampleSourceLevel.EXTRACTION].fa,
+                        title=extraction_data["title"], children=(self._vcf_chip(extraction_data["vcfs"]),))
 
-    @classmethod
-    def _specimen_chip(cls, specimen_data: dict) -> NodeChip:
-        children = cls._group_chips(specimen_data["extractions"], SampleSourceLevel.EXTRACTION, cls._extraction_chip)
-        return NodeChip(text=specimen_data["label"], icon=cls.SOURCE_LEVEL_ICONS[SampleSourceLevel.SPECIMEN].fa,
+    def _specimen_chip(self, specimen_data: dict) -> NodeChip:
+        children = self._group_chips(specimen_data["extractions"], SampleSourceLevel.EXTRACTION, self._extraction_chip)
+        return NodeChip(text=specimen_data["label"], icon=self.SOURCE_LEVEL_ICONS[SampleSourceLevel.SPECIMEN].fa,
                         title=specimen_data["title"], children=children)
 
     def _get_qc_gene_list_chip(self) -> Optional[NodeChip]:
@@ -637,7 +667,7 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         data = self._get_card_data()
         if self.source_level == SampleSourceLevel.SAMPLE:
             # A hand picked sample leaves nothing out, so there's no tree to walk
-            chips.append(NodeChip(text="VCF", icon=self.VCF_CHIP_ICON, title=data["sample_vcf"]))
+            chips.append(self._vcf_chip([data["sample_vcf"]]))
             return chips
 
         specimens = data["specimens"]

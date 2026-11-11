@@ -418,6 +418,36 @@ button.add-analysis-variable-button {
 	background: #f3d9a4;
 }
 
+/* NodeChip.dots - what kinds of call a VCF chip's files hold (snpdb VariantContent, #2759). On the card a dot per
+   kind; the hover card shows each as a chip in the same colour. A kind the grid's variant badge also shows wears that
+   badge's text colour (.rv-kind-* in global/_variant_grid.scss); small variants have no badge, so stay neutral, and
+   CNV - gains and losses together - takes a colour no badge uses */
+.variant-content-small { --variant-content-color: #78909c; }
+.variant-content-cnv { --variant-content-color: #ad1457; }
+.variant-content-sv { --variant-content-color: #a15c00; }
+.variant-content-fusion { --variant-content-color: #5e35b1; }
+.variant-content-gene_cn { --variant-content-color: #b3261e; }
+.variant-content-splice { --variant-content-color: #00695c; }
+
+.node-chip-dots {
+	display: inline-flex;
+	gap: 1px;
+	margin-left: 1px;
+}
+
+.node-chip-dot {
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: var(--variant-content-color);
+}
+
+.node-chip[class*="variant-content-"] {
+	border-color: var(--variant-content-color);
+	background: var(--variant-content-color);
+	color: white;
+}
+
 /* A chip wrapping its children's chips - specimen holding extractions holding their VCFs */
 .node-chip-group {
 	display: flex;
@@ -495,6 +525,19 @@ button.add-analysis-variable-button {
 .node-hover-card .node-chip-count {
 	font-size: 9px;
 	line-height: 12px;
+}
+
+.node-hover-card .node-hover-card-chip-dots {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2px 8px;
+	padding: 2px 0 0 6px;
+}
+
+.node-hover-card .node-hover-card-dot-detail {
+	font-size: 11px;
+	color: #555;
+	margin-left: 3px;
 }
 
 .node-hover-card .node-hover-card-chip-detail {

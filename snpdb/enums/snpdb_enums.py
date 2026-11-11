@@ -3,7 +3,8 @@ snpdb's enums, and the classification enums that apps below classification also 
 lifecycles (ImportStatus, ProcessingStatus, DataState), where uploads came from (ImportSource), allele linking
 (AlleleOrigin, AlleleConversionTool, AlleleOriginFilterDefault), contig roles (SequenceRole - including the
 gene-level fake contig), sample and file kinds, the grid's built-in and per-tag filter keys
-(BuiltInFilters, TagFilter), lab membership roles (LabUserRole), grid loading animations, and the user award scale.
+(BuiltInFilters, TagFilter), lab membership roles (LabUserRole), grid loading animations, the user award scale,
+and what kinds of calls a VCF holds (VariantContent).
 Codes are stored in the database: add values, never renumber. Zygosity lives in patients/enums/patients_enums.py.
 
 AlleleOriginBucket and the ClinicalSignificance / SomaticClinicalSignificance value helpers live here so apps
@@ -450,3 +451,15 @@ class CytobandLevel(models.TextChoices):
     BAND = 'B', 'Band'
     SUB_BAND = 'S', 'Sub-band'
     SUB_SUB_BAND = 'SS', 'Sub-sub-band'
+
+
+class VariantContent(models.TextChoices):
+    """ What kind of calls a VCF holds, from its samples' stats - the dots on a Sample node's VCF chip (#2759).
+        CNV and SV are both symbolic alts: a CNV caller's VCF declares a copy number field, an SV caller's
+        doesn't (@see CohortGenotypeStats.get_variant_contents) """
+    SMALL = "small", "Small"
+    CNV = "cnv", "CNV"
+    SV = "sv", "SV"
+    FUSION = "fusion", "Fusion"
+    GENE_COPY_NUMBER = "gene_cn", "Gene CN"
+    SPLICE = "splice", "Splice"
