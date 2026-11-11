@@ -1,9 +1,11 @@
+from unittest.mock import patch
+
 from django.test import TestCase, override_settings
 
 from analysis.models.nodes.filters.conservation_node import ConservationNode
 from analysis.tests.utils import AnalysisSetupMixin
 from annotation.fake_data import create_fake_variant_annotation, create_fake_variants
-from annotation.models import VariantAnnotation
+from annotation.models import VariantAnnotation, VariantAnnotationVersion
 from snpdb.models import Variant
 
 GERP = VariantAnnotation.CONSERVATION_SCORES["gerp_pp_rs"]
@@ -79,3 +81,10 @@ class TestConservationNode(AnalysisSetupMixin, TestCase):
                       .filter(pk__in=[v.pk for v in variants])
                       .values_list("pk", flat=True))
         self.assertEqual(matched, {v_conserved.pk})
+
+    def test_version_without_conservation_scores_passes_everything_with_warning(self):
+        """ #2787: T2T has no conservation scores, so filtering would drop every variant """
+        with patch.object(VariantAnnotationVersion, "visible_columns", frozenset()):
+            node = ConservationNode(analysis=self.analysis, any_scaled_min=0.9)
+            self.assertFalse(node.modifies_parents())
+            self.assertTrue([w for w in node.get_warnings() if "Conservation filter is NOT being applied" in w])

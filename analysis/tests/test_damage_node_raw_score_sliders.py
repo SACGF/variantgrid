@@ -187,17 +187,17 @@ class TestGRCh38OnlyToolsNotOfferedOnGRCh37(_RawScoreSliderMixin, TestCase):
         self.assertNotIn("eve_class", self._pred_fields())
 
     def test_eve_filter_warns_when_column_not_populated(self):
-        """ A node cloned in from a build that has EVE keeps the filter - warn it has no data """
+        """ A node cloned in from a build that has EVE keeps the filter - warn it isn't applied """
         node = DamageNode(analysis=self.analysis, eve_score_min=0.7)
-        self.assertTrue(any("EVE filter has no data" in w for w in node.get_warnings()))
+        self.assertTrue(any("EVE filter is NOT being applied" in w for w in node.get_warnings()))
 
     def test_popeve_filter_warns_when_column_not_populated(self):
         node = DamageNode(analysis=self.analysis, popeve_score_max=-3.0)
-        self.assertTrue(any("popEVE filter has no data" in w for w in node.get_warnings()))
+        self.assertTrue(any("popEVE filter is NOT being applied" in w for w in node.get_warnings()))
 
     def test_dbnsfp_filter_does_not_warn(self):
         node = DamageNode(analysis=self.analysis, alphamissense_score_min=0.5)
-        self.assertEqual([], [w for w in node.get_warnings() if "has no data" in w])
+        self.assertEqual([], [w for w in node.get_warnings() if "NOT being applied" in w])
 
     def test_editor_renders_dbnsfp_sliders_without_the_grch38_tools(self):
         html = self._editor_html()

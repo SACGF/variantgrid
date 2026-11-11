@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
@@ -75,6 +77,8 @@ class TestDamageNodeV4Q(_ColumnsVersionMixin, TestCase):
         "bayesdel_positive": {"bayesdel_noaf_score": 0.5},
     }
 
+    # Several tools are GRCh38 only, and a column the version doesn't populate isn't filtered on (#2787)
+    @patch.object(VariantAnnotationVersion, "visible_columns", frozenset(t.raw_field for t in RAW_SCORE_TOOLS))
     def test_raw_score_threshold_keeps_damaging_side_per_tool(self):
         for tool in RAW_SCORE_TOOLS:
             with self.subTest(tool=tool.name):
@@ -119,3 +123,28 @@ class TestDamageNodeV3IgnoresV4Fields(_ColumnsVersionMixin, TestCase):
         node = DamageNode(analysis=self.analysis, alphamissense_score_min=0.5)
         self.assertFalse(node.modifies_parents())
         self.assertEqual({"alphamissense_high", "alphamissense_low"}, self._filtered(node, set(self.ROWS)))
+
+
+@override_settings(**get_fake_annotation_settings_dict(columns_version=2))
+class TestDamageNodeVersionWithoutPredictors(_ColumnsVersionMixin, TestCase):
+    """ #2787: T2T has no dbNSFP, so every rankscore is null and every variant counts 0 predictions - a filter
+        on them would drop the whole sample. Skipped with a warning instead, applied where the version has them. """
+    COLUMNS_VERSION = 3
+    ROWS = {"revel_high": {"revel_rankscore": 0.9, "predictions_num_pathogenic": 1},
+            "revel_low": {"revel_rankscore": 0.1, "predictions_num_pathogenic": 0}}
+
+    def _node(self):
+        return DamageNode(analysis=self.analysis, revel_rankscore_min=0.5, damage_predictions_min=1)
+
+    def test_applied_where_populated(self):
+        with patch.object(VariantAnnotationVersion, "visible_columns", frozenset({"revel_rankscore"})):
+            node = self._node()
+            self.assertEqual({"revel_high"}, self._filtered(node, set(self.ROWS)))
+            self.assertFalse([w for w in node.get_warnings() if "NOT being applied" in w])
+
+    def test_skipped_with_warning_where_not_populated(self):
+        with patch.object(VariantAnnotationVersion, "visible_columns", frozenset()):
+            node = self._node()
+            self.assertEqual(set(self.ROWS), self._filtered(node, set(self.ROWS)))
+            self.assertEqual(2, len([w for w in node.get_warnings() if "NOT being applied" in w]))
+            self.assertFalse(DamageNode(analysis=self.analysis).show_rankscore_sliders())
