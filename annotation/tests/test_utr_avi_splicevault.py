@@ -15,7 +15,7 @@ from django.conf import settings
 from django.core.management import CommandError, call_command
 from django.db import connection
 from django.db.migrations.loader import MigrationLoader
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
@@ -27,7 +27,7 @@ from annotation.fake_data import (
 )
 from annotation.models import VariantAnnotationVersion
 from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
-from annotation.vep_annotation import get_vep_command
+from annotation.vep_annotation import get_vep_command, installed_vep_plugin_is_ours
 from annotation.vep_config import vep_component_version_kwargs
 from annotation.vep_plugin_backfill import (
     ENABLE_COMMAND,
@@ -593,3 +593,24 @@ class UTRAnnotatorEffectsTests(TestCase):
 
     def test_no_annotation(self):
         self.assertEqual(utr_annotator_effects(None), [])
+
+
+class InstalledVEPPluginIsOursTests(SimpleTestCase):
+    """ The effects backfill import requires our UTRAnnotator.pm; a header edit alone mustn't make it fail """
+
+    def _installed_is_ours(self, edit) -> bool:
+        source = os.path.join(os.path.dirname(os.path.dirname(__file__)), "annotation_data", "generate_annotation",
+                              "UTRAnnotator.pm")
+        with open(source) as f:
+            code = f.read()
+        with tempfile.TemporaryDirectory() as plugins_dir:
+            with open(os.path.join(plugins_dir, "UTRAnnotator.pm"), "w") as f:
+                f.write(edit(code))
+            with override_settings(ANNOTATION_VEP_PLUGINS_DIR=plugins_dir):
+                return installed_vep_plugin_is_ours("UTRAnnotator")
+
+    def test_comment_edit_is_ours(self):
+        self.assertTrue(self._installed_is_ours(lambda code: "# an older header\n" + code.replace("\n#", "\n  # x", 1)))
+
+    def test_code_edit_is_not_ours(self):
+        self.assertFalse(self._installed_is_ours(lambda code: code + "1;\n"))

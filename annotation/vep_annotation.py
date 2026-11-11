@@ -350,15 +350,20 @@ def is_variantgrid_vep_plugin(plugin_name: str) -> bool:
     return plugin_name in _VARIANTGRID_VEP_PLUGINS
 
 
+def _perl_code_lines(filename: str) -> list[bytes]:
+    """ The file's lines without the whole-line comments, so a comment edit isn't a different plugin """
+    with open(filename, "rb") as f:
+        return [line for line in f if not line.lstrip().startswith(b"#")]
+
+
 def installed_vep_plugin_is_ours(plugin_name: str) -> bool:
     """ Whether the .pm in the plugins dir is this checkout's copy of a plugin we serve - the one
-        download_annotation_data installs, byte for byte """
+        download_annotation_data installs, the same code line for line (comment lines may differ) """
     source = os.path.join(os.path.dirname(__file__), "annotation_data", "generate_annotation", f"{plugin_name}.pm")
     installed = os.path.join(settings.ANNOTATION_VEP_PLUGINS_DIR, f"{plugin_name}.pm")
     if not os.path.exists(installed):
         return False
-    with open(source, "rb") as s, open(installed, "rb") as i:
-        return s.read() == i.read()
+    return _perl_code_lines(source) == _perl_code_lines(installed)
 
 
 def get_vep_plugin_url(plugin_name: str) -> str:

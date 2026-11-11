@@ -82,7 +82,7 @@ would use, stock output still differs between runs (Ensembl/VEP_plugins#870), so
 
 The plugin is installed per deployment, not per version: `download_annotation_data` writes ours over the plugins
 dir's `UTRAnnotator.pm`, and a version keeps calling VEP for as long as new variants are annotated into it (and for a
-pending `backfilled_utr_effects` pass, whose import requires our copy byte for byte,
+pending `backfilled_utr_effects` pass, whose import requires our copy's code line for line,
 `annotation/vep_annotation.py:installed_vep_plugin_is_ours`).
 
 Check, with `<VEP>` the `ANNOTATION_VEP_VERSION` a new version would install:
