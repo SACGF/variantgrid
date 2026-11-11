@@ -1,3 +1,6 @@
+import copy
+from collections import defaultdict
+from collections.abc import Callable, Iterable
 from functools import cached_property, reduce
 from typing import Any, Optional, Self
 
@@ -122,7 +125,13 @@ class OverlapContribution(TimeStampedModel):
 
     @property
     def triage_state_obj(self) -> TriageDecision:
-        return TriageDecision.from_dict(self.triage_state)
+        # TriageDecision is frozen, so it's parsed once per value - pages and the overlaps download read it many times per contribution
+        triage_state = self.triage_state
+        parsed_from, parsed = self.__dict__.get("_triage_state_parsed", (None, None))
+        if parsed is None or parsed_from != triage_state:
+            parsed = TriageDecision.from_dict(triage_state)
+            self.__dict__["_triage_state_parsed"] = (copy.copy(triage_state), parsed)
+        return parsed
 
     @triage_state_obj.setter
     def triage_state_obj(self, value: TriageDecision):
@@ -137,15 +146,34 @@ class OverlapContribution(TimeStampedModel):
         self.comment = value.to_dict()
 
     @cached_property
-    def last_comment(self) -> AuditSingleChange[TriageComment]:
+    def last_comment(self) -> Optional[AuditSingleChange[TriageComment]]:
         # Often want to show the most recent comment made on a Contribution
-        if last_comment := AuditUtils.last_change_for(self, "comment", is_json=True, parser=lambda x: TriageComment.from_dict(x)):
-            if last_comment.value.count != 0:
-                return last_comment
+        return self._last_comment_from(
+            AuditUtils.last_change_for(self, "comment", is_json=True, parser=TriageComment.from_dict),
+            lambda: AuditUtils.last_change_for(self, "triage_state", parser=lambda x: None)
+        )
+
+    def _last_comment_from(self, comment_change: Optional[AuditSingleChange[TriageComment]],
+                           triage_change: Callable[[], Optional[AuditSingleChange]]) -> Optional[AuditSingleChange]:
+        if comment_change and comment_change.value.count != 0:
+            return comment_change
         if not self.triage_state_obj.status.is_default:
-            if last_triage_change := AuditUtils.last_change_for(self, "triage_state", parser=lambda x: None):
-                return last_triage_change
+            return triage_change()
         return None
+
+    @staticmethod
+    def prefetch_last_comments(contributions: Iterable['OverlapContribution']):
+        """ Fills last_comment for many contributions with two queries rather than up to two each """
+        contributions = list(contributions)
+        comment_changes = AuditUtils.last_changes_for(
+            OverlapContribution, [c.pk for c in contributions], "comment", is_json=True, parser=TriageComment.from_dict)
+        triage_changes = AuditUtils.last_changes_for(
+            OverlapContribution, [c.pk for c in contributions if not c.triage_state_obj.status.is_default], "triage_state", parser=lambda x: None)
+        for contribution in contributions:
+            contribution.last_comment = contribution._last_comment_from(
+                comment_changes.get(contribution.pk),
+                lambda pk=contribution.pk: triage_changes.get(pk)
+            )
 
     @property
     def testing_context_full(self) -> TestingContextFull:
@@ -452,6 +480,30 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
     def contributions_list(self) -> list[OverlapContribution]:
         return list(sorted(self.contributions.all()))
 
+    @staticmethod
+    def prefetch_contributions_list(overlaps: Iterable['Overlap']):
+        """
+        Fills contributions_list for many overlaps in two queries rather than one each, with the
+        classification groupings' latest allele info that all_hgvs / hgvses read
+        """
+        overlaps = list(overlaps)
+        contribution_ids_by_overlap = defaultdict(list)
+        for overlap_id, contribution_id in OverlapContributionNextStep.objects.filter(overlap__in=overlaps).values_list("overlap_id", "contribution_id"):
+            contribution_ids_by_overlap[overlap_id].append(contribution_id)
+        contributions_qs = OverlapContribution.objects.filter(
+            contribution_status=OverlapContributionStatus.CONTRIBUTING,
+            pk__in=[pk for pks in contribution_ids_by_overlap.values() for pk in pks]
+        ).select_related(
+            "classification_grouping__lab__organization",
+            "classification_grouping__latest_allele_info__grch37",
+            "classification_grouping__latest_allele_info__grch38",
+            "classification_grouping__latest_allele_info__imported_genome_build_patch_version",
+        ).order_by("pk")
+        contributions_by_id = {contribution.pk: contribution for contribution in contributions_qs}
+        for overlap in overlaps:
+            contributions = [contributions_by_id[pk] for pk in sorted(contribution_ids_by_overlap[overlap.pk]) if pk in contributions_by_id]
+            overlap.contributions_list = sorted(contributions)
+
     @property
     def has_outstanding_triages(self) -> bool:
         return self.contributions.filter(triage_state__status=TriageStatus.PENDING).exists()
@@ -572,10 +624,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         return " ".join(parts) + f" : {self.overlap_status_label}"
 
     def relevant_values(self) -> list[str]:
-        relevant_values = set()
-        for entry in self.contributions.all():
-            if entry.contribution_status == OverlapContributionStatus.CONTRIBUTING:
-                relevant_values.add(entry.effective_value)
+        relevant_values = {entry.effective_value for entry in self.contributions_list}
 
         if self.value_type == ClassificationResultValue.ONC_PATH:
             return list(val.replace('_', '-') for val in EvidenceKeyMap.cached_key(SpecialEKeys.CLINICAL_SIGNIFICANCE).sort_values(relevant_values))
