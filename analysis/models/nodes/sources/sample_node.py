@@ -1,5 +1,5 @@
 import operator
-from collections import Counter, defaultdict
+from collections import Counter
 from functools import cached_property, reduce
 from typing import Optional
 
@@ -32,6 +32,7 @@ from analysis.models.nodes.node_vcf_filter import NodeVCFFilter
 from analysis.models.nodes.stats_cache import (
     get_cached_label_count_for_cohort,
 )
+from analysis.models.nodes.vcf_chip import get_vcf_contents, vcf_chip
 from annotation.models.models import VariantTranscriptAnnotation
 from genes.models import SampleGeneList
 from library.constants import DAY_SECS
@@ -45,10 +46,8 @@ from patients.sample_grouping import (
     get_sample_group,
     get_specimen_label,
 )
-from snpdb.enums import VariantContent
 from snpdb.grid_columns.grid_sample_columns import get_copy_number_annotation
 from snpdb.models import Sample
-from snpdb.models.models_cohort_stats import CohortGenotypeStats
 
 
 class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
@@ -111,7 +110,6 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         SampleSourceLevel.SPECIMEN: NodeIcon(fa=Specimen.preview_icon()),
         SampleSourceLevel.PATIENT: NodeIcon(fa=Patient.preview_icon()),
     }
-    VCF_CHIP_ICON = "fa-solid fa-file-lines"
     # Above this many siblings in one chip group the card runs out of room, so they collapse to a count
     MAX_GROUP_CHIPS = 3
     min_inputs = 0
@@ -596,37 +594,11 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         }
 
     @cached_property
-    def _vcf_contents(self) -> dict[int, dict[VariantContent, int]]:
-        """ vcf_id -> kinds of call its samples in this node hold. Read fresh rather than memoized with the card,
-            as the stats that say it land after the node is made. A sample whose stats predate the counts
-            leaves its VCF without dots until they're recomputed """
-        stats_qs = CohortGenotypeStats.objects.filter(
-            sample__in=self.get_source_samples(), filter_key__isnull=True, passing_filter=False,
-            code_version__version__gte=CohortGenotypeStats.VARIANT_CONTENTS_STATS_VERSION)
-        # Latest per sample - a reload in place keeps the collection, so there is normally just one
-        stats_qs = stats_qs.select_related("sample__vcf").order_by("sample_id", "-pk").distinct("sample_id")
-        contents = defaultdict(Counter)
-        for stats in stats_qs:
-            vcf = stats.sample.vcf
-            contents[vcf.pk].update(stats.get_variant_contents(has_copy_number=bool(vcf.copy_number_field)))
-        return contents
+    def _vcf_contents(self) -> dict[int, Counter]:
+        return get_vcf_contents(self.get_source_samples())
 
     def _vcf_chip(self, vcfs: list[tuple[int, str]]) -> NodeChip:
-        """ Always one chip - a card has no room for a pill per caller, so the names are the hover, each with
-            what it holds, and the chip's dots are what the files hold between them """
-        lines = []
-        totals = Counter()
-        for vcf_id, name in vcfs:
-            contents = self._vcf_contents.get(vcf_id, {})
-            totals.update(contents)
-            if len(vcfs) > 1 and contents:
-                name += " - " + ", ".join(VariantContent(c).label for c in VariantContent if c in contents)
-            lines.append(name)
-        dots = tuple(NodeChip(text=content.label, css_class=f"variant-content-{content.value}",
-                              title=f"{totals[content]:,} {'call' if totals[content] == 1 else 'calls'}")
-                     for content in VariantContent if content in totals)
-        return NodeChip(text="VCF", icon=self.VCF_CHIP_ICON, title="\n".join(lines),
-                        count=len(vcfs) if len(vcfs) > 1 else None, dots=dots)
+        return vcf_chip(vcfs, self._vcf_contents)
 
     @classmethod
     def _group_chips(cls, items: list[dict], level: str, chip_func) -> tuple[NodeChip, ...]:
