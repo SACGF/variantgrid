@@ -80,6 +80,27 @@ class PopulationNode(AnalysisNode):
         return any([self.filtering_by_population, self.use_internal_counts,
                     self._gnomad_count_maxes(), not self.show_gnomad_filtered])
 
+    def _filters_on_gnomad(self) -> bool:
+        if self._gnomad_count_maxes():
+            return True
+        if not self.filtering_by_population:
+            return False
+        gnomad_fields = [f for f in self.population_database_fields if f.startswith("gnomad")]
+        if any(getattr(self, f) for f in gnomad_fields):
+            return True
+        return bool(self.pk) and self.populationnodegnomadpopulation_set.exists()
+
+    def get_warnings(self) -> list[str]:
+        warnings = super().get_warnings()
+        vav = self.analysis.annotation_version.variant_annotation_version
+        if vav.gnomad_is_liftover and self._filters_on_gnomad():
+            warnings.append(
+                f"gnomAD on {vav.genome_build} ({vav.gnomad}) is lifted over from GRCh38, which drops sites "
+                f"where the {vav.genome_build} reference carries a different allele from GRCh38. Variants there have "
+                "no gnomAD frequency, so this node keeps them as rare - though many are common."
+            )
+        return warnings
+
     def _has_common_variants(self) -> bool:
         rare_only = (self.gnomad_af or self.gnomad_popmax_af) and self.percent <= 5
         return not rare_only

@@ -68,6 +68,10 @@ Patterns here:
   GeneAnnotationRelease (annotation/models/models_version.py:VariantAnnotationVersion.link_gene_annotation_release) →
   `gene_annotation --new-releases` → promote. Non-VEP tools: `create_new_annotation_pipeline_version`.
 Gotchas:
+- T2T's gnomAD (`4.1.t2t_liftover`) is built from gnomAD's T2T liftover files, and has no record where CHM13's reference
+  allele differs from GRCh38's: a T2T variant at such a site (often common - it's GRCh38's reference allele) gets no
+  gnomAD AF, so frequency filters keep it as rare (#2788). Flagged on the version as
+  `annotation/models/models_version.py:VariantAnnotationVersion.gnomad_is_liftover`.
 - AnnotSV's memory is its bundle, not its input: an unsorted `*.sorted.bed` regulatory element file makes every run load it (1.4 GB, #2749),
   whatever the SVs. annotation/annotsv_annotation.py:get_annotsv_unsorted_regulatory_element_files finds them; AnnotationRun.tool_peak_memory_mb and max_variant_length are on the run page.
 - Call NCBI E-utilities through `library/entrez.py` (`efetch`, `esearch`, `esummary`, `epost`), keeping Bio only to parse: `Bio.Entrez.efetch` etc.

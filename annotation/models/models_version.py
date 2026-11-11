@@ -272,6 +272,12 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         return int(major.removeprefix("r"))
 
     @property
+    def gnomad_is_liftover(self) -> bool:
+        """ gnomAD lifted over from another build (T2T's "4.1.t2t_liftover"). The liftover drops sites where this
+            build's reference allele differs from GRCh38's, so variants there have no gnomAD frequency (#2788) """
+        return "liftover" in (self.gnomad or "")
+
+    @property
     def uses_raw_spliceai(self) -> bool:
         # SpliceAI ships "raw" and "masked" precomputed score files; the masked
         # files zero out splice-site changes Illumina's README flags as typically
