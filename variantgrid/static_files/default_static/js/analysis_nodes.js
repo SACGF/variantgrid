@@ -702,17 +702,22 @@ function setNodeCounts(node, data) {
 		const count = counts[c];
 		if (count === null || count === undefined) {
 			setVariantCount(vc, '?');  // Node hasn't finished counting - @see updateDirtyNode
-		} else if (count > 0 || vc.hasClass("show-zero")) {
-			setVariantCount(vc, formatNodeCount(count, deterministic));
-		} else {
+			vc.removeClass("zero-count");
+		} else if (count === 0 && vc.hasClass("hide-zero")) {
 			vc.hide();
+		} else {
+			// A zero keeps its slot (dimmed) so the card is the same height whatever the counts are (#2770)
+			setVariantCount(vc, formatNodeCount(count, deterministic));
+			vc.toggleClass("zero-count", count === 0 && !vc.hasClass("show-zero"));
 		}
 	}
 	markLiveDataCount(node_counts, deterministic, data.live_data_sources);
+	setTagCountsRowEmpty($(".node-tag-counts", node));
+}
 
-	// Most nodes have no tagged variants - don't leave them showing a bare tag icon
-	const tag_counts = $(".node-tag-counts", node).show();  // Un-hide so :visible reflects this update's counts
-	tag_counts.toggle(tag_counts.find(".node-count:visible").length > 0);
+// Most nodes have no tagged variants - the row keeps its height but doesn't show a bare tag icon
+function setTagCountsRowEmpty(tag_counts) {
+	tag_counts.toggleClass("no-tag-counts", tag_counts.find(".node-count:visible").length === 0);
 }
 
 // Warnings / errors as a coloured list on hover, so you can see what's wrong without opening the editor (#347)
@@ -840,6 +845,9 @@ function createNodeCountDiv(nodeCountType) {
 	if (data["show_zero"]) {
 		nodeCountDiv.addClass("show-zero");
 	}
+	if (isTagNodeCount(nodeCountType)) {
+		nodeCountDiv.addClass("hide-zero");  // A dozen dimmed tag zeros on every node would bury the ones that matter
+	}
 	return nodeCountDiv;
 }
 
@@ -880,6 +888,7 @@ function attachVariantCounters(nodes_selector, nodeCountTypes) {
 			for (let i=0 ; i<tagCountTypes.length ; ++i) {
 				createNodeCountDiv(tagCountTypes[i]).appendTo(tag_counts);
 			}
+			setTagCountsRowEmpty(tag_counts);
 		}
 		updateDirtyNode($(this));
 	});
