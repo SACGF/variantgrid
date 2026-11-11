@@ -100,10 +100,11 @@ HEADER=header.vcf
 ) > ${HEADER}
 (
   cat ${HEADER}
-  for chrom in ${CHROMOSOMES}; do cat swaps_${chrom}.txt; done | sort -t$'\t' -k1,1 -k2,2n -k4,4 -k5,5 -u
+  for chrom in ${CHROMOSOMES}; do cat swaps_${chrom}.txt; done | sort -T . -S 500M -t$'\t' -k1,1 -k2,2n -k4,4 -k5,5 -u
 ) | bgzip -@ ${THREADS} > ${SWAPS_VCF}
 tabix -f -p vcf ${SWAPS_VCF}
 
+# Temp files in WORK_DIR: the root disk may be small
 # A text merge: the T2T file has INFO fields its header doesn't define, which bcftools refuses to write back out
 echo "Merging into the T2T liftover per contig..."
 CONTIGS=${T2T_CONTIGS:-$(tabix -l ${GNOMAD_T2T})}  # T2T_CONTIGS: a test run's contigs

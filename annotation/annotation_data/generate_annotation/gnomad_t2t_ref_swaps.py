@@ -74,9 +74,9 @@ def read_chains(chain_filename) -> Iterator[tuple]:
             yield chain
 
 
-def _sequence(fasta: pysam.FastaFile, contig: str) -> np.ndarray:
-    """ Upper case bases as bytes - a chromosome is ~250MB, so a few copies at most """
-    return np.frombuffer(fasta.fetch(contig).upper().encode(), dtype=np.uint8)
+def _sequence(fasta: pysam.FastaFile, contig: str, start=None, end=None) -> np.ndarray:
+    """ Upper case bases as bytes - a chromosome is ~250MB, so a couple of copies at most """
+    return np.frombuffer(fasta.fetch(contig, start, end).upper().encode(), dtype=np.uint8)
 
 
 def write_sites(args):
@@ -96,19 +96,21 @@ def write_sites(args):
         for t_chrom in chroms:
             t_seq = _sequence(grch38_fasta, grch38_contigs[t_chrom])
             rows = []
-            q_seqs = {}
             for _, _, q_name, q_size, q_strand, blocks in chains_by_target[t_chrom]:
                 q_chrom = q_name.removeprefix("chr")
-                if (q_chrom, q_strand) not in q_seqs:
-                    q_seq = _sequence(t2t_fasta, t2t_contigs[q_chrom])
-                    if q_strand == "-":
-                        # Blocks are on the reverse strand: compare against the reverse complement
-                        q_seq = COMPLEMENT_BYTES[q_seq[::-1]]
-                    q_seqs[(q_chrom, q_strand)] = q_seq
-                q_seq = q_seqs[(q_chrom, q_strand)]
+                # Only the span the chain covers (in its strand's coordinates), so a small chain onto another
+                # chromosome doesn't load that whole chromosome
+                q_lo = blocks[0][1]
+                q_hi = blocks[-1][1] + blocks[-1][2]
+                if q_strand == "-":
+                    # Blocks are on the reverse strand: compare against the reverse complement
+                    span = _sequence(t2t_fasta, t2t_contigs[q_chrom], q_size - q_hi, q_size - q_lo)
+                    span = COMPLEMENT_BYTES[span[::-1]]
+                else:
+                    span = _sequence(t2t_fasta, t2t_contigs[q_chrom], q_lo, q_hi)
                 for t_start, q_start, size in blocks:
                     t_block = t_seq[t_start:t_start + size]
-                    q_block = q_seq[q_start:q_start + size]
+                    q_block = span[q_start - q_lo:q_start - q_lo + size]
                     differ = (t_block != q_block) & np.isin(t_block, ACGT) & np.isin(q_block, ACGT)
                     for offset in np.flatnonzero(differ):
                         q_pos = q_start + offset
