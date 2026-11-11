@@ -123,6 +123,18 @@ class ExternalBeaconsViewTestCase(TestCase):
             self.client.get(self._url())
             self.assertEqual(mock_get.call_count, first_call_count)
 
+    def test_cache_from_a_different_query_is_refreshed(self):
+        """ A row cached from an earlier form of the query (e.g. before CNV length bounds) is a
+            miss, so the page never shows a count for a query it no longer sends. """
+        BeaconQueryCache.objects.create(variant=self.variant, node_id="nodeA", exists=True, count=4057,
+                                        params={"referenceName": "3", "start": 999})
+        payload = {"responseSummary": {"exists": True, "numTotalResults": 40}}
+        self.client.force_login(self.user)
+        with patch("beacon.client.requests.get", return_value=_mock_response(payload)):
+            self.client.get(self._url())
+        cache = BeaconQueryCache.objects.get(variant=self.variant, node_id="nodeA")
+        self.assertEqual(cache.count, 40)
+
     @override_settings(BEACON_OUTBOUND_ENABLED=False)
     def test_disabled_returns_empty(self):
         self.client.force_login(self.user)
@@ -163,16 +175,20 @@ class BeaconQueryGatingTestCase(TestCase):
         self.assertEqual(eligible["seq"]["start"], 999)  # 1-based -> 0-based
         self.assertEqual(eligible["seq"]["alternateBases"], "T")
 
-    def test_cnv_deletion_routes_to_cnv_node_as_range_query(self):
-        variant = self._variant(is_symbolic=True, chrom="9", position=21967752,
-                                ref="N", alt="<DEL>", svlen=-27549, end=21995301)
+    def test_cnv_deletion_routes_to_cnv_node_as_bracket_query(self):
+        variant = self._variant(is_symbolic=True, chrom="1", position=155209999,
+                                ref="N", alt="<DEL>", svlen=-20001, end=155230000)
         eligible = _eligible_queries(variant, self.grch38, self.both_nodes)
         self.assertEqual(list(eligible), ["cnv"])
         params = eligible["cnv"]
-        self.assertEqual(params["start"], 21967751)  # 0-based
-        self.assertEqual(params["end"], 21995301)    # position + abs(svlen)
         self.assertEqual(params["variantType"], "EFO:0030067")  # <DEL> -> copy number loss
-        self.assertNotIn("referenceBases", params)   # a range query, not an exact-allele one
+        self.assertNotIn("referenceBases", params)   # a span query, not an exact-allele one
+        # 0-based span 155209998-155230000 (20,002 bp) at 80% reciprocal overlap: a breakpoint may move
+        # 20% of our length inwards and 25% outwards, and the length 0.8x-1.25x ours
+        self.assertEqual(params["start"], "155204998,155213998")
+        self.assertEqual(params["end"], "155226000,155235000")
+        self.assertEqual(params["variantMinLength"], 16002)
+        self.assertEqual(params["variantMaxLength"], 25002)
 
     def test_cnv_duplication_maps_to_gain(self):
         variant = self._variant(is_symbolic=True, chrom="2", position=15940550,

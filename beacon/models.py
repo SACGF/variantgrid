@@ -25,6 +25,7 @@ class BeaconQueryCache(models.Model):
         Only a public coordinate is ever sent to reach these results. """
     variant = models.ForeignKey("snpdb.Variant", on_delete=models.CASCADE)
     node_id = models.CharField(max_length=64)           # key into settings.BEACON_QUERY_NODES
+    params = models.JSONField(null=True, blank=True)    # query sent; a different query is a cache miss
     exists = models.BooleanField(null=True, blank=True)  # None when the node didn't answer
     count = models.IntegerField(null=True, blank=True)  # None when the node returns no count
     error = models.TextField(null=True, blank=True)     # node unreachable / errored -> "unavailable"

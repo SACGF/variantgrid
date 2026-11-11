@@ -8,6 +8,7 @@ settings.BEACON_QUERY_NODES selects its target via `type` (and may restrict `ass
 gate the variant passes, plus a reason for each one it skipped, so a variant page shows only the
 Beacons that apply to that variant and why the rest did not.
 """
+import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional
@@ -32,6 +33,10 @@ class BeaconQueryTarget(ABC):
     def build_params(self, variant: Variant, genome_build: GenomeBuild) -> dict:
         """ The g_variants query params to send (only a public coordinate leaves). """
 
+    def describe(self, params: dict) -> str:
+        """ What a count from this query means, shown on the variant page. """
+        return ""
+
 
 class SnvBeaconTarget(BeaconQueryTarget):
     """ Sequence Beacons: an exact referenceBases/alternateBases coordinate query. """
@@ -47,17 +52,29 @@ class SnvBeaconTarget(BeaconQueryTarget):
 
 
 class CnvBeaconTarget(BeaconQueryTarget):
-    """ Copy-number Beacons (bycon/progenetix et al.): a symbolic <DEL>/<DUP> becomes a range
-        query for any copy-number event of that class overlapping the variant's span. The
+    """ Copy-number Beacons (bycon/progenetix et al.): a symbolic <DEL>/<DUP> becomes a bracket
+        query for copy-number events of that class that roughly match the variant's span. The
         per-sample copy number (on CohortGenotype) stays internal - only the public span and
         copy-number class leave. """
 
     domain = "copy-number DEL/DUP variant"
 
+    # A bare range query counts every overlapping event, which for a cancer copy-number Beacon is
+    # dominated by arm-level and whole-chromosome losses/gains. Matching is the same reciprocal
+    # overlap as gnomAD-SV annotation (ANNOTATION_VEP_SV_OVERLAP_MIN_FRACTION). A Beacon only returns
+    # a count, so the query carries the bounds that overlap implies: each breakpoint within the shift
+    # it allows, and the length within MIN_RECIPROCAL_OVERLAP..1/MIN_RECIPROCAL_OVERLAP of ours. That
+    # is slightly looser than the overlap itself where both breakpoints are near their limits.
+    MIN_RECIPROCAL_OVERLAP = 0.8
+
     # VG symbolic alt -> GA4GH/EFO copy-number class (validated live against progenetix).
     VARIANT_TYPE_EFO = {
         VCFSymbolicAllele.DEL: "EFO:0030067",  # copy number loss
         VCFSymbolicAllele.DUP: "EFO:0030070",  # copy number gain
+    }
+    EFO_LABELS = {
+        "EFO:0030067": "copy number loss",
+        "EFO:0030070": "copy number gain",
     }
 
     def _efo(self, vc) -> Optional[str]:
@@ -69,13 +86,27 @@ class CnvBeaconTarget(BeaconQueryTarget):
 
     def build_params(self, variant, genome_build) -> dict:
         vc = variant.coordinate
+        start = vc.position - 1  # 1-based -> 0-based
+        end = vc.end             # position + abs(svlen)
+        length = end - start
+        overlap = self.MIN_RECIPROCAL_OVERLAP
+        # Moving a breakpoint inwards shrinks the overlap against our length, outwards against theirs
+        inwards = int(length * (1 - overlap))
+        outwards = int(length * (1 - overlap) / overlap)
         return {
             "referenceName": vc.chrom.replace("chr", ""),
             "assemblyId": genome_build.name,
-            "start": vc.position - 1,  # 1-based -> 0-based
-            "end": vc.end,             # position + abs(svlen)
+            # Beacon v2 bracket query: an event whose start and end each fall in the given range
+            "start": f"{max(0, start - outwards)},{start + inwards}",
+            "end": f"{end - inwards},{end + outwards}",
             "variantType": self._efo(vc),
+            "variantMinLength": math.ceil(length * overlap),
+            "variantMaxLength": int(length / overlap),
         }
+
+    def describe(self, params: dict) -> str:
+        event = self.EFO_LABELS[params["variantType"]]
+        return f"{event} events with at least {self.MIN_RECIPROCAL_OVERLAP:.0%} reciprocal overlap"
 
 
 TARGETS: dict[str, BeaconQueryTarget] = {
@@ -93,6 +124,7 @@ class NodeEligibility:
     eligible: bool
     params: Optional[dict] = None
     reason: Optional[str] = None
+    description: str = ""
 
 
 def evaluate_queries(variant: Variant, genome_build: GenomeBuild, node_configs: dict) -> list[NodeEligibility]:
@@ -118,6 +150,7 @@ def evaluate_queries(variant: Variant, genome_build: GenomeBuild, node_configs: 
             results.append(NodeEligibility(node_id, node_type, False,
                                            reason=f"only queried for a {target.domain}"))
             continue
-        results.append(NodeEligibility(node_id, node_type, True,
-                                       params=target.build_params(variant, genome_build)))
+        params = target.build_params(variant, genome_build)
+        results.append(NodeEligibility(node_id, node_type, True, params=params,
+                                       description=target.describe(params)))
     return results
