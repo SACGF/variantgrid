@@ -41,7 +41,7 @@ Route by task. The app notes (`<app>/AGENTS.md`) load automatically when you wor
 | a page, grid, template tag, JS behaviour | `uicore/AGENTS.md` (grids in `#grids`) | `vg page <url> --queries`, `--js-writes-to-database` |
 | permissions, notifications, previews, `library/utils` | `library/AGENTS.md` | - |
 | the user-facing changelog (`system/changelog`) | `variantgrid/templates/default_templates/changelog.html` (rules in its header comment) | `git log` since its last update |
-| a management command that must run on deploy | `manual/__manual_readme.md` | `manage.py manual_outstanding` |
+| a migration, a management command that must run on deploy, a one-off fix or backfill | `manual/AGENTS.md`, `manual/__manual_readme.md` | `manage.py manual_outstanding` |
 | a breakage the migration squash (#736) could explain: missing seed data, a data fix that never ran | `manual/__manual_readme.md#the-migration-squash` | `git show pre_squash_checkpoint:<path>` |
 | a setting, secrets, services, deploy, scale | `claude/guides/operations.md` | `vg settings NAME`, `vg status` |
 | writing a test | `claude/guides/testing.md` (fixture index) | `scripts/vg tests --explain` |
@@ -184,24 +184,9 @@ the compile rules are in `variantgrid/static_files/AGENTS.md`.
 JS goes in a static file under `default_static/js/<app>/`, not inline in a template: the template keeps only a `<script src>`
 and a short init call passing page values. A JS block in a template you are editing moves out with the change.
 
-### Editing a pushed migration
-By default, express a change of mind about a pushed migration (a field removed, a default changed) as a new migration on
-top: renaming or editing one that a deployment has applied leaves `django_migrations` pointing at a name that no longer
-exists (`InconsistentMigrationHistory`), repaired by hand on every database. A migration that only exists locally
-(unpushed) can still be reshaped or regenerated - check with `git log origin/master -- <migration file>`. When I say a
-pushed migration is safe to edit (it hasn't reached a deployment, or I'll fix the databases), edit it as asked.
-Changing a library call inside a pushed migration (a renamed helper, an inlined one) is fine when the migration's behaviour
-stays identical: migrations never freeze the names of the code they import.
-
-### Manual migrations (management commands on deploy)
-A new management command that must run on existing deployments goes in a migration as a `ManualOperation`
-(`manual/operations/manual_operations.py`, example the `ManualOperation.operation_manage` calls in
-`snpdb/migrations/0002_seed_data.py`).
-A one-off fix or backfill - something run once on existing data - is deleted at the next migration checkpoint
-(`manual/__manual_readme.md#one-off-commands`), so make that obvious: name it `one_off_<what_it_fixes>`, declare
-`category = "one-off"`, and keep all its code (queries, recounts, helpers) in the command file and its test, so
-removing it leaves core code unchanged. Calling existing core functions is fine. A core change the fix needs, such
-as a new parameter, belongs in the PR only if the code would keep it once the command is gone.
+### Migrations, manual operations and one-off commands
+Read `manual/AGENTS.md` before writing or editing a migration, a command that must run on deploy, or a one-off
+fix or backfill, in any app: editing a pushed migration, `ManualOperation`, and how a one-off is shaped.
 
 ### Celery
 A task with no `queue=` or `CELERY_TASK_ROUTES` entry runs on the default queue, db_workers, which suits most tasks. Route
@@ -227,6 +212,20 @@ reporting back.
 When a change has a side effect worth reporting (a deployment has to re-run something, a check now fails, a cost
 someone pays), say what would remove it alongside the caveat - often the existing code that causes it is stricter
 than it needs to be - or say why nothing does.
+
+### Fix the cause
+An issue's proposed fix is a starting point, not the spec. Before building a warning, a display change or a
+skip around bad data or a missing capability, find the cause and say whether it can be fixed where it starts
+(the data file, the importer, the shared code every caller goes through).
+Before designing, find how the code already handles the same kind of problem and extend that. A design that
+needs the data model to hold something it normally never does, such as overlapping ranges or a row that
+disagrees with its parent, is a workaround.
+When the proper fix is bigger than what was asked (regenerating data, a new core capability, a re-annotation),
+don't quietly ship the workaround: put both options to me, with the cost of each, before building. If I'm not
+around to ask, build the proper fix if it's in reach. If not, open the workaround PR as a draft whose body
+starts with the choice, so a workaround is never reported as the fix.
+"Least invasive" means the fewest moving parts for a correct result, not avoiding core changes. A brief handed
+to a subagent carries the problem, not an issue's proposed fix.
 
 ### Testing
 `claude/guides/testing.md` has the base classes and the fixture index.

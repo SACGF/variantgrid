@@ -6,6 +6,9 @@ Plans live in `claude/plans/<issue>_<slug>_plan.md`. Directly under the title, r
 judgement it reflects. Update the line if a different model revises the plan. Add a `Status:` line
 (`draft | approved | in progress | landed <sha> | superseded by <plan>`) and keep it current.
 
+Near the top, one line: `Cause: <what actually produces the problem>; fixed at the cause, or why not.` A plan that
+fixes a symptom says so there, and the user decides on it at review (AGENTS.md "Fix the cause").
+
 A plan states the chosen design: what the code and data will be, and why. Leave out rejected alternatives,
 "considered and dropped" sections and revision history (what changed since the last draft, review notes, struck-through
 text) - when the design changes, rewrite the text in place so it reads as the current decision. Once part of a plan
