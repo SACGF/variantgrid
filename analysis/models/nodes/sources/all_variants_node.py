@@ -1,4 +1,5 @@
-from functools import cached_property
+import operator
+from functools import cached_property, reduce
 from typing import Optional
 
 from auditlog.registry import auditlog
@@ -13,11 +14,12 @@ from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
 from genes.models import GeneSymbol
 from library.django_utils import highest_pk
 from snpdb.models import Variant, VariantZygosityCountCollection
-from snpdb.models.models_genome import Contig
+from snpdb.models.models_genome import Contig, Cytoband
 from snpdb.variant_filters import (
     get_all_variant_types,
     get_contig_ids_for_variant_types,
     get_contigs_q,
+    get_cytobands_q,
     get_gene_symbols_q,
     get_variant_type_labels,
     get_variant_types_q,
@@ -64,6 +66,16 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
         ).order_by("contig__genomebuildcontig__order")
         return list(qs.values_list("contig_id", flat=True))
 
+    @cached_property
+    def cytobands(self) -> list[Cytoband]:
+        if self.pk is None:
+            return []
+        qs = Cytoband.objects.filter(
+            allvariantsnodecytoband__all_variants_node=self,
+            contig__genomebuildcontig__genome_build=self.analysis.genome_build
+        ).select_related("contig").order_by(*Cytoband.GENOME_BUILD_ORDERING)
+        return list(qs)
+
     @staticmethod
     def all_variant_types() -> list[str]:
         """ What "everything selected" means for this node - the grid's types plus reference """
@@ -72,11 +84,9 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
     def _get_node_arg_q_dict(self) -> dict[Optional[str], dict[str, Q]]:
         """ Restrict to analysis genome build """
 
-        genome_build = self.analysis.genome_build
-        contig_ids = get_contig_ids_for_variant_types(genome_build, self.contig_ids, self.variant_types)
-        q_contigs = get_contigs_q(genome_build, contig_ids=contig_ids)
+        q_regions = self._get_regions_q()
         q_dict = {
-            str(q_contigs): q_contigs,
+            str(q_regions): q_regions,
         }
         if self.gene_symbol:
             q_gene = get_gene_symbols_q(self.analysis.annotation_version, [self.gene_symbol], traverse_aliases=False)
@@ -91,14 +101,31 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
         self.merge_arg_q_dicts(arg_q_dict, self.get_zygosity_count_arg_q_dict())
         return arg_q_dict
 
+    def _get_regions_q(self) -> Q:
+        """ The chromosomes and bands OR together. Only a chromosome selection lets the gene-level contig
+            (fusions etc) through - nobody can tick it, and a band never matches one """
+        genome_build = self.analysis.genome_build
+        if not (self.contig_ids or self.cytobands):
+            return get_contigs_q(genome_build)
+        q_list = []
+        if self.contig_ids:
+            contig_ids = get_contig_ids_for_variant_types(genome_build, self.contig_ids, self.variant_types)
+            q_list.append(get_contigs_q(genome_build, contig_ids=contig_ids))
+        if q_cytobands := get_cytobands_q(self.cytobands):
+            q_list.append(q_cytobands)
+        return reduce(operator.or_, q_list)
+
     def get_node_name(self):
         name_lines = []
+        regions = []
         if self.contig_ids:
-            contig_names = list(Contig.objects.filter(pk__in=self.contig_ids,
-                                                      genomebuildcontig__genome_build=self.analysis.genome_build)
-                                .order_by("genomebuildcontig__order")
-                                .values_list("name", flat=True))
-            name_lines.append(", ".join(contig_names))
+            regions.extend(Contig.objects.filter(pk__in=self.contig_ids,
+                                                 genomebuildcontig__genome_build=self.analysis.genome_build)
+                           .order_by("genomebuildcontig__order")
+                           .values_list("name", flat=True))
+        regions.extend(str(cytoband) for cytoband in self.cytobands)
+        if regions:
+            name_lines.append(", ".join(regions))
         if self.gene_symbol:
             name_lines.append(self.gene_symbol_id)
 
@@ -134,9 +161,12 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
 
     def save_clone(self):
         contig_ids = self.contig_ids  # Save before clone
+        cytobands = self.cytobands
         copy = super().save_clone()
         for contig_id in contig_ids:
             copy.allvariantsnodecontig_set.create(contig_id=contig_id)
+        for cytoband in cytobands:
+            copy.allvariantsnodecytoband_set.create(cytoband=cytoband)
         return copy
 
     @cached_property
@@ -195,5 +225,21 @@ class AllVariantsNodeContig(NodeAuditLogMixin, models.Model):
         return f"AllVariantsNodeContig {self.all_variants_node_id}: {self.contig}"
 
 
+class AllVariantsNodeCytoband(NodeAuditLogMixin, models.Model):
+    """ Stores multi-select cytoband values """
+    all_variants_node = models.ForeignKey(AllVariantsNode, on_delete=CASCADE)
+    cytoband = models.ForeignKey(Cytoband, on_delete=CASCADE)
+
+    class Meta:
+        unique_together = ("all_variants_node", "cytoband")
+
+    def __str__(self):
+        return f"AllVariantsNodeCytoband {self.all_variants_node_id}: {self.cytoband}"
+
+    def _get_node(self):
+        return self.all_variants_node
+
+
 auditlog.register(AllVariantsNode)
 auditlog.register(AllVariantsNodeContig)
+auditlog.register(AllVariantsNodeCytoband)

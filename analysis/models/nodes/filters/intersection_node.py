@@ -25,6 +25,7 @@ from snpdb.enums import ImportStatus
 from snpdb.models import GenomicIntervalsCollection, VariantCollection
 from snpdb.models.models_genome import Contig, Cytoband
 from snpdb.models.models_variant import Variant
+from snpdb.variant_filters import get_cytobands_q
 from snpdb.variants_to_vcf import write_qs_to_vcf_file_sort_alphabetically
 
 
@@ -117,9 +118,8 @@ class IntersectionNode(AnalysisNode):
             q = self._get_variants_q()
         elif self.accordion_panel == self.CONTIG:
             q_list = [Q(locus__contig_id=c) for c in self.contig_ids]
-            q_list.extend(Q(locus__contig_id=cytoband.contig_id,
-                            locus__position__gte=cytoband.start, locus__position__lte=cytoband.end)
-                          for cytoband in self.cytobands)
+            if q_cytobands := get_cytobands_q(self.cytobands):
+                q_list.append(q_cytobands)
             if q_list:
                 q = reduce(operator.or_, q_list)
             else:

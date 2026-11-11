@@ -1,9 +1,11 @@
 """ AllVariantsNode's variant type checkboxes - the Q is built as an OR of the selected types or as the
-    complement of the unselected ones, whichever is cheaper, and both have to select the same variants """
+    complement of the unselected ones, whichever is cheaper, and both have to select the same variants -
+    and its chromosome and cytoband pickers """
 from importlib import import_module
 
 from django.test import SimpleTestCase, TestCase, override_settings
 
+from analysis.forms.forms_nodes import AllVariantsNodeForm
 from analysis.models import AllVariantsNode
 from analysis.tests.utils import AnalysisSetupMixin
 from genes.fake_data import create_gene_level_variant
@@ -12,6 +14,7 @@ from genes.tests.gene_fusion_test_utils import create_gene_fusion
 from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VCFSymbolicAllele
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN
 from snpdb.models import Variant, VariantCoordinate
+from snpdb.models.models_genome import Cytoband
 from snpdb.tests.utils.vcf_testing_utils import (
     slowly_create_test_variant,
     slowly_create_test_variant_from_coordinate,
@@ -90,6 +93,50 @@ class AllVariantsNodeVariantTypeTest(AnalysisSetupMixin, TestCase):
                 for q in node._get_node_arg_q_dict()[None].values():
                     qs = qs.filter(q)
                 self.assertEqual(every_variant_id, set(qs.values_list("pk", flat=True)))
+
+
+@override_settings(ANALYSIS_NODE_CACHE_Q=False)
+class AllVariantsNodeCytobandTest(AnalysisSetupMixin, TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        contig_11 = cls.grch37.chrom_contig_mappings["11"]
+        cls.band_11p13 = Cytoband.objects.get(contig=contig_11, name="p13")  # 31000001-36400000
+        cls.in_band = slowly_create_test_variant("11", 31000001, "A", "G", cls.grch37)
+        cls.outside_band = slowly_create_test_variant("11", 36400001, "A", "G", cls.grch37)
+        cls.on_chrom_2 = slowly_create_test_variant("2", 1000, "A", "G", cls.grch37)
+        for symbol in ["CD74", "ROS1"]:
+            GeneSymbol.objects.get_or_create(symbol=symbol)
+        cls.fusion = create_gene_fusion("CD74", "ROS1").variant
+
+    def _save_form(self, contigs=(), cytobands=()) -> AllVariantsNode:
+        node = AllVariantsNode.objects.create(analysis=self.analysis)
+        data = {"contigs": [c.pk for c in contigs], "cytobands": [c.pk for c in cytobands],
+                "variant_types": get_all_variant_types(), "max_variant": self.on_chrom_2.pk,
+                "min_het_or_hom_count": 0}
+        form = AllVariantsNodeForm(data, instance=node, genome_build=self.grch37)
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        return AllVariantsNode.objects.get(pk=node.pk)
+
+    def _filtered_variants(self, node: AllVariantsNode) -> set[Variant]:
+        test_variants = [self.in_band, self.outside_band, self.on_chrom_2, self.fusion]
+        qs = Variant.objects.filter(pk__in=[v.pk for v in test_variants])
+        for q in node._get_node_arg_q_dict()[None].values():
+            qs = qs.filter(q)
+        return set(qs)
+
+    def test_band_filters_to_its_coordinates(self):
+        node = self._save_form(cytobands=[self.band_11p13])
+        self.assertEqual(self._filtered_variants(node), {self.in_band})
+        self.assertEqual(node.get_node_name(), "11p13")
+
+    def test_chromosomes_or_bands(self):
+        """ The chromosome selection is what lets the gene-level fusion through """
+        contig_2 = self.grch37.chrom_contig_mappings["2"]
+        node = self._save_form(contigs=[contig_2], cytobands=[self.band_11p13])
+        self.assertEqual(self._filtered_variants(node), {self.in_band, self.on_chrom_2, self.fusion})
+        self.assertEqual(node.get_node_name(), "2, 11p13")
 
 
 class AllVariantsNodeNameTest(SimpleTestCase):

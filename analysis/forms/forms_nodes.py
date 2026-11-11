@@ -383,11 +383,16 @@ class AnalysisOutputNodeChoiceForm(forms.Form):
         self.fields["node"].queryset = node_qs
 
 
-class AllVariantsNodeForm(BaseNodeForm):
+class AllVariantsNodeForm(GenomeBuildAutocompleteForwardMixin, BaseNodeForm):
+    genome_build_fields = ["contigs", "cytobands"]
     contigs = forms.ModelMultipleChoiceField(required=False,
                                              queryset=Contig.objects.all(),
                                              widget=ModelSelect2Multiple(url='contig_autocomplete',
                                                                          attrs={'data-placeholder': 'Chromosome...'}))
+    cytobands = forms.ModelMultipleChoiceField(required=False,
+                                               queryset=Cytoband.objects.all(),
+                                               widget=ModelSelect2Multiple(url='cytoband_autocomplete',
+                                                                           attrs={'data-placeholder': 'Band or arm, eg 11p13, 17p'}))
     variant_types = VariantTypesField(include_reference=True, label="Variant types")
 
     class Meta:
@@ -410,12 +415,6 @@ class AllVariantsNodeForm(BaseNodeForm):
                    'min_hom_count': WIDGET_INTEGER_MIN_0,
                    'max_hom_count': WIDGET_INTEGER_MIN_1}
 
-    def __init__(self, *args, **kwargs):
-        genome_build = kwargs.pop("genome_build", None)
-        super().__init__(*args, **kwargs)
-        if genome_build:
-            self.fields["contigs"].widget.forward = [forward.Const(genome_build.pk, "genome_build_id")]
-
     def save(self, commit=True):
         node = super().save(commit=False)
 
@@ -423,6 +422,11 @@ class AllVariantsNodeForm(BaseNodeForm):
         contigs_set.all().delete()
         for contig in self.cleaned_data["contigs"]:
             contigs_set.create(contig=contig)
+
+        cytobands_set = self.instance.allvariantsnodecytoband_set
+        cytobands_set.all().delete()
+        for cytoband in self.cleaned_data["cytobands"]:
+            cytobands_set.create(cytoband=cytoband)
 
         if commit:
             node.save()
