@@ -6,10 +6,10 @@ Start with: `guardian_utils.py` (DjangoPermission, group getters, assign_permiss
 report_message) · `preview_request.py` (PreviewModelMixin, PreviewData, the preview signals) ·
 `django_utils/unittest_utils.py` (URLTestCase, query profiling) · `django_utils/django_object_managers.py`
 Patterns here:
-- `library` sits below the apps: `.importlinter` (checked in CI by `lint-imports`) forbids it importing one. Code that
-  needs an app's models belongs in that app (`snpdb/vcf_utils.py`, `snpdb/keycloak.py`, `snpdb/views/datatable_dataframe.py`
-  are examples); the contract's `ignore_imports` lists the remaining exceptions, and an entry nothing matches fails
-  the check, so delete it when you remove the import.
+- `library` sits below the apps (Imports, below). Code that needs an app's models belongs in that app
+  (`snpdb/vcf_utils.py`, `snpdb/keycloak.py`, `snpdb/views/datatable_dataframe.py` are examples); the contract's
+  `ignore_imports` lists the remaining exceptions, and an entry nothing matches fails the check, so delete it when you
+  remove the import.
 - Timestamped models inherit `model_utils.models.TimeStampedModel` (pylint bans the `django_extensions` one). Its
   `save()` adds `modified` to any `update_fields`, so a write that must leave `modified` alone (an internal fix, an
   import run with no data change) goes through `QuerySet.update()` / `bulk_update()` - `modified` drives exports and
@@ -109,3 +109,14 @@ count, duplicates and timings via `library/django_utils/unittest_utils.py:QueryP
 also writes Python stacks for matching SQL to `<file>.trace`. Under `UNIT_TEST` the cache is in-process LocMem,
 Rollbar and axes are off, and Postgres JIT is disabled. Library's own tests: `library/tests/`, `library/django_utils/tests/`.
 Deep reference: __library_readme.md · claude/research/library.md
+
+## Imports
+Imports go at the top of the file (root `AGENTS.md`, Python style). Inside a package, import a name from the module
+that defines it (`from snpdb.models.models_vcf import VCF`), not through the package `__init__` that re-exports it -
+that is the usual cause of a cycle. Importing any submodule still runs its package `__init__` first, so a module that
+an app's models import can't import anything under that `models` package. The exception is an app's enums, which live
+in an `<app>/enums/` package outside `models/` (`classification/enums/`): its `__init__` star-imports each
+`<topic>_enums.py`, so callers write `from classification.enums import ShareLevel`. An enums module imports only
+`library`, Django and other enums packages, never an app's `models`. `scripts/vg imports cycles` (which follows those
+`__init__` imports) and `lint-imports` (`.importlinter`: `library` never imports an app, and app models import only
+the apps below them - `snpdb` < `genes` < `annotation` < `classification` < `analysis`) both gate CI.

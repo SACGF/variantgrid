@@ -145,9 +145,22 @@ class Test(URLTestCase):
 - Query budgets: wrap the call in `CaptureQueriesContext(connection)` and assert on `production_query_count(ctx.captured_queries)`, which drops savepoints and reads of `PRODUCTION_CACHED_TABLES` (GenomeBuild, GeneSymbol, FlagType, ResolvedVariantInfo, Allele, Organization, Lab - their managers cache in production but not under `UNIT_TEST`). Raw `assertNumQueries` over-counts by exactly those.
 - `VG_QUERY_PROFILE=/path.jsonl manage.py test ...` swaps in `QueryProfilingClient`: one JSON line per GET with status, query count, ms and duplicated (N+1) SQL. Add `VG_QUERY_TRACE=<regex>` to log a stack trace to `<path>.trace` for each matching statement.
 
+## Which tests to keep
+
+Write as many tests as you like while developing - they're a great way to check your work as you go. When the code is
+finished, audit them and delete the ones that don't earn their keep. Every test kept is code to run, read and maintain,
+and one more thing to update when refactoring. A test earns its keep when it covers logic *we* wrote: a branch, a fallback,
+a calculation, a rule that's easy to get wrong later. The most common thing to throw away is a test of framework behaviour
+rather than ours - that `blank=True` makes a field optional, that a `disabled` form field ignores POSTed data, that
+`order_fields` orders fields. Django is already tested. If the test would still pass with our logic deleted, or it only
+restates a field declaration, drop it. The other test to throw away is the change-detector - one that asserts what the
+code currently does (the text of a generated Q, which private helper was called, a value copied from the first run)
+rather than what it is supposed to do; the next section shows the five forms found in this repo and the
+behaviour-level test to write instead.
+
 ## Change-detector tests
 
-A test earns its keep by checking what the code is *supposed* to do (`AGENTS.md`, Testing). The failure mode to
+A test earns its keep by checking what the code is *supposed* to do (Which tests to keep, above). The failure mode to
 watch for in a test written alongside the code it tests - which is how most tests here were written - is the
 change-detector (Google's name for it: testing.googleblog.com, "Change-Detector Tests Considered Harmful"): it
 asserts what the code *currently does*, so it fails on any equivalent rewrite and passes on any bug that keeps the
