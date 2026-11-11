@@ -171,6 +171,10 @@ class AllVariantsNodeNameTest(SimpleTestCase):
     def test_nothing_ticked_says_nothing(self):
         self.assertEqual("", AllVariantsNode(variant_types=[]).get_node_name())
 
+    def test_every_type_with_reference_is_short(self):
+        node = AllVariantsNode(variant_types=AllVariantsNode.all_variant_types())
+        self.assertEqual("(incl. Reference)", node.get_node_name())
+
 
 class AllVariantsNodeMigrationTest(SimpleTestCase):
     """ The eight checkboxes an AllVariantsNode had become the grid's types (migration 0015) """

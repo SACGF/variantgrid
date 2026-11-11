@@ -16,11 +16,13 @@ from snpdb.models import Variant, VariantZygosityCountCollection
 from snpdb.models.models_genome import Contig, Cytoband
 from snpdb.variant_filters import (
     ContigRegion,
+    VariantType,
     get_all_variant_types,
     get_gene_symbols_q,
     get_regions_q,
     get_variant_type_labels,
     get_variant_types_q,
+    restricts_variant_types,
 )
 
 
@@ -122,9 +124,13 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
         if self.gene_symbol:
             name_lines.append(self.gene_symbol_id)
 
-        if self.variant_types and set(self.variant_types) != set(get_all_variant_types()):
-            type_names = ", ".join(get_variant_type_labels(self.variant_types))
-            name_lines.append(f"(type: {type_names})")
+        selected = set(self.variant_types or [])
+        if restricts_variant_types(selected, all_variant_types=self.all_variant_types()):
+            if selected != set(get_all_variant_types()):
+                type_names = ", ".join(get_variant_type_labels(selected))
+                name_lines.append(f"(type: {type_names})")
+        elif VariantType.REFERENCE in selected:
+            name_lines.append("(incl. Reference)")
 
         return "\n".join(name_lines)
 
