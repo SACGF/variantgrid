@@ -26,8 +26,8 @@ from snpdb.models.models_vcf import SampleStatsCodeVersion
 
 # Targeted panels can have too few chrX calls for the hom/het ratio to mean anything
 MIN_CHRX_VARIANTS_FOR_SEX_GUESS = 30
-# A female's chrX has about as many hom alt calls as het, a male's hets are only pseudoautosomal or
-# miscalled so hom outnumbers them many times over. The gap between is unknown: we only call when sure
+# A female's chrX has about as many hom alt calls as het, a male's (outside the pseudoautosomal regions) are
+# miscalls so hom outnumbers them many times over. The gap between is unknown: we only call when sure
 CHRX_FEMALE_MAX_HOM_HET_RATIO = 1.5
 CHRX_MALE_MIN_HOM_HET_RATIO = 5
 
@@ -35,7 +35,8 @@ DETECTED_SEX_HELP = (
     "Sex called from the sample's chrX hom/het genotype ratio - males are hemizygous so have almost "
     f"no heterozygous chrX calls. Above {CHRX_MALE_MIN_HOM_HET_RATIO} is male, below "
     f"{CHRX_FEMALE_MAX_HOM_HET_RATIO} is female, in between is unknown, and it takes at least "
-    f"{MIN_CHRX_VARIANTS_FOR_SEX_GUESS} chrX calls to call it at all. Structural variants aren't counted."
+    f"{MIN_CHRX_VARIANTS_FOR_SEX_GUESS} chrX calls to call it at all. Structural variants and the "
+    "pseudoautosomal regions aren't counted."
 )
 
 
@@ -134,13 +135,12 @@ class CohortGenotypeStats(TimeStampedModel):
     @property
     def chrx_sex_guess(self) -> Sex:
         """ Genetic sex from the chrX hom/het ratio - UNKNOWN if we don't have enough calls to tell """
-        if self.x_het_count and self.x_hom_count:
-            if self.chrx_genotyped_count >= MIN_CHRX_VARIANTS_FOR_SEX_GUESS:
-                ratio = self.chrx_hom_het_ratio
-                if ratio < CHRX_FEMALE_MAX_HOM_HET_RATIO:
-                    return Sex.FEMALE
-                if ratio > CHRX_MALE_MIN_HOM_HET_RATIO:
-                    return Sex.MALE
+        if self.x_hom_count and self.chrx_genotyped_count >= MIN_CHRX_VARIANTS_FOR_SEX_GUESS:
+            ratio = self.chrx_hom_het_ratio
+            if ratio is None or ratio > CHRX_MALE_MIN_HOM_HET_RATIO:  # no hets - hemizygous calls
+                return Sex.MALE
+            if ratio < CHRX_FEMALE_MAX_HOM_HET_RATIO:
+                return Sex.FEMALE
         return Sex.UNKNOWN
 
     @property

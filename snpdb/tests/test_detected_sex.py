@@ -37,8 +37,9 @@ class TestChrXSexGuess(TestCase):
         low = MIN_CHRX_VARIANTS_FOR_SEX_GUESS - 2
         self.assertEqual(Sex.UNKNOWN, self._stats(low, 1).chrx_sex_guess)
 
-    def test_no_hets_unknown(self):
-        self.assertEqual(Sex.UNKNOWN, self._stats(500, 0).chrx_sex_guess)
+    def test_no_hets_male(self):
+        """ A caller that knows chrX is haploid in males makes no hets there at all """
+        self.assertEqual(Sex.MALE, self._stats(500, 0).chrx_sex_guess)
 
 
 class TestSampleDetectedSex(TestCase):
