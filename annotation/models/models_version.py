@@ -265,6 +265,8 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
             ),
         ]
 
+    GNOMAD_VERSIONS_LACKING_REF_SWAPS = {"4.1.t2t_liftover"}
+
     @property
     def gnomad_major_version(self) -> int:
         # Pre-migration GRCh37 versions stored the VEP-style "r2.1"
@@ -272,10 +274,11 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
         return int(major.removeprefix("r"))
 
     @property
-    def gnomad_is_liftover(self) -> bool:
-        """ gnomAD lifted over from another build (T2T's "4.1.t2t_liftover"). The liftover drops sites where this
-            build's reference allele differs from GRCh38's, so variants there have no gnomAD frequency (#2788) """
-        return "liftover" in (self.gnomad or "")
+    def gnomad_lacks_ref_swaps(self) -> bool:
+        """ gnomAD's own T2T liftover ("4.1.t2t_liftover") drops sites where CHM13's reference allele differs from
+            GRCh38's, so variants there have no gnomAD frequency. "4.1.t2t_liftover_ref_swaps" adds them back
+            (annotation/annotation_data/generate_annotation/gnomad_t2t_ref_swaps.sh, #2788) """
+        return self.gnomad in self.GNOMAD_VERSIONS_LACKING_REF_SWAPS
 
     @property
     def uses_raw_spliceai(self) -> bool:

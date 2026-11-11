@@ -1,6 +1,7 @@
 """
-PopulationNode on a build whose gnomAD is lifted over (T2T, #2788): variants where the build's reference allele
-differs from GRCh38's have no gnomAD AF, so a gnomAD frequency filter keeps them as rare - the node warns.
+PopulationNode on gnomAD's own T2T liftover (#2788): variants where CHM13's reference allele differs from GRCh38's
+have no gnomAD AF, so a gnomAD frequency filter keeps them as rare - the node warns, until the version uses the
+regenerated file that adds them.
 """
 from django.test import TestCase
 
@@ -30,6 +31,8 @@ class TestPopulationNodeGnomADLiftover(AnalysisSetupMixin, TestCase):
         self.assertFalse(self._warns())  # 100% - no filter
         self.assertFalse(self._warns(percent=1, gnomad_af=False, af_1kg=True))
 
-    def test_no_warning_on_native_gnomad(self):
-        self._set_gnomad("4.1")
-        self.assertFalse(self._warns(percent=1))
+    def test_no_warning_on_native_gnomad_or_with_ref_swaps(self):
+        for gnomad in ["4.1", "4.1.t2t_liftover_ref_swaps"]:
+            with self.subTest(gnomad=gnomad):
+                self._set_gnomad(gnomad)
+                self.assertFalse(self._warns(percent=1))

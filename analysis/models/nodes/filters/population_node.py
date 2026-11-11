@@ -93,11 +93,12 @@ class PopulationNode(AnalysisNode):
     def get_warnings(self) -> list[str]:
         warnings = super().get_warnings()
         vav = self.analysis.annotation_version.variant_annotation_version
-        if vav.gnomad_is_liftover and self._filters_on_gnomad():
+        if vav.gnomad_lacks_ref_swaps and self._filters_on_gnomad():
             warnings.append(
                 f"gnomAD on {vav.genome_build} ({vav.gnomad}) is lifted over from GRCh38, which drops sites "
                 f"where the {vav.genome_build} reference carries a different allele from GRCh38. Variants there have "
-                "no gnomAD frequency, so this node keeps them as rare - though many are common."
+                "no gnomAD frequency, so this node keeps them as rare - though many are common. Annotation versions "
+                "using gnomAD 4.1.t2t_liftover_ref_swaps have them."
             )
         return warnings
 

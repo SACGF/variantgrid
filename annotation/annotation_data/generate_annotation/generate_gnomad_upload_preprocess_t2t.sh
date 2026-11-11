@@ -14,11 +14,12 @@ VARIANTGRID_DIR=$(dirname $(dirname $(dirname $(dirname ${BASH_SOURCE[0]}))))
 CHROM_MAPPING_DIR=${VARIANTGRID_DIR}/snpdb/genome
 
 GENOME_BUILD=T2T-CHM13v2.0
-GNOMAD_VERSION_T2T=4.1.t2t_liftover
+# 4.1.t2t_liftover_ref_swaps is gnomAD's liftover plus the sites it drops (gnomad_t2t_ref_swaps.sh, #2788)
+GNOMAD_VERSION_T2T=${GNOMAD_VERSION_T2T:-4.1.t2t_liftover_ref_swaps}
 
 ANNOTATION_DATA_DIR=${VEP_ANNOTATION_DIR}/annotation_data/T2T-CHM13v2.0
 CHROM_MAPPING=${CHROM_MAPPING_DIR}/chrom_mapping_${GENOME_BUILD}.map
-GNOMAD_VCF=${ANNOTATION_DATA_DIR}/gnomad4.1.t2t_liftover_T2T-CHM13v2.0_combined_af.vcf.bgz
+GNOMAD_VCF=${ANNOTATION_DATA_DIR}/gnomad${GNOMAD_VERSION_T2T}_T2T-CHM13v2.0_combined_af.vcf.bgz
 OUTPUT_NAME=gnomad${GNOMAD_VERSION_T2T}_${GENOME_BUILD}_af_greater_than_5
 OUTPUT_AF=${ANNOTATION_DATA_DIR}/${OUTPUT_NAME}.vcf.gz
 OUTPUT_STRIPPED=${ANNOTATION_DATA_DIR}/${OUTPUT_NAME}.stripped.vcf.gz
