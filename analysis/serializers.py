@@ -51,7 +51,7 @@ from analysis.models.nodes.node_allele_frequency import (
     NodeAlleleFrequencyFilter,
     NodeAlleleFrequencyRange,
 )
-from analysis.models.nodes.sources.all_variants_node import AllVariantsNodeContig
+from analysis.models.nodes.sources.all_variants_node import AllVariantsNodeContig, AllVariantsNodeCytoband
 from genes.models import PanelAppPanel, PanelAppServer
 from genes.serializers import GeneListSerializer
 from library.django_utils import get_model_fields
@@ -158,6 +158,20 @@ class AnalysisNodeSerializer(DynamicFieldsModelSerializer):
                 self.add_import_warning(f"contig '{name}' not in {analysis.genome_build} - left out")
         return contigs
 
+    def get_cytobands(self, analysis, cytoband_set_data: list[dict]) -> list[Cytoband]:
+        """ Cytoband by contig and band name in the importing analysis' build """
+        cytobands = []
+        for cytoband_data in cytoband_set_data:
+            contig_name = cytoband_data["cytoband"]["contig"]["name"]
+            cytoband_name = cytoband_data["cytoband"]["name"]
+            for contig in self.get_contigs(analysis, [contig_name]):
+                if cytoband := Cytoband.objects.filter(contig=contig, name=cytoband_name).first():
+                    cytobands.append(cytoband)
+                else:
+                    self.add_import_warning(f"cytoband {contig_name} {cytoband_name} not in "
+                                            f"{analysis.genome_build} - left out")
+        return cytobands
+
     @staticmethod
     def get_node_serializers() -> dict[str, 'AnalysisNodeSerializer']:
         node_serializers = {}
@@ -178,18 +192,28 @@ class NodeContigSerializer(serializers.Serializer):
     contig = serializers.CharField(source="contig.name")
 
 
+class NodeCytobandSerializer(serializers.Serializer):
+    """ A cytoband by contig and band name, so it resolves on another system and in another build """
+    contig = serializers.CharField(source="cytoband.contig.name")
+    cytoband = serializers.CharField(source="cytoband.name")
+
+
 class AllVariantsNodeSerializer(AnalysisNodeSerializer):
     allvariantsnodecontig_set = NodeContigSerializer(many=True, required=False)
+    allvariantsnodecytoband_set = NodeCytobandSerializer(many=True, required=False)
 
     class Meta(AnalysisNodeSerializer.Meta):
         model = AllVariantsNode
-        fields = _analysis_node_fields(model) + ["allvariantsnodecontig_set"]
+        fields = _analysis_node_fields(model) + ["allvariantsnodecontig_set", "allvariantsnodecytoband_set"]
 
     def create(self, validated_data):
         contig_set_data = validated_data.pop("allvariantsnodecontig_set", [])
+        cytoband_set_data = validated_data.pop("allvariantsnodecytoband_set", [])
         node = super().create(validated_data)
         for contig in self.get_contigs(node.analysis, [c["contig"]["name"] for c in contig_set_data]):
             AllVariantsNodeContig.objects.create(all_variants_node=node, contig=contig)
+        for cytoband in self.get_cytobands(node.analysis, cytoband_set_data):
+            AllVariantsNodeCytoband.objects.create(all_variants_node=node, cytoband=cytoband)
         return node
 
 
@@ -344,14 +368,9 @@ class GeneListNodeSerializer(AnalysisNodeSerializer):
         return None
 
 
-class IntersectionNodeCytobandSerializer(serializers.Serializer):
-    contig = serializers.CharField(source="cytoband.contig.name")
-    cytoband = serializers.CharField(source="cytoband.name")
-
-
 class IntersectionNodeSerializer(AnalysisNodeSerializer):
     intersectionnodecontig_set = NodeContigSerializer(many=True, required=False)
-    intersectionnodecytoband_set = IntersectionNodeCytobandSerializer(many=True, required=False)
+    intersectionnodecytoband_set = NodeCytobandSerializer(many=True, required=False)
 
     class Meta(AnalysisNodeSerializer.Meta):
         model = IntersectionNode
@@ -363,16 +382,8 @@ class IntersectionNodeSerializer(AnalysisNodeSerializer):
         node = super().create(validated_data)
         for contig in self.get_contigs(node.analysis, [c["contig"]["name"] for c in contig_set_data]):
             IntersectionNodeContig.objects.create(intersection_node=node, contig=contig)
-
-        for cytoband_data in cytoband_set_data:
-            contig_name = cytoband_data["cytoband"]["contig"]["name"]
-            cytoband_name = cytoband_data["cytoband"]["name"]
-            for contig in self.get_contigs(node.analysis, [contig_name]):
-                if cytoband := Cytoband.objects.filter(contig=contig, name=cytoband_name).first():
-                    IntersectionNodeCytoband.objects.create(intersection_node=node, cytoband=cytoband)
-                else:
-                    self.add_import_warning(f"cytoband {contig_name} {cytoband_name} not in "
-                                            f"{node.analysis.genome_build} - left out")
+        for cytoband in self.get_cytobands(node.analysis, cytoband_set_data):
+            IntersectionNodeCytoband.objects.create(intersection_node=node, cytoband=cytoband)
         return node
 
 

@@ -232,6 +232,7 @@ class TestAnalysisRoundTrip(TestCase):
 
         all_variants_node = AllVariantsNode.objects.create(analysis=analysis)
         all_variants_node.allvariantsnodecontig_set.create(contig=contig)
+        all_variants_node.allvariantsnodecytoband_set.create(cytoband=cytoband)
         intersection_node = IntersectionNode.objects.create(analysis=analysis)
         intersection_node.intersectionnodecontig_set.create(contig=contig)
         intersection_node.intersectionnodecytoband_set.create(cytoband=cytoband)
