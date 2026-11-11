@@ -428,7 +428,7 @@ def download_overlaps(request, lab_id: str):
         OverlapContributionNextStep.objects.filter(lab_filter_q).filter(
             overlap=OuterRef('pk')
         ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
-    ))
+    )).filter(skew_status__gt=TriageNextStep.NOT_INVOLVED)
 
     qs = qs.order_by("-overlap_status", "-skew_status", "-overlap_status_change_timestamp", "-overlap_override_status")
 
