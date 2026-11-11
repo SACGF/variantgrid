@@ -11,11 +11,13 @@ from django.db.models.functions import Concat, Length, Replace, Substr
 from analysis.enums import GroupOperation
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.cohort_mixin import MERGED_COHORT_WARNING, CohortMixin
-from analysis.models.nodes.node_display import NodeIcon
+from analysis.models.nodes.node_display import NodeChip, NodeIcon
 from analysis.models.nodes.stats_cache import (
     get_cached_label_count_for_cohort,
 )
+from analysis.models.nodes.vcf_chip import get_vcf_contents, vcf_chip
 from analysis.models.nodes.zygosity_count_node import AbstractZygosityCountNode
+from library.utils import remove_duplicates_from_list
 from patients.enums import SimpleZygosity, Zygosity
 from snpdb.enums import VariantOrigin
 from snpdb.models import Cohort, CohortGenotypeCollection, CohortSample
@@ -43,6 +45,17 @@ class AbstractCohortBasedNode(CohortMixin, AnalysisNode):
 
     def _has_filters_that_affect_label_counts(self) -> bool:
         return any(getattr(self, f) for f in self.QUALITY_FILTER_FIELDS)
+
+    def get_node_chips(self) -> list[NodeChip]:
+        """ The VCFs the cohort's samples come from - a custom cohort or family can span several, and the
+            dots say what each original file holds (a family's CNV VCF cohort looks like its SNV one) """
+        chips = super().get_node_chips()
+        if cohort := self._get_cohort():
+            samples = [cs.sample for cs in cohort.get_cohort_samples()]
+            vcfs = remove_duplicates_from_list([(s.vcf_id, str(s.vcf)) for s in samples])
+            if vcfs:
+                chips.append(vcf_chip(vcfs, get_vcf_contents(samples)))
+        return chips
 
     def _cached_label_count_zygosities(self):
         """ Override in subclasses that expose zygosity flags. By default, the
