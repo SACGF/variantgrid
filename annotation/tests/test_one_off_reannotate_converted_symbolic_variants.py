@@ -1,155 +1,192 @@
+import gzip
+import os
+import shutil
+import tempfile
 from io import StringIO
 from unittest.mock import patch
 
+import cyvcf2
+from django.conf import settings
 from django.core.management import call_command
 from django.test import TestCase
+from django.test.utils import override_settings
 from django.utils import timezone
 
-from annotation.annotation_version_querysets import get_queryset_for_annotation_version
-from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
-from annotation.fake_data import get_fake_annotation_version
+from annotation.enums import (
+    AnnotationStatus,
+    VariantAnnotationPipelineType,
+    VEPSkippedReason,
+)
+from annotation.fake_data import (
+    get_fake_annotation_settings_dict,
+    get_fake_annotation_version,
+    retire_seeded_annotation_version,
+)
 from annotation.models import (
+    AnnotationVersion,
     VariantAnnotation,
     VariantAnnotationVersion,
     VariantGeneOverlap,
     VariantTranscriptAnnotation,
 )
-from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
-from annotation.pipelines import get_runner
+from annotation.models.models_annotation_run import (
+    AnnotationPipelineVersion,
+    AnnotationRangeLock,
+    AnnotationRun,
+)
+from annotation.vep_annotation import (
+    VEPConfig,
+    get_vep_skipped_variants_filename,
+    get_vep_version_from_vcf,
+    vep_dict_to_variant_annotation_version_kwargs,
+)
+from annotation.vep_warnings import SKIPPED_VARIANTS_FILE_HEADER_PREFIX
 from genes.enums import AnnotationConsortium
 from genes.fake_data import create_fake_gene_version
 from library.django_utils.django_partition import bulk_create_in_partition
-from library.genomics.vcf_enums import VCFSymbolicAllele
-from snpdb.models import GenomeBuild, VariantCoordinate
-from snpdb.tests.utils.vcf_testing_utils import (
-    slowly_create_test_variant,
-    slowly_create_test_variant_from_coordinate,
-)
+from library.genomics.vcf_enums import VariantClass
+from snpdb.models import GenomeBuild
+from snpdb.tests.utils.vcf_testing_utils import slowly_create_loci_and_variants_for_vcf
 
 COMMAND = "one_off_reannotate_converted_symbolic_variants"
+MODULE = f"annotation.management.commands.{COMMAND}"
+TEST_DATA_DIR = os.path.join(settings.BASE_DIR, "annotation/tests/test_data")
+# STRUCTURAL_VARIANT pipeline output: <INV> 1.18 Mb (variant 202), <DEL> 14.5 kb (203), <DUP> 6 kb (205)
+SV_VEP_OUTPUT = os.path.join(TEST_DATA_DIR, "test_columns_version3_grch37_sv.vep_annotated.vcf")
+ANNOTSV_TSV = os.path.join(TEST_DATA_DIR, "annotsv", "test_grch37_sv.annotated.tsv")
+INV, DEL, DUP = 202, 203, 205
 STANDARD = VariantAnnotationPipelineType.STANDARD
 STRUCTURAL_VARIANT = VariantAnnotationPipelineType.STRUCTURAL_VARIANT
+ANNOTSV = VariantAnnotationPipelineType.ANNOTSV
 
 
-@patch(f"annotation.management.commands.{COMMAND}.dispatch_annotation_runs")
+def fake_sv_vep(_vav, vcf_dump_filename, vcf_annotated_filename):
+    """ VEP's output for the dumped variants, taken from the fixture """
+    dumped_ids = {v.INFO["variant_id"] for v in cyvcf2.VCF(vcf_dump_filename)}
+    with open(SV_VEP_OUTPUT) as f_in, gzip.open(vcf_annotated_filename, "wt") as f_out:
+        for line in f_in:
+            if line.startswith("#") or int(line.split("variant_id=")[1].split(";")[0]) in dumped_ids:
+                f_out.write(line)
+    with open(get_vep_skipped_variants_filename(vcf_annotated_filename), "w") as f:
+        f.write(f"{SKIPPED_VARIANTS_FILE_HEADER_PREFIX} {vcf_dump_filename}]\n")
+
+
+@override_settings(**{**get_fake_annotation_settings_dict(columns_version=3),
+                      "ANNOTATION_VEP_SV_CONSERVATION_PYBIGWIG_ENABLED": False,
+                      "ANNOTATION_ANNOTSV_ENABLED": False,
+                      "ANNOTATION_VEP_SV_MAX_SIZE": 1_000_000})  # leaves the inversion out of the dump
+@patch(f"{MODULE}.run_sv_vep", side_effect=fake_sv_vep)
 class OneOffReannotateConvertedSymbolicVariantsTest(TestCase):
-    """ One finished range lock holding symbolic variants converted in place (STANDARD rows) among correctly
-        routed ones: an SNV at each end, a symbolic deletion under structural_variant_min_size and an SV """
+    """ One finished range lock over the fixture's SVs: the inversion and duplication were converted in place
+        (STANDARD rows), the deletion was annotated by the STRUCTURAL_VARIANT run """
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
         cls.grch37 = GenomeBuild.get_name_or_alias("GRCh37")
-        cls.annotation_version = get_fake_annotation_version(cls.grch37)
-        cls.vav = cls.annotation_version.variant_annotation_version
-        sv_min_size = cls.vav.structural_variant_min_size
+        seeded_vav = get_fake_annotation_version(cls.grch37).variant_annotation_version
+        gene_annotation_release = seeded_vav.gene_annotation_release
+        retire_seeded_annotation_version(cls.grch37)
+        vep_dict = get_vep_version_from_vcf(SV_VEP_OUTPUT)
+        kwargs = vep_dict_to_variant_annotation_version_kwargs(VEPConfig(cls.grch37), vep_dict)
+        kwargs.update(genome_build=cls.grch37, gene_annotation_release=gene_annotation_release,
+                      status=VariantAnnotationVersion.Status.ACTIVE)
+        cls.vav = VariantAnnotationVersion.objects.create(**kwargs)
+        AnnotationVersion.objects.create(genome_build=cls.grch37, variant_annotation_version=cls.vav)
+        slowly_create_loci_and_variants_for_vcf(cls.grch37, SV_VEP_OUTPUT, get_variant_id_from_info=True)
 
-        def create_symbolic(position, alt, svlen):
-            vc = VariantCoordinate(chrom="1", position=position, ref="A", alt=alt, svlen=svlen)
-            return slowly_create_test_variant_from_coordinate(vc, cls.grch37)
-
-        cls.first_snv = slowly_create_test_variant("1", 100000, "A", "T", cls.grch37)
-        cls.converted_dup = create_symbolic(200000, VCFSymbolicAllele.DUP, 2 * sv_min_size)
-        cls.small_del = create_symbolic(300000, VCFSymbolicAllele.DEL, -(sv_min_size // 2))
-        cls.sv = create_symbolic(400000, VCFSymbolicAllele.DEL, -5 * sv_min_size)
-        cls.converted_del = create_symbolic(500000, VCFSymbolicAllele.DEL, -3 * sv_min_size)
-        cls.last_snv = slowly_create_test_variant("1", 600000, "A", "T", cls.grch37)
-
-        cls.lock = AnnotationRangeLock.objects.create(version=cls.vav, min_variant=cls.first_snv,
-                                                      max_variant=cls.last_snv, count=6)
-        cls.standard_run = cls._finished_run(cls.lock, STANDARD)
-        cls.sv_run = cls._finished_run(cls.lock, STRUCTURAL_VARIANT)
+        cls.lock = AnnotationRangeLock.objects.create(version=cls.vav, min_variant_id=INV, max_variant_id=DUP, count=3)
+        cls.standard_run = cls._finished_run(STANDARD)
+        cls.sv_run = cls._finished_run(STRUCTURAL_VARIANT)
         cls.gene = create_fake_gene_version(cls.grch37, "ENSG_FAKE_2786", "FAKE2786",
                                             AnnotationConsortium.ENSEMBL).gene
-        cls.standard_variants = [cls.first_snv, cls.converted_dup, cls.small_del, cls.converted_del, cls.last_snv]
-        cls._annotate(cls.standard_run, cls.standard_variants)
-        cls._annotate(cls.sv_run, [cls.sv])
-
-    @staticmethod
-    def _finished_run(lock, pipeline_type) -> AnnotationRun:
-        return AnnotationRun.objects.create(annotation_range_lock=lock, pipeline_type=pipeline_type,
-                                            upload_end=timezone.now())
+        cls._annotate(cls.standard_run, [INV, DUP])
+        cls._annotate(cls.sv_run, [DEL])
 
     @classmethod
-    def _annotate(cls, run, variants):
+    def _finished_run(cls, pipeline_type, **kwargs) -> AnnotationRun:
+        return AnnotationRun.objects.create(annotation_range_lock=cls.lock, pipeline_type=pipeline_type,
+                                            upload_end=timezone.now(), **kwargs)
+
+    @classmethod
+    def _annotate(cls, run, variant_ids):
         for klass, table, kwargs in [
             (VariantAnnotation, VariantAnnotationVersion.REPRESENTATIVE_TRANSCRIPT_ANNOTATION, {}),
             (VariantTranscriptAnnotation, VariantAnnotationVersion.TRANSCRIPT_ANNOTATION, {}),
             (VariantGeneOverlap, VariantAnnotationVersion.VARIANT_GENE_OVERLAP, {"gene": cls.gene}),
         ]:
-            records = [klass(version=cls.vav, variant=v, annotation_run=run, **kwargs) for v in variants]
+            records = [klass(version=cls.vav, variant_id=variant_id, annotation_run=run, **kwargs)
+                       for variant_id in variant_ids]
             bulk_create_in_partition(cls.vav, klass, table, records)
 
-    def _annotated_variant_ids(self, klass) -> set[int]:
-        qs = get_queryset_for_annotation_version(klass, self.annotation_version)
-        return set(qs.values_list("variant_id", flat=True))
+    def setUp(self):
+        dump_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, dump_dir)
+        dump_dir_settings = self.settings(ANNOTATION_VCF_DUMP_DIR=dump_dir)
+        dump_dir_settings.enable()
+        self.addCleanup(dump_dir_settings.disable)
 
     def _call(self, **kwargs) -> str:
         out = StringIO()
         call_command(COMMAND, variant_annotation_version=self.vav.pk, stdout=out, **kwargs)
         return out.getvalue()
 
-    def test_reannotates_through_sv_pipeline(self, mock_dispatch):
+    def _variant_annotation(self, variant_id) -> VariantAnnotation:
+        return VariantAnnotation.objects.get(version=self.vav, variant_id=variant_id)
+
+    def _assert_untouched(self, mock_vep):
+        mock_vep.assert_not_called()
+        self.assertEqual(self._variant_annotation(INV).annotation_run, self.standard_run)
+        self.assertEqual(self._variant_annotation(DUP).annotation_run, self.standard_run)
+
+    def test_reannotates_into_the_sv_run(self, mock_vep):
         output = self._call()
         self.assertIn("2 variants with STANDARD annotation now routed to STRUCTURAL_VARIANT", output)
-        mock_dispatch.si.assert_called_once_with(self.vav.pk)
+        mock_vep.assert_called_once()
 
-        kept = {self.first_snv.pk, self.small_del.pk, self.sv.pk, self.last_snv.pk}
+        dup = self._variant_annotation(DUP)
+        self.assertEqual(dup.annotation_run, self.sv_run)
+        self.assertEqual(dup.variant_class, VariantClass.DUPLICATION)
+        inv = self._variant_annotation(INV)
+        self.assertEqual(inv.annotation_run, self.sv_run)
+        self.assertEqual(inv.vep_skipped_reason, VEPSkippedReason.TOO_LONG)
         for klass in [VariantAnnotation, VariantTranscriptAnnotation, VariantGeneOverlap]:
-            self.assertEqual(self._annotated_variant_ids(klass), kept, klass.__name__)
+            self.assertFalse(klass.objects.filter(annotation_run=self.standard_run).exists(), klass.__name__)
+        self.assertEqual(self._variant_annotation(DEL).annotation_run, self.sv_run)
 
-        new_lock = AnnotationRangeLock.objects.exclude(pk=self.lock.pk).get(version=self.vav)
-        self.assertEqual((new_lock.min_variant_id, new_lock.max_variant_id),
-                         (self.converted_dup.pk, self.converted_del.pk))
-        runs = {run.pipeline_type: run for run in new_lock.annotationrun_set.all()}
-        self.assertEqual(runs[STRUCTURAL_VARIANT].status, AnnotationStatus.CREATED)
-        # The new lock spans the small deletion and the SV, but its runs only take what is left unannotated
-        sv_dump = get_runner(STRUCTURAL_VARIANT).get_variants_qs(runs[STRUCTURAL_VARIANT])
-        self.assertEqual(set(sv_dump.values_list("pk", flat=True)), {self.converted_dup.pk, self.converted_del.pk})
-        self.assertFalse(get_runner(STANDARD).get_variants_qs(runs[STANDARD]).exists())
+        self.assertEqual(AnnotationRangeLock.objects.filter(version=self.vav).count(), 1)
+        self.assertEqual(AnnotationRun.objects.filter(annotation_range_lock__version=self.vav).count(), 2)
+        self.sv_run.refresh_from_db()
+        self.assertIsNone(self.sv_run.vcf_annotated_filename)
 
         self.assertIn("0 variants", self._call())
 
-    def test_dry_run_changes_nothing(self, mock_dispatch):
-        self.assertIn("DRY RUN", self._call(dry_run=True))
-        self._assert_untouched(mock_dispatch)
+    def test_dry_run_changes_nothing(self, mock_vep):
+        output = self._call(dry_run=True)
+        self.assertIn(f"2 variants -> STRUCTURAL_VARIANT run {self.sv_run.pk}", output)
+        self._assert_untouched(mock_vep)
 
-    def test_waits_for_unfinished_runs(self, mock_dispatch):
+    def test_lock_without_finished_sv_run(self, mock_vep):
         AnnotationRun.objects.filter(pk=self.sv_run.pk).update(upload_end=None, status=AnnotationStatus.ERROR,
                                                                error_exception="failed")
-        self.assertIn("2 wait for unfinished annotation runs", self._call())
-        self._assert_untouched(mock_dispatch)
+        self.assertIn("no finished STRUCTURAL_VARIANT run", self._call(dry_run=True))
+        self.assertIn("0 in 0 range locks", self._call())
+        self._assert_untouched(mock_vep)
 
-    def test_leaves_historical_versions(self, mock_dispatch):
+    def test_leaves_historical_versions(self, mock_vep):
         VariantAnnotationVersion.objects.filter(pk=self.vav.pk).update(
             status=VariantAnnotationVersion.Status.HISTORICAL)
         self.assertIn("left as they are", self._call())
-        self._assert_untouched(mock_dispatch)
+        self._assert_untouched(mock_vep)
 
-    def _assert_untouched(self, mock_dispatch):
-        mock_dispatch.si.assert_not_called()
-        self.assertEqual(self._annotated_variant_ids(VariantAnnotation),
-                         {v.pk for v in self.standard_variants} | {self.sv.pk})
-        self.assertEqual(AnnotationRangeLock.objects.filter(version=self.vav).count(), 1)
-
-    def test_lock_bounds_already_taken(self, mock_dispatch):
-        """ A converted variant at each end of its lock (unique_together), and alone in its lock """
-        sv_min_size = self.vav.structural_variant_min_size
-        coordinates = [(700000, -2 * sv_min_size), (800000, -3 * sv_min_size), (900000, -4 * sv_min_size)]
-        first, last, alone = [slowly_create_test_variant_from_coordinate(
-            VariantCoordinate(chrom="1", position=position, ref="A", alt=VCFSymbolicAllele.DEL, svlen=svlen),
-            self.grch37) for position, svlen in coordinates]
-        both_ends_lock = AnnotationRangeLock.objects.create(version=self.vav, min_variant=first, max_variant=last)
-        self._annotate(self._finished_run(both_ends_lock, STANDARD), [first, last])
-        alone_lock = AnnotationRangeLock.objects.create(version=self.vav, min_variant=alone, max_variant=alone)
-        self._annotate(self._finished_run(alone_lock, STANDARD), [alone])
-        empty_sv_run = AnnotationRun.objects.create(annotation_range_lock=alone_lock, pipeline_type=STRUCTURAL_VARIANT,
-                                                    dump_count=0)
-
+    @override_settings(ANNOTATION_ANNOTSV_ENABLED=True)
+    @patch(f"{MODULE}.run_annotsv", return_value=ANNOTSV_TSV)
+    def test_annotsv_over_finished_annotsv_run(self, mock_annotsv, _mock_vep):
+        pipeline_version = AnnotationPipelineVersion.objects.create(
+            pipeline_type=ANNOTSV, genome_build=self.grch37, code_version="3.5", data_version="3.5",
+            status=AnnotationPipelineVersion.Status.ACTIVE)
+        annotsv_run = self._finished_run(ANNOTSV, pipeline_version=pipeline_version)
         self._call()
-        new_bounds = set(AnnotationRangeLock.objects.filter(version=self.vav, min_variant_id__gte=first.pk)
-                         .values_list("min_variant_id", "max_variant_id"))
-        self.assertEqual(new_bounds, {(first.pk, last.pk), (first.pk, first.pk), (last.pk, last.pk),
-                                      (alone.pk, alone.pk)})
-        empty_sv_run.refresh_from_db()
-        self.assertEqual(empty_sv_run.status, AnnotationStatus.CREATED)
+        mock_annotsv.assert_called_once()
+        self.assertEqual(mock_annotsv.call_args.args[0], annotsv_run)
+        self.assertEqual(self._variant_annotation(DUP).annotsv_acmg_score, -0.5)

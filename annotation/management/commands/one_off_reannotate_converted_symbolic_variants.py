@@ -5,56 +5,95 @@ that one_off_fix_symbolic_variants converted in place to a symbolic <DEL>/<DUP>/
 structural_variant_min_size: the conversion kept the pk, and so the annotation VEP wrote for the explicit
 sequence, and the scheduler only ever fills new pk ranges.
 
-Only the versions the dispatcher annotates (the latest NEW and ACTIVE per build) are repaired. The variants are
-grouped by the range lock whose STANDARD run annotated them; each group's STANDARD rows (VariantAnnotation,
-VariantTranscriptAnnotation, VariantGeneOverlap) are deleted, and a new AnnotationRangeLock over the group's pk
-bounds - inside the original lock - gets the runs the scheduler would give it. The VEP pipelines take only the
-unannotated variants of their type in range (AnnotSV takes every SV in range, and only UPDATEs), so the new lock's
-STRUCTURAL_VARIANT run picks up exactly the deleted variants, and the dispatcher annotates them like any other
-backlog; a failed run is retried from the annotation runs page. A group whose range still has an unfinished VEP
-run is left alone, for a later run of this command, which finds only what is still left.
+For each NEW/ACTIVE version, the variants are dumped to one VCF and run through VEP with the STRUCTURAL_VARIANT
+pipeline's command line (get_vep_command), here rather than as an AnnotationRun. Then, one transaction per range lock,
+their STANDARD rows (VariantAnnotation, VariantTranscriptAnnotation, VariantGeneOverlap) are deleted and VEP's
+output is inserted by BulkVEPVCFAnnotationInserter, attributed to the lock's existing finished STRUCTURAL_VARIANT
+run - so every row matches its run's pipeline_type again, no run or range lock is added, and a second run of this
+command finds nothing. Where the lock's AnnotSV run has finished at the ACTIVE AnnotSV version, AnnotSV is run over
+the same variants and its TSV imported through that run as well; an AnnotSV run that is still to come takes them
+with every other SV in its range. The run rows themselves are never saved: they keep the history of the run that
+annotated the rest of the range.
 
-Other versions are counted but not touched: the dispatcher never runs a HISTORICAL version's annotation, and its
-VEP no longer matches the installed one. --dry-run prints the counts and changes nothing.
+A lock with no finished STRUCTURAL_VARIANT run is reported and left alone. HISTORICAL versions are counted but not
+touched: their VEP no longer matches the installed one. --dry-run prints the counts and the runs the rows would go to.
 Registered as a deploy-time ManualOperation (annotation/migrations/0017_reannotate_converted_symbolic_variants.py).
 """
+import os
+import shutil
+import tempfile
 from dataclasses import dataclass, field
+from typing import Optional
 
+import cyvcf2
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
+from annotation.annotation_run_files import write_qs_to_vcf
 from annotation.annotation_version_querysets import (
+    filter_vep_sv_max_size,
     get_queryset_for_annotation_version,
     get_variants_qs_for_annotation,
 )
-from annotation.annotation_versions import _reset_run_counts_after_extend
-from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType
+from annotation.annotsv_annotation import get_annotsv_command, get_annotsv_tsv_filename
+from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType, VEPSkippedReason
 from annotation.models.models import (
     VariantAnnotation,
     VariantGeneOverlap,
     VariantTranscriptAnnotation,
 )
-from annotation.models.models_annotation_run import AnnotationRangeLock, AnnotationRun
+from annotation.models.models_annotation_run import AnnotationPipelineVersion, AnnotationRun
 from annotation.models.models_version import VariantAnnotationVersion
-from annotation.tasks.annotation_scheduler_task import (
-    _dispatchable_variant_annotation_versions,
-    _handle_range_lock,
-    _scheduled_pipeline_versions,
-    dispatch_annotation_runs,
+from annotation.pipelines import get_pipeline, get_runner
+from annotation.sv_conservation import (
+    conservation_sidecar_filename,
+    get_sv_conservation_tracks,
+    score_sv_vcf,
+    write_conservation_sidecar,
 )
+from annotation.vcf_files.bulk_annotsv_tsv_inserter import import_annotsv_tsv
+from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnnotationInserter
+from annotation.vcf_files.import_vcf_annotations import (
+    _add_vep_skipped_variant,
+    _insert_vep_skipped_variants,
+)
+from annotation.vep_annotation import (
+    get_vep_command,
+    get_vep_skipped_variants_filename,
+    vep_check_annotated_file_version_match,
+    vep_check_command_line_version_match,
+)
+from annotation.vep_command_check import check_vep_command
+from annotation.vep_warnings import parse_skipped_variants_file
 from library.django_utils.data_archive_mixin import DataArchivedError
+from library.utils import execute_cmd
+from snpdb.models import Variant
+from snpdb.vcf_utils import cyvcf2_header_types
 
 STANDARD = VariantAnnotationPipelineType.STANDARD
 STRUCTURAL_VARIANT = VariantAnnotationPipelineType.STRUCTURAL_VARIANT
+ANNOTSV = VariantAnnotationPipelineType.ANNOTSV
 
 
 @dataclass
 class LockGroup:
-    """ Misrouted variants annotated by one range lock's STANDARD run """
+    """ Misrouted variants annotated by one range lock's STANDARD run, and the lock's runs their rows go to """
     range_lock_id: int
-    range_lock: AnnotationRangeLock = None
     variant_ids: list[int] = field(default_factory=list)
     standard_run_ids: set[int] = field(default_factory=set)
+    sv_run: Optional[AnnotationRun] = None
+    annotsv_run: Optional[AnnotationRun] = None
+
+    def __str__(self):
+        s = f"range lock {self.range_lock_id}: {len(self.variant_ids)} variants"
+        if self.sv_run:
+            s += f" -> STRUCTURAL_VARIANT run {self.sv_run.pk}"
+            if self.annotsv_run:
+                s += f", AnnotSV run {self.annotsv_run.pk}"
+        else:
+            s += " - no finished STRUCTURAL_VARIANT run, left as they are"
+        return s
 
 
 def find_misrouted_variants(annotation_version) -> list[LockGroup]:
@@ -68,70 +107,156 @@ def find_misrouted_variants(annotation_version) -> list[LockGroup]:
         group = groups.setdefault(range_lock_id, LockGroup(range_lock_id))
         group.variant_ids.append(variant_id)
         group.standard_run_ids.add(run_id)
-    range_locks = AnnotationRangeLock.objects.in_bulk(groups)
-    for range_lock_id, group in groups.items():
-        group.range_lock = range_locks[range_lock_id]
+
+    finished_runs_qs = AnnotationRun.objects.filter(annotation_range_lock__in=list(groups),
+                                                    status=AnnotationStatus.FINISHED)
+    for run in finished_runs_qs.filter(pipeline_type=STRUCTURAL_VARIANT).select_related("annotation_range_lock__version"):
+        groups[run.annotation_range_lock_id].sv_run = run
+    annotsv_runs_qs = finished_runs_qs.filter(pipeline_type=ANNOTSV,
+                                              pipeline_version__status=AnnotationPipelineVersion.Status.ACTIVE)
+    for run in annotsv_runs_qs.select_related("annotation_range_lock__version", "pipeline_version"):
+        groups[run.annotation_range_lock_id].annotsv_run = run
     return list(groups.values())
 
 
-def has_unfinished_vep_runs(vav: VariantAnnotationVersion, min_variant_id: int, max_variant_id: int) -> bool:
-    """ A VEP run that may still write or retry rows over this range would race the new lock's run """
-    qs = AnnotationRun.objects.filter(annotation_range_lock__version=vav,
-                                      annotation_range_lock__min_variant_id__lte=max_variant_id,
-                                      annotation_range_lock__max_variant_id__gte=min_variant_id,
-                                      pipeline_type__in=[STANDARD, STRUCTURAL_VARIANT])
-    return qs.exclude(status=AnnotationStatus.FINISHED).exists()
+def run_sv_vep(vav: VariantAnnotationVersion, vcf_dump_filename: str, vcf_annotated_filename: str):
+    """ VEP over the dump with the STRUCTURAL_VARIANT pipeline's arguments, plus the conservation sidecar its
+        import reads, as VEPRunner.annotate does for a run """
+    vep_check_command_line_version_match(vav)
+    cmd = get_vep_command(vcf_dump_filename, vcf_annotated_filename, vav.genome_build, vav.annotation_consortium,
+                          STRUCTURAL_VARIANT, variant_annotation_version=vav)
+    check_vep_command(vav, STRUCTURAL_VARIANT, cmd)
+    return_code, _std_out, std_err = execute_cmd(cmd)
+    if return_code != 0:
+        raise RuntimeError(f"VEP returned {return_code}: {std_err}")
+    if get_runner(STRUCTURAL_VARIANT).sv_conservation_enabled:
+        genome_build = vav.genome_build
+        write_conservation_sidecar(conservation_sidecar_filename(vcf_annotated_filename),
+                                   score_sv_vcf(vcf_dump_filename, genome_build),
+                                   get_sv_conservation_tracks(genome_build))
 
 
-def delete_standard_annotation(annotation_version, group: LockGroup):
-    for klass in [VariantAnnotation, VariantTranscriptAnnotation, VariantGeneOverlap]:
-        qs = get_queryset_for_annotation_version(klass, annotation_version)
-        qs.filter(variant_id__in=group.variant_ids, annotation_run_id__in=group.standard_run_ids).delete()
+def run_annotsv(annotsv_run: AnnotationRun, vcf_dump_filename: str, output_dir: str) -> str:
+    """ AnnotSV over the dump, as AnnotSVRunner.annotate does for a run. Returns its TSV """
+    get_runner(ANNOTSV).check_tool_version(annotsv_run)
+    cmd = get_annotsv_command(vcf_dump_filename, output_dir, annotsv_run.genome_build,
+                              annotsv_run.annotation_consortium)
+    return_code, _std_out, std_err = execute_cmd(cmd, timeout=settings.ANNOTATION_ANNOTSV_TIMEOUT_SECONDS)
+    tsv_filename = get_annotsv_tsv_filename(vcf_dump_filename, output_dir)
+    if return_code != 0 or not os.path.exists(tsv_filename):
+        raise RuntimeError(f"AnnotSV returned {return_code}: {std_err}")
+    return tsv_filename
 
 
-def create_range_locks(vav: VariantAnnotationVersion, group: LockGroup, pipeline_versions) -> int:
-    """ Lock(s) over the group's bounds with the scheduler's runs. Returns the number of locks created """
-    variant_ids = group.variant_ids
-    original = group.range_lock
-    min_variant_id, max_variant_id = variant_ids[0], variant_ids[-1]
-    if (min_variant_id, max_variant_id) != (original.min_variant_id, original.max_variant_id):
-        bounds = [(min_variant_id, max_variant_id)]
-    elif min_variant_id != max_variant_id:
-        # A second lock over the original's bounds breaks unique_together, so the first variant gets its own
-        bounds = [(min_variant_id, min_variant_id), (variant_ids[1], max_variant_id)]
-    else:
-        # The original lock holds only this variant, so its STRUCTURAL_VARIANT run finished empty: reopen it
-        _reset_run_counts_after_extend(original)
-        return 0
+def check_vep_output(vcf_annotated_filename: str, dump_count: int):
+    """ Every dumped record must come back annotated or listed as skipped - VEP can exit 0 having written a short
+        VCF (see import_vcf_annotations.check_all_dumped_records_accounted_for) """
+    records_read = sum(1 for _ in cyvcf2.VCF(vcf_annotated_filename))
+    skipped = len(parse_skipped_variants_file(get_vep_skipped_variants_filename(vcf_annotated_filename)))
+    if records_read + skipped != dump_count:
+        raise ValueError(f"VEP output '{vcf_annotated_filename}' has {records_read} records and {skipped} skipped, "
+                         f"but {dump_count} were dumped - truncated")
 
-    for lock_min, lock_max in bounds:
-        count = sum(lock_min <= variant_id <= lock_max for variant_id in variant_ids)
-        range_lock = AnnotationRangeLock.objects.create(version=vav, min_variant_id=lock_min,
-                                                        max_variant_id=lock_max, count=count)
-        _handle_range_lock(range_lock, pipeline_versions)
-    return len(bounds)
+
+def reannotate_group(annotation_version, group: LockGroup, vcf_annotated_filename: Optional[str],
+                     annotsv_tsv_filename: Optional[str]):
+    """ Swap the group's STANDARD rows for VEP's STRUCTURAL_VARIANT output, attributed to the lock's SV run """
+    variant_ids = set(group.variant_ids)
+    sv_run = group.sv_run
+    with transaction.atomic():
+        for klass in [VariantAnnotation, VariantTranscriptAnnotation, VariantGeneOverlap]:
+            qs = get_queryset_for_annotation_version(klass, annotation_version)
+            qs.filter(variant_id__in=variant_ids, annotation_run_id__in=group.standard_run_ids).delete()
+
+        # The inserter reads the annotated VCF (and its conservation sidecar) off the run - this instance is never saved
+        sv_run.vcf_annotated_filename = vcf_annotated_filename
+        annotated_ids = set()
+        if vcf_annotated_filename:
+            vcf_reader = cyvcf2.VCF(vcf_annotated_filename)
+            bulk_inserter = BulkVEPVCFAnnotationInserter(sv_run, cyvcf2_header_types(vcf_reader)["INFO"])
+            bulk_inserter.remove_processing_files()  # Its scratch dir is the run's - clear what the run left
+            for v in vcf_reader:
+                variant_id = v.INFO["variant_id"]
+                if variant_id in variant_ids:
+                    bulk_inserter.process_entry(v)
+                    if v.INFO.get("CSQ"):
+                        annotated_ids.add(variant_id)
+            bulk_inserter.finish()
+        else:
+            bulk_inserter = BulkVEPVCFAnnotationInserter(sv_run, validate_columns=False, vep_skipped_only=True)
+            bulk_inserter.remove_processing_files()
+
+        sv_max_size = settings.ANNOTATION_VEP_SV_MAX_SIZE
+        skipped_qs = Variant.objects.filter(pk__in=variant_ids - annotated_ids)
+        for v in skipped_qs.select_related("locus__contig", "locus__ref", "alt"):
+            too_long = sv_max_size and v.svlen is not None and abs(v.svlen) > sv_max_size  # never dumped
+            reason = VEPSkippedReason.TOO_LONG if too_long else VEPSkippedReason.UNKNOWN
+            _add_vep_skipped_variant(sv_run, bulk_inserter, v, reason)
+        _insert_vep_skipped_variants(bulk_inserter)
+        bulk_inserter.remove_processing_files()
+
+        if annotsv_tsv_filename and group.annotsv_run:
+            group.annotsv_run.vcf_annotated_filename = annotsv_tsv_filename  # never saved, as above
+            import_annotsv_tsv(group.annotsv_run)
+
+
+def reannotate_version(annotation_version, groups: list[LockGroup], work_dir: str) -> int:
+    """ Returns the number of variants AnnotSV was run over """
+    vav = annotation_version.variant_annotation_version
+    genome_build = vav.genome_build
+    variant_ids = [variant_id for group in groups for variant_id in group.variant_ids]
+    variants_qs = Variant.objects.filter(pk__in=variant_ids)
+
+    dump_qs = variants_qs
+    if settings.ANNOTATION_VEP_SV_MAX_SIZE:
+        dump_qs = filter_vep_sv_max_size(dump_qs, settings.ANNOTATION_VEP_SV_MAX_SIZE, too_long=False)
+    vcf_dump_filename = os.path.join(work_dir, "structural_variant.vcf")
+    dump_count = write_qs_to_vcf(vcf_dump_filename, genome_build, dump_qs,
+                                 structural_variant_min_size=vav.structural_variant_min_size)
+    vcf_annotated_filename = None
+    if dump_count:
+        vcf_annotated_filename = os.path.join(work_dir, f"structural_variant.vep_annotated_{genome_build.name}.vcf.gz")
+        run_sv_vep(vav, vcf_dump_filename, vcf_annotated_filename)
+        vep_check_annotated_file_version_match(vav, vcf_annotated_filename)
+        check_vep_output(vcf_annotated_filename, dump_count)
+
+    annotsv_tsv_filename = None
+    annotsv_groups = [group for group in groups if group.annotsv_run]
+    num_annotsv = sum(len(group.variant_ids) for group in annotsv_groups)
+    if annotsv_groups:
+        annotsv_dir = os.path.join(work_dir, "annotsv")
+        os.makedirs(annotsv_dir)
+        annotsv_dump_filename = os.path.join(annotsv_dir, "annotsv.vcf")
+        annotsv_ids = [variant_id for group in annotsv_groups for variant_id in group.variant_ids]
+        write_qs_to_vcf(annotsv_dump_filename, genome_build, Variant.objects.filter(pk__in=annotsv_ids),
+                        samples=get_runner(ANNOTSV).dump_samples,
+                        structural_variant_min_size=vav.structural_variant_min_size)
+        annotsv_tsv_filename = run_annotsv(annotsv_groups[0].annotsv_run, annotsv_dump_filename, annotsv_dir)
+
+    for group in groups:
+        reannotate_group(annotation_version, group, vcf_annotated_filename, annotsv_tsv_filename)
+    return num_annotsv
 
 
 class Command(BaseCommand):
     category = "one-off"
 
     def add_arguments(self, parser):
-        parser.add_argument("--dry-run", action="store_true", help="Print the counts without changing anything")
+        parser.add_argument("--dry-run", action="store_true",
+                            help="Print the counts and the runs the rows would go to, without running VEP or writing")
         parser.add_argument("--variant-annotation-version", type=int,
                             help="Only this version (default: every version whose data isn't archived)")
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
-        dispatchable_ids = {vav.pk for vav in _dispatchable_variant_annotation_versions()}
         qs = VariantAnnotationVersion.objects.filter(data_archived_date__isnull=True).select_related("genome_build")
         if vav_id := options["variant_annotation_version"]:
             qs = qs.filter(pk=vav_id)
         for vav in qs.order_by("pk"):
             prefix = "DRY RUN " if dry_run else ""
-            self.stdout.write(f"{prefix}{vav}: {self._handle_version(vav, vav.pk in dispatchable_ids, dry_run)}")
+            self.stdout.write(f"{prefix}{vav}: {self._handle_version(vav, dry_run)}")
 
-    @staticmethod
-    def _handle_version(vav: VariantAnnotationVersion, dispatchable: bool, dry_run: bool) -> str:
+    def _handle_version(self, vav: VariantAnnotationVersion, dry_run: bool) -> str:
         annotation_version = vav.get_any_annotation_version()
         if annotation_version is None:
             return "skipped: no AnnotationVersion"
@@ -143,31 +268,27 @@ class Command(BaseCommand):
         summary = f"{num_variants} variants with STANDARD annotation now routed to STRUCTURAL_VARIANT"
         if not num_variants:
             return summary
-        if not dispatchable:
-            return f"{summary} - left as they are: the dispatcher doesn't annotate this {vav.get_status_display()} version"
+        if vav.status == VariantAnnotationVersion.Status.HISTORICAL:
+            return f"{summary} - left as they are: HISTORICAL versions aren't re-annotated"
         if blocker := vav.get_annotation_run_blocker():
             return f"{summary} - left as they are until annotation is unblocked: {blocker}"
 
-        ready = []
-        waiting = []
-        for group in groups:
-            if has_unfinished_vep_runs(vav, group.variant_ids[0], group.variant_ids[-1]):
-                waiting.append(group)
-            else:
-                ready.append(group)
+        annotsv = get_pipeline(ANNOTSV)
+        if not (annotsv.enabled and annotsv.runner.supports_genome_build(vav.genome_build)):
+            for group in groups:
+                group.annotsv_run = None
+        ready = [group for group in groups if group.sv_run]
+        if dry_run:
+            for group in groups:
+                self.stdout.write(f"  {group}")
         num_ready = sum(len(g.variant_ids) for g in ready)
-        if waiting:
-            num_waiting = sum(len(g.variant_ids) for g in waiting)
-            summary += f" ({num_waiting} wait for unfinished annotation runs over their range - run this again later)"
+        summary += f", {num_ready} in {len(ready)} range locks with a finished STRUCTURAL_VARIANT run"
         if dry_run or not ready:
-            return f"{summary}, {num_ready} to re-annotate from {len(ready)} range locks"
+            return summary
 
-        pipeline_versions = _scheduled_pipeline_versions(vav.genome_build)
-        num_locks = 0
-        with transaction.atomic():
-            for group in ready:
-                delete_standard_annotation(annotation_version, group)
-                num_locks += create_range_locks(vav, group, pipeline_versions)
-        dispatch_annotation_runs.si(vav.pk).apply_async()
-        return (f"{summary}, {num_ready} STANDARD annotations deleted and queued for STRUCTURAL_VARIANT annotation "
-                f"({num_locks} new range locks)")
+        os.makedirs(settings.ANNOTATION_VCF_DUMP_DIR, exist_ok=True)
+        work_dir = tempfile.mkdtemp(prefix=f"reannotate_converted_symbolic_vav{vav.pk}_",
+                                    dir=settings.ANNOTATION_VCF_DUMP_DIR)
+        num_annotsv = reannotate_version(annotation_version, ready, work_dir)
+        shutil.rmtree(work_dir)  # Left in place for a look when anything above raised
+        return f"{summary}: re-annotated (AnnotSV over {num_annotsv})"
