@@ -1,5 +1,4 @@
-import operator
-from functools import cached_property, reduce
+from functools import cached_property
 from typing import Optional
 
 from auditlog.registry import auditlog
@@ -16,11 +15,10 @@ from library.django_utils import highest_pk
 from snpdb.models import Variant, VariantZygosityCountCollection
 from snpdb.models.models_genome import Contig, Cytoband
 from snpdb.variant_filters import (
+    ContigRegion,
     get_all_variant_types,
-    get_contig_ids_for_variant_types,
-    get_contigs_q,
-    get_cytobands_q,
     get_gene_symbols_q,
+    get_regions_q,
     get_variant_type_labels,
     get_variant_types_q,
 )
@@ -102,18 +100,13 @@ class AllVariantsNode(AnalysisNode, AbstractZygosityCountNode):
         return arg_q_dict
 
     def _get_regions_q(self) -> Q:
-        """ The chromosomes and bands OR together. Only a chromosome selection lets the gene-level contig
-            (fusions etc) through - nobody can tick it, and a band never matches one """
-        genome_build = self.analysis.genome_build
-        if not (self.contig_ids or self.cytobands):
-            return get_contigs_q(genome_build)
-        q_list = []
-        if self.contig_ids:
-            contig_ids = get_contig_ids_for_variant_types(genome_build, self.contig_ids, self.variant_types)
-            q_list.append(get_contigs_q(genome_build, contig_ids=contig_ids))
-        if q_cytobands := get_cytobands_q(self.cytobands):
-            q_list.append(q_cytobands)
-        return reduce(operator.or_, q_list)
+        """ The chromosomes and bands OR together """
+        regions = [ContigRegion(contig_id) for contig_id in self.contig_ids]
+        regions.extend(ContigRegion.from_cytoband(cytoband) for cytoband in self.cytobands)
+        q_regions = get_regions_q(self.analysis.annotation_version, regions, self.variant_types)
+        if q_regions is None:
+            return Variant.get_contigs_q(self.analysis.genome_build)
+        return q_regions
 
     def get_node_name(self):
         name_lines = []

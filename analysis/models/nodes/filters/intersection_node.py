@@ -25,7 +25,7 @@ from snpdb.enums import ImportStatus
 from snpdb.models import GenomicIntervalsCollection, VariantCollection
 from snpdb.models.models_genome import Contig, Cytoband
 from snpdb.models.models_variant import Variant
-from snpdb.variant_filters import get_cytobands_q
+from snpdb.variant_filters import ContigRegion, get_regions_q
 from snpdb.variants_to_vcf import write_qs_to_vcf_file_sort_alphabetically
 
 
@@ -104,9 +104,13 @@ class IntersectionNode(AnalysisNode):
         q_list = []
         if self.variant_ids:
             q_list.append(Q(pk__in=self.variant_ids))
+        chrom_contig_mappings = self.analysis.genome_build.chrom_contig_mappings
+        regions = []
         for region in self.variant_regions:
             chrom, start, end = parse_region(region)
-            q_list.append(Variant.get_chrom_q(chrom) & Q(locus__position__gte=start, locus__position__lte=end))
+            regions.append(ContigRegion(chrom_contig_mappings[chrom].pk, start, end))
+        if (q_regions := get_regions_q(self.analysis.annotation_version, regions)) is not None:
+            q_list.append(q_regions)
         if not q_list:
             # Entries that aren't in the system will always match nothing
             return self.q_none()
@@ -117,12 +121,10 @@ class IntersectionNode(AnalysisNode):
         if self.accordion_panel == self.VARIANTS:
             q = self._get_variants_q()
         elif self.accordion_panel == self.CONTIG:
-            q_list = [Q(locus__contig_id=c) for c in self.contig_ids]
-            if q_cytobands := get_cytobands_q(self.cytobands):
-                q_list.append(q_cytobands)
-            if q_list:
-                q = reduce(operator.or_, q_list)
-            else:
+            regions = [ContigRegion(contig_id) for contig_id in self.contig_ids]
+            regions.extend(ContigRegion.from_cytoband(cytoband) for cytoband in self.cytobands)
+            q = get_regions_q(self.analysis.annotation_version, regions)
+            if q is None:
                 q = self.q_none()
         elif self.accordion_panel == self.SELECTED_INTERVALS:
             raise ValueError("Should never be here - NodeCache should have been generated!")

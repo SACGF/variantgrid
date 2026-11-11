@@ -1189,9 +1189,14 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
             (1-based inclusive, as Cytoband / Locus). The span is the cdot exons' first start and last end,
             which are 0-based half-open - so a transcript overlaps when exon_start < end and exon_end >= start.
             Coordinates are only in the JSON, a scan of a whole chromosome's transcripts is ~130ms (#2723) """
-        qs = cls.objects.filter(genome_build=genome_build, contig=contig)
-        qs = qs.alias(**cls._exon_span(genome_build)).filter(tx_start__lt=end, tx_end__gte=start)
+        qs = cls.filter_overlapping(cls.objects.filter(genome_build=genome_build, contig=contig), genome_build,
+                                    start, end)
         return qs.order_by().values_list("gene_version_id", flat=True).distinct()
+
+    @classmethod
+    def filter_overlapping(cls, qs: QuerySet, genome_build: GenomeBuild, start: int, end: int) -> QuerySet:
+        """ Narrows a queryset of the build's transcripts to those overlapping start-end (1-based inclusive) """
+        return qs.alias(**cls._exon_span(genome_build)).filter(tx_start__lt=end, tx_end__gte=start)
 
     @classmethod
     def get_gene_symbol_span(cls, genome_build: GenomeBuild,
