@@ -1042,15 +1042,17 @@ VariantGridFormat.representativeVariantLabel = (variantId, rowData) => {
         const sv = _isStructuralAlt(alt) ? _svGeneLead(pickGene, overlappingSymbols, _contigLabel(chrom))
                                          : {lead: pickGene, genes: null};
         let html = sv.lead ? `<span class='rv-gene'>${escapeHtml(sv.lead)}</span> ` : '';
-        html += `<span class='rv-hgvs'>${escapeHtml(c.change)}</span>`;
+        // A long inserted sequence is shown as its length - the title keeps the full HGVS (#2612)
+        html += `<span class='rv-hgvs'>${escapeHtml(abbreviateHgvsSequences(c.change))}</span>`;
         const p = _splitHgvs(hgvsP);
+        const pChange = p ? abbreviatePHgvsSequences(p.change) : null;
         if (p) {
-            html += ` <span class='rv-hgvs-p'>${escapeHtml(p.change)}</span>`;
+            html += ` <span class='rv-hgvs-p'>${escapeHtml(pChange)}</span>`;
         }
         // Two line rows move the accession and the protein change below the name (global.scss picks
         // which of the two shows) - the identifiers a reader wants next, without a second column
         html += `<span class='rv-line2'>${escapeHtml(c.accession)}`
-              + (p ? ` <span class='rv-hgvs-p'>${escapeHtml(p.change)}</span>` : '') + '</span>';
+              + (p ? ` <span class='rv-hgvs-p'>${escapeHtml(pChange)}</span>` : '') + '</span>';
         return {html: html, title: hgvsC + (hgvsP ? " " + hgvsP : "") + _svGenesTitle(sv)};
     }
     // 2. g.HGVS (no transcript - intergenic, or annotation not run yet for this variant). The lead slot

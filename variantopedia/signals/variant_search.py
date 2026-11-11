@@ -45,6 +45,7 @@ from snpdb.models import (
     Variant,
     VariantCoordinate,
 )
+from snpdb.models.models_variant import abbreviate_variant_coordinate
 from snpdb.search import (
     SearchExample,
     SearchInputInstance,
@@ -84,9 +85,11 @@ class VariantExtra:
 
         kwargs = {"genome_build_name": genome_build.pk, "variants_text": variant_string}
         internal_url = reverse('create_manual_variant_entry_from_text', kwargs=kwargs)
+        identifier = abbreviate_variant_coordinate(variant_string)
         return PreviewData(
             category="Variant",
-            identifier=variant_string,
+            identifier=identifier,
+            identifier_tooltip=variant_string if identifier != variant_string else None,
             icon="fa-solid fa-circle-plus",
             title="Click to create and annotate this variant",
             internal_url=internal_url,
@@ -100,10 +103,10 @@ class VariantExtra:
         kwargs = {"variant_id": variant.pk, "genome_build_name": genome_build.name}
         name = "create_classification_for_variant"
         internal_url = reverse(name, kwargs=kwargs)
-        parts = [str(variant)]
         return PreviewData(
             category="Variant",
-            identifier=" ".join(parts),
+            identifier=variant.abbreviated_string,
+            identifier_tooltip=variant.abbreviated_string_tooltip,
             icon="fa-solid fa-circle-plus",
             title="Click to classify variant",
             internal_url=internal_url,

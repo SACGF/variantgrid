@@ -180,6 +180,7 @@ class PreviewModelMixin:
             self,
             category: Optional[str] = None,
             identifier: Optional[str] = None,
+            identifier_tooltip: Optional[str] = None,
             title: Optional[str] = None,
             icon: Optional[str] = None,
             summary: Optional[Union[str, SafeString]] = None,
@@ -202,6 +203,7 @@ class PreviewModelMixin:
             obj=self,
             category=category or self.preview_category(),
             identifier=identifier,
+            identifier_tooltip=identifier_tooltip,
             title=title,
             icon=icon or self.preview_icon(),
             summary_extra=summary_extra,
@@ -254,6 +256,7 @@ def preview_coordinator_icon_html(preview_coordinator: PreviewCoordinator, css_c
 class PreviewData:
     category: str
     identifier: str
+    identifier_tooltip: Optional[str] = None  # the full value when identifier is shortened for display
     title: Optional[str] = None
     icon: Optional[str] = None
     summary_extra: Optional[list[PreviewKeyValue]] = None
@@ -274,6 +277,7 @@ class PreviewData:
             obj: Union[Model, PreviewModelMixin],
             category: Optional[str] = None,
             identifier: Optional[str] = None,
+            identifier_tooltip: Optional[str] = None,
             title: Optional[str] = None,
             icon: Optional[str] = None,
             summary_extra: Optional[list[PreviewKeyValue]] = None,
@@ -333,6 +337,7 @@ class PreviewData:
             category=category,
             icon=icon,
             identifier=identifier,
+            identifier_tooltip=identifier_tooltip,
             title=title,
             summary_extra=summary_extra,
             internal_url=internal_url,
@@ -391,6 +396,7 @@ class PreviewData:
         return {
             "category": self.category,
             "identifier": self.identifier,
+            "identifier_tooltip": self.identifier_tooltip,
             "title": self.title,
             "icon": self.icon,
             "summary": summary,
@@ -406,6 +412,7 @@ class PreviewData:
         fields = (
             self.category,
             self.identifier,
+            self.identifier_tooltip,
             self.title,
             self.icon,
             summary_extra,

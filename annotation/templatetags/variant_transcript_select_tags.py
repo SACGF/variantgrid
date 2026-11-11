@@ -1,5 +1,8 @@
 from django.template import Library
 
+from genes.hgvs.hgvs import abbreviate_hgvs_sequences
+from genes.hgvs.phgvs_canonical import abbreviate_p_hgvs_sequences
+
 register = Library()
 
 
@@ -18,3 +21,13 @@ def variant_transcript_select(transcript_select_jquery, vts,
         "show_all_transcript_details": show_all_transcript_details,
         "empty_transcript_option": empty_transcript_option
     }
+
+
+@register.filter
+def abbreviate_hgvs(hgvs):
+    return abbreviate_hgvs_sequences(hgvs)
+
+
+@register.filter
+def abbreviate_p_hgvs(p_hgvs):
+    return abbreviate_p_hgvs_sequences(p_hgvs)

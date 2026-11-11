@@ -318,7 +318,10 @@ function populateVariantAllele(data) {
         });
         $("#variant_coordinate").append(link);
     }
-    $("#variant-canonical-c-hgvs").text(data.link_data.canonical_c_hgvs || "-");
+    const canonicalCHgvs = data.link_data.canonical_c_hgvs;
+    const canonicalCHgvsDisplay = abbreviateHgvsSequences(canonicalCHgvs);
+    $("#variant-canonical-c-hgvs").text(canonicalCHgvsDisplay || "-")
+        .attr("title", canonicalCHgvsDisplay !== canonicalCHgvs ? canonicalCHgvs : null);
 
     let clinGenId = $("#clingen-allele-id");
     clinGenId.empty(); // clear loading

@@ -2,7 +2,7 @@
 {% load ui_utils %}
 <div class="preview-data">
     {% preview_icon preview "preview-icon" %}
-    <span class="preview-category">{{ preview.category }}</span>&nbsp;{% if preview.internal_url %}<a class="preview-identifier hover-link" href="{{ preview.internal_url }}" target="_blank">{{ preview.identifier }}</a>{% else %}<span class="preview-identifier preview-no-link" title="No view available for this result">{{ preview.identifier }}</span>{% endif %}
+    <span class="preview-category">{{ preview.category }}</span>&nbsp;{% if preview.internal_url %}<a class="preview-identifier hover-link" href="{{ preview.internal_url }}" target="_blank"{% if preview.identifier_tooltip %} title="{{ preview.identifier_tooltip }}"{% endif %}>{{ preview.identifier }}</a>{% else %}<span class="preview-identifier preview-no-link" title="No view available for this result">{{ preview.identifier }}</span>{% endif %}
     {% if preview.title %}<span class="preview-title">{{ preview.title }}</span>{% endif %}
     {% if preview.summary_all %}
         <div class="preview-key-values">

@@ -48,7 +48,7 @@ from library.genomics.vcf_enums import (
     VCFSymbolicAllele,
 )
 from library.guardian_utils import admin_bot
-from library.preview_request import PreviewKeyValue, PreviewModelMixin
+from library.preview_request import PreviewData, PreviewKeyValue, PreviewModelMixin
 from library.utils import FormerTuple, sha256sum_str
 from snpdb.babelfish import get_genome_babelfish
 from snpdb.enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus, SequenceRole
@@ -797,6 +797,10 @@ class Variant(PreviewModelMixin, models.Model):
     def preview_can_liftover(cls) -> bool:
         return True
 
+    @property
+    def preview(self) -> PreviewData:
+        return self.preview_with(identifier=self.abbreviated_string, identifier_tooltip=self.abbreviated_string_tooltip)
+
     @staticmethod
     def get_chrom_q(chrom):
         return Q(locus__contig__name__iexact=chrom) | Q(locus__contig__ucsc_name__iexact=chrom)
@@ -1054,12 +1058,22 @@ class Variant(PreviewModelMixin, models.Model):
 
     @property
     def is_abbreviated(self):
-        return str(self) != self.full_string
+        return self.abbreviated_string != self.full_string
 
     @cached_property
     def full_string(self):
         """ No abbreviation """
         return self.format_tuple(*self.as_tuple())
+
+    @cached_property
+    def abbreviated_string(self) -> str:
+        """ Long ref/alt as 'TTT...TAG' - for display, with abbreviated_string_tooltip as its tooltip (#2612) """
+        return self.format_tuple(*self.as_tuple(), abbreviate=True)
+
+    @property
+    def abbreviated_string_tooltip(self) -> Optional[str]:
+        """ The full coordinate when abbreviated_string shortens it """
+        return self.full_string if self.is_abbreviated else None
 
     def __str__(self):
         return self.format_tuple(self.locus.contig.name, self.locus.position, self.locus.ref.seq, self.alt.seq, self.svlen)
