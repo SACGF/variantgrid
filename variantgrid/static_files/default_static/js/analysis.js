@@ -473,6 +473,10 @@ function replaceEditorWindow(url) {
     nodeDataContainer.empty();
     nodeDataContainer.removeAttr("node_url");
     nodeDataContainer.removeAttr("node_id");
+    nodeDataContainer.removeAttr("node_loading");
+    hideLoadingOverlay();  // a node still loading put it over the whole panel - it would hide what we load (#2782)
+    removeGridLoadingOverlay();
+    registerDeferredGridLoad(null);
     unselectActive();
     if (url) {
         // Toolbar content (analysis settings, input samples) is editor-only - put it where it can be seen
@@ -920,11 +924,12 @@ function loadGridAndEditorForNode(nodeId, extra_filters, fromSelectNode) {
         showNodeEditorTab(NODE_EDITOR_TAB_EDITOR);  // a node comes up on its editor, so its grid stays deferred
         openNodeEditorDrawer();  // selecting a node is what opens the drawer
         showLoadingOverlay();
-        dataContainer.load(load_node_url, function() {
-            const dc = $(this);
-            if (dc.attr("node_url") === load_node_url) {  // still the node we asked for
-                dc.attr('node_id', nodeId).removeAttr("node_loading");
+        $.get(load_node_url, function(html) {
+            if (dataContainer.attr("node_url") !== load_node_url) {
+                return;  // moved on (another node, analysis settings) while this was in flight
             }
+            dataContainer.html(html);
+            dataContainer.attr('node_id', nodeId).removeAttr("node_loading");
         });
     } else {
         removeGridLoadingOverlay();
