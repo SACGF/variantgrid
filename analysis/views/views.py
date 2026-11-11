@@ -208,6 +208,7 @@ def view_analysis(request, analysis_id, active_node_id=0):
         "warnings": analysis.get_toolbar_warnings(request.user),
         "loading_animations": user_settings.grid_loading_animations,
         "tips": [t.tip for t in get_tips(app="analysis")] if user_settings.show_tips else [],
+        "node_zoom_percent": user_settings.analysis_node_zoom_percent,
     }
     return render(request, 'analysis/analysis.html', context)
 

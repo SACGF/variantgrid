@@ -75,6 +75,9 @@ VARIANT_TAG_STALE_DAYS_CHOICES = [
     (1825, "5 years"),
 ]
 
+# Analysis node graph zoom (#2784), as a percentage - the slider in analysis settings uses the same steps
+ANALYSIS_NODE_ZOOM_CHOICES = [(percent, f"{percent}%") for percent in range(50, 201, 10)]
+
 
 class TagConfigCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
     """ How a lab uses tags: colour, sort order, 1-click and staleness. An analysis points at one so
@@ -262,6 +265,8 @@ class SettingsOverride(models.Model):
                                          help_text="If true, an extra tab appears in analysis node editor, with details about node settings + SQL query.")
     analysis_horizontal_mode = models.BooleanField(null=True, blank=True,
                                                    help_text="Analysis nodes connect left/right, and grid on bottom. Default=False - connect vertically top/bottom, grid in editor")
+    analysis_node_zoom = models.IntegerField(null=True, blank=True, choices=ANALYSIS_NODE_ZOOM_CHOICES,
+                                             help_text="Size of the analysis node graph, as a percentage. Positions scale too, so layouts keep their spacing. Default=100%")
 
     import_messages = models.BooleanField(null=True, blank=True,
                                           help_text="Get internal notification (message icon top right) when imports are done (eg VCF finished processing and annotating)")
@@ -429,6 +434,7 @@ class UserSettings:
     tool_tips: bool
     node_debug_tab: bool
     analysis_horizontal_mode: bool
+    analysis_node_zoom: Optional[int]
     import_messages: bool
     igv_port: bool
     default_genome_build: GenomeBuild
@@ -449,6 +455,10 @@ class UserSettings:
         if self.tag_config is None:
             return None
         return self.tag_config.variant_tag_stale_date
+
+    @property
+    def analysis_node_zoom_percent(self) -> int:
+        return self.analysis_node_zoom or 100
 
     @staticmethod
     def parse_value(field_name: str, value: Any) -> Any:

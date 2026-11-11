@@ -45,6 +45,22 @@ function getNodeOrientation() {
 // @jsplumb/browser-ui instance, created in variantgridPipeline.init once #analysis is in the DOM
 let jsPlumbInstance = null;
 
+// Node graph zoom (#2784) - #analysis is scaled as a whole so saved node positions keep their spacing,
+// and jsPlumb is told so drags and connectors map back to unscaled coordinates
+function getNodeZoom() {
+	return ANALYSIS_NODE_ZOOM_PERCENT / 100;
+}
+
+function setNodeZoomPercent(percent) {
+	ANALYSIS_NODE_ZOOM_PERCENT = percent;
+	const zoom = getNodeZoom();
+	$("#analysis").css({transform: `scale(${zoom})`, "transform-origin": "0 0"});
+	if (jsPlumbInstance) {
+		jsPlumbInstance.setZoom(zoom, true);
+	}
+}
+
+
 function getNode(nodeId) {
 	return $("#analysis-node-" + nodeId);
 }
@@ -1041,11 +1057,12 @@ function setupNodeModifications() {
 	function drawMarquee(event) {
 		const rect = draggedRect(event);
 		const canvasOffset = canvas.offset();
+		const zoom = getNodeZoom();  // the marquee lives inside the scaled canvas
 		marquee.css({
-			left: rect.left - canvasOffset.left,
-			top: rect.top - canvasOffset.top,
-			width: rect.right - rect.left,
-			height: rect.bottom - rect.top,
+			left: (rect.left - canvasOffset.left) / zoom,
+			top: (rect.top - canvasOffset.top) / zoom,
+			width: (rect.right - rect.left) / zoom,
+			height: (rect.bottom - rect.top) / zoom,
 		});
 	}
 
@@ -1053,8 +1070,9 @@ function setupNodeModifications() {
 		$("div.window", canvas).each(function() {
 			const node = $(this);
 			const offset = node.offset();
-			const intersects = offset.left < rect.right && offset.left + node.outerWidth() > rect.left &&
-							   offset.top < rect.bottom && offset.top + node.outerHeight() > rect.top;
+			const box = this.getBoundingClientRect();  // scaled size, unlike outerWidth()
+			const intersects = offset.left < rect.right && offset.left + box.width > rect.left &&
+							   offset.top < rect.bottom && offset.top + box.height > rect.top;
 			if (intersects) {
 				node.addClass(ACTIVE_CLASS);
 			}
@@ -1177,6 +1195,7 @@ window.variantgridPipeline = {init : function(readOnly) {
 		});
 	});
 	jsPlumbInstance.bind("drag:stop", saveDraggedNodePositions);
+	setNodeZoomPercent(ANALYSIS_NODE_ZOOM_PERCENT);
 
 	setupHideInvalidConnectionsOnDrag();
 
