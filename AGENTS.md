@@ -295,6 +295,9 @@ The detail is `claude/guides/github.md`; these are the rules it rests on.
 - Issues go in the public `SACGF/variantgrid` with nothing identifying (no patient, lab or variant details, hostnames
   or config values); a security problem or one that needs those details goes in `SACGF/variantgrid_private`, which
   is issues only - never branch or push there. Suggest an issue in chat; create one only when told to.
+- Names from a deployment's data are identifying too - sample, patient, VCF, cohort and family names, case IDs - in
+  any public issue, PR or comment, agent-test results included: illustrate with invented names of the same shape
+  (`FAM123_P`, `SMP5008`…`SMP5010`). Fake data you created yourself (`agent_test_…`) is fine.
 - Private repos (`variantgrid_private`, `variantgrid_sapath`, the Shariant repos) carry patient and lab details: read
   only the issue I hand you, search one only when I ask you to, never `gh search --owner SACGF`.
 - Plans: `claude/plans/AGENTS.md`.
