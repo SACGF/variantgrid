@@ -260,10 +260,11 @@ carries the steps; `annotation/migrations/0007_alphagenome_splicing.py` does the
      as big: extract it and the .tbi into `annotation_data/GRCh38/` from a zip on another filesystem, or stream it
      (`curl <download url> | bsdtar -xf -`) so the zip never lands, as zip + extract need ~177 GB on one disk.
    - `UTRAnnotator.pm` comes from our repo (`annotation/annotation_data/generate_annotation/UTRAnnotator.pm`), not
-     Ensembl's: it carries Ensembl/VEP_plugins#869, which reports every 5' UTR effect in a fixed order where the stock
-     plugin picks one by hash order and so differs between runs. `download_annotation_data` replaces the installed copy
-     whenever it differs from ours (`annotation/vep_annotation.py:is_variantgrid_vep_plugin`). Drop it from
-     `_VARIANTGRID_VEP_PLUGINS` once that PR is on the release branch we download from.
+     Ensembl's: it carries the first version of Ensembl/VEP_plugins#869, which reports every 5' UTR effect in a fixed
+     order where the stock plugin picks one by hash order and so differs between runs. `download_annotation_data`
+     replaces the installed copy whenever it differs from ours (`annotation/vep_annotation.py:is_variantgrid_vep_plugin`).
+     The PR now reports every effect only with the plugin option `all=1`, so moving to Ensembl's plugin follows
+     `claude/runbooks/upstream_watch.md` ("UTRAnnotator copy").
    - `AVI.pm`, which `download_annotation_data` fetches from VEP_plugins `release/<ANNOTATION_VEP_VERSION>` into
      ANNOTATION_VEP_PLUGINS_DIR along with any other configured plugin missing there.
    - GRCh38, non-commercial research deployments only (`DEPLOYMENT_DIAGNOSTIC_USE = False`): "AlphaGenome SNV merged splicing scores",
@@ -328,8 +329,8 @@ and evidence key autopopulate
 no fallback to `VariantAnnotation`). The first backfills imported the PICK'd entry into `VariantAnnotation` only, so
 `VariantAnnotationVersion.backfilled_utr_splicevault_transcripts` sends those versions through one more UTRAnnotator +
 SpliceVault pass over every variant, imported per transcript. SpliceVault values only land on the MANE transcript's
-row (the data file is keyed by it). UTRAnnotator reports one `5UTR_consequence` per transcript even when it finds
-several effects (the last flagged, in Perl hash order); `5UTR_annotation` keeps every effect.
+row (the data file is keyed by it). Our UTRAnnotator reports every effect per transcript: `5UTR_consequence` the
+terms `&`-joined in a fixed order, `5UTR_annotation` each effect's uORF entries in the same order.
 
 ### ClinVar
 

@@ -1,11 +1,11 @@
-# VariantGrid's copy of Ensembl VEP_plugins UTRAnnotator.pm (release/116) with
+# VariantGrid's copy of Ensembl VEP_plugins UTRAnnotator.pm (release/116) with the first version of
 # https://github.com/Ensembl/VEP_plugins/pull/869 applied: every triggered 5' UTR effect is reported in a fixed
 # order, where the stock plugin reports one of them chosen by Perl hash order, so its output differed between runs
 # (https://github.com/Ensembl/VEP_plugins/issues/870). download_annotation_data installs this file over Ensembl's
 # because UTRAnnotator is in _VARIANTGRID_VEP_PLUGINS (annotation/vep_annotation.py).
 #
-# TODO: once that PR is merged and on the VEP_plugins release branch we download from, delete this file and take
-# UTRAnnotator out of _VARIANTGRID_VEP_PLUGINS.
+# The PR as it stands reports every effect only with the plugin option all=1, so replacing this file with Ensembl's
+# takes more than deleting it: claude/runbooks/upstream_watch.md ("UTRAnnotator copy") has the check and the steps.
 
 =head1 LICENSE
 

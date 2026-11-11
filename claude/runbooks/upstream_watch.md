@@ -9,7 +9,7 @@ column (the fifth `|`-separated field), so keep the table shape.
 | Item | Waiting on | Last checked | Next check |
 |---|---|---|---|
 | hgvs fork | biocommons/hgvs release with #899, #901, #902, #911 | 2026-10-27 | 2026-11-27 |
-| UTRAnnotator copy | Ensembl/VEP_plugins#869 on the `release/<VEP>` branch | 2026-11-03 | 2026-12-03 |
+| UTRAnnotator copy | Ensembl/VEP_plugins#869 on the `release/<VEP>` branch | 2026-11-11 | 2026-12-11 |
 | VEP plugin per-variant cache | Ensembl/ensembl-variation#1220, Ensembl/VEP_plugins#871 | 2026-11-03 | 2026-12-03 |
 | CSI index docs | Ensembl/ensembl-vep#2068 | 2026-11-03 | 2027-01-27 |
 | Pre-112 VEP fasta | Shariant and runx1db2 moving to VEP >= 112 (Ensembl/ensembl-vep#1635 fixed in 112) | 2026-11-03 | 2027-02-03 |
@@ -68,22 +68,36 @@ files (root `AGENTS.md`, Python packages) and run `genes.tests.test_hgvs` and `g
 
 ## UTRAnnotator copy
 
-`annotation/annotation_data/generate_annotation/UTRAnnotator.pm` is Ensembl's plugin with Ensembl/VEP_plugins#869
-applied (every 5' UTR effect reported in a fixed order; stock output differs between runs, Ensembl/VEP_plugins#870).
-`download_annotation_data` installs it over Ensembl's because UTRAnnotator is in `_VARIANTGRID_VEP_PLUGINS`
-(`annotation/vep_annotation.py:is_variantgrid_vep_plugin`).
+`annotation/annotation_data/generate_annotation/UTRAnnotator.pm` is Ensembl's plugin with the first version of
+Ensembl/VEP_plugins#869 applied: every 5' UTR effect reported, `&`-joined in a fixed order (stock output differs
+between runs, Ensembl/VEP_plugins#870). `download_annotation_data` installs it over Ensembl's because UTRAnnotator is
+in `_VARIANTGRID_VEP_PLUGINS` (`annotation/vep_annotation.py:is_variantgrid_vep_plugin`).
 
-Check, with `<VEP>` the `ANNOTATION_VEP_VERSION` deployments install:
+Ensembl/VEP_plugins#869 now reports, by default, only the first effect in a fixed order
+(`uAUG_gained uSTOP_lost uAUG_lost uSTOP_gained uFrameshift`), and every effect only with `all=1` (output then
+identical to our copy's plus a `consequence=<effect>` field on each uORF entry). We are not moving to `all=1`: the
+copy stays for the VariantAnnotationVersions annotated with it, so one version's 5' UTR effects all come from one
+plugin, and new versions will use Ensembl's plugin with its default. Until #869 is on the release branch a new version
+would use, stock output still differs between runs (Ensembl/VEP_plugins#870), so a new version keeps our copy too.
+
+The plugin is installed per deployment, not per version: `download_annotation_data` writes ours over the plugins
+dir's `UTRAnnotator.pm`, and a version keeps calling VEP for as long as new variants are annotated into it (and for a
+pending `backfilled_utr_effects` pass, whose import requires our copy byte for byte,
+`annotation/vep_annotation.py:installed_vep_plugin_is_ours`).
+
+Check, with `<VEP>` the `ANNOTATION_VEP_VERSION` a new version would install:
 
 ```bash
 gh pr view 869 --repo Ensembl/VEP_plugins --json state,mergedAt -q '"\(.state) \(.mergedAt)"'
-diff <(curl -sL https://raw.githubusercontent.com/Ensembl/VEP_plugins/release/<VEP>/UTRAnnotator.pm) \
-     <(tail -n +10 annotation/annotation_data/generate_annotation/UTRAnnotator.pm) && echo "release branch has it"
+curl -sL https://raw.githubusercontent.com/Ensembl/VEP_plugins/release/<VEP>/UTRAnnotator.pm | grep -c '{all}'
 ```
 
-When resolved (the diff is empty, or differs only in a way we do not need): delete the file, take UTRAnnotator out of
-`_VARIANTGRID_VEP_PLUGINS`, drop its paragraph from `claude/research/annotation.md` (data files step) and this row. If
-the PR is closed unmerged, keep the copy and note why here.
+When resolved (#869 is on `release/<VEP>` and each deployment's VEP upgrade to it brings a new version, the versions
+annotated with our copy no longer annotating new variants and none with `backfilled_utr_effects` pending): delete our
+`.pm`, take UTRAnnotator out of `_VARIANTGRID_VEP_PLUGINS`, drop the `installed_vep_plugin_is_ours` guard from the
+effects backfill import (`annotation/vep_plugin_backfill.py`), update the UTRAnnotator paragraphs in
+`claude/research/annotation.md` (effects backfill, data files step, transcript rows), and delete this row. Until
+every deployment is there the copy stays. If #869 is closed unmerged, new versions keep our copy: note why here.
 
 ## VEP plugin per-variant cache
 
