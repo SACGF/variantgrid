@@ -1,10 +1,12 @@
 """
 Model-level helpers: ModelUtilsMixin (accept an instance or its pk), the ArrayLength / AsciiValue SQL
 functions, model_has_field, refresh_for_update (re-read a row under SELECT FOR UPDATE),
-get_model_content_type_dict, and AuditUtils.last_change_for (a field's latest value from django-auditlog).
+get_model_content_type_dict, and AuditUtils.last_change_for / last_change_in (a field's latest value from
+django-auditlog, queried or from loaded log entries).
 """
 import datetime
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Callable, Generic, Optional, TypeVar, Union
 
@@ -93,26 +95,33 @@ class AuditSingleChange(Generic[T]):
 class AuditUtils:
 
     @staticmethod
+    def _single_change(log_entry: LogEntry, field: str, is_json: bool, parser: Optional[Callable[[Union[str, dict]], T]]) -> AuditSingleChange[T]:
+        value = log_entry.changes.get(field)[1]
+        if isinstance(value, str) and is_json:
+            try:
+                value = json.loads(value)
+                if isinstance(value, str):
+                    # not sure what's going on with double encoding
+                    value = json.loads(value)
+            except:
+                pass
+        if parser:
+            value = parser(value)
+        return AuditSingleChange(value, log_entry)
+
+    @staticmethod
     def last_change_for(model_instance: Model, field: str, is_json: bool = False, parser: Optional[Callable[[Union[str, dict]], T]] = None) -> AuditSingleChange[T]:
         # order_by = '-timestamp'
         # because we've done some wonky things with timestamp, use the more objective count index for getting the most recent comment
         order_by = '-pk'
 
         if log_entry := LogEntry.objects.get_for_object(model_instance).filter(**{f"changes__{field}__isnull": False}).order_by(order_by).first():
-            value = log_entry.changes.get(field)[1]
-            if isinstance(value, str) and is_json:
-                try:
-                    value = json.loads(value)
-                    if isinstance(value, str):
-                        # not sure what's going on with double encoding
-                        value = json.loads(value)
-                except:
-                    pass
-            if parser:
-                try:
-                    value = parser(value)
-                except Exception as ex:
-                    raise ex
-                    # raise ValueError(f"Couldn't parse {field} \"{value_str}\"")
-            return AuditSingleChange(value, log_entry)
+            return AuditUtils._single_change(log_entry, field, is_json, parser)
+        return None
+
+    @staticmethod
+    def last_change_in(log_entries: Iterable[LogEntry], field: str, is_json: bool = False, parser: Optional[Callable[[Union[str, dict]], T]] = None) -> Optional[AuditSingleChange[T]]:
+        """ last_change_for picked from log entries already loaded (e.g. a prefetched AuditlogHistoryField) """
+        if log_entry := max((entry for entry in log_entries if field in entry.changes), key=lambda entry: entry.pk, default=None):
+            return AuditUtils._single_change(log_entry, field, is_json, parser)
         return None
