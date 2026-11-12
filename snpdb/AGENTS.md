@@ -1,5 +1,5 @@
 # snpdb — agent notes
-Owns: Variant/Allele/Locus/Sequence, GenomeBuild/Contig, VCF/Sample/Cohort/Trio, CohortGenotype packing, zygosity counts, liftover, ClinGen alleles, Lab/Organization, UserSettings, VariantGridColumn/CustomColumnsCollection, DataTables engine.
+Owns: Variant/Allele/Locus/Sequence, GenomeBuild/Contig, VCF/Sample/Cohort/Trio, CohortGenotype packing, zygosity counts, liftover, ClinGen alleles, Lab/Organization, UserSettings, API tokens (models/models_api_token.py), VariantGridColumn/CustomColumnsCollection, DataTables engine.
 Start with:
 - models/models_variant.py — Sequence, Locus, Variant, VariantCoordinate, Allele, VariantAllele, LiftoverRun, AlleleLiftover
 - models/models_genome.py — GenomeBuild, Contig, GenomeBuildContig, GenomeFasta

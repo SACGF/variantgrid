@@ -19,6 +19,17 @@
                     {% endfor %}
                 </select>
             </div>
+            {% if auth_tokens %}
+            <div class="form-group ml-4">
+                <label class="mr-2" for="api-auth-token">Token</label>
+                <select id="api-auth-token" class="form-control form-control-sm">
+                    <option value=''></option>
+                    {% for token in auth_tokens %}
+                        <option value="{{ token.pk }}" {% if token.pk == auth_token %}selected{% endif %}>{{ token.user.username }}: {{ token.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
             <div class="form-group ml-4">
                 <label class="mr-2" for="api-date-from">From</label>
                 <input class="form-control form-control-sm" type="date" id="api-date-from" value="{{ date_from|default_if_none:'' }}">

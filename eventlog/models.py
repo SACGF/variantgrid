@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Optional, Union
 
 from django.apps import apps
+from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.contrib.auth.signals import user_logged_in
 from django.contrib.contenttypes.models import ContentType
@@ -196,6 +197,7 @@ class ApiRequestLog(models.Model):
         Kept forever unless settings.API_REQUEST_LOG_DAYS is set, then pruned by eventlog.tasks.prune_api_request_log """
     created = models.DateTimeField(auto_now_add=True, db_index=True)
     user = models.ForeignKey(User, null=True, on_delete=SET_NULL)
+    auth_token = models.ForeignKey(settings.KNOX_TOKEN_MODEL, null=True, on_delete=SET_NULL)  # None for other auth
     method = models.CharField(max_length=10)
     path = models.TextField()
     query_string = models.TextField(blank=True)

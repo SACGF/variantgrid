@@ -75,6 +75,7 @@ class ApiRequestLogColumns(DatatableConfig[ApiRequestLog]):
         self.rich_columns = [
             RichColumn('created', client_renderer='TableFormat.timestamp', orderable=True, default_sort=SortOrder.DESC),
             self.user_column(),
+            RichColumn('auth_token__name', label='Token', orderable=True),
             RichColumn('method', orderable=True),
             RichColumn('view_name', label='View', orderable=True),
             RichColumn('status_code', label='Status', orderable=True),
@@ -120,6 +121,8 @@ class ApiRequestLogColumns(DatatableConfig[ApiRequestLog]):
     def filter_queryset(self, qs: QuerySet[ApiRequestLog]) -> QuerySet[ApiRequestLog]:
         if view_name := self.get_query_param('view_name'):
             qs = qs.filter(view_name=view_name)
+        if auth_token := self.get_query_param('auth_token'):
+            qs = qs.filter(auth_token=auth_token)
         if self.get_query_json('errors_only'):
             qs = qs.filter(status_code__gte=400)
         if self.get_query_json('wrote_data'):

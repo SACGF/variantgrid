@@ -833,6 +833,7 @@ django==6.1.1 \
     #   django-model-utils
     #   django-postgres-extra
     #   django-recaptcha
+    #   django-rest-knox
     #   django-storages
     #   django-termsandconditions
     #   djangorestframework
@@ -912,6 +913,10 @@ django-registration-redux==2.13 \
     --hash=sha256:547c86ad9b951cf743075b5486f304e51e450b45d04e5ef04392838a9cff3da8 \
     --hash=sha256:9793a05b32b1d7342c6ef3e0140b2951b7dbde058b3ba6e8a232b534928279f9
     # via -r requirements.in
+django-rest-knox==5.1.1 \
+    --hash=sha256:4a61218ef771c1573edf5c1c308a3c6acc438a6be2e86e225620b74b18fc38b4 \
+    --hash=sha256:b303d1a7c898d535cb2d2f153ca80b6d71e493d5fa2d8f09aa17f9b86c66641b
+    # via -r requirements.in
 django-storages==1.14.6 \
     --hash=sha256:11b7b6200e1cb5ffcd9962bd3673a39c7d6a6109e8096f0e03d46fab3d3aabd9 \
     --hash=sha256:7a25ce8f4214f69ac9c7ce87e2603887f7ae99326c316bc8d2d75375e09341c9
@@ -925,6 +930,7 @@ djangorestframework==3.18.3 \
     --hash=sha256:8544bb674846731b1e3c9b309236ee1dc412905a0aa725be2ec193ca950a7d12
     # via
     #   -r requirements.in
+    #   django-rest-knox
     #   drf-spectacular
 dnspython==2.9.0 \
     --hash=sha256:9a4aedb833c3c1b49214d04d44d3032ab7a9135f7c1d29a549b4ff78fd82fda9 \

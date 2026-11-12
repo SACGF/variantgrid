@@ -1,0 +1,52 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load js_tags %}
+{% load ui_utils %}
+{% block title %}API Token{% endblock title %}
+{% block head %}
+    <script src="{% static 'js/snpdb/api_tokens.js' %}"></script>
+{% endblock %}
+{% block content %}
+<div class="container">
+    <h3>API Token: {{ token.name }}</h3>
+    {% labelled label="User" %}{{ token.user.username }}{% endlabelled %}
+    {% labelled label="Created" %}{% timestamp token.created %}{% endlabelled %}
+    {% labelled label="Expires" %}{% if token.expiry %}{% timestamp token.expiry %}{% else %}Never{% endif %}{% endlabelled %}
+    {% labelled label="Last used" %}{% if token.last_used %}{% timestamp token.last_used time_ago=True %}{% else %}<span class="no-value">-</span>{% endif %}{% endlabelled %}
+    {% labelled label="Status" %}
+        {{ token.status }}
+        {% if token.revoked %}by {{ token.revoked_by.username|default:'deleted user' }} {% timestamp token.revoked %}{% endif %}
+    {% endlabelled %}
+    {% if not token.revoked %}
+        {% labelled label="" %}
+            <form class="api-token-revoke" method="post" action="{% url 'api_token_revoke' %}" data-name="{{ token.name }}">
+                {% csrf_token %}
+                <input type="hidden" name="digest" value="{{ token.digest }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger">Revoke</button>
+            </form>
+        {% endlabelled %}
+    {% endif %}
+    {% if api_log_url %}
+        {% labelled label="API Log" admin_only=True %}<a class="hover-link" href="{{ api_log_url }}">Calls logged with this token</a>{% endlabelled %}
+    {% endif %}
+
+    <h4 class="mt-4">Use history</h4>
+    <p class="text-muted">The first request in each hour the token was used{% if uses|length == max_uses_shown %}, latest {{ max_uses_shown }} shown{% endif %}.</p>
+    {% if uses %}
+        <table class="table table-sm">
+            <thead><tr><th>Used</th><th>IP address</th><th>Path</th></tr></thead>
+            <tbody>
+            {% for use in uses %}
+                <tr>
+                    <td>{% timestamp use.used %}</td>
+                    <td class="mono">{{ use.ip_address|default:"-" }}</td>
+                    <td class="mono">{{ use.path }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="no-value">Not used yet.</p>
+    {% endif %}
+</div>
+{% endblock content %}

@@ -1,0 +1,39 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% block title %}API Tokens{% endblock title %}
+{% block head %}
+    <script src="{% static 'js/snpdb/api_tokens.js' %}"></script>
+{% endblock %}
+{% block content %}
+<div class="container">
+    <h3>API Tokens</h3>
+    <p>
+        A token lets a script or the <span class="mono">variantgrid_api</span> client call the <a href="/api/docs">REST API</a> as you.
+        Send it in the header <span class="mono">Authorization: Token &lt;key&gt;</span>. Anyone with the key can do anything you can through the API,
+        so give each script its own token, and revoke one that is no longer needed.
+    </p>
+
+    {% if new_token_key %}
+        <div class="alert alert-success" id="new-api-token">
+            <p>Created API token <b>{{ new_token.name }}</b>. Copy the key now - it is not stored, and won't be shown again.</p>
+            <div class="input-group">
+                <input type="text" class="form-control mono" id="new-api-token-key" value="{{ new_token_key }}" readonly>
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-secondary" id="copy-api-token-key">Copy</button>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <h4 class="mt-4">Create a token</h4>
+    <form method="post" id="api-token-create-form">
+        {% csrf_token %}
+        {% crispy form form_helper.horizontal %}
+        <button type="submit" class="btn btn-primary">Create token</button>
+    </form>
+
+    <h4 class="mt-4">Your tokens</h4>
+    {% include "snpdb/settings/api_token_table.html" with tokens=tokens admin=False %}
+</div>
+{% endblock content %}

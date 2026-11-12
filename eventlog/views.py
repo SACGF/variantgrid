@@ -3,6 +3,7 @@ import json
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied
+from django.db.models import Exists, OuterRef
 from django.http import HttpRequest, HttpResponseBadRequest
 from django.http.response import HttpResponse
 from django.shortcuts import get_object_or_404, render
@@ -12,6 +13,7 @@ from django.views.decorators.http import require_POST
 from eventlog.models import ApiRequestLog, Event
 from library.django_utils import require_superuser
 from library.enums.log_level import LogLevel
+from snpdb.models.models_api_token import ApiToken
 
 
 def eventlog_view(view_func):
@@ -44,9 +46,12 @@ def eventlog_detail(request: HttpRequest, pk: int):
 @require_superuser
 def api_request_log(request):
     view_names = ApiRequestLog.objects.order_by('view_name').values_list('view_name', flat=True).distinct()
+    logged_tokens = ApiToken.objects.filter(Exists(ApiRequestLog.objects.filter(auth_token=OuterRef('pk'))))
     context = {
         "view_names": view_names,
         "view_name": request.GET.get("view_name"),
+        "auth_tokens": logged_tokens.select_related("user").order_by("user__username", "name"),
+        "auth_token": request.GET.get("auth_token"),
         "date_from": request.GET.get("date_from"),
         "date_to": request.GET.get("date_to"),
         "retention_days": settings.API_REQUEST_LOG_DAYS,
