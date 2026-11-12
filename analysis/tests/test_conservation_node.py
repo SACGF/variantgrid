@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.http import JsonResponse
 from django.test import TestCase, override_settings
 from django.test.client import Client
 from django.urls.base import reverse
@@ -94,15 +95,19 @@ class TestConservationNode(AnalysisSetupMixin, TestCase):
             self.assertTrue([w for w in node.get_warnings() if "Conservation filter is NOT being applied" in w])
             self.assertFalse(ConservationNode(analysis=self.analysis).get_warnings())
 
-    def _editor_html(self, **node_kwargs) -> str:
+    def _editor_client_and_url(self, node: ConservationNode) -> tuple[Client, str]:
         user = User.objects.get(username=f"test_{self.__class__.__name__}")
         assign_permission_to_user_and_groups(user, self.analysis)
-        node = ConservationNode.objects.create(analysis=self.analysis, **node_kwargs)
         client = Client()
         client.force_login(user)
         url = reverse("node_view", kwargs={"analysis_id": self.analysis.pk, "analysis_version": self.analysis.version,
                                            "node_id": node.pk, "node_version": node.version,
                                            "extra_filters": "default"})
+        return client, url
+
+    def _editor_html(self, **node_kwargs) -> str:
+        node = ConservationNode.objects.create(analysis=self.analysis, **node_kwargs)
+        client, url = self._editor_client_and_url(node)
         response = client.get(url)
         self.assertEqual(200, response.status_code)
         return response.content.decode()
@@ -118,3 +123,15 @@ class TestConservationNode(AnalysisSetupMixin, TestCase):
             html = self._editor_html(any_scaled_min=0.9)
         self.assertIn('id="any_scaled_min-slider"', html)
         self.assertNotIn('id="gerp_pp_rs-slider"', html)
+
+    @patch("analysis.views.nodes.node_view.update_analysis")
+    def test_saved_filter_clears_on_version_without_conservation_scores(self, _update_analysis):
+        """ The T2T editor posts only the master slider and checkboxes - the individual scores it doesn't
+            render must not be required, or the save silently fails (#2787) """
+        node = ConservationNode.objects.create(analysis=self.analysis, any_scaled_min=0.3)
+        client, url = self._editor_client_and_url(node)
+        with patch.object(VariantAnnotationVersion, "visible_columns", frozenset()):
+            response = client.post(url, {"any_scaled_min": 0})
+        self.assertIsInstance(response, JsonResponse)
+        node.refresh_from_db()
+        self.assertFalse(node.has_saved_filter())

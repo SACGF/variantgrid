@@ -34,7 +34,7 @@ class ConservationNode(AnalysisNode):
     any_scaled_min = models.FloatField(default=0.0)
 
     # Individual scores - minimums
-    gerp_pp_rs = models.FloatField(default=0.0)
+    gerp_pp_rs = models.FloatField(default=0.0, blank=True)
     phylop_30_way_mammalian = models.FloatField(default=0.0, blank=True)  # 38 only
     phylop_46_way_mammalian = models.FloatField(default=0.0, blank=True)  # 37 only
     phylop_100_way_vertebrate = models.FloatField(default=0.0, blank=True)  # 37/38
