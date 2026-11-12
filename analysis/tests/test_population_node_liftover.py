@@ -12,9 +12,10 @@ LIFTOVER_WARNING = "is lifted over from GRCh38"
 
 
 class TestPopulationNodeGnomADLiftover(AnalysisSetupMixin, TestCase):
-    def _set_gnomad(self, gnomad: str):
+    def _set_gnomad(self, gnomad: str, backfilled_gnomad_ref_swaps: bool = True):
         vav = self.analysis.annotation_version.variant_annotation_version
         vav.gnomad = gnomad
+        vav.backfilled_gnomad_ref_swaps = backfilled_gnomad_ref_swaps
         vav.save()
 
     def _warns(self, **kwargs) -> bool:
@@ -36,3 +37,7 @@ class TestPopulationNodeGnomADLiftover(AnalysisSetupMixin, TestCase):
             with self.subTest(gnomad=gnomad):
                 self._set_gnomad(gnomad)
                 self.assertFalse(self._warns(percent=1))
+
+    def test_warns_on_ref_swaps_until_backfilled(self):
+        self._set_gnomad("4.1.t2t_liftover_ref_swaps", backfilled_gnomad_ref_swaps=False)
+        self.assertTrue(self._warns(percent=1))

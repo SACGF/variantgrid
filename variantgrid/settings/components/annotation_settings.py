@@ -302,7 +302,7 @@ ANNOTATION = {
             "dbnsfp": None,
             "dbscsnv": None,
             "denovo_db": None,  # N/A
-            "gnomad4": "annotation_data/T2T-CHM13v2.0/gnomad4.1.t2t_liftover_T2T-CHM13v2.0_combined_af.vcf.bgz",
+            "gnomad4": "annotation_data/T2T-CHM13v2.0/gnomad4.1.t2t_liftover_ref_swaps_T2T-CHM13v2.0_combined_af.vcf.bgz",
             "gnomad_sv": "annotation_data/T2T-CHM13v2.0/gnomad.v4.0.sv.merged_t2t.no_filters.vcf.gz",
             "gnomad_sv_name": "annotation_data/T2T-CHM13v2.0/gnomad.v4.0.sv.merged_t2t.no_filters.vcf.gz",
             "mastermind": None,  # N/A
