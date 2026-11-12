@@ -17,6 +17,7 @@ column (the fifth `|`-separated field), so keep the table shape.
 | gnomAD SV overlap via two `--custom` | Ensembl/ensembl-vep#1989 (`coords=2`, `show_overlaps`) for #1645 | 2026-11-03 | 2027-02-03 |
 | AnnotSV regulatory element sort | lgmgeo/AnnotSV#356 fixed in a released Annotations_Human bundle | 2026-11-10 | 2026-12-10 |
 | chrX PAR table | a bioutils release with `bioutils.par` that installs on Python 3.14 (0.6.2 caps `<3.14`, biocommons/bioutils#97) | 2026-11-11 | 2026-12-11 |
+| HPO phenotype synonyms | an HPO release after 2026-10-24 carrying obophenotype/human-phenotype-ontology#11777-#11799 | 2026-11-12 | 2026-12-12 |
 
 ## chrX PAR table
 
@@ -192,3 +193,25 @@ for f in Annotations_Human/FtIncludedInSV/RegulatoryElements/*/*.sorted.bed; do 
 When resolved (a released bundle passes that loop): take the sort out of the AnnotSV install paragraph in
 `claude/guides/operations.md` and delete this row. The `deployment_check` warning stays - it is cheap and catches a
 bundle that regresses.
+
+## HPO phenotype synonyms
+
+`patients/phenotype_matcher.py:PhenotypeMatcher._get_special_case_lookups` hardcodes free-text phrases that no HPO
+term's name or synonym covers. obophenotype/human-phenotype-ontology#11778-#11799 added synonyms for 22 of them
+(closed 2026-10-24, after the v2026-09-01 release), e.g. "Elevated renin", "Hot flushes", "Crowded dentition",
+"Fetal hydrops". #11777 ("LQTS" on HP:0001657) was declined as a disease name on a finding; #11806, asking that the
+term's existing "Long QT syndrome" synonyms go too, is open, so keep the `"LQTS"` entry.
+
+Check:
+
+```bash
+gh release list --repo obophenotype/human-phenotype-ontology --limit 3
+gh issue view 11806 --repo obophenotype/human-phenotype-ontology --json state -q .state
+```
+
+When resolved (a release dated after 2026-10-24): import its `hp.owl` (`manage.py ontology_import --hpo <file>`) on
+a test deployment, then for each special-case key check whether the matcher's alias index (built from
+`OntologyTerm.aliases` in `PhenotypeMatcher.__init__`) now resolves it to the same term. Delete those entries
+(several keys differ from the synonym that was added - "increased renin" vs "Elevated renin", "recurrent urtis" vs
+"Recurrent URTI" - so only the exact matches go), run `patients.tests.test_phenotype_matching`, and delete this row.
+If #11806 is still open, carry it as its own row.
