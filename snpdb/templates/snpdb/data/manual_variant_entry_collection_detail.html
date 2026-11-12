@@ -1,4 +1,5 @@
 {% load ui_utils %}
+{% load variant_kind_tags %}
 
 {% if url_name_visible.view_upload_pipeline and mvec.uploadedmanualvariantentrycollection %}
     <a class="hover-link" href="{% url 'view_upload_pipeline' mvec.uploadedmanualvariantentrycollection.file_upload.uploadpipeline.pk %}">
@@ -34,6 +35,7 @@
                     {% else %}
                         <a class="hover-link variant-coordinate un-annotated" title="Not annotated" href="{% url 'view_variant' cmv.variant_id  %}">{{ cmv.variant }}</a>
                     {% endif %}
+                    {% variant_kind_badge cmv.variant %}
                 {% endfor %}
             </td>
             <td>
