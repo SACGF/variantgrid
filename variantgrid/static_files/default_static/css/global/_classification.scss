@@ -341,12 +341,6 @@ a .c-hgvs-body {
 	}
 }
 
-// The classifications grid on sample, patient, cohort and family pages is wider than the page at common window
-// sizes (its columns' min-widths and content) - it scrolls on its own rather than the whole page scrolling
-.dt-table-container:has(> #vc-datatable) {
-	overflow-x: auto;
-}
-
 #vc-datatable {
 	.dt-c_hgvs {
 		.c-hgvs-body {
