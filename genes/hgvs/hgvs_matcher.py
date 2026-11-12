@@ -465,7 +465,9 @@ class HGVSMatcher:
             variant_coordinate = None
             hgvs_methods = []
             clingen_unavailable = False
-            for tv, potential_converter_type in self.filter_best_transcripts_and_converter_type_by_accession(transcript_accession):
+            tv_and_converter_types = self.filter_best_transcripts_and_converter_type_by_accession(transcript_accession)
+            self._validate_transcript_kind(hgvs_variant, [tv for tv, _ in tv_and_converter_types])
+            for tv, potential_converter_type in tv_and_converter_types:
                 method = None
                 clingen_skipped = False
                 used_transcript_accession = tv.accession
@@ -566,6 +568,21 @@ class HGVSMatcher:
             raise HGVSNomenclatureException(
                 f"'m.' (mitochondrial) HGVS requires the mitochondrial reference, "
                 f"but '{contig_accession}' is not the mitochondrion for {self.genome_build}")
+
+    @staticmethod
+    def _validate_transcript_kind(hgvs_variant: HGVSVariant, transcript_versions: list):
+        """ n. counts from the transcript start and c. from the start codon, so an n. on a coding transcript names a
+            different base, and resolving it would silently give another variant. Which numbering was meant can't be
+            told, so it's an error (#1946). Judged by the best local transcript version (closest to the one asked
+            for); a transcript we have no record of is left to the converters. The reverse, c. on a non-coding
+            transcript, is HGVSNonCodingTranscriptException from the converter """
+        if hgvs_variant.kind != 'n':
+            return
+        transcript_version = next((tv for tv in transcript_versions if isinstance(tv, TranscriptVersion)), None)
+        if transcript_version is not None and transcript_version.is_coding:
+            raise HGVSNomenclatureException(
+                f"{hgvs_variant.transcript} is a coding transcript, so it can't take 'n.' (use c.): "
+                f"n. counts from the transcript start, not the start codon")
 
     def get_transcript_accession(self, hgvs_string: str) -> str:
         return self.hgvs_converter.get_transcript_accession(hgvs_string)

@@ -361,6 +361,15 @@ class TestHGVS(TestCase):
         hgvs_string = "NC_000001.10:m.100000A>G"
         self.assertRaises(HGVSException, lambda: matcher.get_variant_coordinate(hgvs_string))
 
+    def test_n_hgvs_on_coding_transcript_rejected(self):
+        """ n. counts from the transcript start, so on a coding transcript it names a different base from the c. -
+            an error rather than another variant (#1946) """
+        genome_build = GenomeBuild.grch37()
+        transcript_version = create_fake_transcript_version(genome_build)
+        matcher = HGVSMatcher(genome_build)
+        with self.assertRaisesMessage(HGVSNomenclatureException, "is a coding transcript"):
+            matcher.get_variant_coordinate(f"{transcript_version.accession}:n.1440A>T")
+
     def test_mitochondria_hgvs_contig_not_in_build(self):
         """ 'm.' on a contig from another build (e.g. NC_012920.1 on T2T) is left to ContigNotInBuildError
             so search can skip it, rather than a nomenclature error (#2365) """
