@@ -21,7 +21,12 @@ from library.genomics.vcf_enums import GeneLevelSymbolicAlt
 from snpdb.enums import SequenceRole
 from snpdb.models.models_genome import Contig, Cytoband, GenomeBuild
 from snpdb.models.models_user_settings import AllVariantsFilter
-from snpdb.models.models_variant import Sequence, Variant, get_base_and_reference_sequence_ids
+from snpdb.models.models_variant import (
+    Locus,
+    Sequence,
+    Variant,
+    get_base_and_reference_sequence_ids,
+)
 
 # The smallest standard autosome - a brand new user's default, so their first page load is cheap
 DEFAULT_CONTIG_NAME = "21"
@@ -244,39 +249,39 @@ class ContigRegion:
     def is_whole_contig(self) -> bool:
         return self.start is None
 
-    def get_q(self) -> Q:
-        q = Q(locus__contig_id=self.contig_id)
+    def get_q(self, path_to_locus: str = "locus__") -> Q:
+        q = Q(**{f"{path_to_locus}contig_id": self.contig_id})
         if not self.is_whole_contig:
-            q &= Q(locus__position__gte=self.start, locus__position__lte=self.end)
+            q &= Q(**{f"{path_to_locus}position__gte": self.start, f"{path_to_locus}position__lte": self.end})
         return q
 
+    def overlaps_transcript(self, contig_id: int, tx_start: int, tx_end: int) -> bool:
+        """ tx_start/tx_end 0-based half-open, as TranscriptVersion.get_gene_spans """
+        if contig_id != self.contig_id:
+            return False
+        return self.is_whole_contig or (tx_start < self.end and tx_end >= self.start)
 
-def get_gene_level_variant_ids_in_regions(annotation_version: AnnotationVersion,
-                                          regions: Iterable[ContigRegion]) -> list[int]:
-    """ Gene-level variants with one of their genes (either partner of a fusion) in a region. Their position is a
-        gene ID, so they are placed by their VariantGeneOverlap rows and the genes' transcripts (#2769).
-        Gene-level variants are few, so this starts from their genes - starting from a chromosome's genes
-        scans millions of overlaps. One not yet annotated has no overlap rows, so matches no region """
+
+def get_gene_level_variant_loci_in_regions(annotation_version: AnnotationVersion,
+                                           regions: Iterable[ContigRegion]) -> dict[int, int]:
+    """ variant_id -> locus_id of gene-level variants with one of their genes (either partner of a fusion) in a
+        region. Their position is a gene ID, so they are placed by their VariantGeneOverlap rows and the genes'
+        transcripts (#2769). Gene-level variants and their genes are few, so the genes' transcript spans are
+        matched to the regions here rather than in SQL, where a query per region ORed together scans every
+        transcript. One not yet annotated has no overlap rows, so matches no region """
+    regions = list(regions)
     genome_build = annotation_version.genome_build
     overlaps = list(VariantGeneOverlap.objects.filter(
         version=annotation_version.variant_annotation_version,
         variant__locus__contig_id__in=get_gene_level_contig_ids(genome_build),
-    ).values_list("variant_id", "gene_id"))
+    ).values_list("variant_id", "variant__locus_id", "gene_id"))
     if not overlaps:
-        return []
-    gene_ids = {gene_id for _, gene_id in overlaps}
-    q_list = []
-    for region in regions:
-        qs = TranscriptVersion.objects.filter(genome_build=genome_build, contig_id=region.contig_id,
-                                              gene_version__gene_id__in=gene_ids)
-        if not region.is_whole_contig:
-            qs = TranscriptVersion.filter_overlapping(qs, genome_build, region.start, region.end)
-        q_list.append(Q(pk__in=qs.values("pk")))
-    if not q_list:
-        return []
-    transcript_versions = TranscriptVersion.objects.filter(reduce(operator.or_, q_list))
-    genes_in_regions = set(transcript_versions.values_list("gene_version__gene_id", flat=True))
-    return sorted({variant_id for variant_id, gene_id in overlaps if gene_id in genes_in_regions})
+        return {}
+    gene_ids = {gene_id for _, _, gene_id in overlaps}
+    genes_in_regions = {gene_id for gene_id, contig_id, tx_start, tx_end
+                        in TranscriptVersion.get_gene_spans(genome_build, gene_ids)
+                        if any(region.overlaps_transcript(contig_id, tx_start, tx_end) for region in regions)}
+    return {variant_id: locus_id for variant_id, locus_id, gene_id in overlaps if gene_id in genes_in_regions}
 
 
 def get_regions_q(annotation_version: AnnotationVersion, regions: Iterable[ContigRegion],
@@ -286,14 +291,27 @@ def get_regions_q(annotation_version: AnnotationVersion, regions: Iterable[Conti
     regions = list(regions)
     if not regions:
         return None
-    whole_contig_ids = sorted({region.contig_id for region in regions if region.is_whole_contig})
-    q_list = [region.get_q() for region in regions if not region.is_whole_contig]
-    if whole_contig_ids:
-        q_list.append(Q(locus__contig_id__in=whole_contig_ids))
+
+    def regions_locus_q(path_to_locus: str) -> Q:
+        whole_contig_ids = sorted({region.contig_id for region in regions if region.is_whole_contig})
+        q_list = [region.get_q(path_to_locus) for region in regions if not region.is_whole_contig]
+        if whole_contig_ids:
+            q_list.append(Q(**{f"{path_to_locus}contig_id__in": whole_contig_ids}))
+        return reduce(operator.or_, q_list)
+
+    gene_level_variant_loci = {}
     if includes_gene_level_types(variant_types):
-        if gene_level_variant_ids := get_gene_level_variant_ids_in_regions(annotation_version, regions):
-            q_list.append(Q(pk__in=gene_level_variant_ids))
-    return reduce(operator.or_, q_list)
+        gene_level_variant_loci = get_gene_level_variant_loci_in_regions(annotation_version, regions)
+    if not gene_level_variant_loci:
+        return regions_locus_q("locus__")
+
+    # Matched on the locus table: Postgres can't push an OR of a variant id list and a locus condition through
+    # the join, and seq scans every variant. A gene-level locus holds all of one gene's gene-level variants (its
+    # copy number, splice calls and fusions), so on those loci only the variants that matched are kept
+    gene_level_locus_ids = sorted(set(gene_level_variant_loci.values()))
+    loci = Locus.objects.filter(regions_locus_q("") | Q(pk__in=gene_level_locus_ids))
+    return Q(locus__in=loci.values("pk")) & (~Q(locus_id__in=gene_level_locus_ids)
+                                             | Q(pk__in=sorted(gene_level_variant_loci)))
 
 
 def resolve_gene_symbols(gene_symbols: Optional[Iterable[Any]]) -> list[GeneSymbol]:

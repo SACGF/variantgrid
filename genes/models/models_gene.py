@@ -1199,6 +1199,13 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         return qs.alias(**cls._exon_span(genome_build)).filter(tx_start__lt=end, tx_end__gte=start)
 
     @classmethod
+    def get_gene_spans(cls, genome_build: GenomeBuild, gene_ids: Iterable[str]) -> list[tuple[str, int, int, int]]:
+        """ (gene_id, contig_id, tx_start, tx_end) for each of the genes' transcripts in the build - 0-based half-open """
+        qs = cls.objects.filter(genome_build=genome_build, gene_version__gene_id__in=gene_ids)
+        qs = qs.annotate(**cls._exon_span(genome_build))
+        return list(qs.values_list("gene_version__gene_id", "contig_id", "tx_start", "tx_end"))
+
+    @classmethod
     def get_gene_symbol_span(cls, genome_build: GenomeBuild,
                              gene_symbol: 'GeneSymbol') -> Optional[tuple[Contig, int, int]]:
         """ (contig, start, end) - 1-based inclusive - spanning the symbol's transcripts in the build, on the contig
