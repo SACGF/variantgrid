@@ -54,8 +54,9 @@ unit's own `.env` is relative to it (`config/systemd/README.txt`). `variantgrid/
 `deployment_check` invalid when an installed unit reads an env file that is missing or `VG_INSTALL_DIR` is another checkout, since
 the restart after the upgrade would fail; the manual step that installs them registers only on such a box.
 
-Route a task with `@celery.shared_task(queue=...)` or an entry in `CELERY_TASK_ROUTES`; `claude/maps/tasks.md` lists every
-task with its queue and enqueuers. The broker is RabbitMQ (`CELERY.broker_url` secret), the result backend and cache Redis.
+A task with no `queue=` or `CELERY_TASK_ROUTES` entry runs on the default queue, db_workers, which suits most tasks.
+Route one elsewhere when it needs a particular worker, with `@celery.shared_task(queue=...)` or an entry in
+`CELERY_TASK_ROUTES`; `claude/maps/tasks.md` lists every task with its queue and enqueuers. The broker is RabbitMQ (`CELERY.broker_url` secret), the result backend and cache Redis.
 `vg status` shows per-queue depth and consumer count from a passive declare. A worker takes several seconds after a restart
 to load Django and register, so a queue whose unit is active but has no consumer is re-read for up to 30 s; one still at
 `0c NO CONSUMER` after that is a real fault - `celery -A variantgrid inspect active_queues` shows what each worker consumes.

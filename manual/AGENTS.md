@@ -3,6 +3,9 @@
 Rules for writing or editing a migration, a `ManualOperation` (a management command run on deploy) or a one-off
 fix/backfill command, in any app. How the upgrader runs these steps is in `manual/__manual_readme.md`.
 
+## A migration's data step
+Prefer the plain option: a data step is `RunPython` with the ORM, not raw SQL.
+
 ## Editing a pushed migration
 By default, express a change of mind about a pushed migration (a field removed, a default changed) as a new migration on
 top: renaming or editing one that a deployment has applied leaves `django_migrations` pointing at a name that no longer

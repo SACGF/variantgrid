@@ -97,6 +97,7 @@ urlpatterns = [
     path('settings/set_user_row_config', views_user_settings.set_user_row_config, name='set_user_row_config'),
     path('settings/set_user_data_grid_config', views_user_settings.set_user_data_grid_config, name='set_user_data_grid_config'),
     path('settings/set_show_tips', views_user_settings.set_show_tips, name='set_show_tips'),
+    path('settings/set_analysis_node_zoom', views_user_settings.set_analysis_node_zoom, name='set_analysis_node_zoom'),
     path('settings/set_all_variants_filter/<genome_build_name>', views_user_settings.set_all_variants_filter,
          name='set_all_variants_filter'),
     path('settings/tags', views_tag.tag_settings, name='tag_settings'),

@@ -640,6 +640,10 @@ class ConservationNodeForm(BaseNodeForm):
             field.widget = HiddenInput(attrs={"min": data['min'], "max": data['max'], "step": step})
 
     @property
+    def individual_conservation_score_names(self) -> list[str]:
+        return list(self.individual_conservation_score_fields)
+
+    @property
     def individual_conservation_score_fields(self) -> dict:
         conservation_score_fields = {}
         for field_name in self.instance.get_individual_field_names():
@@ -712,14 +716,37 @@ class DamageNodeForm(BaseNodeForm):
             "min_field": self[tool.node_threshold_field],
             "required_field": self[f"{tool.raw_field}_required"],
             "allow_null_field": self[f"{tool.raw_field}_allow_null"],
-        } for tool in self.instance.get_raw_score_tools()]
+        } for tool in self.instance.get_editor_raw_score_tools()]
+
+    def get_rankscore_rows(self) -> list[dict]:
+        """ Rankscore slider rows (columns v2 on), the same shape as get_raw_score_rows """
+        return [{
+            "tool": tool,
+            "field": tool.rankscore_field,
+            "threshold_field": f"{tool.rankscore_field}_min",
+            "min_field": self[f"{tool.rankscore_field}_min"],
+            "required_field": self[f"{tool.rankscore_field}_required"],
+            "allow_null_field": self[f"{tool.rankscore_field}_allow_null"],
+        } for tool in self.instance.get_editor_rankscore_tools()]
+
+    def has_individual_prediction_rows(self) -> bool:
+        """ Whether "Show individual pathogenicity predictions" has any rows to reveal - none on T2T (#2787) """
+        node = self.instance
+        if node.columns_version == 1:
+            return True
+        if node.columns_version >= 4 and self.get_raw_score_rows():
+            return True
+        return node.columns_version < 4 and bool(self.get_rankscore_rows())
 
     def get_slider_setups(self) -> list[dict]:
         """ Selectors for each slider the editor draws: the hidden form field, the range input and its enable
             checkbox - passed to initDamageNodeEditor (damagenode_editor.js) """
         node = self.instance
-        sliders = [("splice_min", "splice"), ("cosmic_count_min", "cosmic-count"),
-                   ("damage_predictions_min", "damage-predictions")]
+        sliders = [("splice_min", "splice")]
+        if node.shows_cosmic_count():
+            sliders.append(("cosmic_count_min", "cosmic-count"))
+        if node.shows_damage_predictions():
+            sliders.append(("damage_predictions_min", "damage-predictions"))
         if node.has_alphagenome_splicing():
             sliders.append(("alphagenome_splicing_min", "alphagenome-splicing"))
         if node.has_gene_constraint:
@@ -729,11 +756,7 @@ class DamageNodeForm(BaseNodeForm):
         if node.columns_version == 1:
             sliders.extend([("cadd_score_min", "cadd"), ("revel_score_min", "revel")])
         elif node.columns_version >= 2:
-            rankscore_fields = ["bayesdel_noaf_rankscore", "cadd_raw_rankscore", "clinpred_rankscore",
-                                "metalr_rankscore", "revel_rankscore", "vest4_rankscore"]
-            if node.columns_version >= 3:
-                rankscore_fields.insert(0, "alphamissense_rankscore")
-            sliders.extend((f"{field}_min", field) for field in rankscore_fields)
+            sliders.extend((row["threshold_field"], row["field"]) for row in self.get_rankscore_rows())
             if node.columns_version >= 4:
                 sliders.extend((row["threshold_field"], row["field"]) for row in self.get_raw_score_rows())
         return [{"input": f"#id_{field}", "slider": f"#{name}-slider", "enable": f"input#enable-{name}"}
@@ -746,7 +769,7 @@ class DamageNodeForm(BaseNodeForm):
             "pred_field": self[tool.pred_field],
             "required_field": self[f"{tool.pred_field}_required"],
             "allow_null_field": self[f"{tool.pred_field}_allow_null"],
-        } for tool in self.instance.get_pred_tools()]
+        } for tool in self.instance.get_editor_pred_tools()]
 
 
 class FilterNodeForm(BaseNodeForm):

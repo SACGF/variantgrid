@@ -44,49 +44,34 @@ class ConservationNode(AnalysisNode):
     allow_null = models.BooleanField(default=False, blank=True)
     use_individual_sliders = models.BooleanField(default=False, blank=True)
 
-    # Need a way to work out what columns we have
     @cached_property
     def vav(self):
         return self.analysis.annotation_version.variant_annotation_version
-
-    @cached_property
-    def has_phastcons_30_way_mammalian(self) -> bool:
-        return self.vav.has_phastcons_30_way_mammalian
-
-    @cached_property
-    def has_phylop_30_way_mammalian(self) -> bool:
-        return self.vav.has_phylop_30_way_mammalian
-
-    @cached_property
-    def has_phastcons_46_way_mammalian(self) -> bool:
-        return self.vav.has_phastcons_46_way_mammalian
-
-    @cached_property
-    def has_phylop_46_way_mammalian(self) -> bool:
-        return self.vav.has_phylop_46_way_mammalian
 
     def get_individual_field_names(self) -> list[str]:
         return list(self.get_individual_field_names_allow_null().keys())
 
     def get_individual_field_names_allow_null(self) -> dict[str, bool]:
+        """ The conservation scores this annotation version populates (eg 30-way on GRCh38, 46-way on GRCh37,
+            none on T2T - #2787), with whether a null score may pass when allow_null is set """
         fields = {
             "gerp_pp_rs": False,  # Is in dbNSFP - so all intergenic will be NULL
             "phylop_100_way_vertebrate": True,
             "phastcons_100_way_vertebrate": True,
+            "phastcons_30_way_mammalian": True,
+            "phastcons_46_way_mammalian": True,
+            "phylop_30_way_mammalian": True,
+            "phylop_46_way_mammalian": True,
         }
-        if self.has_phastcons_30_way_mammalian:
-            fields["phastcons_30_way_mammalian"] = True
+        visible_columns = self.vav.visible_columns
+        return {f: allow_null for f, allow_null in fields.items() if f in visible_columns}
 
-        if self.has_phastcons_46_way_mammalian:
-            fields["phastcons_46_way_mammalian"] = True
+    def has_conservation_scores(self) -> bool:
+        return bool(self.get_individual_field_names_allow_null())
 
-        if self.has_phylop_30_way_mammalian:
-            fields["phylop_30_way_mammalian"] = True
-
-        if self.has_phylop_46_way_mammalian:
-            fields["phylop_46_way_mammalian"] = True
-
-        return fields
+    def has_saved_filter(self) -> bool:
+        """ A filter set on the node, whether or not this version can apply it (eg copied from GRCh38 onto T2T) """
+        return self.use_individual_sliders or self.any_scaled_min > 0.0
 
     def _get_individual_scores(self) -> dict[str, tuple[float, bool]]:
         scores = {}
@@ -114,6 +99,13 @@ class ConservationNode(AnalysisNode):
 
     def get_warnings(self) -> list[str]:
         warnings = super().get_warnings()
+        if self.has_saved_filter() and not self.has_conservation_scores():
+            warnings.append(
+                f"Conservation filter is NOT being applied: there are no conservation scores (GERP++, phyloP, "
+                f"phastCons) on {self.vav.genome_build} / VEP {self.vav.vep} / columns_version "
+                f"{self.vav.columns_version}, so every variant passes. Set the slider to 0 and untick "
+                "'Use individual sliders' to clear it."
+            )
         if self.modifies_parents() and not self.vav.backfilled_sv_conservation:
             warnings.append(
                 "Structural variant conservation scores on this VariantAnnotationVersion were taken "
@@ -124,6 +116,8 @@ class ConservationNode(AnalysisNode):
         return warnings
 
     def modifies_parents(self):
+        if not self.has_conservation_scores():
+            return False
         if self.use_individual_sliders:
             for field_name, (score, _allow_null) in self._get_individual_scores().items():
                 cons_stats = VariantAnnotation.CONSERVATION_SCORES[field_name]
@@ -151,6 +145,8 @@ class ConservationNode(AnalysisNode):
         return reduce(operator.or_, q_list)
 
     def _get_filtering_description(self):
+        if not self.has_conservation_scores():
+            return ["No conservation scores on this build"]
         filtering = []
         if self.use_individual_sliders:
             scores = self._get_scores_and_allow_null()
