@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("snpdb", "0015_settingsoverride_analysis_node_zoom"),
-        ("authtoken", "0004_alter_tokenproxy_options"),
+        ("authtoken", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
