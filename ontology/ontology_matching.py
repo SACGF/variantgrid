@@ -105,7 +105,9 @@ class OntologyMatch:
 OPRPHAN_OMIM_TERMS = re.compile("[0-9]{6,}")
 SUFFIX_SKIP_TERMS = {"", "the", "an", "and", "&", "or", "for", "type", "group", "with"}
 PREFIX_SKIP_TERMS = SUFFIX_SKIP_TERMS.union({"a"})  # only exclude "A" from prefix, in case it says "type" A
-IGNORE_TERMS = {"ar", "ad", "linked", "xld", "xlr", "disability", "disorder"}  # ignore when the user provides
+# modes of inheritance labs append to a condition ("noonan syndrome 1 ad"), dropped from both sides of a text match
+INHERITANCE_TERMS = {"ar", "ad", "xl", "xld", "xlr"}
+IGNORE_TERMS = INHERITANCE_TERMS.union({"linked", "disability", "disorder"})  # ignore when the user provides
 # should disease be in this as well?
 NON_PR_TERMS = {"retard"}
 
@@ -177,7 +179,8 @@ class SearchText:  # TODO shold be renamed ConditionSearchText
         self.suffix = None
         self.suffix_terms: set[str] = set()
 
-        normal_text = normalize_condition_text(text)
+        # dropped before the subtype split, so "type 1a ad" still ends in its subtype
+        normal_text = " ".join(word for word in normalize_condition_text(text).split(" ") if word not in INHERITANCE_TERMS)
         if sub_type_match := SUB_TYPE.match(normal_text):
             self.prefix = sub_type_match.group(1).strip()
             self.suffix = sub_type_match.group(2).strip()

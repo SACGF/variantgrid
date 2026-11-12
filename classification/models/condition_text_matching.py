@@ -959,7 +959,8 @@ def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> Co
                 cms.add_message(ConditionMatchingMessage(severity="info", text=f"Text matched on {alias_kind} of {term.id}"))
         if term.ontology_service == OntologyService.OMIM:
             if mondo := OntologyTermRelation.as_mondo(term):
-                cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Converted from OMIM term {term.id}"))
+                # MONDO's own equivalence, so it doesn't stop a gene-level auto-assign
+                cms.add_message(ConditionMatchingMessage(severity="info", text=f"Converted from OMIM term {term.id}"))
                 term = mondo
             else:
                 # slowly direct users to MONDO

@@ -20,8 +20,13 @@ from classification.models.condition_text_matching import (
 from classification.tasks.condition_text_automatch_task import condition_text_automatch_task
 from genes.models import GeneSymbol
 from library.request_context import set_thread_variable
-from ontology.enums import OntologyService
-from ontology.models.models_ontology import OntologyImport, OntologySnake, OntologyTerm
+from ontology.enums import OntologyService, OntologyTermStatus
+from ontology.models.models_ontology import (
+    OntologyImport,
+    OntologySnake,
+    OntologyTerm,
+    OntologyTermRelation,
+)
 from ontology.ontology_matching import SearchText
 from snpdb.models import Country, Lab, Organization
 
@@ -184,11 +189,11 @@ class ConditionTextSearchFailedTest(TestCase):
 @patch.object(OntologySnake, 'has_gene_relationship', return_value=True)
 @patch.object(OntologyTerm, 'is_leaf', new_callable=PropertyMock, return_value=True)
 class ConditionTextExactSynonymTest(TestCase):
-    """ #2806 - a MONDO exact synonym auto-assigns at gene level, a related one only suggests """
+    """ SACGF/variantgrid_private#3948 - what a gene-level text match can auto-assign """
 
     def setUp(self):
-        ontology_import = OntologyImport.objects.create(import_source=OntologyService.MONDO, filename="test",
-                                                        processed_date=timezone.now())
+        self.ontology_import = ontology_import = OntologyImport.objects.create(import_source=OntologyService.MONDO, filename="test",
+                                                                               processed_date=timezone.now())
         self.term = OntologyTerm.objects.create(
             id="MONDO:0007309", ontology_service=OntologyService.MONDO, index=7309,
             name="Charcot-Marie-Tooth disease type 1A", from_import=ontology_import,
@@ -208,4 +213,27 @@ class ConditionTextExactSynonymTest(TestCase):
     def test_related_synonym_only_suggests(self, _is_leaf, _has_gene):
         suggestion = self._suggestion("charcot-marie-tooth disease demyelinating type 1a")
         self.assertEqual(suggestion.terms, [self.term])
+        self.assertFalse(suggestion.is_auto_assignable(gene_symbol=self.gene_symbol))
+
+    def test_inheritance_suffix_ignored(self, _is_leaf, _has_gene):
+        suggestion = self._suggestion("charcot-marie-tooth disease type 1a ad")
+        self.assertTrue(suggestion.is_auto_assignable(gene_symbol=self.gene_symbol))
+
+    def _omim_suggestion(self, mondo_term: OntologyTerm) -> ConditionMatchingSuggestion:
+        omim_name = "CHARCOT-MARIE-TOOTH DISEASE, TYPE 1A"
+        omim_term = OntologyTerm.objects.create(id="OMIM:118220", ontology_service=OntologyService.OMIM, index=118220,
+                                                name=f"{omim_name}; CMT1A", aliases=[omim_name, "CMT1A"],
+                                                from_import=self.ontology_import)
+        with patch.object(OntologyTermRelation, 'as_mondo', return_value=mondo_term):
+            return search_text_to_suggestion(SearchText("charcot-marie-tooth disease type 1a"), omim_term)
+
+    def test_omim_title_converted_to_mondo_auto_assigns(self, _is_leaf, _has_gene):
+        suggestion = self._omim_suggestion(self.term)
+        self.assertEqual(suggestion.terms, [self.term])
+        self.assertTrue(suggestion.is_auto_assignable(gene_symbol=self.gene_symbol))
+
+    def test_omim_title_converted_to_obsolete_mondo_only_suggests(self, _is_leaf, _has_gene):
+        self.term.status = OntologyTermStatus.DEPRECATED
+        self.term.save()
+        suggestion = self._omim_suggestion(self.term)
         self.assertFalse(suggestion.is_auto_assignable(gene_symbol=self.gene_symbol))
