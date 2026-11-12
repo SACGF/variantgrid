@@ -1,7 +1,7 @@
 """
-The overlaps CSV download (classification/views/overlaps_view.py:download_overlaps) loads each batch's
-contributions and their last comments in bulk (#2789): its rows must read the same as rows built one
-overlap at a time, and its query count must not grow with the number of overlaps.
+The overlaps CSV download (classification/views/overlaps_view.py:download_overlaps) prefetches each chunk's
+contributions and their last comments through Overlap.objects.with_contributions() (#2789): its rows must read
+the same as rows built from one un-prefetched overlap, and its query count must not grow with the number of overlaps.
 """
 import csv
 import io

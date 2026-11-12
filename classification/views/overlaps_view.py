@@ -1,5 +1,3 @@
-from collections.abc import Iterator
-from itertools import batched
 from typing import Optional
 from django.contrib import messages
 from django import forms
@@ -376,7 +374,7 @@ class OverlapDownloadRow(ExportRow):
     @export_column("Next Step", categories={"outstanding": True})
     def next_step(self):
         relevant_ids = {x.pk for x in self.overlap.contributions_list if x.classification_grouping and x.classification_grouping.lab_id in self.lab_picker.lab_ids}
-        if next_steps := [x for x in self.overlap.overlapcontributionnextstep_set.all() if x.contribution_id in relevant_ids]:
+        if next_steps := [x for x in self.overlap.next_steps if x.contribution_id in relevant_ids]:
             return max(x.next_step for x in next_steps).label
         return ""
 
@@ -396,17 +394,6 @@ class OverlapDownloadRow(ExportRow):
                         rows.append("")
 
         return "\n".join(rows)
-
-
-_DOWNLOAD_BATCH_SIZE = 1000
-
-
-def _with_contributions_prefetched(overlaps: Iterator[Overlap]) -> Iterator[Overlap]:
-    """ Loads each batch's contributions and their last comments in bulk, which the rows would otherwise query one by one """
-    for batch in batched(overlaps, _DOWNLOAD_BATCH_SIZE):
-        Overlap.prefetch_contributions_list(batch)
-        OverlapContribution.prefetch_last_comments(c for overlap in batch for c in overlap.contributions_list)
-        yield from batch
 
 
 def download_overlaps(request, lab_id: str):
@@ -445,11 +432,11 @@ def download_overlaps(request, lab_id: str):
 
     qs = qs.order_by("-overlap_status", "-skew_status", "-overlap_status_change_timestamp", "-overlap_override_status")
 
-    qs = qs.prefetch_related("overlapcontributionnextstep_set")
+    qs = qs.with_contributions()
     categories = {"solved": solved_mode, "outstanding": not solved_mode}
 
     return OverlapDownloadRow.streaming_csv(
-        data=_with_contributions_prefetched(qs.iterator(chunk_size=_DOWNLOAD_BATCH_SIZE)),
+        data=qs.iterator(chunk_size=1000),
         filename=f"discordance_reports_{'solved' if solved_mode else 'outstanding'}",
         export_tweak=ExportTweak(categories=categories),
         transformer=lambda x: OverlapDownloadRow(x, lab_picker)

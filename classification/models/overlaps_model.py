@@ -1,17 +1,15 @@
-import copy
-from collections import defaultdict
-from collections.abc import Callable, Iterable
-from functools import cached_property, reduce
+from functools import reduce
 from typing import Any, Optional, Self
 
-from auditlog.models import AuditlogHistoryField
+from auditlog.models import AuditlogHistoryField, LogEntry
 from auditlog.registry import auditlog
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.db import models
-from django.db.models import CASCADE, SET_NULL, JSONField, QuerySet
+from django.db.models import CASCADE, SET_NULL, JSONField, Prefetch, QuerySet
 from django.urls import reverse
+from django.utils.functional import cached_property
 from model_utils.models import TimeStampedModel
 
 from annotation.enums import EffectiveDate
@@ -125,13 +123,7 @@ class OverlapContribution(TimeStampedModel):
 
     @property
     def triage_state_obj(self) -> TriageDecision:
-        # TriageDecision is frozen, so it's parsed once per value - pages and the overlaps download read it many times per contribution
-        triage_state = self.triage_state
-        parsed_from, parsed = self.__dict__.get("_triage_state_parsed", (None, None))
-        if parsed is None or parsed_from != triage_state:
-            parsed = TriageDecision.from_dict(triage_state)
-            self.__dict__["_triage_state_parsed"] = (copy.copy(triage_state), parsed)
-        return parsed
+        return TriageDecision.from_dict(self.triage_state)
 
     @triage_state_obj.setter
     def triage_state_obj(self, value: TriageDecision):
@@ -146,34 +138,20 @@ class OverlapContribution(TimeStampedModel):
         self.comment = value.to_dict()
 
     @cached_property
-    def last_comment(self) -> Optional[AuditSingleChange[TriageComment]]:
+    def history_entries(self) -> list[LogEntry]:
+        """ Overlap.objects.with_contributions() prefetches this """
+        return list(self.history.select_related("actor"))
+
+    @cached_property
+    def last_comment(self) -> Optional[AuditSingleChange]:
         # Often want to show the most recent comment made on a Contribution
-        return self._last_comment_from(
-            AuditUtils.last_change_for(self, "comment", is_json=True, parser=TriageComment.from_dict),
-            lambda: AuditUtils.last_change_for(self, "triage_state", parser=lambda x: None)
-        )
-
-    def _last_comment_from(self, comment_change: Optional[AuditSingleChange[TriageComment]],
-                           triage_change: Callable[[], Optional[AuditSingleChange]]) -> Optional[AuditSingleChange]:
-        if comment_change and comment_change.value.count != 0:
-            return comment_change
+        history = self.history_entries
+        if last_comment := AuditUtils.last_change_in(history, "comment", is_json=True, parser=TriageComment.from_dict):
+            if last_comment.value.count != 0:
+                return last_comment
         if not self.triage_state_obj.status.is_default:
-            return triage_change()
+            return AuditUtils.last_change_in(history, "triage_state", parser=lambda x: None)
         return None
-
-    @staticmethod
-    def prefetch_last_comments(contributions: Iterable['OverlapContribution']):
-        """ Fills last_comment for many contributions with two queries rather than up to two each """
-        contributions = list(contributions)
-        comment_changes = AuditUtils.last_changes_for(
-            OverlapContribution, [c.pk for c in contributions], "comment", is_json=True, parser=TriageComment.from_dict)
-        triage_changes = AuditUtils.last_changes_for(
-            OverlapContribution, [c.pk for c in contributions if not c.triage_state_obj.status.is_default], "triage_state", parser=lambda x: None)
-        for contribution in contributions:
-            contribution.last_comment = contribution._last_comment_from(
-                comment_changes.get(contribution.pk),
-                lambda pk=contribution.pk: triage_changes.get(pk)
-            )
 
     @property
     def testing_context_full(self) -> TestingContextFull:
@@ -301,11 +279,29 @@ class OverlapContribution(TimeStampedModel):
 auditlog.register(OverlapContribution)
 
 
+class OverlapQuerySet(QuerySet):
+    """ Overlap.objects """
+
+    def with_contributions(self) -> 'OverlapQuerySet':
+        """
+        Loads each overlap's contributions_list (with the groupings' labs and allele info that the c.HGVS columns
+        read) and each contribution's last_comment, so listing many overlaps doesn't query per overlap.
+        Under iterator(chunk_size=...) it prefetches per chunk.
+        next_steps and history_entries must be Django's cached_property: Prefetch(to_attr=...) evaluates a functools one per object
+        """
+        return self.prefetch_related(
+            Prefetch("overlapcontributionnextstep_set", queryset=_next_steps_with_contributions(), to_attr="next_steps"),
+            Prefetch("next_steps__contribution__history", queryset=LogEntry.objects.select_related("actor"), to_attr="history_entries"),
+        )
+
+
 class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
     """
     Overlap is made by composition as making a separate model for each overlap type added a lot of overhead for just isolating a few fields
     """
     history = AuditlogHistoryField()
+
+    objects = OverlapQuerySet.as_manager()
 
     overlap_type = models.TextField(choices=OverlapType.choices)
     value_type = TextFieldChoices(max_length=1, choices_type=ClassificationResultValue)  # type:ClassificationResultValue
@@ -477,32 +473,16 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
         ).select_related("classification_grouping__lab__organization")
 
     @cached_property
-    def contributions_list(self) -> list[OverlapContribution]:
-        return list(sorted(self.contributions.all()))
+    def next_steps(self) -> list['OverlapContributionNextStep']:
+        """ With each contribution's grouping, lab and allele info - Overlap.objects.with_contributions() prefetches this """
+        return list(_next_steps_with_contributions().filter(overlap=self))
 
-    @staticmethod
-    def prefetch_contributions_list(overlaps: Iterable['Overlap']):
-        """
-        Fills contributions_list for many overlaps in two queries rather than one each, with the
-        classification groupings' latest allele info that all_hgvs / hgvses read
-        """
-        overlaps = list(overlaps)
-        contribution_ids_by_overlap = defaultdict(list)
-        for overlap_id, contribution_id in OverlapContributionNextStep.objects.filter(overlap__in=overlaps).values_list("overlap_id", "contribution_id"):
-            contribution_ids_by_overlap[overlap_id].append(contribution_id)
-        contributions_qs = OverlapContribution.objects.filter(
-            contribution_status=OverlapContributionStatus.CONTRIBUTING,
-            pk__in=[pk for pks in contribution_ids_by_overlap.values() for pk in pks]
-        ).select_related(
-            "classification_grouping__lab__organization",
-            "classification_grouping__latest_allele_info__grch37",
-            "classification_grouping__latest_allele_info__grch38",
-            "classification_grouping__latest_allele_info__imported_genome_build_patch_version",
-        ).order_by("pk")
-        contributions_by_id = {contribution.pk: contribution for contribution in contributions_qs}
-        for overlap in overlaps:
-            contributions = [contributions_by_id[pk] for pk in sorted(contribution_ids_by_overlap[overlap.pk]) if pk in contributions_by_id]
-            overlap.contributions_list = sorted(contributions)
+    @cached_property
+    def contributions_list(self) -> list[OverlapContribution]:
+        return sorted(
+            next_step.contribution for next_step in self.next_steps
+            if next_step.contribution.contribution_status == OverlapContributionStatus.CONTRIBUTING
+        )
 
     @property
     def has_outstanding_triages(self) -> bool:
@@ -654,6 +634,15 @@ class OverlapContributionNextStep(TimeStampedModel):
 
     def __str__(self):
         return f"{self.contribution} ({self.next_step.name})"
+
+
+def _next_steps_with_contributions() -> QuerySet[OverlapContributionNextStep]:
+    return OverlapContributionNextStep.objects.select_related(
+        "contribution__classification_grouping__lab__organization",
+        "contribution__classification_grouping__latest_allele_info__grch37",
+        "contribution__classification_grouping__latest_allele_info__grch38",
+        "contribution__classification_grouping__latest_allele_info__imported_genome_build_patch_version",
+    )
 
 
 class OverlapDiscordanceNotification(TimeStampedModel):

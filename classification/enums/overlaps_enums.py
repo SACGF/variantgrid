@@ -119,6 +119,11 @@ class TriageDecision(DataClassJsonMixin):
             return f"{self.status.label} ({self.amend_value.replace("_", "-")})"
         return self.status.label
 
+    @classmethod
+    def from_dict(cls, kvs: dict, *, infer_missing=False) -> 'TriageDecision':
+        # dataclasses-json's generic decode is ~70x slower, and pages and the overlaps download parse this per access
+        return cls(status=TriageStatus(kvs.get("status", TriageStatus.PENDING)), amend_value=kvs.get("amend_value"))
+
     @staticmethod
     def default_json():
         return TriageDecision().to_dict()

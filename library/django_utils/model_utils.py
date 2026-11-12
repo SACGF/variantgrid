@@ -1,8 +1,8 @@
 """
 Model-level helpers: ModelUtilsMixin (accept an instance or its pk), the ArrayLength / AsciiValue SQL
 functions, model_has_field, refresh_for_update (re-read a row under SELECT FOR UPDATE),
-get_model_content_type_dict, and AuditUtils.last_change_for / last_changes_for (a field's latest value from
-django-auditlog, for one record or many).
+get_model_content_type_dict, and AuditUtils.last_change_for / last_change_in (a field's latest value from
+django-auditlog, queried or from loaded log entries).
 """
 import datetime
 import json
@@ -120,11 +120,8 @@ class AuditUtils:
         return None
 
     @staticmethod
-    def last_changes_for(model: type[Model], pks: Iterable[int], field: str, is_json: bool = False, parser: Optional[Callable[[Union[str, dict]], T]] = None) -> dict[int, AuditSingleChange[T]]:
-        """ last_change_for of many records of one model (integer pks) in one query, keyed by pk - a record without a change to field is absent """
-        log_entries = LogEntry.objects.filter(
-            content_type=ContentType.objects.get_for_model(model),
-            object_id__in=pks,
-            **{f"changes__{field}__isnull": False}
-        ).order_by('object_id', '-pk').distinct('object_id').select_related('actor')
-        return {log_entry.object_id: AuditUtils._single_change(log_entry, field, is_json, parser) for log_entry in log_entries}
+    def last_change_in(log_entries: Iterable[LogEntry], field: str, is_json: bool = False, parser: Optional[Callable[[Union[str, dict]], T]] = None) -> Optional[AuditSingleChange[T]]:
+        """ last_change_for picked from log entries already loaded (e.g. a prefetched AuditlogHistoryField) """
+        if log_entry := max((entry for entry in log_entries if field in entry.changes), key=lambda entry: entry.pk, default=None):
+            return AuditUtils._single_change(log_entry, field, is_json, parser)
+        return None
