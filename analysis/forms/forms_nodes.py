@@ -633,6 +633,12 @@ class ConservationNodeForm(BaseNodeForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # The editor only renders the scores this version populates - the rest keep their saved values (#2787)
+        individual_field_names = self.instance.get_individual_field_names()
+        for field_name in VariantAnnotation.CONSERVATION_SCORES:
+            if field_name not in individual_field_names:
+                del self.fields[field_name]
+
         num_steps = 20
         for field_name, field in self.individual_conservation_score_fields.items():
             data = VariantAnnotation.CONSERVATION_SCORES[field_name]
