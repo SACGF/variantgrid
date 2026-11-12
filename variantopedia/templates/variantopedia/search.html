@@ -7,6 +7,7 @@
 {% load settings_tags %}
 {% load js_tags %}
 {% load classification_tags %}
+{% load variant_kind_tags %}
 
 
 {% block title %}Search{% endblock %}
@@ -198,7 +199,7 @@
                                                 </div>
                                             {% endif %}
                                             {% if not preview.is_error %}
-                                                <label class="search-identifier"{% if preview.identifier_tooltip %} title="{{ preview.identifier_tooltip }}"{% endif %}>{{ preview.identifier }}</label>&nbsp;{% if preview.title %}<span class="search-title">{{ preview.title }}</span>{% endif %}
+                                                <label class="search-identifier"{% if preview.identifier_tooltip %} title="{{ preview.identifier_tooltip }}"{% endif %}>{{ preview.identifier }}</label>&nbsp;{% variant_kind_badge preview.obj %}{% if preview.title %}<span class="search-title">{{ preview.title }}</span>{% endif %}
                                                 {% if preview.summary_all %}
                                                     <div class="d-block text-small text-secondary extra-summary">
                                                         {% for extra in preview.summary_all %}
