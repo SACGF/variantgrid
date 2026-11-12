@@ -41,7 +41,7 @@ from snpdb.models.models_genome import GenomeBuild
 
 # Plugins in annotation/annotation_data/generate_annotation rather than Ensembl's VEP_plugins. download_annotation_data
 # installs these over whatever the plugins dir holds, so a fix can ship ahead of Ensembl: UTRAnnotator carries
-# Ensembl/VEP_plugins#869 (every 5' UTR effect reported, deterministically) and comes out once that is released
+# Ensembl/VEP_plugins#869 (every 5' UTR effect reported, deterministically), which Ensembl's plugin does only with all=1
 _VARIANTGRID_VEP_PLUGINS = {"Grantham", "UTRAnnotator"}
 
 

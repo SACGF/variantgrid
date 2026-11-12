@@ -9,7 +9,7 @@ column (the fifth `|`-separated field), so keep the table shape.
 | Item | Waiting on | Last checked | Next check |
 |---|---|---|---|
 | hgvs fork | biocommons/hgvs release with #899, #901, #902, #911 | 2026-10-27 | 2026-11-27 |
-| UTRAnnotator copy | Ensembl/VEP_plugins#869 on the `release/<VEP>` branch | 2026-11-11 | 2026-12-11 |
+| UTRAnnotator copy | Ensembl/VEP_plugins#869 on the `release/<VEP>` branch, run with `all=1` | 2026-11-11 | 2026-12-11 |
 | VEP plugin per-variant cache | Ensembl/ensembl-variation#1220, Ensembl/VEP_plugins#871 | 2026-11-03 | 2026-12-03 |
 | CSI index docs | Ensembl/ensembl-vep#2068 | 2026-11-03 | 2027-01-27 |
 | Pre-112 VEP fasta | Shariant and runx1db2 moving to VEP >= 112 (Ensembl/ensembl-vep#1635 fixed in 112) | 2026-11-03 | 2027-02-03 |
@@ -58,36 +58,46 @@ files (root `AGENTS.md`, Python packages) and run `genes.tests.test_hgvs` and `g
 
 ## UTRAnnotator copy
 
-`annotation/annotation_data/generate_annotation/UTRAnnotator.pm` is Ensembl's plugin with the first version of
-Ensembl/VEP_plugins#869 applied: every 5' UTR effect reported, `&`-joined in a fixed order (stock output differs
-between runs, Ensembl/VEP_plugins#870). `download_annotation_data` installs it over Ensembl's because UTRAnnotator is
-in `_VARIANTGRID_VEP_PLUGINS` (`annotation/vep_annotation.py:is_variantgrid_vep_plugin`).
+`annotation/annotation_data/generate_annotation/UTRAnnotator.pm` is Ensembl's plugin with the first revision of
+Ensembl/VEP_plugins#869 (8891949) applied: every 5' UTR effect reported, `&`-joined in a fixed order (stock output
+differs between runs, Ensembl/VEP_plugins#870). `download_annotation_data` installs it over Ensembl's because
+UTRAnnotator is in `_VARIANTGRID_VEP_PLUGINS` (`annotation/vep_annotation.py:is_variantgrid_vep_plugin`).
 
-Ensembl/VEP_plugins#869 now reports, by default, only the first effect in a fixed order
-(`uAUG_gained uSTOP_lost uAUG_lost uSTOP_gained uFrameshift`), and every effect only with `all=1` (output then
-identical to our copy's plus a `consequence=<effect>` field on each uORF entry). We are not moving to `all=1`: the
-copy stays for the VariantAnnotationVersions annotated with it, so one version's 5' UTR effects all come from one
-plugin, and new versions will use Ensembl's plugin with its default. Until #869 is on the release branch a new version
-would use, stock output still differs between runs (Ensembl/VEP_plugins#870), so a new version keeps our copy too.
+The PR as revised for review (c27df0e4) leaves the default output one effect per transcript, now the first in the
+order `uAUG_gained uSTOP_lost uAUG_lost uSTOP_gained uFrameshift`, and reports every effect with the plugin option
+`all=1`. With `all=1` its output is our copy's plus a `consequence=<SO term>` field on each uORF entry. We want
+`all=1`: the high-impact 5' UTR filter (`annotation/effect_filters.py:utr_high_impact_rules`) matches each effect's
+own records, so a variant whose high-impact effect is not the first would drop out of it under the default. Our copy
+ignores `all`, so the option can go on the `--plugin` string before the switch.
 
-The plugin is installed per deployment, not per version: `download_annotation_data` writes ours over the plugins
-dir's `UTRAnnotator.pm`, and a version keeps calling VEP for as long as new variants are annotated into it (and for a
-pending `backfilled_utr_effects` pass, whose import requires our copy's code line for line,
-`annotation/vep_annotation.py:installed_vep_plugin_is_ours`).
+The plugin is installed per deployment, not per version, and a VEP upgrade brings a new VariantAnnotationVersion, so
+the switch happens with the VEP upgrade to a release carrying #869. A pending `backfilled_utr_effects` pass needs
+our copy installed (`annotation/vep_annotation.py:installed_vep_plugin_is_ours`), so it runs before that upgrade.
 
 Check, with `<VEP>` the `ANNOTATION_VEP_VERSION` a new version would install:
 
 ```bash
-gh pr view 869 --repo Ensembl/VEP_plugins --json state,mergedAt -q '"\(.state) \(.mergedAt)"'
-curl -sL https://raw.githubusercontent.com/Ensembl/VEP_plugins/release/<VEP>/UTRAnnotator.pm | grep -c '{all}'
+gh pr view 869 --repo Ensembl/VEP_plugins --json state,mergedAt,commits \
+    -q '"\(.state) \(.mergedAt) \(.commits[-1].oid[0:8])"'
+curl -sL https://raw.githubusercontent.com/Ensembl/VEP_plugins/release/<VEP>/UTRAnnotator.pm \
+    | grep -c 'param_hash->{all}'
 ```
 
-When resolved (#869 is on `release/<VEP>` and each deployment's VEP upgrade to it brings a new version, the versions
-annotated with our copy no longer annotating new variants and none with `backfilled_utr_effects` pending): delete our
-`.pm`, take UTRAnnotator out of `_VARIANTGRID_VEP_PLUGINS`, drop the `installed_vep_plugin_is_ours` guard from the
-effects backfill import (`annotation/vep_plugin_backfill.py`), update the UTRAnnotator paragraphs in
-`claude/research/annotation.md` (effects backfill, data files step, transcript rows), and delete this row. Until
-every deployment is there the copy stays. If #869 is closed unmerged, new versions keep our copy: note why here.
+A new commit on the PR: diff it against c27df0e4 and update this section if the `all=1` output changes.
+
+When resolved (#869 on `release/<VEP>`, every deployment upgraded to that VEP and none with `backfilled_utr_effects`
+pending):
+- add `,all=1` to the `VEPPlugin.UTR_ANNOTATOR` `--plugin` string (`annotation/vep_annotation.py:get_vep_command`),
+  delete our `.pm` and take UTRAnnotator out of `_VARIANTGRID_VEP_PLUGINS`.
+- drop the `installed_vep_plugin_is_ours` guard on `--mark-backfilled backfilled_utr_effects`
+  (`annotation/management/commands/annotation_backfill_columns.py`).
+- the `consequence` field: `annotation/effect_filters.py` still works out each record's effect from its keys, which
+  older versions need, and its lookaheads skip the extra key. Put `consequence` first in
+  `annotation/vep_plugin_display.py:_UTR_ANNOTATOR_KEY_ORDER`, where it heads each record on the variant page.
+- update the UTRAnnotator paragraphs in `claude/research/annotation.md` (effects backfill, data files step, transcript
+  rows) and delete this row.
+
+If #869 is closed unmerged, new versions keep our copy: note why here.
 
 ## VEP plugin per-variant cache
 
