@@ -469,26 +469,6 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
             return self.min_pathogenic_rankscore
         return settings.ANNOTATION_MIN_PATHOGENIC_RANKSCORE
 
-    @cached_property
-    def _vep_config(self) -> dict:
-        return self.genome_build.settings["vep_config"]
-
-    @cached_property
-    def has_phastcons_30_way_mammalian(self) -> bool:
-        return self._vep_config.get("phastcons30way")
-
-    @cached_property
-    def has_phylop_30_way_mammalian(self) -> bool:
-        return self._vep_config.get("phylop30way")
-
-    @cached_property
-    def has_phastcons_46_way_mammalian(self) -> bool:
-        return self._vep_config.get("phastcons46way")
-
-    @cached_property
-    def has_phylop_46_way_mammalian(self) -> bool:
-        return self._vep_config.get("phylop46way")
-
     def get_visible_columns(self, pipeline_type: Optional[VariantAnnotationPipelineType] = None) -> frozenset[str]:
         """ VariantGrid columns this version populates, off the same VEP_COLUMNS table that controls what
             annotation writes (#1148). Pass a pipeline_type to narrow to what that pipeline wrote. """

@@ -1,80 +1,16 @@
 {% extends "analysis/node_editors/grid_editor.html" %}
 {% load js_tags %}
+{% load static %}
 {% block content %}
 <style>
 	.individual-conservation-scores {
 	    display: none;
 	}
 </style>
+<script src="{% static 'js/analysis/conservationnode_editor.js' %}"></script>
 <script>
-    function showIndividualConservationScores() {
-        $(".individual-conservation-scores").show();
-        $("#show-individual-conservation-scores").hide();
-    }
-
-    function setSliderEnabled(sliderSelector, enabled) {
-        sliderSelector.prop("disabled", !enabled);
-    }
-
-    function setupConservationNodeSlider(inputSelector, sliderSelector, enableInput) {
-        setupSlider(inputSelector, sliderSelector);
-        if (enableInput) {
-            function setEnabledIfChecked() {
-                setSliderEnabled(sliderSelector, enableInput.is(":checked"));
-            }
-            setEnabledIfChecked(); // initial setting
-            enableInput.change(setEnabledIfChecked);
-        }
-    }
-
-    function setIndividualSlidersFromMaster(masterValue) {
-        if ($("#id_use_individual_sliders").is(":checked")) {
-            return;
-        }
-        let floatVal = parseFloat(masterValue);
-
-        {% for field_name in form.individual_conservation_score_fields %}
-            var inputSelector = $("#id_{{ field_name }}");
-            var sliderSelector = $("#{{ field_name }}-slider");
-            var min = parseFloat(inputSelector.attr("min"));
-            var max = parseFloat(inputSelector.attr("max"));
-            var range = max-min;
-            var newSliderValue = min + range * floatVal;
-            sliderSelector.val(newSliderValue);
-            inputSelector.val(newSliderValue);
-            setVisibleSliderValue(inputSelector, sliderSelector, newSliderValue);
-        {% endfor %}
-    }
-
-    function masterSliderChanged() {
-        setIndividualSlidersFromMaster(this.value);
-    }
-
-    $(document).ready(function() {
-        let conservationForm = $("form#conservation-filter");
-        ajaxForm(conservationForm);
-
-        const useIndividualSliders = $("#id_use_individual_sliders");
-        let masterInput = $("#id_any_scaled_min");
-        let masterSlider = $("#any_scaled_min-slider");
-        setupSlider(masterInput, masterSlider);
-
-        function setEnabledIfNotChecked() {
-            setSliderEnabled(masterSlider, !useIndividualSliders.is(":checked"));
-        }
-        useIndividualSliders.change(setEnabledIfNotChecked);
-        setEnabledIfNotChecked();
-        masterSlider.on('change', masterSliderChanged);
-
-        {% for field_name in form.individual_conservation_score_fields %}
-            setupConservationNodeSlider($("#id_{{ field_name }}"), $("#{{ field_name }}-slider"), useIndividualSliders);
-        {% endfor %}
-
-        // after all setup, now set from initial master value if applicable
-        setIndividualSlidersFromMaster(masterInput.val());
-        if (useIndividualSliders.is(":checked")) {
-            showIndividualConservationScores();
-        }
+    initConservationNodeEditor({
+        individualFields: {{ form.individual_conservation_score_names | jsonify }},
     });
 </script>
 <form id="conservation-filter" method="post" action="{{ request.path }}">
@@ -84,6 +20,17 @@
     {% endfor %}
 
     {{ form.non_field_errors }}
+    {% if not node.has_conservation_scores %}
+        <div class="editor-help">
+            This annotation version ({{ node.vav.genome_build }}) has no conservation scores (GERP++, phyloP,
+            phastCons), so there is nothing to filter on.
+            {% if node.has_saved_filter %}
+                This node has a saved conservation filter (eg from a copied analysis) that isn't being applied -
+                set the slider to 0, untick 'Use individual sliders' and save to clear it.
+            {% endif %}
+        </div>
+    {% endif %}
+    {% if node.has_conservation_scores or node.has_saved_filter %}
     <table class="editor-table">
         <tr>
             <th>{{ form.any_scaled_min.label }}</th>
@@ -105,12 +52,14 @@
             <th>{{ form.allow_null.label }}</th>
             <td>{{ form.allow_null }}</td>
         </tr>
+        {% if node.has_conservation_scores %}
         <tr id="show-individual-conservation-scores">
             <td colspan="2">
-                <a class="hover-link" href="javascript:showIndividualConservationScores()">Show individual conservation scores</a>
+                <a class="hover-link" href="#">Show individual conservation scores</a>
             </td>
         </tr>
-        <tr class="individual-conservation-scores">
+        {% endif %}
+        <tr {% if node.has_conservation_scores %}class="individual-conservation-scores"{% endif %}>
             <th>{{ form.use_individual_sliders.label }}</th>
             <td>{{ form.use_individual_sliders }}</td>
         </tr>
@@ -138,6 +87,7 @@
             <button id='damage-save' class="btn btn-primary">Save</button>
         {% endif %}
     </div>
+    {% endif %}
     {{ form.media }}
 </form>
 {% endblock content %}
