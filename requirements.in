@@ -47,7 +47,7 @@ nameparser
 nh3
 nltk>=3.10.4  # WekaClassifier model-path advisory
 numpy
-oauthlib>=4.0.0
+oauthlib>=4.0.1
 openpyxl  # pandas read_excel (SA Pathology somatic xlsx import)
 pandas
 ped_parser
