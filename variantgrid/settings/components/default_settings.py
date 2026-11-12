@@ -459,8 +459,8 @@ VCF_IMPORT_COMMON_FILTERS = {
         "clinical_significance_max": "3",
     },
     "T2T-CHM13v2.0": {
-        "gnomad_af_filename": "annotation_data/T2T-CHM13v2.0/gnomad4.1.t2t_liftover_T2T-CHM13v2.0_af_greater_than_5.stripped.vcf.gz",
-        "gnomad_version": "4.1.t2t_liftover",
+        "gnomad_af_filename": "annotation_data/T2T-CHM13v2.0/gnomad4.1.t2t_liftover_ref_swaps_T2T-CHM13v2.0_af_greater_than_5.stripped.vcf.gz",
+        "gnomad_version": "4.1.t2t_liftover_ref_swaps",
         "gnomad_af_min": 0.05,
         "clinical_significance_max": "3",
     }

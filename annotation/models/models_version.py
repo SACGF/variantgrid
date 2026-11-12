@@ -256,6 +256,11 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
     # that ran either plugin.
     backfilled_utr_splicevault_transcripts = models.BooleanField(default=True)
 
+    # #2788 - gnomAD 4.1.t2t_liftover had no record where CHM13's reference allele differs from GRCh38's. The migration
+    # moves the ACTIVE T2T version onto 4.1.t2t_liftover_ref_swaps when settings do and sets this False, as variants
+    # annotated before then have no gnomAD values there until one_off_backfill_t2t_gnomad_ref_swaps fills them.
+    backfilled_gnomad_ref_swaps = models.BooleanField(default=True)
+
     class Meta:
         constraints = [
             models.UniqueConstraint(
@@ -265,11 +270,21 @@ class VariantAnnotationVersion(DataArchiveMixin, SubVersionPartition):
             ),
         ]
 
+    GNOMAD_VERSIONS_LACKING_REF_SWAPS = {"4.1.t2t_liftover"}
+
     @property
     def gnomad_major_version(self) -> int:
         # Pre-migration GRCh37 versions stored the VEP-style "r2.1"
         major = self.gnomad.split(".", maxsplit=1)[0]
         return int(major.removeprefix("r"))
+
+    @property
+    def gnomad_lacks_ref_swaps(self) -> bool:
+        """ gnomAD's own T2T liftover ("4.1.t2t_liftover") drops sites where CHM13's reference allele differs from
+            GRCh38's, so variants there have no gnomAD frequency. "4.1.t2t_liftover_ref_swaps" adds them back
+            (annotation/annotation_data/generate_annotation/gnomad_t2t_ref_swaps.sh, #2788), to variants annotated
+            once the version is on it and to the rest once backfilled_gnomad_ref_swaps """
+        return self.gnomad in self.GNOMAD_VERSIONS_LACKING_REF_SWAPS or not self.backfilled_gnomad_ref_swaps
 
     @property
     def uses_raw_spliceai(self) -> bool:
