@@ -1,5 +1,7 @@
 from datetime import timedelta
+from importlib import import_module
 
+from django.apps import apps
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -57,8 +59,12 @@ class ApiTokenAuthenticationTest(TestCase):
             self.assertEqual(401, self._call(key).status_code)
         self.assertEqual(2, ApiToken.objects.filter(pk__in=[revoked.pk, expired.pk]).count())
 
-    def test_legacy_token_still_authenticates(self):
+    def test_imported_legacy_token_authenticates(self):
         legacy = Token.objects.create(user=self.user)
+        import_module("snpdb.migrations.0016_api_token")._import_legacy_tokens(apps, None)
+        self.assertFalse(Token.objects.exists())
+        token = ApiToken.objects.get(user=self.user)
+        self.assertEqual(("Legacy token", None, legacy.created), (token.name, token.expiry, token.created))
         self.assertEqual(200, self._call(legacy.key).status_code)
 
 

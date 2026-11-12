@@ -937,8 +937,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.BasicAuthentication',  # Needed to classification export clients
         'rest_framework.authentication.SessionAuthentication',
-        'snpdb.api_token_authentication.ApiTokenAuthentication',  # must come before DRF's, which refuses vg_ keys
-        'rest_framework.authentication.TokenAuthentication',  # legacy keys from before ApiToken
+        'snpdb.api_token_authentication.ApiTokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -1067,7 +1066,7 @@ INSTALLED_APPS = [
     'guardian',
     "psqlextra",
     'rest_framework',
-    'rest_framework.authtoken',
+    'rest_framework.authtoken',  # read by snpdb 0016_api_token, which imports its keys as ApiTokens
     'knox',
     'drf_spectacular',
     'drf_spectacular_sidecar',

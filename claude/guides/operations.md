@@ -243,10 +243,11 @@ the endpoint answers 404, or on VG3 (which only exempts `^/api/v1/capabilities$`
 client (variantgrid_api) doesn't follow redirects and reads either as "legacy server".
 
 API clients authenticate with an `Authorization: Token <key>` header (`REST_FRAMEWORK`'s `DEFAULT_AUTHENTICATION_CLASSES`).
-A `vg_`-prefixed key is a `snpdb/models/models_api_token.py:ApiToken` (django-rest-knox: several per user, each with an expiry,
+Every key is a `snpdb/models/models_api_token.py:ApiToken` (django-rest-knox: several per user, each with an expiry,
 only a digest stored), authenticated by `snpdb/api_token_authentication.py:ApiTokenAuthentication`, which records each token's
-use once an hour (`ApiTokenUse`) on every endpoint. Any other key is a legacy `rest_framework.authtoken` key, still read by DRF's
-`TokenAuthentication`. Users manage their own at Settings → API Tokens when `API_TOKEN_SELF_SERVICE_ENABLED`; admins see and revoke
+use once an hour (`ApiTokenUse`) on every endpoint. New keys start `vg_`; the unprefixed 40-hex keys named "Legacy token" never
+expire and were imported from `rest_framework.authtoken` by `snpdb/migrations/0016_api_token.py`, which knox authenticates the
+same way since it looks a key up by its first characters and digest, not its prefix. Users manage their own at Settings → API Tokens when `API_TOKEN_SELF_SERVICE_ENABLED`; admins see and revoke
 every user's at Settings → All API Tokens and issue one with `manage.py drf_user_api_token`. Shariant's `REST_FRAMEWORK` has
 neither token class - its API authenticates through Keycloak - so the setting is off there. Brute force isn't throttled
 (`axes` covers only password logins), which is acceptable for 256-bit random keys.

@@ -9,7 +9,7 @@
     <h3>All API Tokens</h3>
     <p class="text-muted">
         Every user's API tokens, including expired and revoked ones, which are kept with their use history.
-        Tokens of a deactivated user stop working. Legacy tokens (made before tokens had names and expiry) are not listed.
+        Tokens of a deactivated user stop working.
     </p>
     {% include "snpdb/settings/api_token_table.html" with tokens=tokens admin=True %}
 </div>

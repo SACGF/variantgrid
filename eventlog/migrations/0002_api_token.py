@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("eventlog", "0001_initial"),
-        ("snpdb", "0015_api_token"),  # swappable_dependency would give snpdb's first migration
+        ("snpdb", "0016_api_token"),  # swappable_dependency would give snpdb's first migration
     ]
 
     operations = [

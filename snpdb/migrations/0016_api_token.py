@@ -3,12 +3,28 @@
 import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
+from knox.crypto import hash_token
+from knox.settings import CONSTANTS
+
+
+def _import_legacy_tokens(apps, _schema_editor):
+    """ Knox finds a token by the first TOKEN_KEY_LENGTH characters of its key and checks the digest, never the
+        prefix, so a rest_framework.authtoken key keeps working as an ApiToken. The plaintext keys are then deleted """
+    Token = apps.get_model("authtoken", "Token")
+    ApiToken = apps.get_model("snpdb", "ApiToken")
+    for legacy in Token.objects.all():
+        token = ApiToken(user_id=legacy.user_id, name="Legacy token", expiry=None, digest=hash_token(legacy.key),
+                         token_key=legacy.key[:CONSTANTS.TOKEN_KEY_LENGTH])
+        token.save()  # not objects.create(), which knox's manager replaces with one that makes a new key
+        ApiToken.objects.filter(pk=token.pk).update(created=legacy.created)  # created is auto_now_add
+    Token.objects.all().delete()
 
 
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("snpdb", "0014_cohortgenotypestats_variant_contents"),
+        ("snpdb", "0015_settingsoverride_analysis_node_zoom"),
+        ("authtoken", "0004_alter_tokenproxy_options"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -82,4 +98,5 @@ class Migration(migrations.Migration):
                 ],
             },
         ),
+        migrations.RunPython(_import_legacy_tokens, migrations.RunPython.noop),
     ]
