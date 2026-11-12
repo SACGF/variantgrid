@@ -937,7 +937,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.BasicAuthentication',  # Needed to classification export clients
         'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.TokenAuthentication',
+        'snpdb.api_token_authentication.ApiTokenAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -947,12 +947,23 @@ REST_FRAMEWORK = {
     #    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
 }
 
+# API tokens (snpdb/models/models_api_token.py:ApiToken, #2800) - several per user, each with an expiry, digest stored
+KNOX_TOKEN_MODEL = 'snpdb.ApiToken'
+REST_KNOX = {
+    'TOKEN_PREFIX': 'vg_',  # so a leaked key is recognisable to secret scanners
+    'TOKEN_TTL': None,  # every token is created with its own expiry
+}
+# Users create and revoke their own tokens from the API Tokens page. Tokens bypass OIDC (MFA, group checks),
+# so OIDC deployments turn this off and only admins issue them (manage.py drf_user_api_token)
+API_TOKEN_SELF_SERVICE_ENABLED = True
+API_TOKEN_MAX_LIFETIME_DAYS = 365  # the longest expiry a user can pick for their own token
+
 # drf-spectacular OpenAPI schema / Swagger docs (served at /api/schema and /api/docs)
 # The docs pages are public (DRF views, SERVE_PERMISSIONS below) but the API endpoints themselves still require auth
 SPECTACULAR_SETTINGS = {
     'TITLE': 'VariantGrid API',
     'DESCRIPTION': 'REST API for VariantGrid - variant database, annotation and classification platform. '
-                   'Authenticate with a session, HTTP basic auth, or a token from your user profile page.',
+                   'Authenticate with a session, HTTP basic auth, or a token from Settings > API Tokens.',
     'VERSION': VARIANTGRID_VERSION,
     'SERVE_INCLUDE_SCHEMA': False,
     'SERVE_PUBLIC': True,  # list all endpoints in the schema regardless of viewer permissions
@@ -1055,7 +1066,8 @@ INSTALLED_APPS = [
     'guardian',
     "psqlextra",
     'rest_framework',
-    'rest_framework.authtoken',
+    'rest_framework.authtoken',  # read by snpdb 0016_api_token, which imports its keys as ApiTokens
+    'knox',
     'drf_spectacular',
     'drf_spectacular_sidecar',
     'termsandconditions',
@@ -1284,6 +1296,9 @@ URLS_NAME_REGISTER_SETTINGS = {
     "clinvar_match": "CLINVAR_EXPORT",
     "classification_import_tool": "CLASSIFICATION_OMNI_IMPORTER_APP_DIR",
     "keycloak_admin": "KEYCLOAK_SYNC_DETAILS",
+    "api_tokens": "API_TOKEN_SELF_SERVICE_ENABLED",
+    "api_token_detail": "API_TOKEN_SELF_SERVICE_ENABLED",
+    "api_token_revoke": "API_TOKEN_SELF_SERVICE_ENABLED",
 }
 
 # The top bar and sub-menus (uicore/menus.py); a deployment repo may point this at its own tuple built on the default

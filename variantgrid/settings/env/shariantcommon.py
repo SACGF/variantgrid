@@ -94,6 +94,7 @@ REST_FRAMEWORK = {
 
 # OIDC SETTINGS
 USE_OIDC = True
+API_TOKEN_SELF_SERVICE_ENABLED = False  # REST_FRAMEWORK below authenticates through Keycloak only, so tokens would not work
 OIDC_STORE_ID_TOKEN = True  # needed so we can pass the token back to keycloak for an automatic logout
 LOGIN_URL = '/oidc_login/'
 OIDC_USE_PKCE = True

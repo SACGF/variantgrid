@@ -1,0 +1,16 @@
+{% extends "uicore/page/base.html" %}
+{% load static %}
+{% block title %}All API Tokens{% endblock title %}
+{% block head %}
+    <script src="{% static 'js/snpdb/api_tokens.js' %}"></script>
+{% endblock %}
+{% block content %}
+<div class="container">
+    <h3>All API Tokens</h3>
+    <p class="text-muted">
+        Every user's API tokens, including expired and revoked ones, which are kept with their use history.
+        Tokens of a deactivated user stop working.
+    </p>
+    {% include "snpdb/settings/api_token_table.html" with tokens=tokens admin=True %}
+</div>
+{% endblock content %}

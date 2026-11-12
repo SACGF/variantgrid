@@ -14,6 +14,7 @@ from eventlog.models import API_KEY_PREFIX, ApiRequestLog, IntegrationActivity, 
 from library.django_utils.change_tracking import ChangeCollector, collect_changes
 from library.integration_status import IntegrationDirection
 from oidc_auth.session_refresh import VariantGridSessionRefresh
+from snpdb.models.models_api_token import ApiToken
 
 IGNORE_SEGMENTS = {"api", "datatable", "citations_json"}  # this should be mostly redundant to is_ajax call
 IGNORE_TEXT = {"detail", "metrics"}
@@ -185,9 +186,11 @@ class IntegrationApiMiddleware:
         if api_log_model := getattr(view_class, "api_log_model", None):
             content_type = ContentType.objects.get_for_model(api_log_model)
 
-        user = getattr(request, "user", None)  # DRF copies its authenticated user back onto the Django request
+        user = getattr(request, "user", None)  # DRF copies its authenticated user and auth back onto the Django request
+        auth = getattr(request, "auth", None)
         ApiRequestLog.objects.create(
             user=user if user and user.is_authenticated else None,
+            auth_token=auth if isinstance(auth, ApiToken) else None,
             method=request.method,
             path=request.path_info,
             query_string=_redact_urlencoded(request.META.get("QUERY_STRING", "")),

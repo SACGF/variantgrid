@@ -2,6 +2,7 @@
 // eventlog/templates/api_request_log.html
 function apiRequestLogFilter(data) {
     data.view_name = $("select#api-view-name").val();
+    data.auth_token = $("select#api-auth-token").val();
     data.errors_only = $("#api-errors-only").is(":checked");
     data.wrote_data = $("#api-wrote-data").is(":checked");
     data.date_from = $("#api-date-from").val();
@@ -10,7 +11,7 @@ function apiRequestLogFilter(data) {
 
 $(document).ready(() => {
     const reload = () => $('#api-request-log-datatable').DataTable().ajax.reload();
-    $("select#api-view-name").change(reload);
+    $("select#api-view-name, select#api-auth-token").change(reload);
     $("#api-errors-only, #api-wrote-data").click(reload);
     $("#api-date-from, #api-date-to").change(reload);
     const setDates = (value) => {

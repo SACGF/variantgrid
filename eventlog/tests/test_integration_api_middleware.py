@@ -7,6 +7,7 @@ from django.urls import reverse
 
 from eventlog.middleware import IntegrationApiMiddleware
 from eventlog.models import ApiRequestLog, IntegrationActivity
+from snpdb.models.models_api_token import ApiToken
 
 TRACKED_PATH = reverse('eventlog_detail', kwargs={'pk': 1})
 TRACKED_PREFIX = TRACKED_PATH.rsplit("/", 1)[0]
@@ -65,6 +66,16 @@ class IntegrationApiMiddlewareTest(TestCase):
         self.assertEqual("[redacted]", logged["auth"]["api_token"])
         self.assertEqual({"password": "[redacted]", "name": "s1"}, logged["samples"][0])
         self.assertIsNone(api_request.response_body)
+
+    @override_settings(INTEGRATION_API_TRACKING=TRACKING)
+    def test_logs_the_api_token_used(self):
+        user = User.objects.create_user("api_log_token_user")
+        token, _ = ApiToken.create_for_user(user, "pipeline", None, created_by=user)
+        request = self.factory.post(TRACKED_PATH)
+        request.user = user
+        request.auth = token
+        self._call(TRACKED_PATH, request=request)
+        self.assertEqual(token, ApiRequestLog.objects.get().auth_token)
 
     @override_settings(INTEGRATION_API_TRACKING=TRACKING)
     def test_form_body_and_query_string_redacted(self):

@@ -1,0 +1,49 @@
+{% load js_tags %}
+{# Tokens annotated with recent_uses (snpdb/views/views_api_token.py); admin=True adds the user column and returns a revoke to the admin page #}
+{% if tokens %}
+<table class="table table-sm" id="api-tokens-table">
+    <thead>
+        <tr>
+            {% if admin %}<th>User</th>{% endif %}
+            <th>Name</th>
+            <th>Created</th>
+            <th>Expires</th>
+            <th>Last used</th>
+            <th class="text-right" title="Hours in which the token was used">Used ({{ recent_use_days }} days)</th>
+            <th>Status</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for token in tokens %}
+        <tr>
+            {% if admin %}<td>{{ token.user.username }}</td>{% endif %}
+            <td><a class="hover-link" href="{% url 'api_token_detail' token.digest %}">{{ token.name }}</a></td>
+            <td>{% timestamp token.created %}</td>
+            <td>{% if token.expiry %}{% timestamp token.expiry %}{% else %}Never{% endif %}</td>
+            <td>{% if token.last_used %}{% timestamp token.last_used time_ago=True %}{% else %}<span class="no-value">-</span>{% endif %}</td>
+            <td class="text-right">{{ token.recent_uses }}</td>
+            <td>
+                {% if token.revoked %}
+                    <span title="Revoked by {{ token.revoked_by.username|default:'deleted user' }}">Revoked {% timestamp token.revoked text_only=True %}</span>
+                {% else %}
+                    {{ token.status }}
+                {% endif %}
+            </td>
+            <td>
+                {% if not token.revoked %}
+                    <form class="api-token-revoke" method="post" action="{% url 'api_token_revoke' %}" data-name="{{ token.name }}">
+                        {% csrf_token %}
+                        <input type="hidden" name="digest" value="{{ token.digest }}">
+                        {% if admin %}<input type="hidden" name="admin" value="1">{% endif %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Revoke</button>
+                    </form>
+                {% endif %}
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+    <p class="no-value">No API tokens.</p>
+{% endif %}

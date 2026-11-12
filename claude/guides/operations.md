@@ -64,7 +64,8 @@ to load Django and register, so a queue whose unit is active but has no consumer
 Logs: `/var/log/variantgrid/` (`gunicorn.log`, `celery*.log`, `celeryd_beat.log`). Application events are also rows in
 `eventlog/models.py:Event` (severity, app, name, details) - `vg status` lists the last ten ERRORs; `ViewEvent` records page views
 (the `claude_agent` user's included). `ApiRequestLog` keeps one row per call (body, status, duration) to the endpoints in
-`INTEGRATION_API_TRACKING`, kept forever unless `API_REQUEST_LOG_DAYS` is set; admins read it at Settings → API Log.
+`INTEGRATION_API_TRACKING`, with the API token used, kept forever unless `API_REQUEST_LOG_DAYS` is set (which also prunes
+`ApiTokenUse`); admins read it at Settings → API Log.
 Uncaught exceptions go to Rollbar when `ROLLBAR.access_token` is configured, and Slack notifications through `eventlog/notifications.py:AdminNotificationBuilder` when `SLACK.enabled`.
 
 ## Deploy and upgrade
@@ -240,6 +241,16 @@ and only the release tag as `version` (`vg4.0`, not `vg4.0-12-gc174556`). `API_F
 names once added. `upload_file_types` is derived from the import task factories, so it needs no upkeep. A server too old to have
 the endpoint answers 404, or on VG3 (which only exempts `^/api/v1/capabilities$`, not `^/api/.*`) a redirect to login. The
 client (variantgrid_api) doesn't follow redirects and reads either as "legacy server".
+
+API clients authenticate with an `Authorization: Token <key>` header (`REST_FRAMEWORK`'s `DEFAULT_AUTHENTICATION_CLASSES`).
+Every key is a `snpdb/models/models_api_token.py:ApiToken` (django-rest-knox: several per user, each with an expiry,
+only a digest stored), authenticated by `snpdb/api_token_authentication.py:ApiTokenAuthentication`, which records each token's
+use once an hour (`ApiTokenUse`) on every endpoint. New keys start `vg_`; the unprefixed 40-hex keys named "Legacy token" never
+expire and were imported from `rest_framework.authtoken` by `snpdb/migrations/0016_api_token.py`, which knox authenticates the
+same way since it looks a key up by its first characters and digest, not its prefix. Users manage their own at Settings → API Tokens when `API_TOKEN_SELF_SERVICE_ENABLED`; admins see and revoke
+every user's at Settings → All API Tokens and issue one with `manage.py drf_user_api_token`. Shariant's `REST_FRAMEWORK` has
+neither token class - its API authenticates through Keycloak - so the setting is off there. Brute force isn't throttled
+(`axes` covers only password logins), which is acceptable for 256-bit random keys.
 
 Privilege has two levels: a user and a superuser. `is_staff` is not a supported tier: the OIDC backend sets it from the same
 flag as `is_superuser` (`oidc_auth/backend.py`), no deployment grants one without the other, and a new permission check uses

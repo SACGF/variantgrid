@@ -25,6 +25,7 @@ from snpdb.grids import (
 )
 from snpdb.views import (
     views,
+    views_api_token,
     views_autocomplete,
     views_cohort,
     views_data,
@@ -118,6 +119,10 @@ urlpatterns = [
     ), name='change_password'),
     path('settings/password/password_change_done', PasswordChangeDoneView.as_view(template_name='snpdb/settings/password_change_done.html'), name='password_change_done'),
     path('settings/user', views_user_settings.view_user_settings, name='view_user_settings'),
+    path('settings/api_tokens', views_api_token.api_tokens, name='api_tokens'),
+    path('settings/api_tokens/detail/<str:digest>', views_api_token.api_token_detail, name='api_token_detail'),
+    path('settings/api_tokens/revoke', views_api_token.api_token_revoke, name='api_token_revoke'),
+    path('settings/api_tokens/all', views_api_token.api_tokens_admin, name='api_tokens_admin'),
     path('settings/node_counts_tab/user', views_user_settings.user_settings_node_counts_tab, name='user_settings_node_counts_tab'),
     path('settings/node_counts_tab/lab/<int:pk>', views_user_settings.lab_settings_node_counts_tab, name='lab_settings_node_counts_tab'),
     path('settings/node_counts_tab/organization/<int:pk>', views_user_settings.organization_settings_node_counts_tab, name='organization_settings_node_counts_tab'),

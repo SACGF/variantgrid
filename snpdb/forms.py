@@ -2,11 +2,13 @@
 snpdb's Django forms: the BaseForm / BaseModelForm variants that drop the ':' label suffix, the
 autocomplete-backed pickers (user, lab, genome build via GenomeBuildAutocompleteForwardMixin), the
 Lab / Organization / VCF / user settings model forms (ROFormMixin gives read-only rendering), the
-Guardian GroupPermissionForm, and manual variant entry. VCFForm hides unused sample-field columns, so
+Guardian GroupPermissionForm, manual variant entry and creating an API token. VCFForm hides unused sample-field columns, so
 not every model field is on the form.
 """
 import collections
+from datetime import timedelta
 from functools import cached_property
+from typing import Optional
 
 from crispy_forms.bootstrap import FieldWithButtons
 from crispy_forms.layout import Field, Layout, Submit
@@ -942,3 +944,29 @@ class UserLabChoiceForm(forms.Form):
             lab_field = self.fields['lab']
             lab_field.initial = default_lab
             # lab_field.choices = [(default_lab.pk, default_lab)]
+
+
+class ApiTokenCreateForm(forms.Form):
+    """ Expiry choices stop at settings.API_TOKEN_MAX_LIFETIME_DAYS, with "Never" only when that is None """
+    EXPIRY_DAYS = (7, 30, 90, 180, 365)
+    NEVER = 0
+
+    name = forms.CharField(max_length=100, help_text="What the token is for, eg the script or machine that uses it")
+    expiry_days = forms.TypedChoiceField(label="Expires", coerce=int)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        max_days = settings.API_TOKEN_MAX_LIFETIME_DAYS
+        choices = [(days, f"in {days} days") for days in self.EXPIRY_DAYS if max_days is None or days < max_days]
+        if max_days is None:
+            choices.append((self.NEVER, "Never"))
+        else:
+            choices.append((max_days, f"in {max_days} days"))
+        self.fields["expiry_days"].choices = choices
+        self.fields["expiry_days"].initial = choices[0][0]
+
+    @property
+    def expiry(self) -> Optional[timedelta]:
+        if days := self.cleaned_data["expiry_days"]:
+            return timedelta(days=days)
+        return None
