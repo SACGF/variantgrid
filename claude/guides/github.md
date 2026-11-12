@@ -7,7 +7,8 @@ in `AGENTS.md`; this is the detail behind them.
 ## Commits
 
 Do NOT commit unless the user explicitly asks you to. "Apply the fix", "make the change", "implement X" mean edit the
-code only. "Commit" means commit straight onto `master` - no branch. Branch only when the user asks for a PR.
+code only. "Commit" means commit straight onto `master` - no branch. Branch only when the user asks for a PR. The
+exception is reviewing a PR (Pull requests, below): a change asked for there is committed and pushed to the PR.
 
 Before committing, check `git status` for already-staged changes unrelated to the task; if any exist, stop and confirm
 before including them.
@@ -39,6 +40,10 @@ checkout stays on the branch it was on (on a deployment, the deployed commit).
   failing CI job or a conflict is yours to fix before the report-back, not the user's to discover. After the PR merges,
   its branch is deleted once `git branch -r --merged origin/master` (or `git merge-base --is-ancestor`) confirms every
   commit reached master.
+- **Reviewing a PR, a change the user asks for goes onto the PR**: the user reviews on GitHub, so a change made while
+  going through a PR (answering a question about it, addressing a review comment) is committed and pushed to its
+  branch, from a worktree on that branch (`git worktree add ../variantgrid_wt_<issue> <branch>`), without a separate
+  ask. Run its at-risk tests first, and update the body if the change alters what it describes.
 - **Updating a PR means its title too**: rewrite the title whenever the body's description of the problem or the fix
   has changed. Same for an issue.
 

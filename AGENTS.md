@@ -240,7 +240,8 @@ page that points at them.
 ### GitHub
 The detail is `claude/guides/github.md`; these are the rules it rests on.
 - Do NOT commit unless the user explicitly asks. "Apply the fix" or "implement X" means edit the code only. "Commit"
-  means straight onto `master`; branch only for a PR, and a PR's base is always `master`. Before committing, check
+  means straight onto `master`; branch only for a PR, and a PR's base is always `master`. While reviewing a PR, a
+  change I ask for is committed and pushed to that PR's branch, since that is where I review. Before committing, check
   `git status` for staged changes unrelated to the task and ask about them.
 - Every PR names its issue: branch `<issue>_<slug>`, body citing `#N` (or `SACGF/variantgrid_private#N`, with nothing
   from the private issue in the PR's text). A PR is done when CI is green and it merges cleanly.
