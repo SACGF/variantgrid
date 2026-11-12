@@ -113,7 +113,7 @@ def _js_check_reminder(relative: str, path: str, session_id: str) -> str:
     return (f"Reminder (not blocking): {relative} has page JS. Before reporting back, load a page that runs it with "
             f"`python3 manage.py vg page <url> --js-writes-to-database`{where}. Pick a URL whose data reaches the code "
             f"you changed. It WRITES to the database (not rolled back): fine on a developer box, ask first on a shared "
-            f"test box, refused elsewhere.{static}\n")
+            f"test box, refused elsewhere (uicore/AGENTS.md#verifying-pages).{static}\n")
 
 
 def main() -> int:

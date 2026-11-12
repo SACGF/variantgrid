@@ -21,10 +21,6 @@ Patterns here:
   register in global.js; a feature's register from its own file (`[data-citation-id]` in citations.js,
   `[data-preview-db]` in vc_form.js), which must load before `globalSetup()` runs on ready - registration order
   is the order processors run.
-- A change to a page's JS (an inline `<script>` here, or a file it loads) is checked by running the page:
-  `python3 manage.py vg page <url> --js-writes-to-database`, with `--click '#tab'` for a tab's JS, and a URL whose
-  data reaches the changed code. Not rolled back: fine on a developer box, ask first on a shared test box, refused
-  anywhere else.
 - Put Python values into a `<script>` with `{{ value|jsonify }}` (uicore/templatetags/js_tags.py:jsonify_for_js) -
   it escapes `<`, `>` and `&` and marks safe (no quotes or backticks around it); `{{ value|js_symbol }}` for identifiers. Never build JS literals with `{{ }}`.
 - Label/value rows are `{% labelled label="..." %}...{% endlabelled %}` (uicore/templatetags/ui_utils.py:LabelledValueTag),
@@ -81,6 +77,20 @@ Tests: uicore/tests/test_menus.py covers the registry and the page frame endpoin
   library/django_utils/unittest_utils.py:URLTestCase - `_test_urls` for pages, `_test_datatable_urls` for grid
   endpoints (hits the URL and `?dataTableDefinition=1`). No JS tests - check processors in a browser (`run` skill).
 Deep reference: __uicore_readme.md · claude/research/uicore.md
+
+## Verifying pages
+Run `vg page <url> --queries` before and after a template or view change; a rising query count is an N+1.
+`--js-writes-to-database` checks a change to a page's JavaScript (inline or static): it loads the page in headless chromium and
+reports uncaught errors and console warnings at the template or static file line they came from, plus failed
+requests; `--click '#tab'` runs a tab's JS too. Pick a URL whose data reaches the changed code. **It writes to the
+database and nothing is rolled back** - plain `vg page` rolls back, this does not: the page and the ajax it fires run
+as `claude_agent` exactly as for a user. It counts as a write under the root `AGENTS.md` "This box": fine on a
+developer box, ask first on a shared test one, and the command refuses to run anywhere else (production included).
+It needs `scripts/browser/setup.sh` once per box and serves static files from `STATIC_ROOT` (run `collectstatic`
+after a static JS edit).
+For layout - what a CSS or template change actually looks like - `scripts/browser/README.md` has a headless
+chromium harness (screenshots, element boxes, quirks-vs-standards diff, try-a-fix patches) that runs against a
+working-tree `runserver` as `claude_agent`; read the PNGs it writes rather than guessing at a render.
 
 ## Grids
 - One engine: subclass snpdb/views/datatable_view.py:DatatableConfig, set `self.rich_columns` (list of

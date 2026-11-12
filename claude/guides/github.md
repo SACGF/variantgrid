@@ -20,8 +20,8 @@ instruction.
 
 ## Pull requests
 
-When the user says PR: branch from master, commit, push, open the PR, then `git checkout master` (on a deployment, the
-checkout stays on the deployed commit).
+When the user says PR: branch from master in a worktree (Worktrees, below), commit, push, open the PR. The box's
+checkout stays on the branch it was on (on a deployment, the deployed commit).
 
 - **Base is always `master`**, even when the PR builds on another open PR. A PR stacked on another's branch merges
   into that branch, not master, once the first has landed. Branch from master and cherry-pick the dependency, or wait
@@ -41,6 +41,17 @@ checkout stays on the deployed commit).
   commit reached master.
 - **Updating a PR means its title too**: rewrite the title whenever the body's description of the problem or the fix
   has changed. Same for an issue.
+
+## Worktrees
+
+Several sessions share a box's checkout, and on a shared box gunicorn and celery run from it, so never check out,
+switch or create a branch there - the other sessions' edits and commits land on whatever branch you left. Branch
+work goes in its own worktree from the checkout's root: `git worktree add ../variantgrid_wt_<issue> -b <issue>_<slug>
+origin/master`; a commit straight to master goes in one too when the checkout isn't on master. The worktree shares the
+virtualenv but not gitignored files: copy the box's settings module if it lives in `env_developers/`, run
+`manage.py collectstatic_js_reverse` before the first test run, give tests their own database
+(`claude/guides/testing.md`), and `collectstatic` there before a `vg page` or `runserver` (`STATIC_ROOT` is per
+checkout). `git worktree remove` it when the PR is up.
 
 ## Issues
 

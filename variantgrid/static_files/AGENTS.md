@@ -24,7 +24,7 @@ crawls pages as `claude_agent` and reports which dynamic names reach rendered HT
 most grid and flag names still need reading the code that builds them. A class whose name is a database value
 (`SequencerModel.css_class`) goes in `DATA_DERIVED` there, or the scan calls it unused.
 
-Bootstrap 4: `data-toggle` / `data-target`, not the Bootstrap 5 `data-bs-*` forms.
+Bootstrap 4, in templates and JS alike: use `data-toggle` (not `data-bs-toggle`) and `data-target` (not `data-bs-target`).
 
 Third-party libraries live under `default_static/js/lib/` as our own copies, never loaded from a CDN (#1741), and the
 version goes in the path (`variantgrid/static_files/default_static/js/lib/jquery-3.7.1/jquery-3.7.1.min.js`,
@@ -35,7 +35,8 @@ Copy the file the project publishes (npm `min/` for moment) rather than a CDN's 
 release.
 
 Page JS goes in a static file by default, written there from the start rather than inline and moved later: static JS
-is cached by the browser, linted, and can't change with the context it renders in. It lives in
+is cached by the browser, linted, and can't change with the context it renders in. A JS block in a template you are
+editing moves out with the change. It lives in
 `default_static/js/<app>/<template_name>.js` (#2021). The
 static file knows nothing about the page's context: it defines functions whose parameters are the page values (one
 `options` object with named keys once there are several, an `init<Name>(options)` entry point for a file called once per
@@ -50,6 +51,5 @@ file 500s every page that references it until `collectstatic` has added it to th
 
 Lint only sees the code; a bug that needs particular data (a variant with no transcript) only shows when the page
 runs. After a JS change, `collectstatic`, then load a page that runs it with
-`python3 manage.py vg page <url> --js-writes-to-database` - uncaught errors and console warnings come back at their
-source line. It writes to the database (not rolled back): fine on a developer box, ask first on a shared test box,
-and it refuses anywhere else. The edit hook reminds you and suggests URLs.
+`python3 manage.py vg page <url> --js-writes-to-database` (`uicore/AGENTS.md#verifying-pages`: it writes to the
+database). The edit hook reminds you and suggests URLs.
