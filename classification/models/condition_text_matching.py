@@ -583,6 +583,9 @@ class ConditionMatchingSuggestion:
         self.alias_index: Optional[int] = None
         """ If not null, the index of the alias of the term we matched via text, useful to determine auto-assign """
 
+        self.alias_is_exact_synonym = False
+        """ The alias matched is one the ontology marks as an exact synonym, so it can auto-assign at gene level """
+
         self.merged = False
         """ Was this suggestion merged, e.g. if there was an condition text 'BAM' that matched Best At Motoneuron and Blood Attacked Myliver """
 
@@ -621,7 +624,7 @@ class ConditionMatchingSuggestion:
     def is_auto_assignable(self, gene_symbol: Optional[GeneSymbol] = None):
         """ Is this suggestion so certain we can just assign it
         Has to be a single term (since we don't support uncertain/co-occurring in text yet).
-        Can't be found via an alias.
+        Can't be found via an alias, unless it's an exact synonym and we're at gene level.
         Can't be any warnings or errors.
         If we're a gene symbol, the term has to be a leaf term and have a relationship to the gene.
         Or if we're top level, the ID has to be found within text.
@@ -630,7 +633,7 @@ class ConditionMatchingSuggestion:
             if len(terms) != 1 and self.condition_multi_operation == MultiCondition.NOT_DECIDED:
                 return False
 
-            if self.alias_index is not None:
+            if self.alias_index is not None and not (gene_symbol and self.alias_is_exact_synonym):
                 return False
 
             for message in self.messages:
@@ -950,8 +953,10 @@ def search_text_to_suggestion(search_text: SearchText, term: OntologyTerm) -> Co
                     #     cms.matched_via_alias_and_exact_term = omim_term.id
 
             if not safe_alias:
-                cms.add_message(ConditionMatchingMessage(severity="info", text=f"Text matched on alias of {term.id}"))
                 cms.alias_index = match_info.alias_index
+                cms.alias_is_exact_synonym = any(SearchText(synonym).effective_equals(search_text) for synonym in term.exact_synonyms)
+                alias_kind = "exact synonym" if cms.alias_is_exact_synonym else "alias"
+                cms.add_message(ConditionMatchingMessage(severity="info", text=f"Text matched on {alias_kind} of {term.id}"))
         if term.ontology_service == OntologyService.OMIM:
             if mondo := OntologyTermRelation.as_mondo(term):
                 cms.add_message(ConditionMatchingMessage(severity="warning", text=f"Converted from OMIM term {term.id}"))

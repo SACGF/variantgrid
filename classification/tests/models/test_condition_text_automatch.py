@@ -1,5 +1,5 @@
 from datetime import timedelta
-from unittest.mock import patch
+from unittest.mock import PropertyMock, patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -15,12 +15,14 @@ from classification.models.condition_text_matching import (
     ConditionText,
     ConditionTextMatch,
     condition_matching_suggestions,
+    search_text_to_suggestion,
 )
 from classification.tasks.condition_text_automatch_task import condition_text_automatch_task
 from genes.models import GeneSymbol
 from library.request_context import set_thread_variable
 from ontology.enums import OntologyService
-from ontology.models import OntologyImport, OntologyTerm
+from ontology.models.models_ontology import OntologyImport, OntologySnake, OntologyTerm
+from ontology.ontology_matching import SearchText
 from snpdb.models import Country, Lab, Organization
 
 
@@ -177,3 +179,33 @@ class ConditionTextSearchFailedTest(TestCase):
         mock_search.return_value = []
         self.assertEqual(ConditionTextMatch.retry_failed_automatch(), 2)
         self.assertFalse(ConditionText.objects.filter(monarch_search_failed__isnull=False).exists())
+
+
+@patch.object(OntologySnake, 'has_gene_relationship', return_value=True)
+@patch.object(OntologyTerm, 'is_leaf', new_callable=PropertyMock, return_value=True)
+class ConditionTextExactSynonymTest(TestCase):
+    """ #2806 - a MONDO exact synonym auto-assigns at gene level, a related one only suggests """
+
+    def setUp(self):
+        ontology_import = OntologyImport.objects.create(import_source=OntologyService.MONDO, filename="test",
+                                                        processed_date=timezone.now())
+        self.term = OntologyTerm.objects.create(
+            id="MONDO:0007309", ontology_service=OntologyService.MONDO, index=7309,
+            name="Charcot-Marie-Tooth disease type 1A", from_import=ontology_import,
+            aliases=["HMSN1A", "Charcot-Marie-Tooth disease, demyelinating, type 1A"],
+            extra={"synonyms": [{"pred": "hasExactSynonym", "val": "HMSN1A"},
+                                {"pred": "hasRelatedSynonym", "val": "Charcot-Marie-Tooth disease, demyelinating, type 1A"}]})
+        self.gene_symbol = GeneSymbol.objects.get_or_create(symbol="PMP22")[0]
+
+    def _suggestion(self, text: str) -> ConditionMatchingSuggestion:
+        return search_text_to_suggestion(SearchText(text), self.term)
+
+    def test_exact_synonym_auto_assigns_at_gene_level_only(self, _is_leaf, _has_gene):
+        suggestion = self._suggestion("hmsn1a")
+        self.assertTrue(suggestion.is_auto_assignable(gene_symbol=self.gene_symbol))
+        self.assertFalse(suggestion.is_auto_assignable())
+
+    def test_related_synonym_only_suggests(self, _is_leaf, _has_gene):
+        suggestion = self._suggestion("charcot-marie-tooth disease demyelinating type 1a")
+        self.assertEqual(suggestion.terms, [self.term])
+        self.assertFalse(suggestion.is_auto_assignable(gene_symbol=self.gene_symbol))
