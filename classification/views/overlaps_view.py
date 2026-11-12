@@ -417,7 +417,9 @@ def download_overlaps(request, lab_id: str):
 
     # only look at discordant overlaps
     if solved_mode:
-        qs = qs.filter(Q(overlap_override_status__ne=OverlapOverrideStatus.NO_OVERRIDE) | Q(overlap_max_ever_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES))
+        qs = qs.filter(
+            Q(overlap_max_ever_status__gte=OverlapStatus.MAJOR_DIFFERENCES, overlap_status__lt=OverlapStatus.MAJOR_DIFFERENCES) |
+            Q(overlap_override_status__ne=OverlapOverrideStatus.NO_OVERRIDE))
         qs = qs.filter(overlap_status__gte=OverlapStatus.SINGLE_SUBMITTER)  # don't show overlaps that everyone withdrew from
     else:
         qs = qs.filter(overlap_status__gte=OverlapStatus.TIER_1_VS_TIER_2_DIFFERENCES).filter(
