@@ -186,8 +186,10 @@
                 {% if classification_modifications %}
                     <div class="card-body d-flex align-items-center">
                         {% if case_report_templates %}
-                            <button type="button" class="btn btn-primary btn-sm mr-3" id="build-case-report"
-                                    data-dialog-url="{% url 'case_report_build_dialog' case_type case_id %}">Build multiple variant report</button>
+                            {# Disabled until classify_report_tab.js has counted the ticked rows. Each populating poll reloads the tab, so it starts on the waiting label too #}
+                            <button type="button" class="btn btn-primary btn-sm mr-3" id="build-case-report" disabled
+                                    data-dialog-url="{% url 'case_report_build_dialog' case_type case_id %}">
+                                {% if populating_classifications %}<i class="fas fa-spinner fa-spin mr-1"></i>Waiting for {{ populating_classifications|length }} classification{{ populating_classifications|pluralize }} to populate&hellip;{% else %}Build multiple variant report{% endif %}</button>
                             <span class="text-muted small">Template: {{ case_report_templates|join:", " }}</span>
                             <span class="text-danger small ml-3 d-none" id="populating-warning"></span>
                         {% else %}

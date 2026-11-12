@@ -2649,6 +2649,13 @@ a.nav-link.not-important.active {
   position: relative;
 }
 
+/* A grid in a section of a page (the related data under a sample, patient, cohort or family) whose columns can add
+   up to more than the page width scrolls sideways in its own box, rather than the whole page scrolling (#2790).
+   A header can't stick to the page from inside that box, so these grids don't use sticky-header */
+.dt-table-container:has(> table.scroll-x-in-box) {
+  overflow-x: auto;
+}
+
 div.dataTables_processing {
   position: sticky;
   top: 0;

@@ -38,13 +38,15 @@ Route by task. The app notes (`<app>/AGENTS.md`) load automatically when you wor
 | an analysis node | `analysis/AGENTS.md` | `manage.py profile_analysis_nodes --analysis <id> --rerun --explain` |
 | a classification, discordance, evidence keys | `classification/AGENTS.md` | `claude/maps/models.md#classification` |
 | VCF import | `upload/AGENTS.md` | `claude/maps/tasks.md` |
-| a page, grid, template tag, JS behaviour | `uicore/AGENTS.md` (grids in `#grids`) | `vg page <url> --queries`, `--js-writes-to-database` |
+| a page, grid, template tag, JS behaviour | `uicore/AGENTS.md` (grids in `#grids`, checking a page in `#verifying-pages`), `variantgrid/static_files/AGENTS.md` (Bootstrap 4, page JS) | `vg page <url> --queries`, `--js-writes-to-database` |
 | permissions, notifications, previews, `library/utils` | `library/AGENTS.md` | - |
+| a `models/` or `enums/` package, an import cycle | `library/AGENTS.md#imports` | `scripts/vg imports cycles`, `lint-imports` |
 | the user-facing changelog (`system/changelog`) | `variantgrid/templates/default_templates/changelog.html` (rules in its header comment) | `git log` since its last update |
-| a management command that must run on deploy | `manual/__manual_readme.md` | `manage.py manual_outstanding` |
+| a migration, a management command that must run on deploy, a one-off fix or backfill | `manual/AGENTS.md`, `manual/__manual_readme.md` | `manage.py manual_outstanding` |
 | a breakage the migration squash (#736) could explain: missing seed data, a data fix that never ran | `manual/__manual_readme.md#the-migration-squash` | `git show pre_squash_checkpoint:<path>` |
-| a setting, secrets, services, deploy, scale | `claude/guides/operations.md` | `vg settings NAME`, `vg status` |
-| writing a test | `claude/guides/testing.md` (fixture index) | `scripts/vg tests --explain` |
+| a setting, secrets, services, a celery task's queue, deploy, scale | `claude/guides/operations.md` | `vg settings NAME`, `vg status` |
+| writing a test | `claude/guides/testing.md` (which tests to keep, fixture index) | `scripts/vg tests --explain` |
+| a branch, worktree, commit or PR | `claude/guides/github.md` | `git worktree add` |
 | a GitHub issue, PR or comment I hand you (a number, a link, "look at X's comment") | `scripts/vg issue <ref>` first: the issue, its comments and every PR, branch, plan and master commit already on it - a comment on a Claude-written issue is usually about work already in a PR | `gh pr view`, `gh pr diff` on what it lists |
 | an issue's ZenHub pipeline, what a release shipped | `claude/runbooks/zenhub_issue_triage.md` | `$ZENHUB_TOKEN`, `scripts/vg issue` |
 | a fork or patched copy we carry until upstream ships (the session hook says when a check is due) | `claude/runbooks/upstream_watch.md` | `gh pr view` |
@@ -155,17 +157,10 @@ for "lazy loading", not to keep a function self-contained, not because the impor
 legitimate reason to inline an import is to break a genuine circular import cycle, and even then you must stop, flag the
 cycle to the user, and ask whether to refactor the code instead of papering over it with an inline import. If you are
 about to write `from … import …` anywhere except the top of the file, go back and add it to the top-level import block.
-Inside a package, import a name from the module that defines it (`from snpdb.models.models_vcf import VCF`), not
-through the package `__init__` that re-exports it - that is the usual cause of a cycle. Importing any submodule still
-runs its package `__init__` first, so a module that an app's models import can't import anything under that `models`
-package. The exception is an app's enums, which live in an `<app>/enums/` package outside `models/`
-(`classification/enums/`): its `__init__` star-imports each `<topic>_enums.py`, so callers write
-`from classification.enums import ShareLevel`. An enums module imports only `library`, Django and other enums packages,
-never an app's `models`. `scripts/vg imports cycles` (which follows those `__init__` imports) and `lint-imports`
-(`.importlinter`: `library` never imports an app, and app models import only the apps below them -
-`snpdb` < `genes` < `annotation` < `classification` < `analysis`) both gate CI. The one sanctioned inline import is
-an app's `apps.py` `ready()` importing its signal handlers, which Django requires there; the 80-odd of those are not
-a precedent for anywhere else.
+The one sanctioned inline import is an app's `apps.py` `ready()` importing its signal handlers, which Django requires
+there; the 80-odd of those are not a precedent for anywhere else. Import a name from the module that defines it, not
+through a package `__init__`; the `models/` and `<app>/enums/` package rules and the layering CI enforces are in
+`library/AGENTS.md#imports`.
 
 ### Code comments and docs
 Write comments as if you were a senior developer who knows the codebase, and have it match the surrounding code. Don't
@@ -178,35 +173,9 @@ Code, docstrings and templates cite a GitHub issue (`#1537`), not a plan file or
 are deleted when they land, and copies of papers or prototypes aren't in the repo. Point at an app's `AGENTS.md` only
 for something specific it holds, and name `vg` only where it calls the code.
 
-### Frontend
-Bootstrap 4: use `data-toggle` (not `data-bs-toggle`) and `data-target` (not `data-bs-target`). JS/CSS/SCSS sources and
-the compile rules are in `variantgrid/static_files/AGENTS.md`.
-JS goes in a static file under `default_static/js/<app>/`, not inline in a template: the template keeps only a `<script src>`
-and a short init call passing page values. A JS block in a template you are editing moves out with the change.
-
-### Editing a pushed migration
-By default, express a change of mind about a pushed migration (a field removed, a default changed) as a new migration on
-top: renaming or editing one that a deployment has applied leaves `django_migrations` pointing at a name that no longer
-exists (`InconsistentMigrationHistory`), repaired by hand on every database. A migration that only exists locally
-(unpushed) can still be reshaped or regenerated - check with `git log origin/master -- <migration file>`. When I say a
-pushed migration is safe to edit (it hasn't reached a deployment, or I'll fix the databases), edit it as asked.
-Changing a library call inside a pushed migration (a renamed helper, an inlined one) is fine when the migration's behaviour
-stays identical: migrations never freeze the names of the code they import.
-
-### Manual migrations (management commands on deploy)
-A new management command that must run on existing deployments goes in a migration as a `ManualOperation`
-(`manual/operations/manual_operations.py`, example the `ManualOperation.operation_manage` calls in
-`snpdb/migrations/0002_seed_data.py`).
-A one-off fix or backfill - something run once on existing data - is deleted at the next migration checkpoint
-(`manual/__manual_readme.md#one-off-commands`), so make that obvious: name it `one_off_<what_it_fixes>`, declare
-`category = "one-off"`, and keep all its code (queries, recounts, helpers) in the command file and its test, so
-removing it leaves core code unchanged. Calling existing core functions is fine. A core change the fix needs, such
-as a new parameter, belongs in the PR only if the code would keep it once the command is gone.
-
-### Celery
-A task with no `queue=` or `CELERY_TASK_ROUTES` entry runs on the default queue, db_workers, which suits most tasks. Route
-one elsewhere when it needs a particular worker; the queues and what each is for are in
-`claude/guides/operations.md#services-queues-logs`.
+### Migrations, manual operations and one-off commands
+Read `manual/AGENTS.md` before writing or editing a migration, a command that must run on deploy, or a one-off
+fix or backfill, in any app: editing a pushed migration, `ManualOperation`, and how a one-off is shaped.
 
 ### Scale
 Whole-database work is batched by pk range and fanned out as celery tasks; aggregation happens in SQL, not in Python
@@ -228,40 +197,29 @@ When a change has a side effect worth reporting (a deployment has to re-run some
 someone pays), say what would remove it alongside the caveat - often the existing code that causes it is stricter
 than it needs to be - or say why nothing does.
 
+### Fix the cause
+An issue's proposed fix is a starting point, not the spec. Before building a warning, a display change or a
+skip around bad data or a missing capability, find the cause and say whether it can be fixed where it starts
+(the data file, the importer, the shared code every caller goes through).
+Before designing, find how the code already handles the same kind of problem and extend that. A design that
+needs the data model to hold something it normally never does, such as overlapping ranges or a row that
+disagrees with its parent, is a workaround.
+When the proper fix is bigger than what was asked (regenerating data, a new core capability, a re-annotation),
+don't quietly ship the workaround: put both options to me, with the cost of each, before building. If I'm not
+around to ask, build the proper fix if it's in reach. If not, open the workaround PR as a draft whose body
+starts with the choice, so a workaround is never reported as the fix.
+"Least invasive" means the fewest moving parts for a correct result, not avoiding core changes. A brief handed
+to a subagent carries the problem, not an issue's proposed fix.
+
 ### Testing
-`claude/guides/testing.md` has the base classes and the fixture index.
-
-Write as many tests as you like while developing - they're a great way to check your work as you go. When the code is
-finished, audit them and delete the ones that don't earn their keep. Every test kept is code to run, read and maintain,
-and one more thing to update when refactoring. A test earns its keep when it covers logic *we* wrote: a branch, a fallback,
-a calculation, a rule that's easy to get wrong later. The most common thing to throw away is a test of framework behaviour
-rather than ours - that `blank=True` makes a field optional, that a `disabled` form field ignores POSTed data, that
-`order_fields` orders fields. Django is already tested. If the test would still pass with our logic deleted, or it only
-restates a field declaration, drop it. The other test to throw away is the change-detector - one that asserts what the
-code currently does (the text of a generated Q, which private helper was called, a value copied from the first run)
-rather than what it is supposed to do; `claude/guides/testing.md#change-detector-tests` shows the five forms found in
-this repo and the behaviour-level test to write instead.
-
-### Verifying pages
-Run `vg page <url> --queries` before and after a template or view change; a rising query count is an N+1.
-`--js-writes-to-database` checks a change to a page's JavaScript (inline or static): it loads the page in headless chromium and
-reports uncaught errors and console warnings at the template or static file line they came from, plus failed
-requests; `--click '#tab'` runs a tab's JS too. **It writes to the database and nothing is rolled back** - plain
-`vg page` rolls back, this does not: the page and the ajax it fires run as `claude_agent` exactly as for a user. It
-counts as a write under "This box": fine on a developer box, ask first on a shared test one, and the command refuses
-to run anywhere else (production included).
-It needs `scripts/browser/setup.sh` once per box and serves static files from `STATIC_ROOT` (run `collectstatic`
-after a static JS edit).
-For layout - what a CSS or template change actually looks like - `scripts/browser/README.md` has a headless
-chromium harness (screenshots, element boxes, quirks-vs-standards diff, try-a-fix patches) that runs against a
-working-tree `runserver` as `claude_agent`; read the PNGs it writes rather than guessing at a render.
+Write as many tests as you like while developing; when the code is finished, keep only the ones that earn their keep
+(`claude/guides/testing.md#which-tests-to-keep`, which also has the base classes and the fixture index).
 
 ### Reuse before build
 The codebase already has a helper for most things: permissions (`library/guardian_utils.py`), collections and
 misc utilities (`library/utils/`), fixture builders (`claude/guides/testing.md`). Look before writing a new one, and
-prefer the plain option: a migration's data step is `RunPython` with the ORM, not raw SQL; a test's input is a
-checked-in fixture file, not a generator; a flow the user didn't ask to change (a GET that creates something, a form
-without a confirmation page) stays as it is. A new dependency is weighed by how recognisable it is to a newcomer
+prefer the plain option: a flow the user didn't ask to change (a GET that creates something, a form without a
+confirmation page) stays as it is. A new dependency is weighed by how recognisable it is to a newcomer
 against the code it saves; heavy customisation erodes that.
 
 ### Background shells
@@ -271,14 +229,8 @@ exits and `pkill` kills the shell running it (the hook refuses `pkill -f`). Befo
 every background shell and monitor the session started, not a guessed `pgrep`.
 
 ### Worktrees
-Several sessions share a box's checkout, and on a shared box gunicorn and celery run from it, so never check out,
-switch or create a branch there - the other sessions' edits and commits land on whatever branch you left. Branch
-work goes in its own worktree from the checkout's root: `git worktree add ../variantgrid_wt_<issue> -b <issue>_<slug>
-origin/master`; a commit straight to master goes in one too when the checkout isn't on master. The worktree shares the
-virtualenv but not gitignored files: copy the box's settings module if it lives in `env_developers/`, run
-`manage.py collectstatic_js_reverse` before the first test run, give tests their own database
-(`claude/guides/testing.md`), and `collectstatic` there before a `vg page` or `runserver` (`STATIC_ROOT` is per
-checkout). `git worktree remove` it when the PR is up.
+Never check out, switch or create a branch in a box's shared checkout: other sessions, and on a shared box gunicorn
+and celery, run from it. Branch work goes in its own worktree, set up as `claude/guides/github.md#worktrees` says.
 
 ### Context handoff
 When asked for text to paste into a fresh session ("I'm going to clear context"), use the `/handoff` skill
@@ -309,9 +261,9 @@ The detail is `claude/guides/github.md`; these are the rules it rests on.
 
 ## Definition of done
 
-1. `scripts/vg tests --explain` names the tests at risk and they pass; the ones kept earn their keep (Testing, above).
+1. `scripts/vg tests --explain` names the tests at risk and they pass; the ones kept earn their keep (`claude/guides/testing.md#which-tests-to-keep`).
 2. A change to a page's JavaScript has been run: `vg page <url> --js-writes-to-database` on a page whose data reaches
-   the changed code shows no new errors (Verifying pages, above). On a shared test box, ask before running it.
+   the changed code shows no new errors (`uicore/AGENTS.md#verifying-pages`). On a shared test box, ask before running it.
 3. A new module has a docstring stating what it owns and its entry points. A gotcha learned the hard way is one line in
    the app's `AGENTS.md`, next to the code it is about - not a memory, not this file.
 4. `scripts/vg docs check` passes after any doc edit. A citation is a repo path or `snpdb/models/models_variant.py:Variant`-style path:Symbol in backticks; a plan is checked while

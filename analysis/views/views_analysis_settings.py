@@ -25,6 +25,11 @@ from library.django_utils import add_save_message, set_form_read_only
 from library.guardian_utils import is_superuser
 from library.utils import defaultdict_to_dict
 from patients.models.models_patient import Patient
+from snpdb.models.models_user_settings import (
+    ANALYSIS_NODE_ZOOM_MAX,
+    ANALYSIS_NODE_ZOOM_MIN,
+    ANALYSIS_NODE_ZOOM_STEP,
+)
 
 
 def view_analysis_settings(request, analysis_id):
@@ -36,7 +41,10 @@ def view_analysis_settings(request, analysis_id):
                "has_write_permission": analysis.can_write(request.user),
                "can_unlock": analysis.can_unlock(request.user),
                "can_take_ownership": analysis.can_take_ownership(request.user),
-               "hidden_badge": _get_hidden_badge(analysis)}
+               "hidden_badge": _get_hidden_badge(analysis),
+               "node_zoom_min": ANALYSIS_NODE_ZOOM_MIN,
+               "node_zoom_max": ANALYSIS_NODE_ZOOM_MAX,
+               "node_zoom_step": ANALYSIS_NODE_ZOOM_STEP}
     return render(request, 'analysis/analysis_settings.html', context)
 
 

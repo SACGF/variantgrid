@@ -110,7 +110,7 @@
         {%  for genome_build_name in variant_tag_genome_build_names %}
             {% with table_id=genome_build_name|slugify|add:"-variant-tags-datatable" %}
                 {% datatable_user_data_filter table_id 'Variant Tags' %}
-                <table id="{{ table_id }}" class="sticky-header"
+                <table id="{{ table_id }}" class="scroll-x-in-box"
                        data-datatable-url="{% url 'variant_tags_datatable' genome_build_name|slugify %}"
                        data-datatable-data="relatedVariantTagsDatatableFilter"></table>
             {% endwith %}

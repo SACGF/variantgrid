@@ -18,6 +18,8 @@ from snpdb.models.models_genome import GenomeBuild
 
 PLUGIN_COLUMNS = frozenset({"avi_phred", "alphagenome_splicing", "splicevault_out_of_frame_events",
                             "utr_annotator_consequence", "utr_annotator_annotation"})
+# The splicing threshold only compares scores the version populates (#2787)
+VISIBLE_COLUMNS = PLUGIN_COLUMNS | {"spliceai_pred_ds_ag", "dbscsnv_ada_score", "dbscsnv_rf_score"}
 PLUGIN_FILTERS = {"avi_phred_min": 20, "alphagenome_splicing_min": 0.5,
                   "splicevault_out_of_frame": SpliceVaultOutOfFrame.ALL, "utr_high_impact": UTRHighImpact.ANY_FRAME}
 
@@ -56,7 +58,7 @@ ROWS = {
 
 # The fake version has no AlphaGenome pin, so it would withhold that column: the tests say which columns are offered
 @override_settings(**get_fake_annotation_settings_dict(columns_version=2))
-@patch.object(VariantAnnotationVersion, "visible_columns", PLUGIN_COLUMNS)
+@patch.object(VariantAnnotationVersion, "visible_columns", VISIBLE_COLUMNS)
 @patch.object(VariantAnnotationVersion, "withheld_licence_restricted_columns", frozenset())
 class DamageNodePluginFiltersTest(TestCase):
     @classmethod
@@ -105,7 +107,7 @@ class DamageNodePluginFiltersTest(TestCase):
         self.assertEqual({"avi", "alphagenome_only"}, self._filtered(node, among))
 
         withheld = frozenset({"alphagenome_splicing"})
-        with (patch.object(VariantAnnotationVersion, "visible_columns", PLUGIN_COLUMNS - withheld),
+        with (patch.object(VariantAnnotationVersion, "visible_columns", VISIBLE_COLUMNS - withheld),
               patch.object(VariantAnnotationVersion, "withheld_licence_restricted_columns", withheld)):
             self.assertEqual({"avi"}, self._filtered(node, among))  # AVI still filters, AlphaGenome no longer admits
             warnings = node.get_warnings()

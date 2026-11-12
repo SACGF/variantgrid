@@ -373,8 +373,8 @@ class OverlapDownloadRow(ExportRow):
 
     @export_column("Next Step", categories={"outstanding": True})
     def next_step(self):
-        relevant = [x for x in self.overlap.contributions_list if x.classification_grouping and x.classification_grouping.lab_id in self.lab_picker.lab_ids]
-        if next_steps := list(self.overlap.overlapcontributionnextstep_set.filter(contribution__in=relevant).all()):
+        relevant_ids = {x.pk for x in self.overlap.contributions_list if x.classification_grouping and x.classification_grouping.lab_id in self.lab_picker.lab_ids}
+        if next_steps := [x for x in self.overlap.next_steps if x.contribution_id in relevant_ids]:
             return max(x.next_step for x in next_steps).label
         return ""
 
@@ -428,11 +428,11 @@ def download_overlaps(request, lab_id: str):
         OverlapContributionNextStep.objects.filter(lab_filter_q).filter(
             overlap=OuterRef('pk')
         ).annotate(max_status=Max('next_step')).values_list('max_status')[:1]
-    ))
+    )).filter(skew_status__gt=TriageNextStep.NOT_INVOLVED)
 
     qs = qs.order_by("-overlap_status", "-skew_status", "-overlap_status_change_timestamp", "-overlap_override_status")
 
-    qs = qs.prefetch_related("overlapcontributionnextstep_set")
+    qs = qs.with_contributions()
     categories = {"solved": solved_mode, "outstanding": not solved_mode}
 
     return OverlapDownloadRow.streaming_csv(

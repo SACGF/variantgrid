@@ -1,5 +1,5 @@
 """
-PreToolUse hook for Bash: the rules in AGENTS.md "This box" and "Git commits" that a prompt or a refusal can
+PreToolUse hook for Bash: the rules in AGENTS.md "This box" and "GitHub" that a prompt or a refusal can
 enforce, whatever the permission mode.
 
 - GUARDED: state-changing commands on a box other people are testing on get a confirmation prompt with a reason.
@@ -26,7 +26,7 @@ GUARDED = [
     (r"\brestart_services\.sh|\bstop_services\.sh|\bsystemctl\s+(restart|stop|start)\b|\bservice\s+\S+\s+(restart|stop|start)\b",
      "restarts or stops services on this box: anyone using the site or a running import/annotation loses their work"),
     (r"manage\.py\s+migrate\b",
-     "migrates the live database this box's testers share; pushed migrations are frozen (AGENTS.md), so check this is what is wanted"),
+     "migrates the live database this box's testers share; pushed migrations are frozen (manual/AGENTS.md), so check this is what is wanted"),
     (r"manage\.py\s+(vep_run|create_new_variant_annotation_version|annotate_variants|liftover_alleles|delete_variant_annotation_version)\b",
      "changes annotation state for every variant on the box and runs for hours; annotation runs are shared"),
     (r"\b(DROP|TRUNCATE)\s+(TABLE|DATABASE)\b|\bdropdb\b",
@@ -34,7 +34,7 @@ GUARDED = [
     (r"\b(UPDATE|DELETE\s+FROM|INSERT\s+INTO)\s+(snpdb_variant|snpdb_allele|annotation_variantannotation)\b",
      "writes to a core table every user of the box shares (AGENTS.md, This box)"),
     (r"--js-writes-to-database\b",
-     "loads the page in a browser as claude_agent and its ajax writes to the shared database, not rolled back (AGENTS.md, Verifying pages)"),
+     "loads the page in a browser as claude_agent and its ajax writes to the shared database, not rolled back (uicore/AGENTS.md#verifying-pages)"),
     (r"\bgit\s+push\s+(-f|--force)|\bgit\s+reset\s+--hard\b|\bgit\s+checkout\s+--\s|\bgit\s+clean\s+-[a-z]*f",
      "discards history or working-tree changes"),
     (r"(^|[;&|]\s*)git\s+pull(?=\s|$)",
@@ -46,12 +46,12 @@ GUARDED = [
 # (pattern, the rule and what to do instead)
 DENIED = [
     (r"\bgit\s+commit\b.*(Co-Authored-By|Claude-Session)",
-     "AGENTS.md (Git commits): no attribution trailers. Commit again with the message ending at its last line of content."),
+     "AGENTS.md (GitHub): no attribution trailers. Commit again with the message ending at its last line of content."),
     (r"\bpkill\s+(-\S+\s+)*-f\b|\bpkill\s+-[a-zA-Z]*f",
      "pkill -f matches the shell running it (its command line holds the pattern) and kills this hook's own shell. "
      "Find the PID (ps -eo pid,args | grep <pattern> | grep -v grep) and kill that."),
     (r"\bgh\s+search\s+\S+.*--owner\s+SACGF\b",
-     "AGENTS.md (Which repo an issue goes in): private repos hold patient and lab details, so search only the public repo: "
+     "AGENTS.md (GitHub): private repos hold patient and lab details, so search only the public repo: "
      "gh search issues --repo SACGF/variantgrid."),
     (r"CLAUDE\.local\.md",
      "AGENTS.md: while a CLAUDE.local.md exists anywhere from the working directory up, Claude Code skips every AGENTS.md "
