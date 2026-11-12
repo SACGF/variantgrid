@@ -282,6 +282,12 @@ class OntologyTerm(TimeStampedModel, PreviewModelMixin):
             return None
 
     @cached_property
+    def exact_synonyms(self) -> list[str]:
+        """ The aliases MONDO marks hasExactSynonym (its import keeps the synonym metadata in extra), related ones excluded """
+        synonyms = (self.extra or {}).get("synonyms") or []
+        return [synonym["val"] for synonym in synonyms if synonym.get("pred") == "hasExactSynonym" and synonym.get("val")]
+
+    @cached_property
     def is_leaf(self) -> bool:
         # Warning, just meant to be called on MONDO terms
         if not self.is_stub and self.ontology_service == OntologyService.MONDO:
