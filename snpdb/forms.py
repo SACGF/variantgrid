@@ -57,10 +57,16 @@ from snpdb.models import (
 )
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.models.models_user_settings import (
+    ANALYSIS_NODE_ZOOM_MAX,
+    ANALYSIS_NODE_ZOOM_MIN,
+    ANALYSIS_NODE_ZOOM_STEP,
+)
 from snpdb.sample_file_path import PATTERN_KEYS, validate_sample_file_path_pattern
 from snpdb.tag_operations import get_case_collision
 from snpdb.variant_filters import get_variant_type_choices
 from uicore.utils.form_helpers import FormHelperHelper, form_helper_horizontal
+from uicore.widgets.optional_range_widget import OptionalRangeWidget
 from variantgrid.perm_path import get_visible_url_names
 
 
@@ -578,6 +584,10 @@ class SettingsOverrideForm(BaseModelForm):
             "tool_tips": BlankNullBooleanSelect(),
             "node_debug_tab": BlankNullBooleanSelect(),
             "analysis_horizontal_mode": BlankNullBooleanSelect(),
+            "analysis_node_zoom": OptionalRangeWidget(attrs={"min": ANALYSIS_NODE_ZOOM_MIN,
+                                                             "max": ANALYSIS_NODE_ZOOM_MAX,
+                                                             "step": ANALYSIS_NODE_ZOOM_STEP},
+                                                      initial=100, value_suffix="%"),
             "import_messages": BlankNullBooleanSelect(),
             'default_sort_by_column': ModelSelect2(url='custom_column_autocomplete',
                                                   forward=['columns'],

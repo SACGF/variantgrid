@@ -18,6 +18,7 @@ from dateutil.tz import gettz
 from django.conf import settings
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator, StepValueValidator
 from django.db import models
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.urls import reverse
@@ -75,8 +76,10 @@ VARIANT_TAG_STALE_DAYS_CHOICES = [
     (1825, "5 years"),
 ]
 
-# Analysis node graph zoom (#2784), as a percentage - the slider in analysis settings uses the same steps
-ANALYSIS_NODE_ZOOM_CHOICES = [(percent, f"{percent}%") for percent in range(50, 201, 10)]
+# Analysis node graph zoom (#2784), as a percentage - the sliders in analysis settings and the settings forms
+ANALYSIS_NODE_ZOOM_MIN = 50
+ANALYSIS_NODE_ZOOM_MAX = 200
+ANALYSIS_NODE_ZOOM_STEP = 10
 
 
 class TagConfigCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
@@ -265,7 +268,10 @@ class SettingsOverride(models.Model):
                                          help_text="If true, an extra tab appears in analysis node editor, with details about node settings + SQL query.")
     analysis_horizontal_mode = models.BooleanField(null=True, blank=True,
                                                    help_text="Analysis nodes connect left/right, and grid on bottom. Default=False - connect vertically top/bottom, grid in editor")
-    analysis_node_zoom = models.IntegerField(null=True, blank=True, choices=ANALYSIS_NODE_ZOOM_CHOICES,
+    analysis_node_zoom = models.IntegerField(null=True, blank=True,
+                                             validators=[MinValueValidator(ANALYSIS_NODE_ZOOM_MIN),
+                                                         MaxValueValidator(ANALYSIS_NODE_ZOOM_MAX),
+                                                         StepValueValidator(ANALYSIS_NODE_ZOOM_STEP)],
                                              help_text="Size of the analysis node graph, as a percentage. Positions scale too, so layouts keep their spacing. Default=100%")
 
     import_messages = models.BooleanField(null=True, blank=True,

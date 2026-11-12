@@ -4,6 +4,7 @@ import json
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import Group, User
+from django.core.exceptions import ValidationError
 from django.forms.models import ALL_FIELDS, inlineformset_factory
 from django.forms.widgets import TextInput
 from django.http.response import (
@@ -52,7 +53,6 @@ from snpdb.models import (
     UserSettingsOverride,
     VariantGridColumn,
 )
-from snpdb.models.models_user_settings import ANALYSIS_NODE_ZOOM_CHOICES
 from snpdb.sample_file_path import get_example_replacements
 from snpdb.views.views_lab import _add_read_only_settings_message
 
@@ -108,11 +108,11 @@ def set_analysis_node_zoom(request):
     """ Posted by the zoom slider in analysis settings. A blank zoom clears the user's own value, so the
         lab/org default applies again - returns the zoom now in effect """
 
-    zoom = request.POST.get("zoom") or None
-    if zoom is not None:
-        zoom = int(zoom)
-        if zoom not in dict(ANALYSIS_NODE_ZOOM_CHOICES):
-            return HttpResponseBadRequest(f"Invalid zoom: {zoom}")
+    zoom_field = UserSettingsOverride._meta.get_field("analysis_node_zoom")
+    try:
+        zoom = zoom_field.clean(request.POST.get("zoom") or None, None)
+    except ValidationError as ve:
+        return HttpResponseBadRequest(f"Invalid zoom: {' '.join(ve.messages)}")
     UserSettingsOverride.objects.update_or_create(user=request.user, defaults={"analysis_node_zoom": zoom})
     return JsonResponse({"zoom": UserSettings.get_for(user=request.user).analysis_node_zoom_percent})
 

@@ -1,0 +1,8 @@
+<div class="d-flex align-items-center" data-optional-range data-value-suffix="{{ widget.value_suffix }}">
+    <div class="custom-control custom-checkbox mr-3">
+        <input type="checkbox" class="custom-control-input optional-range-set" id="{{ widget.attrs.id }}-set" name="{{ widget.name }}-set"{% if widget.is_set %} checked{% endif %}{% if widget.read_only %} disabled{% endif %}>
+        <label class="custom-control-label" for="{{ widget.attrs.id }}-set">Set</label>
+    </div>
+    {% include "django/forms/widgets/input.html" %}
+    <span class="ml-2 optional-range-value"></span>
+</div>

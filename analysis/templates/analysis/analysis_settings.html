@@ -17,7 +17,7 @@
 </style>
 <div id="node-zoom-row" class="form-inline mb-2" title="Saved to your user settings - applies to all analyses">
     <label for="node-zoom-slider" class="mr-2">Node zoom</label>
-    <input type="range" class="custom-range w-auto" id="node-zoom-slider" min="50" max="200" step="10">
+    <input type="range" class="custom-range w-auto" id="node-zoom-slider" min="{{ node_zoom_min }}" max="{{ node_zoom_max }}" step="{{ node_zoom_step }}">
     <span id="node-zoom-value" class="ml-2"></span>
     <button class="btn btn-link btn-sm" id="node-zoom-default" type="button">Default</button>
 </div>
