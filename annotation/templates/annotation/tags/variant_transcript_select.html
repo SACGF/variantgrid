@@ -1,5 +1,6 @@
 {% load static %}
 {% load js_tags %}
+{% load variant_transcript_select_tags %}
 <div id='variant-transcript-select-tag-container'>
     {% if vts.transcript_data or empty_transcript_option %}
         {%  if vts.other_annotation_consortium_transcripts_warning %}
@@ -46,9 +47,10 @@
             <td>{%  if transcript_data.ensembl_transcript_accession %}
                     <a target="_blank" class="hover-link" href="{% url 'view_transcript_accession' transcript_data.ensembl_transcript_accession %}">{{ transcript_data.ensembl_transcript_accession }}</a>
                 {%  endif %}
-            <td>
-                {{ transcript_data.hgvs_c| dash_if_empty }}
-                <span class="d-block mt-1 text-secondary" title="{{ transcript_data.hgvs_p }}" data-toggle="tooltip">{{ transcript_data.hgvs_p | dash_if_empty | truncatechars:70 }}</span>
+            <td>{% with hgvs_c_display=transcript_data.hgvs_c|abbreviate_hgvs %}
+                <span{% if hgvs_c_display != transcript_data.hgvs_c %} title="{{ transcript_data.hgvs_c }}"{% endif %}>{{ hgvs_c_display | dash_if_empty }}</span>
+                {% endwith %}
+                <span class="d-block mt-1 text-secondary" title="{{ transcript_data.hgvs_p }}" data-toggle="tooltip">{{ transcript_data.hgvs_p | abbreviate_p_hgvs | dash_if_empty | truncatechars:70 }}</span>
             <td>{{ transcript_data.consequence | format_computer_text }}
             {% if show_all_transcript_details %}
             <td>{{ transcript_data.impact }}
@@ -85,44 +87,16 @@
         {% endif %}
     {% endif %}
     
+<script src="{% static 'js/annotation/variant_transcript_select.js' %}"></script>
 <script>
 $(document).ready(function() {
-    let variant_transcript_annotations = {{ variant_transcript_annotations | jsonify }};
-
-    function setTranscriptInfo(transcriptId) {
-        var data = variant_transcript_annotations[transcriptId];
-        // console.log("setTranscriptInfo(" + transcriptId + ") - data: " + data);
-    {% if transcript_func %}
-        // call custom handler
-        let func = {{ transcript_func | safe }};
-        func(transcriptId, data);
-    {% endif %}
-
-        if (data) {
-            setGeneInfo(data["gene_id"], data["gene_symbol"]);
-        }    
-    }
-    
-    function setGeneInfo(geneId, geneSymbol) {
-        {% if gene_func %}
-            let func = {{ gene_func | safe }};
-            func(geneId, geneSymbol);
-        {% endif %}
-    }
-
-    const container = $("{{ transcript_select_jquery }}");
-    const radioContainer = '#variant-transcript-select-tag-container';
-    const transcriptRadio = $('input[type=radio]', radioContainer);
-    transcriptRadio.change(function() {
-        if ($(this).is(":checked")) {
-            const transcriptId = $(this).val();
-            setTranscriptInfo(transcriptId);
-        }
+    initVariantTranscriptSelect({
+        transcriptSelectJquery: {{ transcript_select_jquery | jsonify }},
+        variantTranscriptAnnotations: {{ variant_transcript_annotations | jsonify }},
+        initialTranscriptId: {{ vts.initial_transcript_id | jsonify }},
+        transcriptFunc: {% if transcript_func %}{{ transcript_func | safe }}{% else %}null{% endif %},
+        geneFunc: {% if gene_func %}{{ gene_func | safe }}{% else %}null{% endif %},
     });
-    transcriptRadio.appendTo(container);
-
-    const initialTranscript = "{{ vts.initial_transcript_id }}";
-    setTranscriptInfo(initialTranscript);
 });
 </script>
 </div>

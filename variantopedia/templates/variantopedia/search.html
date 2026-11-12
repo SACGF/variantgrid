@@ -1,4 +1,5 @@
 {% extends "uicore/page/base.html" %}
+{% load static %}
 {% load english_tags %}
 {% load crispy_forms_field %}
 {% load ui_utils %}
@@ -62,47 +63,16 @@
             margin-left: 8px;
         }
     </style>
+    <script src="{% static 'js/variantopedia/search.js' %}"></script>
     <script>
-        $(document).ready(() => {
-            $('#big_search').select();
-            $('#big_search').focus(() => {
-               $('#big_search').select();
-            });
-        });
+        $(document).ready(initSearch);
     </script>
 {% endblock %}
 {% block content %}
     {% settings_value 'VARIANT_VCF_DB_PREFIX' as variant_vcf_db_prefix %}
     {% settings_value 'SEARCH_SUMMARY' as show_search_summary %}
     {% settings_value 'MAX_STRING_DISPLAY_LENGTH' as max_string_display_length %}
-    <script>
-        function updateSearchMode() {
-            let feeling_lucky = $("#feeling-lucky").is(':checked')
-            $("#search-mode").val(feeling_lucky ? "lucky" : "preview");
-            console.log("Search mode now = ");
-            console.log($("#search-mode").val());
-        }
-    </script>
-
     {% if search and search_results.results %}
-        <script>
-            function scrollToResults(category) {
-                let scrollMe = isPhoneMode() ? $('body') : $('.main-content');
-                let scrollTo = $(`#results-${category}`);
-                let scrollToOffset = scrollTo.position().top;
-
-                scrollMe.animate({scrollTop: scrollToOffset - 30}, 100, 'swing', () => {
-                    $(`.result-${category}`).animate({'background-color': '#cceecc'}, 150).animate({'background-color': 'inherit'}, 100); //.fadeOut(100).fadeIn(100);
-                });
-                return false;
-            }
-            function searchAgain() {
-                let scrollMe = isPhoneMode() ? $('body') : $('.main-content');
-                scrollMe.animate({scrollTop: 0}, 100);
-                $('#big_search').focus();
-            }
-        </script>
-
         <div class="current-record-menu-item">
             <div class="mt-2">
                 <div class="d-none d-lg-block">
@@ -228,7 +198,7 @@
                                                 </div>
                                             {% endif %}
                                             {% if not preview.is_error %}
-                                                <label class="search-identifier">{{ preview.identifier }}</label>&nbsp;{% if preview.title %}<span class="search-title">{{ preview.title }}</span>{% endif %}
+                                                <label class="search-identifier"{% if preview.identifier_tooltip %} title="{{ preview.identifier_tooltip }}"{% endif %}>{{ preview.identifier }}</label>&nbsp;{% if preview.title %}<span class="search-title">{{ preview.title }}</span>{% endif %}
                                                 {% if preview.summary_all %}
                                                     <div class="d-block text-small text-secondary extra-summary">
                                                         {% for extra in preview.summary_all %}

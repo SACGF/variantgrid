@@ -35,6 +35,14 @@ class VariantTestCase(TestCase):
         v = Variant.get_from_variant_coordinate(vc, self.grch37)
         self.assertEqual(self.variant, v)
 
+    def test_preview_abbreviates_long_alt(self):
+        long_alt = "G" + "ACGT" * 6
+        long_insertion = slowly_create_test_variant("3", 128199100, 'G', long_alt, self.grch37)
+        preview = long_insertion.preview
+        self.assertEqual(preview.identifier, "3:128199100 G>GAC...CGT")
+        self.assertEqual(preview.identifier_tooltip, f"3:128199100 G>{long_alt}")
+        self.assertIsNone(self.insertion_variant.preview.identifier_tooltip)
+
     def test_ref_variant_coordinate_explicit(self):
         vc_explicit = self.ref_variant.coordinate.as_external_explicit(self.grch37)
         self.assertEqual(vc_explicit.ref, vc_explicit.alt)
