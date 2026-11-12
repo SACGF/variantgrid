@@ -17,7 +17,6 @@ column (the fifth `|`-separated field), so keep the table shape.
 | gnomAD SV overlap via two `--custom` | Ensembl/ensembl-vep#1989 (`coords=2`, `show_overlaps`) for #1645 | 2026-11-03 | 2027-02-03 |
 | AnnotSV regulatory element sort | lgmgeo/AnnotSV#356 fixed in a released Annotations_Human bundle | 2026-11-10 | 2026-12-10 |
 | chrX PAR table | a bioutils release with `bioutils.par` that installs on Python 3.14 (0.6.2 caps `<3.14`, biocommons/bioutils#97) | 2026-11-11 | 2026-12-11 |
-| uv cooldown exceptions | the 7-day cooldown passing the pinned cutoffs in `uv.toml` | 2026-11-04 | 2026-11-06 |
 
 ## chrX PAR table
 
@@ -40,15 +39,6 @@ When resolved (a final release with `bioutils.par` and no `<3.14` cap): bump `bi
 `position__range` lookup 1-based inclusive), returning `Value(False)` on the `ValueError` for a build with no PAR data.
 Delete `CHRX_PSEUDOAUTOSOMAL_REGIONS`, point `test_pseudoautosomal_regions_stay_out_of_the_chrx_sex_guess` at
 `get_par_map`, and delete this row.
-
-## uv cooldown exceptions
-
-`uv.toml` names packages whose security fix was less than seven days old when it was needed, each with a fixed
-cutoff date that admits it. The entry freezes that package at the cutoff, so it comes out once the default cooldown
-has passed the date: pypdf after 2026-11-05.
-
-Check: `grep exclude-newer-package uv.toml` against today's date. When resolved: delete the expired entries, recompile
-both requirements files (root `AGENTS.md`, Python packages), and delete this row when none are left.
 
 ## hgvs fork
 

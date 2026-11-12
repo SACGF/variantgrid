@@ -6,6 +6,4 @@ exclude-newer = "7 days"
 # Their dependencies still get the cooldown. One-off on the command line: --exclude-newer-package <name>=false
 # A security fix needed inside the cooldown gets a dated cutoff here that admits it (`pkg = "<ISO date>"`); that
 # freezes the package at the date, so the entry is removed once the default 7 days has passed it.
-# pypdf 6.21.4 carries security fixes inside the cooldown, so it gets a fixed cutoff that admits it; this freezes
-# pypdf at that date, so remove the entry once the default 7 days has passed it (after 2026-11-05).
-exclude-newer-package = { cdot = false, pypdf = "2026-10-29T00:00:00Z" }
+exclude-newer-package = { cdot = false }

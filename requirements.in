@@ -55,7 +55,7 @@ pillow>=13.0.0
 pronto>=2.4.7
 psycopg[binary]
 pyBigWig>=0.3.22
-pypdf>=6.21.4  # long-runtime / memory / infinite-loop advisories; inside the cooldown, see uv.toml
+pypdf>=6.21.4  # long-runtime / memory / infinite-loop advisories
 pysam
 python_dateutil
 redis
