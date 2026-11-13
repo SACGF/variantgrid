@@ -1,6 +1,6 @@
 from django.test import SimpleTestCase
 
-from library.django_utils.grid_export import spreadsheet_safe
+from library.utils.text_utils import delimited_row, spreadsheet_safe
 
 
 class SpreadsheetSafeTest(SimpleTestCase):
@@ -16,3 +16,8 @@ class SpreadsheetSafeTest(SimpleTestCase):
         ]
         for value, expected in cases:
             self.assertEqual(expected, spreadsheet_safe(value), value)
+
+    def test_delimited_row_quotes_formula_text(self):
+        """ Classification and other CSV downloads are written through delimited_row (SACGF/variantgrid_private#3946) """
+        row = delimited_row(["=1+1", "+SUM(A1)", "-1.5", "c.-12A>G", 7, None], include_new_line=False)
+        self.assertEqual("'=1+1,'+SUM(A1),-1.5,c.-12A>G,7,", row)

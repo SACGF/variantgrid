@@ -7,6 +7,7 @@ from django.utils.text import slugify
 
 from library.utils import StashFile
 from library.utils.date_utils import local_date_string
+from library.utils.text_utils import spreadsheet_safe
 
 # Rows written per yielded chunk - one chunk per row costs far more in WSGI/nginx (and file write)
 # overhead than it saves in memory
@@ -20,19 +21,6 @@ def csv_streaming_response(basename: str, csv_iterator: Iterator[str]) -> Stream
     response = StreamingHttpResponse(csv_iterator, content_type="text/csv")
     response['Content-Disposition'] = f'attachment; filename="{slugify(basename)}.csv"'
     return response
-
-
-SPREADSHEET_FORMULA_PREFIXES = ('=', '+', '-', '@', '\t', '\r')
-
-
-def spreadsheet_safe(value):
-    """ Text Excel would evaluate as a formula gets a leading quote (numbers like "-1.5" are left alone) """
-    if isinstance(value, str) and len(value) > 1 and value.startswith(SPREADSHEET_FORMULA_PREFIXES):
-        try:
-            float(value)
-        except ValueError:
-            return "'" + value
-    return value
 
 
 def grid_export_csv(csv_columns, items, label_overrides: Optional[dict] = None) -> Iterator[str]:

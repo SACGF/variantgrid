@@ -127,12 +127,26 @@ def format_significant_digits(a_number, sig_digits=3) -> str:
     return rounded_number_str
 
 
+SPREADSHEET_FORMULA_PREFIXES = ('=', '+', '-', '@', '\t', '\r')
+
+
+def spreadsheet_safe(value):
+    """ Text Excel would evaluate as a formula gets a leading quote (numbers like "-1.5" are left alone) """
+    if isinstance(value, str) and len(value) > 1 and value.startswith(SPREADSHEET_FORMULA_PREFIXES):
+        try:
+            float(value)
+        except ValueError:
+            return "'" + value
+    return value
+
+
 def delimited_row(data: list, delimiter: str = ',', include_new_line=True, **kwargs) -> str:
+    """ One CSV/TSV line, each value passed through spreadsheet_safe as these files are opened in spreadsheets """
     # https://docs.python.org/3/library/csv.html#csv.writer
     # If csvfile is a file object, it should be opened with newline=''
     out = io.StringIO(newline='')
     writer = csv.writer(out, delimiter=delimiter, **kwargs)
-    writer.writerow(data)
+    writer.writerow([spreadsheet_safe(value) for value in data])
     text = out.getvalue()
     if not include_new_line:
         text = text.rstrip()
