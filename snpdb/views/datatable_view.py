@@ -21,7 +21,7 @@ from functools import cached_property, reduce
 from typing import Any, Generic, Optional, TypeVar, Union, get_args
 
 from django.contrib.auth.models import User
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import BadRequest, PermissionDenied
 from django.db import models
 from django.db.models import CharField, Expression, F, OrderBy, Q, QuerySet, Value
 from django.db.models.functions import Concat
@@ -32,16 +32,36 @@ from kombu.utils import json
 
 from library.django_utils.datatable_mixins import JSONResponseView
 from library.django_utils.filter_rules import filter_operations_json, parse_filters, rules_to_q
-from library.django_utils.grid_export import csv_streaming_response, grid_export_csv
+from library.django_utils.grid_export import (
+    EXPORT_ROWS_PER_CHUNK,
+    csv_streaming_response,
+    grid_export_csv,
+)
 from library.django_utils.major_operation import MajorOperationViewMixin
 from library.log_utils import report_exc_info
 from library.utils import JsonDataType, JsonObjType, full_class_name, nice_class_name, pretty_label
+from library.utils.collection_utils import batch_iterator
 from snpdb.models import AvatarDetails, UserGridConfig
 
 logger = logging.getLogger(__name__)
 
 # Client asks for the server side CSV by adding this to the table's own ajax params
 DATATABLE_CSV_PARAM = "dataTableCsv"
+
+
+def page_bounds(start: Optional[str], length: Optional[str], max_length: int) -> tuple[int, int]:
+    """ (start, length) of the page DataTables asked for. A length past max_length (or -1, "every row") is
+        refused rather than cut short: a short page reads as the end of the data, which is how client built
+        CSVs came out truncated (#2812). Every row is the server CSV - DatatableConfig.server_csv_download """
+    try:
+        start_index = int(start or 0)
+        page_length = int(length or 10)
+    except ValueError as e:
+        raise BadRequest(f"Page start/length must be integers, not {start!r}/{length!r}") from e
+    if start_index < 0 or not 1 <= page_length <= max_length:
+        raise BadRequest(f"A page is 1-{max_length} rows from start >= 0, not {page_length} from {start_index} - "
+                         f"every row is the grid's server CSV download (server_csv_download)")
+    return start_index, page_length
 # The column filter rules the client sends up (@see library.django_utils.filter_rules)
 DATATABLE_FILTERS_PARAM = "filters"
 # The client looks a renderer up by its dotted name on window (resolveFunctionName in datatable_definition.js),
@@ -237,8 +257,9 @@ class RichColumn:
         :param extra_columns: other columns that need to be selected out for the server renderer
         :param include_in_csv: whether the column goes in the server side CSV (defaults to having a key)
         :param csv_rendered: write render_cell() output to the CSV rather than the raw value - set it
-                             wherever the server renderer converts the value (AF as percent, choices
-                             expanded, packed genotype unpacked) so the CSV matches the grid
+                             wherever the server renderer converts the value (AF as percent, packed
+                             genotype unpacked) so the CSV matches the grid. The renderer can rely on
+                             pre_render, which the export calls per batch of rows
         :param width: column width in pixels (the variant grids lay out table-layout: fixed)
         :param header_title: tooltip on the column header
         :param client_renderer_kwargs: per column settings handed to the client renderer as ctx.kwargs
@@ -291,6 +312,10 @@ class RichColumn:
         self.extra_columns = extra_columns
         self.include_in_csv = bool(key) if include_in_csv is None else include_in_csv
         self.csv_rendered = csv_rendered
+        # A TableFormat.choices column shows the label, so the CSV writes the label too
+        self.csv_choices: Optional[dict] = None
+        if self.client_renderer == "TableFormat.choices":
+            self.csv_choices = client_renderer_kwargs["choices"]
         self.width = width
         self.header_title = header_title
         self.client_renderer_kwargs = client_renderer_kwargs
@@ -371,9 +396,7 @@ class DatatableConfig(Generic[DC]):
     # Also match a row by its exact pk when the search box is handed a number - people write record
     # IDs down, and an integer column can't take the icontains the text columns are searched with
     search_pk_enabled = False
-    download_csv_button_enabled = False
-    # Streams every row's raw values from the server, rather than the client side button which pulls
-    # the rendered rows back through the ajax endpoint - use it on anything that can grow large
+    # Offer a CSV of every row (the filters, search and sort applied) streamed from the server
     server_csv_download = False
     csv_name: Optional[str] = None  # filename for CSV download (date suffix added automatically)
     rich_columns: list[RichColumn]  # columns for display
@@ -408,7 +431,7 @@ class DatatableConfig(Generic[DC]):
     approximate_count_enabled = False
     # Hovering a row for 500ms fetches its expanded content early
     expand_prefetch = True
-    max_page_length = 100
+    max_page_length = UserGridConfig.MAX_ROWS
     # CSV header labels that differ from the column's own (@see csv_columns)
     csv_label_overrides: Optional[dict[str, str]] = None
 
@@ -638,18 +661,37 @@ class DatatableConfig(Generic[DC]):
             columns.append(rc)
         return columns
 
+    def export_cell(self, row: dict, column: RichColumn) -> Any:
+        """ The server renderer's output where the column asked for it (csv_rendered), a choice's
+            label, otherwise the raw value """
+        if column.csv_rendered:
+            return self.render_cell(CellData(all_data=row, key=column.key), column)
+        value = export_value(row.get(column.key))
+        if column.csv_choices:
+            value = column.csv_choices.get(value, value)
+        return value
+
     def render_export_rows(self, rows: Iterable[dict],
                            columns: Optional[list[RichColumn]] = None) -> Iterator[dict]:
-        """ Rows for the CSV/VCF export - the server renderer's output where the column asked for it
-            (csv_rendered), the raw value everywhere else """
+        """ Rows for the CSV/VCF export """
         if columns is None:
             columns = self.export_columns()
         for row in rows:
-            yield {rc.name: self.render_cell(CellData(all_data=row, key=rc.key), rc) if rc.csv_rendered else export_value(row.get(rc.key))
-                   for rc in columns}
+            yield {rc.name: self.export_cell(row, rc) for rc in columns}
 
     def iter_export_rows(self, qs: QuerySet[DC]) -> Iterator[dict]:
-        return self.render_export_rows(qs.values(*self.value_columns()).iterator())
+        columns = self.export_columns()
+        rows = qs.values(*self.value_columns()).iterator()
+        if not any(rc.csv_rendered for rc in columns):
+            return self.render_export_rows(rows, columns)
+        return self._iter_pre_rendered_export_rows(qs, rows, columns)
+
+    def _iter_pre_rendered_export_rows(self, qs: QuerySet[DC], rows: Iterator[dict],
+                                       columns: list[RichColumn]) -> Iterator[dict]:
+        """ Server renderers look up per page what they show (pre_render) - a batch is the export's page """
+        for batch in batch_iterator(rows, EXPORT_ROWS_PER_CHUNK):
+            self.pre_render(qs, batch)
+            yield from self.render_export_rows(batch, columns)
 
     def apply_filters(self, qs: QuerySet[DC]) -> QuerySet[DC]:
         """ Everything that narrows the rows: the config's own params, the search box, then the
@@ -661,12 +703,12 @@ class DatatableConfig(Generic[DC]):
             filtered_qs = self.power_search(filtered_qs, search_text)
         return self.apply_filter_rules(filtered_qs)
 
+    def page_bounds(self) -> tuple[int, int]:
+        return page_bounds(self.get_query_param('start'), self.get_query_param('length'), self.max_page_length)
+
     def paging(self, qs: QuerySet[DC]) -> QuerySet[DC]:
-        limit = min(int(self.get_query_param('length') or 10), self.max_page_length)
-        start = int(self.get_query_param('start') or 0)
-        if limit == -1:  # if pagination is disabled ("paging": false)
-            return qs
-        return qs[start:start + limit]
+        start, length = self.page_bounds()
+        return qs[start:start + length]
 
     def get_csv_name(self) -> str:
         if csv_name := self.csv_name:
@@ -930,8 +972,6 @@ def datatable_definition(config: DatatableConfig, download_url: Optional[str] = 
     data: JsonObjType = {
         "responsive": any(col.detail for col in config.enabled_columns),
         "searchBoxEnabled": config.search_box_enabled,
-        "downloadCsvButtonEnabled": config.download_csv_button_enabled,
-        "csvName": config.get_csv_name(),
         "expandClientRenderer": check_client_renderer_name(config.expand_client_renderer),
         "scrollX": config.scroll_x,
     }
@@ -1056,7 +1096,7 @@ class DatabaseTableView(Generic[DC], MajorOperationViewMixin, JSONResponseView):
         return self.config.prepare_results(qs)
 
     def handle_exception(self, e: BaseException):
-        if not isinstance(e, (PermissionDenied, Http404)):  # Django logs these as 4xx responses
+        if not isinstance(e, (BadRequest, PermissionDenied, Http404)):  # Django logs these as 4xx responses
             report_exc_info()
             logger.exception(str(e))
         raise e

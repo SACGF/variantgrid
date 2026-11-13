@@ -399,7 +399,7 @@ class UncoveredGenesColumns(QCGeneCoverageColumns):
 class GeneSymbolWikiColumns(DatatableConfig[GeneSymbolWiki]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
-        self.download_csv_button_enabled = True
+        self.server_csv_download = True
 
         self.rich_columns = [
             RichColumn('gene_symbol', orderable=True, client_renderer="renderGeneSymbol"),

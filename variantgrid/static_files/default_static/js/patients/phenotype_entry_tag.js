@@ -47,7 +47,7 @@ function initPhenotypeEntry(options) {
                 ],
                 pageLength: 20,
                 dom: '<"toolbar">rtBip',
-                buttons: [{extend: 'csvHtml5', text: 'Download as CSV', filename: 'phenotypes'}],
+                buttons: [CsvExport.dataTableButton('phenotypes')],
             });
         }
 

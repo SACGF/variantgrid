@@ -1,5 +1,3 @@
-import csv
-import io
 import re
 from collections.abc import Iterable
 from typing import Optional
@@ -29,7 +27,7 @@ from classification.views.exports.classification_export_formatter import (
     ClassificationExportFormatter,
 )
 from classification.views.exports.classification_export_utils import CitationCounter
-from library.utils import delimited_row
+from library.utils.text_utils import delimited_row
 
 # WARNING: REDCap export ignores the since parameter
 # WARNING: REDCap export ignores variant warnings
@@ -97,9 +95,6 @@ class ClassificationExportFormatterRedCap(ClassificationExportFormatter):
         return "csv"
 
     def header(self) -> list[str]:
-        out = io.StringIO()
-        writer = csv.writer(out, delimiter=',')
-
         header_array = [REDCAP_PREFIX + 'record_id', REDCAP_PREFIX + 'count']
         standard_keys = ['id', 'lab', 'lab_record_id', 'version', 'evidence_weights', 'citations']
 
@@ -107,8 +102,7 @@ class ClassificationExportFormatterRedCap(ClassificationExportFormatter):
             header_array = header_array + [REDCAP_PREFIX + key + '_' + str(used_keys.key_value_formatter.index) for key in standard_keys]
             header_array = header_array + used_keys.header()
 
-        writer.writerow(header_array)
-        return [out.getvalue()]
+        return [delimited_row(header_array)]
 
     def row(self, allele_data: AlleleData) -> list[str]:
         raise ValueError("row() is not supported in REDCap Export")
@@ -242,33 +236,31 @@ def export_redcap_definition(output):
     repeat_count = 10
     form_name = 'shariant'
 
-    csv_writer = csv.writer(output)
-
-    csv_writer.writerow(RedcapDefinition.header_row())
+    output.write(delimited_row(RedcapDefinition.header_row()))
 
     dont_group = {'redcap_record_id'}
 
-    csv_writer.writerow(RedcapDefinition(name=REDCAP_PREFIX + 'record_id', form_name=form_name, section_header='Record', field_type='text', label='Redcap Record ID').row())
-    csv_writer.writerow(RedcapDefinition(name=REDCAP_PREFIX + 'count', form_name=form_name, section_header='', field_type='text', label='Count').row())
+    output.write(delimited_row(RedcapDefinition(name=REDCAP_PREFIX + 'record_id', form_name=form_name, section_header='Record', field_type='text', label='Redcap Record ID').row()))
+    output.write(delimited_row(RedcapDefinition(name=REDCAP_PREFIX + 'count', form_name=form_name, section_header='', field_type='text', label='Count').row()))
     for idx in range(repeat_count):
         suffix = '_' + str(idx + 1)
         show_if = '[%scount] >= %s' % (REDCAP_PREFIX, str(idx + 1))
 
         label = '[' + REDCAP_PREFIX + 'c_hgvs' + suffix + '] ' + \
                 '([' + REDCAP_PREFIX + 'clinical_significance' + suffix + '])'
-        csv_writer.writerow(RedcapDefinition(name=REDCAP_PREFIX + 'var_des' + suffix, form_name=form_name, section_header='', field_type='descriptive', label='Variant' + str(idx + 1) + ': ' + label, logic=show_if).row())
+        output.write(delimited_row(RedcapDefinition(name=REDCAP_PREFIX + 'var_des' + suffix, form_name=form_name, section_header='', field_type='descriptive', label='Variant' + str(idx + 1) + ': ' + label, logic=show_if).row()))
 
     key_map = EvidenceKeyMap.instance()
     for idx in range(repeat_count):
         suffix = '_' + str(idx + 1)
         show_if = '[%scount] >= %s' % (REDCAP_PREFIX, str(idx + 1))
 
-        csv_writer.writerow(RedcapDefinition(name=REDCAP_PREFIX + 'lab' + suffix, form_name=form_name, section_header='Ids' + suffix, field_type='text', label='Lab', logic=show_if).row())
-        csv_writer.writerow(RedcapDefinition(name=REDCAP_PREFIX + 'lab_record_id' + suffix, form_name=form_name, field_type='text', label='Lab Record ID', logic=show_if).row())
-        csv_writer.writerow(RedcapDefinition(name=REDCAP_PREFIX + 'id' + suffix, form_name=form_name, field_type='text', label='Shariant ID', logic=show_if).row())
-        csv_writer.writerow(RedcapDefinition(name=REDCAP_PREFIX + 'version' + suffix, form_name=form_name, field_type='text', label='Record Version', logic=show_if).row())
-        csv_writer.writerow(RedcapDefinition(name=REDCAP_PREFIX + 'evidence_weights' + suffix, form_name=form_name, field_type='text', label='Evidence Weights', logic=show_if).row())
-        csv_writer.writerow(RedcapDefinition(name=REDCAP_PREFIX + 'citations' + suffix, form_name=form_name, field_type='text', label='Citations', logic=show_if).row())
+        output.write(delimited_row(RedcapDefinition(name=REDCAP_PREFIX + 'lab' + suffix, form_name=form_name, section_header='Ids' + suffix, field_type='text', label='Lab', logic=show_if).row()))
+        output.write(delimited_row(RedcapDefinition(name=REDCAP_PREFIX + 'lab_record_id' + suffix, form_name=form_name, field_type='text', label='Lab Record ID', logic=show_if).row()))
+        output.write(delimited_row(RedcapDefinition(name=REDCAP_PREFIX + 'id' + suffix, form_name=form_name, field_type='text', label='Shariant ID', logic=show_if).row()))
+        output.write(delimited_row(RedcapDefinition(name=REDCAP_PREFIX + 'version' + suffix, form_name=form_name, field_type='text', label='Record Version', logic=show_if).row()))
+        output.write(delimited_row(RedcapDefinition(name=REDCAP_PREFIX + 'evidence_weights' + suffix, form_name=form_name, field_type='text', label='Evidence Weights', logic=show_if).row()))
+        output.write(delimited_row(RedcapDefinition(name=REDCAP_PREFIX + 'citations' + suffix, form_name=form_name, field_type='text', label='Citations', logic=show_if).row()))
 
         last_evidence_category = None
         for key_entry in key_map.all_keys:
@@ -315,8 +307,8 @@ def export_redcap_definition(output):
             if key_entry.mandatory:
                 row.required_field = 'y'
 
-            csv_writer.writerow(row.row())
-            csv_writer.writerow(row_note.row())
+            output.write(delimited_row(row.row()))
+            output.write(delimited_row(row_note.row()))
 
 
 class RedcapKeyValueFormatter(KeyValueFormatter):

@@ -4,7 +4,7 @@ import json
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.models import Group, User
-from django.core.exceptions import ValidationError
+from django.core.exceptions import BadRequest, ValidationError
 from django.forms.models import ALL_FIELDS, inlineformset_factory
 from django.forms.widgets import TextInput
 from django.http.response import (
@@ -64,6 +64,8 @@ def set_user_row_config(request):
 
     grid_name = request.POST["grid_name"]
     grid_rows = int(request.POST["grid_rows"])
+    if not UserGridConfig.valid_rows(grid_rows):
+        raise BadRequest(f"{grid_rows} rows per page is outside 1-{UserGridConfig.MAX_ROWS}")
 
     UserGridConfig.objects.update_or_create(user=request.user, grid_name=grid_name, defaults={"rows": grid_rows})
     return HttpResponse()

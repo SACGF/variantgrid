@@ -1834,36 +1834,20 @@ function createCustomTextGeneList(name, geneListId, className, callbackFunc) {
 }
 
 
-// From https://stackoverflow.com/a/56370447
-// Quick and simple export target #table_id into a csv
-function download_table_as_csv(table_id, separator = ',') {
-    // Select rows from table_id
-    var rows = document.querySelectorAll('table#' + table_id + ' tr');
-    // Construct csv
-    var csv = [];
-    for (var i = 0; i < rows.length; i++) {
-        var row = [], cols = rows[i].querySelectorAll('td, th');
-        for (var j = 0; j < cols.length; j++) {
-            // Clean innertext to remove multiple spaces and jumpline (break csv)
-            var data = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, '').replace(/(\s\s)/gm, ' ')
-            // Escape double-quote with double-double-quote (see https://stackoverflow.com/questions/17808511/properly-escape-a-double-quote-in-csv)
-            data = data.replace(/"/g, '""');
-            // Push escaped string
-            row.push('"' + data + '"');
-        }
-        csv.push(row.join(separator));
-    }
-    var csv_string = csv.join('\n');
-    // Download it
-    var filename = 'export_' + table_id + '_' + new Date().toLocaleDateString() + '.csv';
-    var link = document.createElement('a');
-    link.style.display = 'none';
-    link.setAttribute('target', '_blank');
-    link.setAttribute('href', 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv_string));
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+// The gene grid is a plain table built in the page - export the text of each cell. The header is the column
+// names, with an enrichment kit's sub-column labels under its spanning name; the icons row (and its add gene
+// form) is page furniture
+function download_table_as_csv(table_id) {
+    const table = document.querySelector('table#' + table_id);
+    const cellText = cell => cell.innerText.replace(/(\r\n|\n|\r)/gm, '').replace(/(\s\s)/gm, ' ').trim();
+    // One entry per column, a spanning cell's text repeated across the columns it covers
+    const expandedRow = tr => Array.from(tr ? tr.cells : []).flatMap(cell => Array(cell.colSpan).fill(cellText(cell)));
+
+    const names = expandedRow(table.querySelector('thead tr#column-names'));
+    const subColumns = expandedRow(table.querySelector('thead tr#column-subcolumns'));
+    const header = names.map((name, i) => subColumns[i] ? `${name} ${subColumns[i]}` : name);
+    const rows = Array.from(table.querySelectorAll('tbody tr'), tr => Array.from(tr.cells, cellText));
+    CsvExport.download('export_' + table_id, header, rows);
 }
 
 

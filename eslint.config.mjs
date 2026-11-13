@@ -43,6 +43,7 @@ export default [
                 debounce: "readonly", // global.js
                 escapeHtml: "readonly", // global.js
                 svgSelect: "readonly", // global.js
+                CsvExport: "readonly", // csv_export.js
                 toFixedString: "readonly", // scientific_number_widget.js
                 toPercent: "readonly", // scientific_number_widget.js
                 loadNodeData: "readonly", // analysis.js

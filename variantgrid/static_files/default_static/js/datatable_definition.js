@@ -18,49 +18,6 @@ function resolveFunctionName(name) {
     return value;
 }
 
-const oldExportAction = function (self, e, dt, button, config) {
-    if (button[0].className.indexOf('buttons-csv') >= 0) {
-        if ($.fn.dataTable.ext.buttons.csvHtml5.available(dt, config)) {
-            $.fn.dataTable.ext.buttons.csvHtml5.action.call(self, e, dt, button, config);
-        }
-    }
-};
-
-const newExportAction = function (e, dt, button, config) {
-    /* Pull all data from Ajax - but don't do the draw
-       Code taken from https://stackoverflow.com/a/44635032/295724 */
-    const self = this;
-    const oldStart = dt.settings()[0]._iDisplayStart;
-
-    dt.one('preXhr', function (e, s, data) {
-        // Just this once, load all data from the server...
-        data.start = 0;
-        data.length = 2147483647;
-
-        dt.one('preDraw', function (e, settings) {
-            // Call the original action function
-            oldExportAction(self, e, dt, button, config);
-
-            dt.one('preXhr', function (e, s, data) {
-                // DataTables thinks the first item displayed is index 0, but we're not drawing that.
-                // Set the property to what it was before exporting.
-                settings._iDisplayStart = oldStart;
-                data.start = oldStart;
-            });
-
-            // Reload the grid with the original page. Otherwise, API functions like table.cell(this) don't work properly.
-            setTimeout(dt.ajax.reload, 0);
-
-            // Prevent rendering of the full data to the DOM
-            return false;
-        });
-    });
-
-    // Requery the server with the new one-time export settings
-    dt.ajax.reload();
-};
-
-
 const DataTableDefinition = (function() {
     "use strict";
 
@@ -221,7 +178,7 @@ const DataTableDefinition = (function() {
             }
 
             // 'r' (processing) sits inside dt-table-container so it's positioned against the table, not the wrapper
-            const domString = `<"top"><"toolbar"<"custom">${ defn.searchBoxEnabled ? 'f' : ''}><"dt-table-container"rt>${ defn.downloadCsvButtonEnabled ? 'B' : ''}<"bottom"<"showing"il><"bottom-toolbar">p><"clear">`;
+            const domString = `<"top"><"toolbar"<"custom">${ defn.searchBoxEnabled ? 'f' : ''}><"dt-table-container"rt><"bottom"<"showing"il><"bottom-toolbar">p><"clear">`;
 
             const dtParams = {
                 processing: true,
@@ -306,19 +263,6 @@ const DataTableDefinition = (function() {
                     }
                     return pre;
                 };
-            }
-
-            if (defn.downloadCsvButtonEnabled) {
-                const csvName = defn.csvName || 'export';
-                const dateStr = new Date().toISOString().slice(0, 10);
-                dtParams.buttons = [
-                    {
-                        extend: 'csvHtml5',
-                        action: newExportAction,
-                        text: "Download as CSV",
-                        filename: csvName + '_' + dateStr,
-                    }
-                ];
             }
 
             if (this.filterCount === 'hide') {
@@ -476,8 +420,7 @@ const DataTableDefinition = (function() {
 
             const downloadUrl = this.serverParams.downloadUrl;
             if (downloadUrl) {
-                // Server side streaming CSV - raw values and every row, unlike the client side button
-                // which pulls rows back through the ajax endpoint
+                // Every row the grid's filters, search and sort select, streamed from the server
                 const link = $('<a>', {class: 'btn btn-outline-secondary',
                                        html: '<i class="fas fa-download"></i> CSV'}).appendTo(toolbar);
                 const joiner = downloadUrl.indexOf('?') === -1 ? '?' : '&';

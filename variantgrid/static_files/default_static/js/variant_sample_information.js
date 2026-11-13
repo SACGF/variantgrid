@@ -226,21 +226,23 @@ var VariantSampleInformation = (function () {
         ];
     }
 
-    function csvFilename() {
+    function csvBasename() {
         const slug = (config.gHgvs || config.variantLabel).replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '');
-        const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-        return 'variant_genotypes_' + slug + '_' + dateStr;
+        return 'variant_genotypes_' + slug;
     }
 
     function truncatedVariantIds() {
         return [...responses.values()].filter(data => data.truncated).map(data => data.variant_id);
     }
 
-    function exportCsv(e, dt, node, csvConfig) {
-        const csvAction = $.fn.dataTable.ext.buttons.csvHtml5.action;
+    // Everything but the expand control, so the detail columns are in the download too
+    const CSV_EXPORT_OPTIONS = {orthogonal: 'export', columns: ':not(.details-control)'};
+
+    function exportCsv(e, dt, node) {
+        const download = () => CsvExport.downloadDataTable(dt, csvBasename(), CSV_EXPORT_OPTIONS);
         const variantIds = truncatedVariantIds();
         if (!variantIds.length) {
-            csvAction.call(this, e, dt, node, csvConfig);
+            download();
             return;
         }
 
@@ -250,7 +252,7 @@ var VariantSampleInformation = (function () {
         button.addClass('disabled').empty()
             .append($('<i>', {class: 'fas fa-spinner fa-spin mr-1'}), document.createTextNode('Loading all rows...'));
         $.when(...variantIds.map(variantId => loadVariant(variantId, 0)))
-            .done(() => csvAction.call(this, e, dt, node, csvConfig))
+            .done(download)
             .fail(() => showError("Error loading all rows - CSV export cancelled"))
             .always(() => button.removeClass('disabled').html(buttonHtml));
     }
@@ -263,14 +265,7 @@ var VariantSampleInformation = (function () {
             order: [],
             scrollX: true,  // Wide grid scrolls itself rather than the variant details page
             dom: 'Bfrtip',
-            buttons: [{
-                extend: 'csv',
-                text: 'CSV',
-                // Everything but the expand control, so the detail columns are in the download too
-                exportOptions: {orthogonal: 'export', columns: ':not(.details-control)'},
-                filename: csvFilename,
-                action: exportCsv,
-            }],
+            buttons: [{text: 'CSV', action: exportCsv}],
         });
 
         $("#genotype-grid tbody").on('click', 'td.details-control', toggleDetails);

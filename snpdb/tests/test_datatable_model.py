@@ -53,7 +53,8 @@ class DatatableModelTests(SimpleTestCase):
     def test_definition_does_not_build_queryset(self):
         config = self._config(DirectColumns)
         with mock.patch.object(DirectColumns, "get_initial_queryset", side_effect=AssertionError("built")):
-            self.assertEqual(datatable_definition(config)["csvName"], "Cohort")
+            datatable_definition(config)
+            self.assertEqual(config.get_csv_name(), "Cohort")
 
     def test_bare_config_falls_back_with_warning(self):
         config = self._config(BareColumns)
