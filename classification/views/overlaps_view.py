@@ -439,7 +439,7 @@ def download_overlaps(request, lab_id: str):
 
     return OverlapDownloadRow.streaming_csv(
         data=qs.iterator(chunk_size=1000),
-        filename=f"discordance_reports_{'solved' if solved_mode else 'outstanding'}",
+        filename=f"Overlaps_{'solved' if solved_mode else 'outstanding'}",
         export_tweak=ExportTweak(categories=categories),
         transformer=lambda x: OverlapDownloadRow(x, lab_picker)
     )
