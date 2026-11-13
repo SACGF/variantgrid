@@ -158,7 +158,8 @@ class ClassificationGroupingExportFormatterCSV(ClassificationGroupingExportForma
             cell_formatter=self.csv_format_details.html_handling.format,
             # ignore_evidence_keys=self.csv_format_details.ignore_evidence_keys,
             include_only_evidence_keys=consider_only,
-            include_explains_and_notes=self.csv_format_details.full_detail
+            include_explains_and_notes=self.csv_format_details.full_detail,
+            group_criteria=True
         )
         if self.csv_format_details.full_detail:
             # This is significantly quicker than the attempt to use an aggregate
