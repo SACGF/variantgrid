@@ -2,13 +2,16 @@
 Celery settings: the broker (from the CELERY secret, in memory under tests), the queues and the `*_WORKERS` route
 dicts tasks name, `CELERY_TASK_ROUTES` for tasks that need a worker other than the default db_workers,
 `CELERY_IMPORTS` (every module with a beat-scheduled task must be listed here or be an app's `tasks` module),
-per-queue worker memory caps and the reboot crash-loop brake. Env settings files star-import this alongside
-default_settings.
+per-queue worker memory caps, where pool processes dump their stacks on a fatal signal and the reboot crash-loop
+brake. Env settings files star-import this alongside default_settings.
 """
+import os
+
 from kombu import Exchange, Queue
 
 from variantgrid.settings.components.default_settings import UNIT_TEST
 from variantgrid.settings.components.secret_settings import get_secret
+from variantgrid.settings.components.settings_paths import PRIVATE_DATA_ROOT
 
 # Using RabbitMQ as Redis broker was re-executing long tasks (eg variant annotation)
 # For instructions on setting up proper users:
@@ -226,6 +229,10 @@ CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/1"
 CELERY_WORKER_ADDRESS_SPACE_LIMIT_GB = {
     "analysis_workers": 8,
 }
+
+# Where each pool process's faulthandler writes its stacks if native code kills it, for the next pool process
+# to report to Rollbar (variantgrid.celery.dump_stacks_on_fatal_signal). None = off
+CELERY_WORKER_FAULTHANDLER_DIR = os.path.join(PRIVATE_DATA_ROOT, "celery_faulthandler")
 
 # Crash safety brake: the worker records each host boot, and when two land close together (a box
 # that came up then went down again - a likely crash loop) it auto-pauses the analysis + annotation

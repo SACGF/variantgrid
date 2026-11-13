@@ -64,11 +64,14 @@ several entries conditional on settings (`SYNC_DETAILS` enabled, sapath installe
 `DISCORDANCE_EMAIL`, `MME_ENABLED`, somalier, `SERVER_MIN_DISK_WARNING_GIGS`, `HEARTBEAT_URL`). The always-on sweeps are
 the analysis and annotation dispatchers (every minute), condition-text automatch (5 min), pending-extraction reconcile
 (hourly) and a few nightly jobs. Queues, routes and `CELERY_IMPORTS` are in
-`variantgrid/settings/components/celery_settings.py`. Two worker hooks live here:
+`variantgrid/settings/components/celery_settings.py`. Three worker hooks live here:
 `variantgrid/celery.py:limit_worker_address_space` sets `RLIMIT_AS` on pool processes when every queue in the worker's
 `-Q` list has a limit in `CELERY_WORKER_ADDRESS_SPACE_LIMIT_GB` (analysis_workers: 8 GB), so a runaway node load raises
 `MemoryError` rather than invoking the OOM killer; `variantgrid/celery.py:on_task_failure` reports every failure to
-Rollbar except `RollbarIgnoreException`. The crash-loop brake that pauses dispatchers after two quick reboots is
+Rollbar except `RollbarIgnoreException`; `variantgrid/celery.py:dump_stacks_on_fatal_signal` has each pool process's
+faulthandler write its stacks to `CELERY_WORKER_FAULTHANDLER_DIR` if native code kills it (SIGABRT, SIGSEGV - no
+Python traceback, and the daemonised worker's stderr is /dev/null), and the next pool process to start reports the dump
+to Rollbar. The crash-loop brake that pauses dispatchers after two quick reboots is
 configured here (`JOBS_AUTOPAUSE_ON_REBOOT*`) but implemented in `snpdb/signals/jobs_autopause.py`.
 
 ### Tests

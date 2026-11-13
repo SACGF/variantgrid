@@ -4,10 +4,13 @@
     http://celery.readthedocs.org/en/latest/django/first-steps-with-django.html
 """
 
+import faulthandler
 import logging
 import os
+import re
 import resource
 import sys
+from datetime import datetime
 from time import sleep
 
 import celery
@@ -226,6 +229,64 @@ def limit_worker_address_space(**kwargs):
     resource.setrlimit(resource.RLIMIT_AS, (soft_limit, hard))
     logging.info("Worker RLIMIT_AS soft limit set to %.1f GB (queues=%s)",
                  soft_limit / 1024 ** 3, sorted(queues))
+
+
+_FAULTHANDLER_FILENAME = re.compile(r"^faulthandler_(\d+)\.log$")
+
+
+def _faulthandler_filename(fault_dir: str, pid: int) -> str:
+    return os.path.join(fault_dir, f"faulthandler_{pid}.log")
+
+
+def _pid_is_running(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        pass  # exists, owned by another user
+    return True
+
+
+def report_dead_worker_fault_dumps(fault_dir: str):
+    """ Reports to Rollbar the stack each dead pool process left (an empty file means it exited or was
+        SIGKILLed without one), then deletes it. Pool processes start together, so each file is claimed by
+        rename and only one of them reports it """
+    for filename in os.listdir(fault_dir):
+        if not (m := _FAULTHANDLER_FILENAME.match(filename)):
+            continue
+        pid = int(m.group(1))
+        if _pid_is_running(pid):
+            continue
+        path = os.path.join(fault_dir, filename)
+        claimed_path = f"{path}.{os.getpid()}.reporting"
+        try:
+            os.rename(path, claimed_path)
+        except FileNotFoundError:
+            continue
+        try:
+            with open(claimed_path, errors="replace") as f:
+                dump = f.read()
+            if dump:
+                crashed = datetime.fromtimestamp(os.path.getmtime(claimed_path)).isoformat()
+                message = f"Celery pool process died: {dump.splitlines()[0]}"  # eg "Fatal Python error: Aborted"
+                logging.error("%s (pid %d at %s)\n%s", message, pid, crashed, dump)
+                rollbar.report_message(message, level="critical",
+                                       extra_data={"pid": pid, "crashed": crashed, "stack": dump})
+        finally:
+            os.remove(claimed_path)
+
+
+@celery.signals.worker_process_init.connect
+def dump_stacks_on_fatal_signal(**kwargs):
+    """ Native code dying (SIGABRT, SIGSEGV, SIGBUS, SIGFPE, SIGILL) leaves no Python traceback, and the
+        daemonised worker's stderr is /dev/null - so each pool process has faulthandler write every thread's
+        stack to its own file, which the next pool process to start reports """
+    if not (fault_dir := settings.CELERY_WORKER_FAULTHANDLER_DIR):
+        return
+    os.makedirs(fault_dir, exist_ok=True)
+    report_dead_worker_fault_dumps(fault_dir)
+    faulthandler.enable(file=open(_faulthandler_filename(fault_dir, os.getpid()), "w"), all_threads=True)
 
 
 @celery.signals.task_failure.connect
