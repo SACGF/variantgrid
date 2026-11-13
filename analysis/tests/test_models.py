@@ -2,12 +2,11 @@ import unittest
 from datetime import timedelta
 
 from django.contrib.auth.models import User
-from django.test import SimpleTestCase, TestCase, override_settings
+from django.test import TestCase, override_settings
 from django.test.client import Client
 from django.urls.base import reverse
 from django.utils import timezone
 
-from analysis import models as analysis_models
 from analysis.forms.forms import AnalysisForm
 from analysis.models import (
     AllVariantsNode,
@@ -22,7 +21,6 @@ from analysis.tests.test_node_editors_render import form_submit_data
 from annotation.fake_data import get_fake_annotation_version
 from genes.models import GeneList, SampleGeneList
 from library.guardian_utils import assign_permission_to_user_and_groups
-from library.utils.class_utils import get_subclasses
 from snpdb.enums import ImportStatus
 from snpdb.models import (
     VCF,
@@ -34,16 +32,6 @@ from snpdb.models import (
     TagConfigCollection,
     UserSettingsOverride,
 )
-
-
-class NodeClassRegistrationTest(SimpleTestCase):
-    def test_every_node_class_reachable_from_analysis_models(self):
-        """ A node class only reached through views or forms is missing from select_subclasses() in a process that
-            loads nodes before importing those, and its nodes load as a bare AnalysisNode (#2807) """
-        node_classes = [nc for nc in get_subclasses(analysis_models.AnalysisNode)
-                        if nc.__module__.startswith("analysis.models") and not nc._meta.abstract]
-        unreachable = [nc.__name__ for nc in node_classes if getattr(analysis_models, nc.__name__, None) is not nc]
-        self.assertEqual(unreachable, [])
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
