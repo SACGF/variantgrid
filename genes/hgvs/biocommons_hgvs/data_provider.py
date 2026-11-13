@@ -127,6 +127,12 @@ class DjangoTranscriptDataProvider(LocalDataProvider):
                 break
         return data
 
+    def get_transcript(self, tx_ac):
+        try:
+            return self._get_transcript(tx_ac)
+        except NoTranscript:
+            return None
+
     def _get_transcripts(self, tx_acs) -> dict:
         """ Retrieve many transcripts in one query, rather than cdot's default of one each.
 
