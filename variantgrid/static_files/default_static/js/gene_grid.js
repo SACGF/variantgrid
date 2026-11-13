@@ -1834,12 +1834,20 @@ function createCustomTextGeneList(name, geneListId, className, callbackFunc) {
 }
 
 
-// The gene grid is a plain table built in the page - export the text of each cell
+// The gene grid is a plain table built in the page - export the text of each cell. The header is the column
+// names, with an enrichment kit's sub-column labels under its spanning name; the icons row (and its add gene
+// form) is page furniture
 function download_table_as_csv(table_id) {
-    const cellText = cell => cell.innerText.replace(/(\r\n|\n|\r)/gm, '').replace(/(\s\s)/gm, ' ');
-    const rows = Array.from(document.querySelectorAll('table#' + table_id + ' tr'),
-                            tr => Array.from(tr.querySelectorAll('td, th'), cellText));
-    CsvExport.download('export_' + table_id, rows[0] || [], rows.slice(1));
+    const table = document.querySelector('table#' + table_id);
+    const cellText = cell => cell.innerText.replace(/(\r\n|\n|\r)/gm, '').replace(/(\s\s)/gm, ' ').trim();
+    // One entry per column, a spanning cell's text repeated across the columns it covers
+    const expandedRow = tr => Array.from(tr ? tr.cells : []).flatMap(cell => Array(cell.colSpan).fill(cellText(cell)));
+
+    const names = expandedRow(table.querySelector('thead tr#column-names'));
+    const subColumns = expandedRow(table.querySelector('thead tr#column-subcolumns'));
+    const header = names.map((name, i) => subColumns[i] ? `${name} ${subColumns[i]}` : name);
+    const rows = Array.from(table.querySelectorAll('tbody tr'), tr => Array.from(tr.cells, cellText));
+    CsvExport.download('export_' + table_id, header, rows);
 }
 
 
