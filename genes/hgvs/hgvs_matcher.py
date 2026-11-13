@@ -6,7 +6,7 @@ from functools import lru_cache
 from typing import Optional, Union
 
 from cdot.hgvs import (
-    HGVSFixCode,
+    HGVSInputError,
     VersionStrategy,
     fix_hgvs,
     rank_transcript_versions,
@@ -464,7 +464,7 @@ class HGVSMatcher:
                     msg += f"\nGene appears to be \"{hgvs_variant.gene}\""
                 raise ValueError(msg)
 
-            self._validate_transcript_kind(hgvs_string)
+            self._raise_cdot_errors(hgvs_string)
             variant_coordinate = None
             hgvs_methods = []
             clingen_unavailable = False
@@ -570,13 +570,14 @@ class HGVSMatcher:
                 f"'m.' (mitochondrial) HGVS requires the mitochondrial reference, "
                 f"but '{contig_accession}' is not the mitochondrion for {self.genome_build}")
 
-    def _validate_transcript_kind(self, hgvs_string: str):
-        """ c. counts from the start codon and n. from the transcript start, so a c. on a non-coding transcript or
-            an n. on a coding one names a different base. Which numbering was meant can't be told, so cdot's
-            KIND_REFERENCE_MISMATCH is an error rather than resolving to another variant (#1946) """
-        _, fixes = fix_hgvs(hgvs_string, data_provider=self.hgvs_converter.hdp)
-        if mismatch := next((f for f in fixes if f.code == HGVSFixCode.KIND_REFERENCE_MISMATCH), None):
-            raise HGVSNomenclatureException(mismatch.message)
+    def _raise_cdot_errors(self, hgvs_string: str):
+        """ Raises cdot's ERROR fixes, such as KIND_REFERENCE_MISMATCH: c. counts from the start codon and n. from
+            the transcript start, so a c. on a non-coding transcript or an n. on a coding one would resolve to
+            another variant (#1946) """
+        try:
+            fix_hgvs(hgvs_string, data_provider=self.hgvs_converter.hdp, raise_on_errors=True)
+        except HGVSInputError as e:
+            raise HGVSNomenclatureException(str(e)) from e
 
     def get_transcript_accession(self, hgvs_string: str) -> str:
         return self.hgvs_converter.get_transcript_accession(hgvs_string)
