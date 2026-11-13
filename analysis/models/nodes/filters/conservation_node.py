@@ -6,7 +6,7 @@ from auditlog.registry import auditlog
 from django.db import models
 from django.db.models.query_utils import Q
 
-from analysis.models import AnalysisNode
+from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.node_display import NodeIcon
 from annotation.models import VariantAnnotation
 
