@@ -1,3 +1,4 @@
+from collections import defaultdict
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from functools import cached_property
@@ -7,7 +8,7 @@ from django.contrib.auth.models import User
 from django.db.models import Count
 from django.db.models.query import QuerySet
 
-from classification.enums import CriteriaEvaluation
+from classification.enums import CriteriaEvaluation, EvidenceKeyValueType
 from classification.models.classification import ClassificationModification, EvidenceVisibility
 from classification.models.evidence_key import EvidenceKey, EvidenceKeyMap
 from library.cache import clear_cached_property
@@ -21,10 +22,13 @@ class KeyValueFormatter:
             label = ekey.pretty_label
             if is_note:
                 label += ' note'
+            if (namespace := ekey.namespace) and ':' not in label:
+                label = f"{namespace}:{label}"
         else:
             label = ekey.key
             if is_note:
                 label += '.note'
+
         return label
 
     def value_for(self, ekey: EvidenceKey, value, pretty: bool = False, cell_formatter: Optional[Callable[[Any], Any]] = False):
@@ -89,6 +93,9 @@ class KeyProperty:
             used_key.has_explain = True
 
 
+_GROUPED_NAMESPACES = ("acmg", "horak", "amp", "vcgs")
+
+
 class UsedKeyTracker:
 
     def __init__(self,
@@ -101,12 +108,14 @@ class UsedKeyTracker:
                  cell_formatter: Optional[Callable[[Any], Any]] = None,
                  include_explains_and_notes: bool = False,
                  ignore_evidence_keys: Optional[set[str]] = None,
-                 include_only_evidence_keys: Optional[set[str]] = None):
+                 include_only_evidence_keys: Optional[set[str]] = None,
+                 group_criteria: bool = False):
         self.user = user
         self.evidence_visibility = EvidenceVisibility(user)
         self.ekeys = ekeys
         self.key_value_formatter = key_value_formatter
         self.calc_dict: dict[str, UsedKey] = {}
+        self.group_criteria = group_criteria
         # self.pretty = pretty
         if pretty is not None:
             self.pretty_headers = pretty
@@ -177,17 +186,28 @@ class UsedKeyTracker:
 
     @cached_property
     def ordered_keys(self) -> list[UsedKey]:
+        return self._ordered_keys_extra(self.group_criteria)
+
+    def _ordered_keys_extra(self, group_criteria: bool = False) -> list[UsedKey]:
+        criterias_by_namespace: dict[str, list[UsedKey]] = defaultdict(list)
         ordered_keys: list[UsedKey] = []
-        for ekey in self.considered_keys:
-            used_key = self.calc_dict.get(ekey.key)
-            if used_key:
-                used_key.ekey = ekey
-                ordered_keys.append(used_key)
-        return ordered_keys
+        for e_key in self.considered_keys:
+            if used_key := self.calc_dict.get(e_key.key):
+                used_key.ekey = e_key
+                if (namespace := e_key.namespace) and group_criteria and namespace in _GROUPED_NAMESPACES:
+                    criterias_by_namespace[namespace].append(used_key)
+                else:
+                    ordered_keys.append(used_key)
+
+        criteria_list = []
+        for criterias in criterias_by_namespace.values():
+            criteria_list += criterias
+        return criteria_list + ordered_keys
 
     def header(self) -> list[str]:
         cols: list[str] = []
         for used_key in self.ordered_keys:
+            col: str
             if used_key.has_value:
                 cols.append(self.key_value_formatter.header_for(used_key.ekey, pretty=self.pretty_headers))
             if used_key.has_note:
