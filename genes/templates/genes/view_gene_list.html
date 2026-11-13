@@ -25,6 +25,7 @@
             return `${action} ${genes.length}: ${shown}`;
         }
 
+        {% if has_write_permission %}
         $(document).ready(function() {
             const geneText = $("#gene-text");
             const originalGenes = geneTextTokens(geneText.val());
@@ -42,6 +43,7 @@
                 $("#save-gene-text-button").prop("disabled", !added.length && !removed.length);
             });
         });
+        {% endif %}
     </script>
 {% endblock head %}
 
