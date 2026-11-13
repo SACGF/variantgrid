@@ -92,11 +92,13 @@ def _format_approx_count(n: int) -> str:
 class VariantWikiColumns(DatatableConfig[VariantWiki]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
-        self.download_csv_button_enabled = True
+        self.server_csv_download = True
 
         # self.set_expand_ajax('eventlog_detail', expected_height=120)
         self.rich_columns = [
             RichColumn('variant', renderer=self.render_variant, client_renderer="renderVariantId"),
+            RichColumn(name='g_hgvs', label='g.HGVS', renderer=self.render_g_hgvs, visible=False,
+                       include_in_csv=True, csv_rendered=True),
             RichColumn(name="genome_build", renderer=self.render_genome_build, visible=False),
             RichColumn('markdown'),
             RichColumn('last_edited_by__username', name='user', orderable=True),
@@ -112,6 +114,9 @@ class VariantWikiColumns(DatatableConfig[VariantWiki]):
     def render_variant(self, cell: CellData) -> JsonDataType:
         variant_id = cell["variant"]
         return {"id": variant_id, "g_hgvs": self._page_hgvs_g.get(variant_id)}
+
+    def render_g_hgvs(self, cell: CellData) -> JsonDataType:
+        return self._page_hgvs_g.get(cell["variant"])
 
     def render_genome_build(self, _cell: CellData) -> JsonDataType:
         return self.get_query_param('genome_build')

@@ -777,7 +777,7 @@ class AnalysisNodeIssuesColumns(DatatableConfig[AnalysisNode]):
 
 
 class NodeTissueExpressionGenesColumns(DatatableConfig[HumanProteinAtlasAnnotation]):
-    download_csv_button_enabled = True
+    server_csv_download = True
 
     def __init__(self, request):
         super().__init__(request)
@@ -795,7 +795,7 @@ class NodeTissueExpressionGenesColumns(DatatableConfig[HumanProteinAtlasAnnotati
 
 
 class NodeTissueUniProtGenesColumns(DatatableConfig[HGNC]):
-    download_csv_button_enabled = True
+    server_csv_download = True
 
     def __init__(self, request):
         super().__init__(request)

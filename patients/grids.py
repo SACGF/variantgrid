@@ -209,7 +209,7 @@ class SpecimenColumns(DatatableConfig[Specimen]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.search_box_enabled = True
-        self.download_csv_button_enabled = True
+        self.server_csv_download = True
 
         self.rich_columns = [
             RichColumn('id', visible=False),
@@ -229,7 +229,8 @@ class SpecimenColumns(DatatableConfig[Specimen]):
             RichColumn('external_pk__code', label='External ID', orderable=True),
             RichColumn('extraction_count', label='# Extractions', orderable=True, search=False,
                        css_class='num'),
-            RichColumn('measures', label='Measures', search=False, renderer=self.render_measures),
+            RichColumn('measures', label='Measures', search=False, renderer=self.render_measures,
+                       csv_rendered=True),
             RichColumn('modified', orderable=True, search=False, default_sort=SortOrder.DESC,
                        client_renderer='TableFormat.timestamp'),
         ]
@@ -254,7 +255,7 @@ class ExtractionColumns(DatatableConfig[Extraction]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.search_box_enabled = True
-        self.download_csv_button_enabled = True
+        self.server_csv_download = True
 
         self.rich_columns = [
             RichColumn('id', visible=False),
@@ -315,7 +316,7 @@ def _unmatched_extraction_columns() -> list[RichColumn]:
         extraction before the extraction exists """
     return [
         RichColumn('extraction_reference', label='Claimed reference', orderable=False, search=False,
-                   renderer=_render_extraction_reference),
+                   renderer=_render_extraction_reference, csv_rendered=True),
         RichColumn('extraction_match_status', label='Status', orderable=True, search=False,
                    **RichColumn.choices_client_renderer(MatchStatus.choices)),
         RichColumn('extraction_match_error', label='Problem', orderable=False),
@@ -328,7 +329,7 @@ class UnmatchedExtractionSampleColumns(DatatableConfig[Sample]):
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.search_box_enabled = True
-        self.download_csv_button_enabled = True
+        self.server_csv_download = True
 
         self.rich_columns = [
             RichColumn('id', visible=False),
@@ -359,7 +360,7 @@ class UnmatchedExtractionSequencingSampleColumns(DatatableConfig[SequencingSampl
     def __init__(self, request: HttpRequest):
         super().__init__(request)
         self.search_box_enabled = True
-        self.download_csv_button_enabled = True
+        self.server_csv_download = True
 
         self.rich_columns = [
             RichColumn('id', visible=False),

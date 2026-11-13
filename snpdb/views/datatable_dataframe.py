@@ -190,8 +190,6 @@ class DataFrameTableView(JSONResponseView):
         data: JsonObjType = {
             "responsive": False,
             "searchBoxEnabled": config.search_box_enabled,
-            "downloadCsvButtonEnabled": False,
-            "csvName": self._csv_name(),
             "expandClientRenderer": None,
             "scrollX": config.scroll_x,
             "extra": config.get_extra(),

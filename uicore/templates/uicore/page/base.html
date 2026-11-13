@@ -132,6 +132,7 @@
     {% compress js %}
         <script>window.SITE_NAME = "{{ site_name }}";</script>
         <script src="{% static 'js/global.js' %}"></script>
+        <script src="{% static 'js/csv_export.js' %}"></script>
         <script src="{% static 'django_js_reverse/reverse.js' %}"></script>
 
         <!-- Classification only code, should this be optionally included? -->

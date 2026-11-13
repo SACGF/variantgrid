@@ -4,7 +4,6 @@ genome-wide relatedness summary and per-chromosome phase graph, its counts calcu
 opened, which re-fetches itself (Auto-refresh header) until they finish. trio_karyomapping / trio_karyomapping_gene_csv
 pick a gene and flanks, see the proband's phasing variants by bin as a Plotly scatter and download them as CSV.
 """
-import csv
 from collections import defaultdict
 from typing import Optional
 
@@ -16,7 +15,7 @@ from django.shortcuts import render
 from analysis.forms import TrioKaryomappingGeneForm
 from analysis.models.models_karyomapping import KaryotypeBins, TrioKaryomappingGeneRegion
 from analysis.tasks.karyomapping_tasks import get_or_queue_genome_karyomapping_counts
-from library.utils import StashFile
+from library.utils.text_utils import delimited_row
 from patients.enums import Zygosity
 from snpdb.enums import ImportStatus
 from snpdb.models import Trio
@@ -126,26 +125,17 @@ def trio_karyomapping_gene_csv(request, trio_id):
                 f"up_{gene_region.upstream_kb}kb_down_{gene_region.downstream_kb}kb.csv")
 
     header = ['chrom', 'position', 'ref', 'alt', 'svlen', 'proband_gt', 'father_gt', 'mother_gt', 'karyotype_bin']
-    pseudo_buffer = StashFile()
-    writer = csv.DictWriter(pseudo_buffer, header, dialect='excel')
 
     def iter_row_writer():
-        writer.writeheader()
-        yield pseudo_buffer.value
+        yield delimited_row(header)
         for variant_data, genotype_tuple in variant_and_genotypes:
             _, _contig_id, chrom, position, ref, alt, svlen = variant_data
             proband_gt, father_gt, mother_gt = genotype_tuple
-            row = {'chrom': chrom,
-                   'position': position,
-                   'ref': ref,
-                   'alt': alt,
-                   'svlen': svlen,
-                   'proband_gt': Zygosity.get_genotype(proband_gt),
-                   'father_gt': Zygosity.get_genotype(father_gt),
-                   'mother_gt': Zygosity.get_genotype(mother_gt),
-                   'karyotype_bin': KaryotypeBins.get_bin(genotype_tuple) or ''}
-            writer.writerow(row)
-            yield pseudo_buffer.value
+            yield delimited_row([chrom, position, ref, alt, svlen,
+                                 Zygosity.get_genotype(proband_gt),
+                                 Zygosity.get_genotype(father_gt),
+                                 Zygosity.get_genotype(mother_gt),
+                                 KaryotypeBins.get_bin(genotype_tuple) or ''])
 
     response = StreamingHttpResponse(iter_row_writer(), content_type="text/csv")
     response['Content-Disposition'] = f'attachment; filename="{filename}"'

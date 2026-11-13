@@ -92,7 +92,6 @@ class VariantGridDefinitionTest(GridExportTestCase):
         definition = view.json_definition()
 
         self.assertEqual(f"{url}?{DATATABLE_CSV_PARAM}=1", definition["downloadUrl"])
-        self.assertFalse(definition["downloadCsvButtonEnabled"], "Client side CSV pages through the grid")
 
 
 class VariantGridDataTest(GridExportTestCase):
