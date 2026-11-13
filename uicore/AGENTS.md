@@ -147,6 +147,8 @@ working-tree `runserver` as `claude_agent`; read the PNGs it writes rather than 
   on `pre_render`, called per batch of export rows; a `choices_client_renderer` column exports its label. Datetimes go out
   as dates, not the epoch seconds the JSON carries. A table whose rows are all in the page (no endpoint) downloads through
   `CsvExport` (variantgrid/static_files/default_static/js/csv_export.js), which writes cells as the server exports do.
+- A page is 1 to `max_page_length` (100, `UserGridConfig.MAX_ROWS`) rows: a longer request, or `length=-1`, is a 400
+  rather than a short page (snpdb/views/datatable_view.py:page_bounds) - every row is `server_csv_download`.
 - COUNTs cost: `count_unfiltered = False` skips the unfiltered one; `known_count()` / `approximate_count_enabled`
   supply a stored or estimated total (snpdb/views/datatable_view.py:datatable_response).
 - The Variant cell's kind badge (`VariantGridFormat.variantKindBadge` in

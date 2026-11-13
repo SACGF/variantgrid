@@ -193,11 +193,17 @@ class UserGridConfig(models.Model):
         unique_together = ("user", "grid_name")
 
     DEFAULT_ROWS = 10
-    DEFAULT_ROW_SELECTIONS = {DEFAULT_ROWS, 15, 20, 25, 50, 100}
+    # The largest page a grid serves (DatatableConfig.max_page_length) - every row is the server CSV
+    MAX_ROWS = 100
+    DEFAULT_ROW_SELECTIONS = {DEFAULT_ROWS, 15, 20, 25, 50, MAX_ROWS}
 
     @staticmethod
     def get(user: User, grid_name: str) -> 'UserGridConfig':
         return UserGridConfig.objects.get_or_create(user=user, grid_name=grid_name)[0]
+
+    @staticmethod
+    def valid_rows(rows: int) -> bool:
+        return 1 <= rows <= UserGridConfig.MAX_ROWS
 
     @staticmethod
     def get_rows_and_selections(user: User, grid_name: str) -> tuple[int, list[int]]:
@@ -205,6 +211,8 @@ class UserGridConfig(models.Model):
         try:
             rows = UserGridConfig.objects.get(user=user, grid_name=grid_name).rows
         except UserGridConfig.DoesNotExist:
+            rows = UserGridConfig.DEFAULT_ROWS
+        if not UserGridConfig.valid_rows(rows):
             rows = UserGridConfig.DEFAULT_ROWS
         return rows, sorted(UserGridConfig.DEFAULT_ROW_SELECTIONS | {rows})
 

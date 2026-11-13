@@ -21,7 +21,7 @@ from functools import cached_property, reduce
 from typing import Any, Generic, Optional, TypeVar, Union, get_args
 
 from django.contrib.auth.models import User
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import BadRequest, PermissionDenied
 from django.db import models
 from django.db.models import CharField, Expression, F, OrderBy, Q, QuerySet, Value
 from django.db.models.functions import Concat
@@ -47,6 +47,21 @@ logger = logging.getLogger(__name__)
 
 # Client asks for the server side CSV by adding this to the table's own ajax params
 DATATABLE_CSV_PARAM = "dataTableCsv"
+
+
+def page_bounds(start: Optional[str], length: Optional[str], max_length: int) -> tuple[int, int]:
+    """ (start, length) of the page DataTables asked for. A length past max_length (or -1, "every row") is
+        refused rather than cut short: a short page reads as the end of the data, which is how client built
+        CSVs came out truncated (#2812). Every row is the server CSV - DatatableConfig.server_csv_download """
+    try:
+        start_index = int(start or 0)
+        page_length = int(length or 10)
+    except ValueError as e:
+        raise BadRequest(f"Page start/length must be integers, not {start!r}/{length!r}") from e
+    if start_index < 0 or not 1 <= page_length <= max_length:
+        raise BadRequest(f"A page is 1-{max_length} rows from start >= 0, not {page_length} from {start_index} - "
+                         f"every row is the grid's server CSV download (server_csv_download)")
+    return start_index, page_length
 # The column filter rules the client sends up (@see library.django_utils.filter_rules)
 DATATABLE_FILTERS_PARAM = "filters"
 # The client looks a renderer up by its dotted name on window (resolveFunctionName in datatable_definition.js),
@@ -416,7 +431,7 @@ class DatatableConfig(Generic[DC]):
     approximate_count_enabled = False
     # Hovering a row for 500ms fetches its expanded content early
     expand_prefetch = True
-    max_page_length = 100
+    max_page_length = UserGridConfig.MAX_ROWS
     # CSV header labels that differ from the column's own (@see csv_columns)
     csv_label_overrides: Optional[dict[str, str]] = None
 
@@ -688,12 +703,12 @@ class DatatableConfig(Generic[DC]):
             filtered_qs = self.power_search(filtered_qs, search_text)
         return self.apply_filter_rules(filtered_qs)
 
+    def page_bounds(self) -> tuple[int, int]:
+        return page_bounds(self.get_query_param('start'), self.get_query_param('length'), self.max_page_length)
+
     def paging(self, qs: QuerySet[DC]) -> QuerySet[DC]:
-        limit = min(int(self.get_query_param('length') or 10), self.max_page_length)
-        start = int(self.get_query_param('start') or 0)
-        if limit == -1:  # if pagination is disabled ("paging": false)
-            return qs
-        return qs[start:start + limit]
+        start, length = self.page_bounds()
+        return qs[start:start + length]
 
     def get_csv_name(self) -> str:
         if csv_name := self.csv_name:
@@ -1081,7 +1096,7 @@ class DatabaseTableView(Generic[DC], MajorOperationViewMixin, JSONResponseView):
         return self.config.prepare_results(qs)
 
     def handle_exception(self, e: BaseException):
-        if not isinstance(e, (PermissionDenied, Http404)):  # Django logs these as 4xx responses
+        if not isinstance(e, (BadRequest, PermissionDenied, Http404)):  # Django logs these as 4xx responses
             report_exc_info()
             logger.exception(str(e))
         raise e

@@ -1,10 +1,10 @@
 from django.contrib.auth.models import User
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import BadRequest, PermissionDenied
 from django.db.models import QuerySet
 from django.test import RequestFactory, TestCase
 
 from snpdb.enums import ImportStatus
-from snpdb.models import Cohort, GenomeBuild
+from snpdb.models import Cohort, GenomeBuild, UserGridConfig
 from snpdb.views.datatable_view import CellData, DatabaseTableView, DatatableConfig, RichColumn, SortOrder
 
 
@@ -106,3 +106,32 @@ class DatatableServerCsvTests(TestCase):
     def test_csv_refused_where_not_enabled(self):
         with self.assertRaises(PermissionDenied):
             self._view(column_class=NoCsvColumns).download_csv()
+
+
+class DatatablePagingTests(TestCase):
+    """ A page longer than the grid serves is refused, not cut short - a short page reads as the end of the
+        data, which is how client built CSVs came out truncated (#2812) """
+
+    def setUp(self):
+        self.user = User.objects.create(username='datatable_paging_user')
+
+    def _paged(self, **params):
+        request = RequestFactory().get("/fake/cohorts/", params)
+        request.user = self.user
+        config = CohortCsvColumns(request)
+        return config.paging(config.get_initial_queryset())
+
+    def test_page_within_limit(self):
+        self.assertEqual(self._paged(start="0", length=str(UserGridConfig.MAX_ROWS)).query.high_mark,
+                         UserGridConfig.MAX_ROWS)
+
+    def test_page_outside_limit_refused(self):
+        for length in [str(UserGridConfig.MAX_ROWS + 1), "2147483647", "-1", "0", "ten"]:
+            with self.subTest(length=length), self.assertRaises(BadRequest):
+                self._paged(length=length)
+
+    def test_stored_rows_past_limit_not_offered(self):
+        UserGridConfig.objects.create(user=self.user, grid_name="cohorts", rows=UserGridConfig.MAX_ROWS + 1)
+        rows, selections = UserGridConfig.get_rows_and_selections(self.user, "cohorts")
+        self.assertEqual(rows, UserGridConfig.DEFAULT_ROWS)
+        self.assertLessEqual(max(selections), UserGridConfig.MAX_ROWS)

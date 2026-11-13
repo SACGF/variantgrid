@@ -23,6 +23,7 @@ from snpdb.views.datatable_view import (
     SortOrder,
     check_client_renderer_name,
     escape_cell,
+    page_bounds,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,7 +79,7 @@ class DataFrameDatatableConfig:
 class DataFrameTableView(JSONResponseView):
     """ Wraps a DataFrameDatatableConfig to serve the DataTables client """
     column_class: Optional[type[DataFrameDatatableConfig]] = None
-    max_display_length = 100
+    max_display_length = UserGridConfig.MAX_ROWS
 
     config: DataFrameDatatableConfig
 
@@ -154,12 +155,9 @@ class DataFrameTableView(JSONResponseView):
         df = self._sort(self._dataframe())
         records_total = len(df)
 
-        length = min(int(self._querydict.get('length', 10)), self.max_display_length)
-        if length == -1:
-            df_page = df
-        else:
-            start = int(self._querydict.get('start', 0))
-            df_page = df[start:start + length]
+        start, length = page_bounds(self._querydict.get('start'), self._querydict.get('length'),
+                                    self.max_display_length)
+        df_page = df[start:start + length]
 
         return {
             'draw': int(self._querydict.get('draw', 0)),
