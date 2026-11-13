@@ -239,6 +239,21 @@ class AllVariantsGridFilterTest(TestCase):
                 variant_ids = self._grid_variant_ids({"contig_ids": [contig.pk], "variant_types": filter_types})
                 self.assertEqual(expected, self.fusion_variant.pk in variant_ids)
 
+    def test_gene_level_variant_sharing_a_matched_fusions_locus_is_not_in_the_region(self):
+        """ A gene-level locus holds all of one gene's gene-level variants - a fusion matched by its partner's
+            region doesn't bring the anchor gene's copy number call on the same locus with it """
+        self._create_variant_gene_overlap(self.fusion_variant, self.gene)
+        anchor_id = self.fusion_variant.locus.position
+        alt = GeneLevelSymbolicAlt.format(GeneLevelSymbolicAlt.GAIN, "HGNC", anchor_id)
+        anchor_copy_number = create_gene_level_variant(VariantCoordinate(chrom=GENE_LEVEL_CONTIG_NAME,
+                                                                         position=anchor_id, ref=GENE_LEVEL_REF,
+                                                                         alt=alt, svlen=GENE_LEVEL_SVLEN))
+        self.assertEqual(self.fusion_variant.locus_id, anchor_copy_number.locus_id)
+        variant_ids = self._grid_variant_ids({"contig_ids": [self.gene_contig.pk],
+                                              "variant_types": [VariantType.FUSION, VariantType.COPY_NUMBER]})
+        self.assertIn(self.fusion_variant.pk, variant_ids)
+        self.assertNotIn(anchor_copy_number.pk, variant_ids)
+
     def test_fusion_hidden_when_its_type_is_not_selected(self):
         variant_ids = self._grid_variant_ids({"contig_ids": [self.contig.pk],
                                               "variant_types": [VariantType.SNV]})
