@@ -34,7 +34,6 @@ from genes.hgvs.hgvs_converter import (
     HGVSImplementationException,
     HgvsMatchRefAllele,
     HGVSNomenclatureException,
-    HGVSNonCodingTranscriptException,
     HgvsOriginallyNormalized,
 )
 from genes.hgvs.hgvs_variant import HGVSVariant, _looks_like_transcript
@@ -399,7 +398,7 @@ class BioCommonsHGVSConverter:
         transcript_accession = self._get_transcript_accession_from_sequence_variant(var_x)
         # Check before anything asks the transcript for its CDS (which fails with "CDS is undefined")
         if var_x.type == 'c' and get_refseq_type(transcript_accession) == 'RNA':
-            raise HGVSNonCodingTranscriptException(transcript_accession)
+            raise HGVSNomenclatureException(f"{transcript_accession} is a non-coding transcript, so it can't take 'c.' (use n.)")
         self._check_intronic_offsets_anchor_exon_boundaries(var_x)
 
     def _check_intronic_offsets_anchor_exon_boundaries(self, var_x: SequenceVariant):

@@ -1,11 +1,9 @@
-""" Variant search by HGVS (the search_hgvs receiver): resolves c./n./g. HGVS through HGVSMatcher, retrying c. on a
-    non-coding transcript as n., falls back to a gene symbol's MANE transcripts when no transcript is given, reads
+""" Variant search by HGVS (the search_hgvs receiver): resolves c./n./g. HGVS through HGVSMatcher, falls back to a gene symbol's MANE transcripts when no transcript is given, reads
     the Variant column's gene- or contig-led HGVS ("chr11 +5 genes g.1_2del") back onto its contig, and reports
     what was substituted (transcript version, reference, normalisation) as search messages """
 import itertools
 import logging
 import re
-import sys
 from collections import defaultdict
 from collections.abc import Iterable
 from itertools import zip_longest
@@ -25,7 +23,7 @@ from genes.hgvs import (
     HgvsOriginallyNormalized,
     VariantResolvingError,
 )
-from genes.hgvs.hgvs_converter import HgvsMatchRefAllele, HGVSNonCodingTranscriptException
+from genes.hgvs.hgvs_converter import HgvsMatchRefAllele
 from genes.hgvs.hgvs_matcher import VariantCoordinateAndDetails
 from genes.models import MANE, BadTranscript, MissingTranscript, TranscriptVersion
 from library.enums.log_level import LogLevel
@@ -275,34 +273,12 @@ def _classify_unresolved_hgvs(user: User, genome_build: GenomeBuild, hgvs_string
         yield SearchResult(classify_no_variant, messages=[SearchMessage(f"Error reading HGVS \"{error_message}\"")])
 
 
-def _get_non_coding_c_hgvs_as_n_details(hgvs_matcher: HGVSMatcher, hgvs_string: str,
-                                        search_messages: list[SearchMessage]) -> VariantCoordinateAndDetails:
-    """ Import refuses c.HGVS on a non-coding transcript (it may be numbered from a coding model, so shifted by
-        the 5' UTR length). Search resolves it as n. with a warning, unless the provided reference doesn't match """
-    hgvs_variant = hgvs_matcher.create_hgvs_variant(hgvs_string)
-    hgvs_variant.kind = 'n'
-    n_hgvs_string = hgvs_variant.format(max_ref_length=sys.maxsize)
-    vc_details = hgvs_matcher.get_variant_coordinate_and_details(n_hgvs_string)
-    matches_reference = vc_details.matches_reference
-    if isinstance(matches_reference, HgvsMatchRefAllele) and not matches_reference:
-        raise HGVSNomenclatureException(f'c.HGVS used on non-coding transcript. Not resolved as "{n_hgvs_string}" '
-                                        'as the provided reference does not match, so it is probably numbered '
-                                        'from a coding transcript')
-    msg = f'c.HGVS used on non-coding transcript, resolved as "{n_hgvs_string}". If the c. was numbered from a ' \
-          "coding transcript, the position will be shifted by the length of its 5' UTR"
-    search_messages.append(SearchMessage(msg, LogLevel.WARNING, substituted=True))
-    return vc_details
-
-
 def _resolve_hgvs(hgvs_matcher: HGVSMatcher, hgvs_string: str) -> tuple[VariantCoordinateAndDetails, list[SearchMessage]]:
     """ Resolves hgvs_string to a coordinate, with messages for what the matcher had to change to get there.
         Raises what the matcher raises: MissingTranscript, Contig.ContigNotInBuildError, HGVSNomenclatureException,
         and ValueError / NotImplementedError for anything else (including a gene symbol in place of a transcript) """
     search_messages: list[SearchMessage] = []
-    try:
-        vc_details = hgvs_matcher.get_variant_coordinate_and_details(hgvs_string)
-    except HGVSNonCodingTranscriptException:
-        vc_details = _get_non_coding_c_hgvs_as_n_details(hgvs_matcher, hgvs_string, search_messages)
+    vc_details = hgvs_matcher.get_variant_coordinate_and_details(hgvs_string)
     logging.info("get_variant_coordinate_and_details - variant_coordinate=%s", vc_details.variant_coordinate)
 
     # reporting on the "provided" reference is slightly problematic as it's not always provided directly

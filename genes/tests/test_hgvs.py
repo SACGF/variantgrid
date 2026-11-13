@@ -29,10 +29,8 @@ from genes.hgvs.biocommons_hgvs.data_provider import DjangoTranscriptDataProvide
 from genes.hgvs.biocommons_hgvs.hgvs_converter_biocommons import (
     HgvsMatchTranscriptAndGenomeRefAllele,
 )
-from genes.hgvs.hgvs_converter import HGVSNonCodingTranscriptException
 from genes.hgvs.hgvs_matcher import FakeTranscriptVersion
 from snpdb.models import Contig, GenomeBuild, VariantCoordinate
-from variantopedia.signals.hgvs_search import _get_non_coding_c_hgvs_as_n_details
 
 
 @override_settings(HGVS_VALIDATE_REFSEQ_TRANSCRIPT_LENGTH=False)
@@ -300,8 +298,8 @@ class TestHGVS(TestCase):
         self.assertIn('"G"', vcd.matches_reference.get_message())
 
     def test_biocommons_c_hgvs_on_non_coding_transcript(self):
-        """ c. on a non-coding transcript may be numbered from a coding model, so isn't resolved - except by search,
-            which resolves it as n. with a warning if the provided ref matches - SACGF/variantgrid_private#3497 """
+        """ c. on a non-coding transcript may be numbered from a coding model, so it's an error rather than
+            resolving as n. (#1946) """
         genome_build = GenomeBuild.grch37()
         create_gata2_as1_transcript_version(genome_build)
         matcher = HGVSMatcher(genome_build, hgvs_converter_type=HGVSConverterType.BIOCOMMONS_HGVS)
@@ -310,16 +308,8 @@ class TestHGVS(TestCase):
         vcd = matcher.get_variant_coordinate_and_details("NR_125398.1:n.100G>A")
         self.assertEqual(vcd.variant_coordinate, expected_vc)
 
-        with self.assertRaises(HGVSNonCodingTranscriptException):
+        with self.assertRaisesMessage(HGVSNomenclatureException, "is a non-coding transcript"):
             matcher.get_variant_coordinate_and_details("NR_125398.1:c.100G>A")
-
-        search_messages = []
-        vcd = _get_non_coding_c_hgvs_as_n_details(matcher, "NR_125398.1:c.100G>A", search_messages)
-        self.assertEqual(vcd.variant_coordinate, expected_vc)
-        self.assertEqual(len(search_messages), 1)
-
-        with self.assertRaises(HGVSNomenclatureException):
-            _get_non_coding_c_hgvs_as_n_details(matcher, "NR_125398.1:c.100C>A", [])
 
     def test_biocommons_gene_symbol_hgvs(self):
         self._test_gene_symbol_hgvs(HGVSConverterType.BIOCOMMONS_HGVS)
