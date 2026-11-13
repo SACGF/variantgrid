@@ -1,3 +1,6 @@
+from library.utils import first
+
+
 class EvidenceKeyOptionUpdator:
     """
     Used in migration scripts to link a value to export to ClinVar to an evidence key option
@@ -7,15 +10,26 @@ class EvidenceKeyOptionUpdator:
         self.apps = apps
         EvidenceKey = apps.get_model("classification", "EvidenceKey")
         self.evidence_key = EvidenceKey.objects.get(key=key)
-        self.options = self.evidence_key.options
+        self.options: list[dict] = self.evidence_key.options
         if not isinstance(self.options, list):
             raise ValueError(f"EvidenceKey {key} does not have any options")
 
     def set_option(self, option_key: str, option_data_key: str, option_data_value: str):
-        if option := next(option for option in self.options if option.get('key') == option_key):
+        if option := first(option for option in self.options if option.get('key') == option_key):
             option[option_data_key] = option_data_value
         else:
             raise ValueError(f"No such option {self.evidence_key.key}.{option}")
+        self.evidence_key.save()
+
+    def upsert_option(self, option_data: dict):
+        if option_key := option_data.get("key"):
+            if option := first(option for option in self.options if option.get('key') == option_key):
+                for key, value in option_data.items():
+                    option[key] = value
+            else:
+                self.options.append(option_data)
+        else:
+            raise ValueError(f"Option must have a value for key")
         self.evidence_key.save()
 
     def set_clinvar_option(self, option_key: str, clinvar: str):
