@@ -200,8 +200,8 @@ class UsedKeyTracker:
                     ordered_keys.append(used_key)
 
         criteria_list = []
-        for criterias in criterias_by_namespace.values():
-            criteria_list += criterias
+        for key in sorted(criterias_by_namespace.keys()):
+            criteria_list += criterias_by_namespace[key]
         return criteria_list + ordered_keys
 
     def header(self) -> list[str]:
