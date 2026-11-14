@@ -144,7 +144,9 @@ working-tree `runserver` as `claude_agent`; read the PNGs it writes rather than 
   (snpdb/views/datatable_view.py:DatatableConfig.export_columns) with the grid's filters and ordering; set `csv_rendered=True`
   where the server renderer changes the value, `include_in_csv=False` on action columns; a keyless (renderer only) column needs
   `include_in_csv=True, csv_rendered=True`, and a hidden column with a key is exported. A `csv_rendered` renderer can rely
-  on `pre_render`, called per batch of export rows; a `choices_client_renderer` column exports its label. Datetimes go out
+  on `pre_render`, called per batch of export rows. A column the grid shows as a label rather than its code exports the
+  label from `csv_choices`, which `choices_client_renderer` and snpdb/grids.py:import_status_client_renderer pass - a
+  new code-to-label client renderer gets a kwargs helper that does the same. Datetimes go out
   as dates, not the epoch seconds the JSON carries. A table whose rows are all in the page (no endpoint) downloads through
   `CsvExport` (variantgrid/static_files/default_static/js/csv_export.js), which writes cells as the server exports do.
 - A page is 1 to `max_page_length` (100, `UserGridConfig.MAX_ROWS`) rows: a longer request, or `length=-1`, is a 400
