@@ -58,6 +58,11 @@ virtualenv but not gitignored files: copy the box's settings module if it lives 
 (`claude/guides/testing.md`), and `collectstatic` there before a `vg page` or `runserver` (`STATIC_ROOT` is per
 checkout). `git worktree remove` it when the PR is up.
 
+Worktrees share one repository, so its refs are shared too: the stash list, local branches and tags. Don't
+`git stash` - another worktree stashing or popping at the same moment takes your change and leaves you theirs. To check
+a test against the old code, commit to your branch and `git checkout <base> -- <file>`, or copy the file aside. Use
+your own `<issue>_<slug>` names for branches, and no tags.
+
 ## Issues
 
 Raise issues in the public `SACGF/variantgrid` by default. An issue there contains nothing identifying: no patient, lab
