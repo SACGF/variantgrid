@@ -10,6 +10,7 @@ from django.dispatch import receiver
 from annotation.canonical_annotation import get_canonical_c_hgvs
 from annotation.models import VariantAnnotation, VariantAnnotationVersion
 from classification.models import Classification, ClassificationModification
+from classification.models.classification_variant_info_models import ImportedAlleleInfo
 from genes.hgvs import HGVSDisplay
 from library.preview_request import PreviewKeyValue, preview_extra_signal
 from ontology.models import OntologyTerm
@@ -95,15 +96,18 @@ def _allele_preview_classifications_extra(user: User, obj: Allele, genome_build:
     hgvs_extras = []
     if cms.exists():
         extras += classification_qs_to_extras(cms)
-        column = ClassificationModification.column_name_for_build(genome_build)
-        p_column = ClassificationModification.column_name_for_build(genome_build, 'p_hgvs')
-        # provide the c.HGVS for alleles
-        c_and_p_qs = cms.order_by(column, p_column).values_list(column, p_column).distinct()
-        if c_and_p := sorted(((c_hgvs, p_hgvs) for c_hgvs, p_hgvs in c_and_p_qs if c_hgvs),
-                             key=lambda pair: (pair[0], pair[1] or "")):
-            for c_hgvs, p_hgvs in c_and_p:
-                hgvs_extras.append(PreviewKeyValue(f"{genome_build} c.HGVS", HGVSDisplay.parse(dna_hgvs=c_hgvs, p_hgvs=p_hgvs),
-                                                   dedicated_row=True))
+        # Resolved c.HGVS is only cached for some builds - elsewhere (T2T) the variant's own annotation provides it
+        if genome_build in ImportedAlleleInfo.supported_genome_builds():
+            column = ClassificationModification.column_name_for_build(genome_build)
+            p_column = ClassificationModification.column_name_for_build(genome_build, 'p_hgvs')
+            # provide the c.HGVS for alleles
+            c_and_p_qs = cms.order_by(column, p_column).values_list(column, p_column).distinct()
+            if c_and_p := sorted(((c_hgvs, p_hgvs) for c_hgvs, p_hgvs in c_and_p_qs if c_hgvs),
+                                 key=lambda pair: (pair[0], pair[1] or "")):
+                for c_hgvs, p_hgvs in c_and_p:
+                    hgvs_extras.append(PreviewKeyValue(f"{genome_build} c.HGVS",
+                                                       HGVSDisplay.parse(dna_hgvs=c_hgvs, p_hgvs=p_hgvs),
+                                                       dedicated_row=True))
 
     if not hgvs_extras:
         try:
