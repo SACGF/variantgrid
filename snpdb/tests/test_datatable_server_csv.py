@@ -4,6 +4,7 @@ from django.db.models import QuerySet
 from django.test import RequestFactory, TestCase
 
 from snpdb.enums import ImportStatus
+from snpdb.grids import import_status_client_renderer
 from snpdb.models import Cohort, GenomeBuild, UserGridConfig
 from snpdb.views.datatable_view import CellData, DatabaseTableView, DatatableConfig, RichColumn, SortOrder
 
@@ -60,6 +61,21 @@ class CohortRenderedCsvColumns(DatatableConfig[Cohort]):
         return Cohort.objects.all()
 
 
+class CohortStatusIconCsvColumns(DatatableConfig[Cohort]):
+    """ The grid draws the status as an icon titled with its label """
+    server_csv_download = True
+
+    def __init__(self, request):
+        super().__init__(request)
+        self.rich_columns = [
+            RichColumn(key="name", label="Name", orderable=True, default_sort=SortOrder.ASC),
+            RichColumn(key="import_status", label="Status", **import_status_client_renderer()),
+        ]
+
+    def get_initial_queryset(self) -> QuerySet[Cohort]:
+        return Cohort.objects.all()
+
+
 class DatatableServerCsvTests(TestCase):
     def setUp(self):
         self.user = User.objects.create(username='datatable_csv_user')
@@ -102,6 +118,10 @@ class DatatableServerCsvTests(TestCase):
     def test_csv_writes_what_the_grid_shows(self):
         lines = self._csv_lines(column_class=CohortRenderedCsvColumns)
         self.assertEqual(lines, ["Name,Status,Upper Name", "alpha,success,ALPHA", "zebra,success,ZEBRA"])
+
+    def test_csv_writes_status_icon_label(self):
+        lines = self._csv_lines(column_class=CohortStatusIconCsvColumns)
+        self.assertEqual(lines, ["Name,Status", "alpha,success", "zebra,success"])
 
     def test_csv_refused_where_not_enabled(self):
         with self.assertRaises(PermissionDenied):

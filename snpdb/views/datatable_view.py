@@ -207,8 +207,10 @@ class RichColumn:
     def choices_client_renderer(choices) -> dict[str, Any]:
         """ RichColumn kwargs showing a value as its choice label,
             e.g. RichColumn(key, **RichColumn.choices_client_renderer(Sex.choices)) """
+        choices = dict(choices)
         return {"client_renderer": "TableFormat.choices",
-                "client_renderer_kwargs": {"choices": dict(choices)}}
+                "client_renderer_kwargs": {"choices": choices},
+                "csv_choices": choices}
 
     def __init__(self,
                  key: Optional[str] = None,
@@ -229,6 +231,7 @@ class RichColumn:
                  extra_columns: Optional[list[str]] = None,
                  include_in_csv: Optional[bool] = None,
                  csv_rendered: bool = False,
+                 csv_choices: Optional[dict] = None,
                  width: Optional[int] = None,
                  header_title: Optional[str] = None,
                  client_renderer_kwargs: Optional[dict] = None,
@@ -260,6 +263,9 @@ class RichColumn:
                              wherever the server renderer converts the value (AF as percent, packed
                              genotype unpacked) so the CSV matches the grid. The renderer can rely on
                              pre_render, which the export calls per batch of rows
+        :param csv_choices: {value: label} for a column the grid shows as a label rather than its stored
+                            code (choices_client_renderer, an icon titled with the label) - the CSV writes
+                            the label
         :param width: column width in pixels (the variant grids lay out table-layout: fixed)
         :param header_title: tooltip on the column header
         :param client_renderer_kwargs: per column settings handed to the client renderer as ctx.kwargs
@@ -312,10 +318,7 @@ class RichColumn:
         self.extra_columns = extra_columns
         self.include_in_csv = bool(key) if include_in_csv is None else include_in_csv
         self.csv_rendered = csv_rendered
-        # A TableFormat.choices column shows the label, so the CSV writes the label too
-        self.csv_choices: Optional[dict] = None
-        if self.client_renderer == "TableFormat.choices":
-            self.csv_choices = client_renderer_kwargs["choices"]
+        self.csv_choices = csv_choices
         self.width = width
         self.header_title = header_title
         self.client_renderer_kwargs = client_renderer_kwargs
