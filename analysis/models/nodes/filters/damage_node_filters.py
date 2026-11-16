@@ -10,7 +10,7 @@ import html
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from functools import cache
-from typing import Any, Optional
+from typing import Any, NamedTuple, Optional
 
 from annotation.enums import EVEClass, Pathogenicity, PathogenicityImpact
 from annotation.pathogenicity_predictions import TOOLS
@@ -36,6 +36,15 @@ _PRED_DEFAULTS = {"eve_class": EVEClass.PATHOGENIC}
 _NON_CODING_RAW_FIELDS = frozenset({"promoter_ai_score", "avi_phred"})
 
 
+class ValueControl(NamedTuple):
+    """ One of several thresholds on a row: each has its own on/off, its label, and a note or link of its own """
+    label: str
+    help: str = ""
+    link_text: str = ""
+    link_url: str = ""
+    link_title: str = ""
+
+
 @dataclass(frozen=True)
 class EffectFilter:
     label: str  # the row's label, the tool's own name
@@ -51,6 +60,10 @@ class EffectFilter:
     legacy_null_field: Optional[str] = None
     legacy_null_label: str = ""
     legacy_null_words: str = ""
+    legacy_null_note: str = ""  # why a node would leave the earlier rule, shown under its tick-box
+    # A row drawing more than one value (Splicing with AlphaGenome) labels each, under multi_label
+    multi_label: str = ""
+    value_controls: tuple[ValueControl, ...] = ()
     help: str = ""
     default: Any = None  # a dropdown's value when the filter is added (None: its first option)
 
@@ -153,6 +166,21 @@ def _all_effect_filters(node, editor: bool) -> Iterator[tuple[EffectFilter, Call
                                  legacy_null_field="splice_allow_null_any_missing",
                                  legacy_null_label="keep if any splicing score is missing",
                                  legacy_null_words="or any splicing score missing",
+                                 legacy_null_note="This node was saved with this rule. dbscSNV only scores "
+                                                  "splice-consensus SNVs, so it keeps most variants.",
+                                 multi_label="Splicing",
+                                 value_controls=(
+                                     ValueControl("SpliceAI, dbscSNV ≥",
+                                                  help="SpliceAI or dbscSNV score, or an indel in a splice region"),
+                                     ValueControl("AlphaGenome ≥",
+                                                  help="AlphaGenome merged splicing score (0 to ~3). No published "
+                                                       "cutoff - uncalibrated",
+                                                  link_text="non-commercial use only",
+                                                  link_url="https://deepmind.google.com/science/alphagenome/downloads",
+                                                  link_title="AlphaGenome merged splicing scores are licensed for "
+                                                             "non-commercial use only, and not for diagnostic "
+                                                             "procedures"),
+                                 ),
                                  help="SpliceAI or dbscSNV score, or an indel in a splice region")
     yield splice_filter, always
     if from_version(2):

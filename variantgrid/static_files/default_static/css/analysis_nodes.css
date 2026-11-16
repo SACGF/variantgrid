@@ -1905,12 +1905,18 @@ span.node-counts {
 	color: #3d4550;
 }
 
-/* A second slider on the row (AlphaGenome in Splicing) wraps with its on/off box and licence link */
+/* A slider wraps as a unit with its on/off box, label and link, where its row has them */
 .effect-filter-option-group {
 	display: inline-flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 4px 8px;
+}
+
+.effect-value-conj {
+	font-size: 12px;
+	font-style: italic;
+	color: #6b7280;
 }
 
 /* A node saved under the earlier splicing allow null rule says so under its tick-box (#2836) */

@@ -48,28 +48,28 @@
                 {% for row in form.filter_rows %}
                     <div class="effect-filter" data-filter="{{ row.filter.key }}">
                         <span class="effect-filter-conj"></span>
-                        <span class="effect-filter-label"{% if row.filter.help %} title="{{ row.filter.help }}"{% endif %}>{{ row.filter.label }}{% if row.filter.op %} <span class="effect-filter-op">{{ row.filter.op }}</span>{% endif %}</span>
+                        <span class="effect-filter-label"{% if row.filter.help %} title="{{ row.filter.help }}"{% endif %}>{{ row.label }}{% if row.filter.op and not row.multi %} <span class="effect-filter-op">{{ row.filter.op }}</span>{% endif %}</span>
                         <span class="effect-filter-control">
                             {% for value in row.values %}
                                 {{ value.field.errors }}
                                 {% if value.slider %}
-                                    {% if value.optional %}
-                                        <span class="effect-filter-option-group">
-                                        <label class="effect-filter-option" title="AlphaGenome merged splicing score (0 to ~3), another OR term in this filter beside SpliceAI and dbscSNV. No published cutoff - uncalibrated">
-                                            <input type="checkbox" class="effect-slider-enable" data-field="{{ value.field.name }}"> or AlphaGenome &ge;
-                                        </label>
-                                    {% endif %}
-                                    <span class="slider-container">
-                                        <span class="display-flex">
-                                            <span class="slider-track"><input type="range" class="slider effect-slider" id="{{ value.field.name }}-slider" data-field="{{ value.field.name }}" aria-label="{% if value.optional %}AlphaGenome splicing{% else %}{{ row.filter.label }}{% endif %}"></span>
-                                            <span class="label slider-value"></span>
+                                    <span class="effect-filter-option-group">
+                                        {% if row.multi %}
+                                            {% if not forloop.first %}<span class="effect-value-conj">or</span>{% endif %}
+                                            <label class="effect-filter-option"{% if value.control.help %} title="{{ value.control.help }}"{% endif %}>
+                                                <input type="checkbox" class="effect-slider-enable" data-field="{{ value.field.name }}"> {{ value.control.label }}
+                                            </label>
+                                        {% endif %}
+                                        <span class="slider-container">
+                                            <span class="display-flex">
+                                                <span class="slider-track"><input type="range" class="slider effect-slider" id="{{ value.field.name }}-slider" data-field="{{ value.field.name }}" aria-label="{% if row.multi %}{{ value.control.label }}{% else %}{{ row.label }}{% endif %}"></span>
+                                                <span class="label slider-value"></span>
+                                            </span>
                                         </span>
+                                        {% if value.control.link_url %}
+                                            <a class="text-muted small" href="{{ value.control.link_url }}" target="_blank" title="{{ value.control.link_title }}">{{ value.control.link_text }}</a>
+                                        {% endif %}
                                     </span>
-                                    {% if value.optional %}
-                                        <a class="text-muted small" href="https://deepmind.google.com/science/alphagenome/downloads" target="_blank"
-                                           title="AlphaGenome merged splicing scores are licensed for non-commercial use only, and not for diagnostic procedures">non-commercial use only</a>
-                                        </span>
-                                    {% endif %}
                                 {% elif value.choices %}
                                     <span class="editor-choices">{{ value.field }}</span>
                                 {% elif value.flag %}
@@ -87,7 +87,7 @@
                             {% if row.legacy_null_field %}
                                 <span class="d-none">{{ row.legacy_null_field }}</span>
                                 <span class="effect-null-legacy effect-filter-legacy-note editor-help">
-                                    This node was saved with this rule. dbscSNV only scores splice-consensus SNVs, so it keeps most variants.
+                                    {{ row.filter.legacy_null_note }}
                                     {% if has_write_permission %}<button type="button" class="effect-add-button effect-null-switch">Switch to "{{ row.filter.null_label }}"</button>{% endif %}
                                 </span>
                             {% endif %}

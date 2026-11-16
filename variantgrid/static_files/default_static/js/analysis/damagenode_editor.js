@@ -232,10 +232,21 @@ function initDamageNodeEditor(options) {
             return ticked.map((i, input) => $(input).closest("label").text().trim()).get().join(" or ");
         }
 
+        // A row drawing several sliders (Splicing with AlphaGenome) switches each on and off by its own box, and
+        // only joins them with "or" after one that is on
         function syncSliderEnable(enable) {
             const name = enable.attr("data-field");
             enable.prop("checked", fieldHasValue(name));
             sliders[name].slider.prop("disabled", !fieldHasValue(name));
+        }
+
+        function syncValueConjunctions(row) {
+            let earlierOn = false;
+            $(".effect-filter-option-group", row).each(function () {
+                $(".effect-value-conj", this).toggle(earlierOn);
+                const enable = $("input.effect-slider-enable", this);
+                earlierOn = earlierOn || (enable.length > 0 && fieldHasValue(enable.attr("data-field")));
+            });
         }
 
         // A node saved under an earlier allow null rule keeps it until switched (splicing, #2836)
@@ -363,6 +374,9 @@ function initDamageNodeEditor(options) {
             $("input.effect-slider-enable", editor).each(function () {
                 syncSliderEnable($(this));
             });
+            $(".effect-filter", editor).each(function () {
+                syncValueConjunctions($(this));
+            });
             updateSentence();
         }
 
@@ -417,12 +431,20 @@ function initDamageNodeEditor(options) {
         // A second slider on a row (AlphaGenome splicing) switches on and off by itself
         editor.on("change", "input.effect-slider-enable", function () {
             const name = $(this).attr("data-field");
+            const row = $(this).closest(".effect-filter");
+            const f = filtersByKey[row.attr("data-filter")];
             if (this.checked) {
                 setFieldStart(name);
             } else {
                 clearField(name);
+                if (!hasValue(f)) {
+                    removeFilter(f);  // every slider off is the row removed
+                    layout();
+                    return;
+                }
             }
             syncSliderEnable($(this));
+            syncValueConjunctions(row);
             updateSentence();
         });
         form.on("input change", updateSentence);

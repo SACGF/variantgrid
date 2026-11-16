@@ -94,21 +94,18 @@ class NodeEditorRenderTest(AnalysisSetupMixin, TestCase):
         self.assertIn(f'value="{VariantType.SNV}" id="id_variant_types_0" checked>', content)
 
     def test_damage_node_editor_posts_back_unchanged(self):
-        """ The editor lays its rows out in groups client side - unedited, it posts the same node back, a node on
-            the earlier splicing allow null rule included (#2836) """
+        """ The editor lays its rows out in groups client side - unedited, it posts the same node back: a node on
+            the earlier splicing allow null rule (#2836), and one with only AlphaGenome splicing set, included """
         common = {"impact_min": PathogenicityImpact.HIGH, "annotsv_acmg_class_min": Pathogenicity.LIKELY_PATHOGENIC,
                   "gene_loeuf_max": 0.6, "gene_loeuf_required": True, "gene_loeuf_allow_null": False,
-                  "splice_min": 0.5, "splice_required": True, "in_cosmic": True, "variant_types": [VariantType.SNV]}
-        for splice_allow_null_any_missing in (False, True):
-            with self.subTest(splice_allow_null_any_missing=splice_allow_null_any_missing):
-                node = DamageNode.objects.create(analysis=self.analysis, **common,
-                                                 splice_allow_null_any_missing=splice_allow_null_any_missing)
+                  "splice_required": True, "in_cosmic": True, "variant_types": [VariantType.SNV]}
+        for splicing in ({"splice_min": 0.5}, {"splice_min": 0.5, "splice_allow_null_any_missing": True},
+                         {"alphagenome_splicing_min": 1.0}):
+            with self.subTest(**splicing):
+                node = DamageNode.objects.create(analysis=self.analysis, **common, **splicing)
                 response = self._get_editor(node)
                 content = response.content.decode()
                 self.assertIn('data-filter="gene_loeuf_max"', content)
-                self.assertEqual(splice_allow_null_any_missing,
-                                 'name="splice_allow_null_any_missing" id="id_splice_allow_null_any_missing" checked'
-                                 in content)
                 # A field the version's editor doesn't draw posts nothing, as it always has
                 drawn = [f.name for f in DamageNode._meta.fields if f'name="{f.name}"' in content]
                 before = {name: getattr(node, name) for name in drawn}

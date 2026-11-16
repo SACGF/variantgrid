@@ -729,7 +729,7 @@ class DamageNodeForm(BaseNodeForm):
         rows = []
         for effect_filter in self.effect_filters:
             values = []
-            for field_name in effect_filter.value_fields:
+            for i, field_name in enumerate(effect_filter.value_fields):
                 if field_name == "alphagenome_splicing_min" and not node.has_alphagenome_splicing():
                     continue
                 widget = self.fields[field_name].widget
@@ -738,11 +738,14 @@ class DamageNodeForm(BaseNodeForm):
                     "slider": isinstance(widget, HiddenInput),
                     "flag": isinstance(widget, CheckboxInput),
                     "choices": field_name == "variant_types",
-                    # A second slider on the row (AlphaGenome in Splicing) has its own on/off box
-                    "optional": bool(values),
+                    "control": effect_filter.value_controls[i] if effect_filter.value_controls else None,
                 })
+            # A row drawing more than one value gives each its own on/off - with one, the row being there is the switch
+            multi = len(values) > 1
             rows.append({
                 "filter": effect_filter,
+                "label": effect_filter.multi_label if multi else effect_filter.label,
+                "multi": multi,
                 "values": values,
                 "required_field": self[effect_filter.required_field] if effect_filter.required_field else None,
                 "allow_null_field": self[effect_filter.allow_null_field] if effect_filter.allow_null_field else None,
