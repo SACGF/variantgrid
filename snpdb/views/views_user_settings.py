@@ -53,6 +53,7 @@ from snpdb.models import (
     UserSettingsOverride,
     VariantGridColumn,
 )
+from snpdb.models.models_lab_request import get_user_private_lab
 from snpdb.sample_file_path import get_example_replacements
 from snpdb.views.views_lab import _add_read_only_settings_message
 
@@ -185,6 +186,7 @@ def view_user_settings(request):
         'override_source': override_source,
         'override_values': override_values,
         'labs_by_group_name': labs_by_group_name,
+        'private_lab': get_user_private_lab(user),
         'avatar_details': AvatarDetails.avatar_for(user)
     }
     return render(request, 'snpdb/settings/view_user_settings.html', context)

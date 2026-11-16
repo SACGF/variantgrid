@@ -24,7 +24,7 @@ from django.contrib.auth.models import Group, User
 from django.core.cache import cache
 from django.core.exceptions import FieldDoesNotExist, PermissionDenied, ValidationError
 from django.db import models, transaction
-from django.db.models import QuerySet
+from django.db.models import Q, QuerySet
 from django.db.models.deletion import CASCADE, PROTECT, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
@@ -44,7 +44,13 @@ from library.enums.log_level import LogLevel
 from library.guardian_utils import admin_bot
 from library.preview_request import PreviewModelMixin
 from library.utils import import_class, string_deterministic_hash
-from snpdb.enums import AlleleOriginBucket, LabUserRole, UserAwardKind, UserAwardLevel
+from snpdb.enums import (
+    AlleleOriginBucket,
+    LabRequestStatus,
+    LabUserRole,
+    UserAwardKind,
+    UserAwardLevel,
+)
 from snpdb.user_awards import get_award_definition
 from user_messages.models import Message
 
@@ -403,6 +409,10 @@ class Organization(models.Model, PreviewModelMixin):
             return
 
         group.user_set.add(user)
+        self.send_user_create_message(user)
+
+    def send_user_create_message(self, user: User):
+        """ settings.USER_CREATE_ORG_MESSAGE for this organisation, if it has one """
         org_message = getattr(settings, "USER_CREATE_ORG_MESSAGE", {})
         if message := org_message.get(self.group_name):
             Message.objects.create(subject="Your initial lab / organisation",
@@ -654,7 +664,9 @@ class Lab(models.Model, PreviewModelMixin, LabLike):
         return settings.LAB_EXTERNAL_MEMBERSHIP.get(self.group_name)
 
     def candidate_members_qs(self, for_user: User) -> QuerySet[User]:
-        """ Active users that for_user may add to this lab - their organisation, or everyone for a superuser """
+        """ Active users that for_user may add to this lab - their organisation, or everyone for a superuser.
+            A lab set up from a LabRequest also offers users with an email on the request's domain, so its head can
+            bring in colleagues who registered themselves """
         group = self.group
         if group is None:
             return User.objects.none()
@@ -664,7 +676,11 @@ class Lab(models.Model, PreviewModelMixin, LabLike):
             group_institution = self.group_institution
             if group_institution is None:
                 return User.objects.none()
-            qs = qs.filter(groups=group_institution)
+            q = Q(groups=group_institution)
+            for email in self.labrequest_set.filter(status=LabRequestStatus.APPROVED).values_list("email", flat=True):
+                domain = email.rsplit("@", 1)[-1]
+                q |= Q(email__iendswith=f"@{domain}") | Q(email__iendswith=f".{domain}")
+            qs = qs.filter(q).distinct()
         return qs.exclude(groups=group).order_by('last_name', 'first_name', 'username')
 
     def _clear_member_caches(self):

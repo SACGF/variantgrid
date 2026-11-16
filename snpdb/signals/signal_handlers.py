@@ -4,7 +4,8 @@ from django.db import transaction
 
 from analysis.tasks.karyomapping_tasks import create_genome_karyomapping_for_trio
 from eventlog.notifications import AdminNotificationBuilder
-from snpdb.models import Lab, Organization, SettingsInitialGroupPermission, UserDataPrefix
+from snpdb.models.models_lab_request import create_user_org_labs
+from snpdb.models.models_user_settings import SettingsInitialGroupPermission, UserDataPrefix
 
 
 def user_post_save_handler(sender, instance, **kwargs):
@@ -22,15 +23,7 @@ def user_post_save_handler(sender, instance, **kwargs):
         if udp_kwargs:
             UserDataPrefix.objects.get_or_create(user=instance, **udp_kwargs)
 
-        org_labs = getattr(settings, "USER_CREATE_ORG_LABS", None)
-        if org_labs:
-            for org_group_name, lab_pattern in org_labs.items():
-                organization, _ = Organization.objects.get_or_create(group_name=org_group_name)
-                lab_name = lab_pattern % instance.__dict__
-                lab_group_name = f"{organization.group_name}/{lab_name.lower()}"
-                lab, _ = Lab.objects.get_or_create(name=lab_name, organization=organization, group_name=lab_group_name)
-                organization.add_member(instance)
-                add_user_to_group(lab_group_name)
+        create_user_org_labs(instance)
 
         nb = AdminNotificationBuilder(message="User Created")
         nb.add_markdown("A new user has been created")

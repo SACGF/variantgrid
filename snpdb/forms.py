@@ -15,7 +15,7 @@ from crispy_forms.layout import Field, Layout, Submit
 from dal import forward
 from django import forms
 from django.conf import settings
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Group, User
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.forms import ALL_FIELDS, EmailInput, URLInput, inlineformset_factory
@@ -59,6 +59,12 @@ from snpdb.models import (
 )
 from snpdb.models.models import Lab, Organization
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.models.models_lab_request import (
+    LabRequest,
+    email_matches_website,
+    group_name_slug,
+    lab_group_name,
+)
 from snpdb.models.models_user_settings import (
     ANALYSIS_NODE_ZOOM_MAX,
     ANALYSIS_NODE_ZOOM_MIN,
@@ -134,6 +140,60 @@ class LabMemberForm(forms.Form):
         if not self.lab.candidate_members_qs(self.for_user).filter(pk=user.pk).exists():
             raise ValidationError(f"{user} cannot be added to {self.lab}")
         return user
+
+
+class LabRequestForm(forms.ModelForm):
+    class Meta:
+        model = LabRequest
+        fields = ("organization_name", "lab_name", "website", "email")
+        labels = {"organization_name": "Organisation", "website": "Institution website",
+                  "email": "Institutional email"}
+        help_texts = {"organization_name": "eg the university or hospital",
+                      "website": "Your institution's home page - your email must be on the same domain",
+                      "email": "We email a link to this address to confirm it is yours"}
+        widgets = {"organization_name": TextInput(), "lab_name": TextInput()}
+
+    def clean(self):
+        cleaned_data = super().clean()
+        email = cleaned_data.get("email")
+        website = cleaned_data.get("website")
+        if email and website and not email_matches_website(email, website):
+            raise ValidationError("Your email address must be on the same domain as the institution's website")
+        return cleaned_data
+
+
+class LabRequestApproveForm(forms.Form):
+    """ Group names come from the names: a new organisation's from its name, the lab's from both """
+    organization = forms.ModelChoiceField(queryset=Organization.objects.filter(active=True), required=False,
+                                          label="Existing organisation",
+                                          help_text="Leave blank to create a new organisation with the name below")
+    organization_name = forms.CharField(label="New organisation name", required=False)
+    lab_name = forms.CharField()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        organization = cleaned_data.get("organization")
+        organization_name = cleaned_data.get("organization_name")
+        lab_name = cleaned_data.get("lab_name")
+        if organization:
+            organization_group_name = organization.group_name
+        elif organization_name:
+            organization_group_name = group_name_slug(organization_name)
+            if not organization_group_name:
+                raise ValidationError({"organization_name": "Needs letters or numbers"})
+            if Organization.objects.filter(group_name=organization_group_name).exists():
+                raise ValidationError({"organization": f"An organisation '{organization_group_name}' already "
+                                                       f"exists - pick it"})
+        else:
+            raise ValidationError({"organization_name": "Pick an existing organisation or name a new one"})
+
+        if lab_name:
+            if not group_name_slug(lab_name):
+                raise ValidationError({"lab_name": "Needs letters or numbers"})
+            group_name = lab_group_name(organization_group_name, lab_name)
+            if Lab.objects.filter(group_name=group_name).exists() or Group.objects.filter(name=group_name).exists():
+                raise ValidationError({"lab_name": f"Group '{group_name}' already exists"})
+        return cleaned_data
 
 
 class UserSelectForm(forms.Form):

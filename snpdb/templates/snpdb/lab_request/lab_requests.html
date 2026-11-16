@@ -1,0 +1,13 @@
+{% extends "uicore/page/base.html" %}
+{% block title %}Lab Requests{% endblock title %}
+{% block content %}
+<div class="container">
+    <h3>Lab Requests</h3>
+    <h4 class="mt-4">Awaiting review</h4>
+    {% include "snpdb/lab_request/lab_request_table.html" with lab_requests=awaiting_review table_id="awaiting-review" %}
+    <h4 class="mt-4">Email not yet confirmed</h4>
+    {% include "snpdb/lab_request/lab_request_table.html" with lab_requests=unconfirmed table_id="unconfirmed" %}
+    <h4 class="mt-4">Reviewed</h4>
+    {% include "snpdb/lab_request/lab_request_table.html" with lab_requests=reviewed table_id="reviewed" %}
+</div>
+{% endblock content %}

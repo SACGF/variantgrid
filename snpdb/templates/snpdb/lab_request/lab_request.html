@@ -1,0 +1,60 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load js_tags %}
+{% block title %}Request a Lab{% endblock title %}
+{% block content %}
+<div class="container">
+    <h3>Request a Lab</h3>
+    {% if private_lab %}
+        <p>
+            You're in your own private lab, <b>{{ private_lab }}</b>, so data you upload is visible only to you.
+            To share data and classifications with colleagues, ask us to set up your institution's lab. Approving
+            it turns your private lab into that lab, with you as its lab head, and keeps everything you have uploaded.
+            You can then add colleagues yourself.
+        </p>
+    {% else %}
+        <p>You aren't in a private lab, so there is nothing to request.</p>
+    {% endif %}
+
+    {% if pending %}
+        <div class="alert alert-info" id="pending-lab-request">
+            <p>
+                Your request for <b>{{ pending.lab_name }}</b> at <b>{{ pending.organization_name }}</b>
+                ({{ pending.website }}) is
+                {% if pending.email_confirmed %}
+                    waiting for an administrator to review it.
+                {% else %}
+                    waiting for you to confirm your email: open the link we sent to <b>{{ pending.email }}</b>.
+                {% endif %}
+            </p>
+            <form method="post" action="{% url 'lab_request_cancel' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-secondary btn-sm">Cancel request</button>
+            </form>
+        </div>
+    {% elif form %}
+        <form method="post" id="lab-request-form">
+            {% csrf_token %}
+            {% crispy form form_helper.horizontal %}
+            <button type="submit" class="btn btn-primary">Request lab</button>
+        </form>
+    {% endif %}
+
+    {% if lab_requests %}
+        <h4 class="mt-4">Previous requests</h4>
+        <table class="table table-sm">
+            <thead><tr><th>Requested</th><th>Organisation</th><th>Lab</th><th>Status</th></tr></thead>
+            <tbody>
+            {% for lr in lab_requests %}
+                <tr>
+                    <td>{% timestamp lr.created %}</td>
+                    <td>{{ lr.organization_name }}</td>
+                    <td>{% if lr.lab %}<a class="hover-link" href="{% url 'view_lab' lr.lab.pk %}">{{ lr.lab }}</a>{% else %}{{ lr.lab_name }}{% endif %}</td>
+                    <td>{{ lr.get_status_display }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+</div>
+{% endblock content %}
