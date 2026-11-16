@@ -16,6 +16,7 @@
 from typing import Optional
 
 from django.db import models
+from django.db.models import F, QuerySet
 from django.db.models.deletion import CASCADE
 from django.db.models.query_utils import Q
 from model_utils.models import TimeStampedModel
@@ -95,6 +96,29 @@ class CohortGenotypeStats(TimeStampedModel):
     @property
     def total_count(self):
         return self.variant_count
+
+    @classmethod
+    def variant_contents_qs(cls) -> QuerySet["CohortGenotypeStats"]:
+        """ The per-sample rows get_variant_contents can be read off """
+        return cls.objects.filter(sample__isnull=False, filter_key__isnull=True, passing_filter=False,
+                                  code_version__version__gte=cls.VARIANT_CONTENTS_STATS_VERSION)
+
+    @staticmethod
+    def get_variant_content_q(content: VariantContent) -> Q:
+        """ get_variant_contents as a filter: the per-sample rows whose sample holds content """
+        gene_level_count = F("fusions_count") + F("gene_copy_number_count") + F("gene_splice_count")
+        structural = Q(structural_count__gt=0)
+        has_copy_number = Q(sample__vcf__copy_number_field__gt="")
+        no_copy_number = Q(sample__vcf__copy_number_field__isnull=True) | Q(sample__vcf__copy_number_field="")
+        content_q = {
+            VariantContent.SMALL: Q(variant_count__gt=F("structural_count") + gene_level_count),
+            VariantContent.CNV: structural & has_copy_number,
+            VariantContent.SV: structural & no_copy_number,
+            VariantContent.FUSION: Q(fusions_count__gt=0),
+            VariantContent.GENE_COPY_NUMBER: Q(gene_copy_number_count__gt=0),
+            VariantContent.SPLICE: Q(gene_splice_count__gt=0),
+        }
+        return content_q[content]
 
     def get_variant_contents(self, has_copy_number: bool) -> dict[VariantContent, int]:
         """ Count per kind of call, leaving out the kinds with none. has_copy_number (the VCF declares a

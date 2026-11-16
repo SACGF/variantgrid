@@ -88,6 +88,7 @@ from snpdb.sample_file_path import (
     resolve_sample_file_paths,
 )
 from snpdb.tasks.vcf_archive_tasks import archive_vcf_task
+from snpdb.variant_contents import get_sample_variant_contents, get_vcf_variant_contents
 from snpdb.views.vcf_cohort_page import vcf_cohort_page_context
 from upload.enums import UploadedFileTypes
 from upload.models import UploadedManualVariantEntryCollection, UploadedVCF
@@ -295,6 +296,8 @@ def view_vcf(request, vcf_id):
         'sample_stats_het_hom_count': sample_stats_het_hom_count,
         'sample_stats_pass_het_hom_count': sample_stats_pass_het_hom_count,
         'sample_genotype_stats': sample_genotype_stats,
+        'vcf_variant_contents': get_vcf_variant_contents([vcf]).get(vcf.pk),
+        'sample_variant_contents': get_sample_variant_contents(vcf.sample_set.all()),
         'sample_names': sample_names,
         'sample_zygosities': sample_zygosities,
         'vcf_form': vcf_form,
@@ -568,6 +571,7 @@ def view_sample(request, sample_id):
         "alignment_file_list": sample.get_alignment_files(),
         "sample_stats": sample_stats,
         "sample_genotype_stats": sample_genotype_stats,
+        "variant_contents": get_sample_variant_contents([sample]).get(sample.pk),
         "skipped_annotation_count": skipped_annotation_count,
         "patient_phenotypes": patient_phenotypes_for_samples(request.user, [sample]),
         **somalier_context,

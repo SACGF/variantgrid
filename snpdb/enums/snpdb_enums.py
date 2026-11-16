@@ -454,7 +454,8 @@ class CytobandLevel(models.TextChoices):
 
 
 class VariantContent(models.TextChoices):
-    """ What kind of calls a VCF holds, from its samples' stats - the dots on a Sample node's VCF chip (#2759).
+    """ What kind of calls a VCF holds, from its samples' stats - the chips on the VCF and sample pages and
+        grids, and the dots on an analysis node's VCF chip (#2759).
         CNV and SV are both symbolic alts: a CNV caller's VCF declares a copy number field, an SV caller's
         doesn't (@see CohortGenotypeStats.get_variant_contents) """
     SMALL = "small", "Small"
@@ -463,3 +464,18 @@ class VariantContent(models.TextChoices):
     FUSION = "fusion", "Fusion"
     GENE_COPY_NUMBER = "gene_cn", "Gene CN"
     SPLICE = "splice", "Splice"
+
+    @property
+    def description(self) -> str:
+        return VARIANT_CONTENT_DESCRIPTIONS[self]
+
+
+# Shown in tooltips, which render as HTML - so a symbolic alt is named without its angle brackets
+VARIANT_CONTENT_DESCRIPTIONS = {
+    VariantContent.SMALL: "SNVs and indels written out as ref and alt sequence",
+    VariantContent.CNV: "Copy number calls: DEL / DUP / CNV from a caller that reports copy number",
+    VariantContent.SV: "Structural variants: DEL / DUP / INV from a caller that doesn't report copy number",
+    VariantContent.FUSION: "Gene fusions",
+    VariantContent.GENE_COPY_NUMBER: "Gene-level copy number gains and losses",
+    VariantContent.SPLICE: "Gene-level splice variants",
+}

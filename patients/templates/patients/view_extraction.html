@@ -1,6 +1,8 @@
 {% extends "uicore/page/base_container_table.html" %}
 {% load ui_tabs_builder %}
 {% load ui_utils %}
+{% load js_tags %}
+{% load variant_contents_tags %}
 {% load crispy_forms_tags %}
 {% block title %}Extraction {{ extraction }}{% endblock title %}
 {% block container_table_content %}
@@ -33,15 +35,17 @@
         <hr/>
         <h4>Samples</h4>
         {% if samples %}
+            {% sample_variant_contents samples as sample_contents %}
             <table class="table">
                 <thead>
-                    <tr><th>Sample<th>VCF<th>Variants type</tr>
+                    <tr><th>Sample<th>VCF<th data-help="{% variant_contents_help %}">Contents</th><th>Variants type</tr>
                 </thead>
                 <tbody>
                 {% for sample in samples %}
                     <tr>
                         <td><a href="{% url 'view_sample' sample.pk %}">{{ sample.name }}</a>
                         <td>{{ sample.vcf }}
+                        <td>{% variant_contents sample_contents|get_item:sample.pk %}
                         <td>{{ sample.get_variants_type_display }}
                     </tr>
                 {% endfor %}

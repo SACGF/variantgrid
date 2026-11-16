@@ -30,6 +30,11 @@ from snpdb.models import (
     Trio,
 )
 from snpdb.models.models_genome import Contig, Cytoband
+from snpdb.variant_contents import (
+    get_sample_variant_contents,
+    get_vcf_variant_contents,
+    label_with_variant_contents,
+)
 
 
 class GenomeBuildAutocompleteView(AutocompleteView, ABC):
@@ -119,9 +124,29 @@ class ProjectAutocompleteView(AutocompleteView):
         return Project.objects.all()
 
 
+class VariantContentsResultsMixin:
+    """ Ends each result's text with the kinds of call it holds ("... — Small, SV"): one patient's small
+        variant, CNV and SV VCFs name their sample alike, so the name can't say which is which (#2759).
+        Plain text, as a select2 result that takes HTML also renders the chosen option's name as HTML.
+        The chosen value keeps the object's own label """
+    get_variant_contents = None  # objs -> {pk: contents}
+
+    def get_results(self, context):
+        objs = context['object_list']
+        contents = self.get_variant_contents(objs)
+        return [
+            {
+                'id': self.get_result_value(obj),
+                'text': label_with_variant_contents(self.get_result_label(obj), contents.get(obj.pk)),
+                'selected_text': self.get_selected_result_label(obj),
+            } for obj in objs
+        ]
+
+
 @method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')
-class VCFAutocompleteView(GenomeBuildAutocompleteView):
+class VCFAutocompleteView(VariantContentsResultsMixin, GenomeBuildAutocompleteView):
     fields = ['name']
+    get_variant_contents = staticmethod(get_vcf_variant_contents)
 
     def get_user_queryset(self, user):
         qs = VCF.filter_for_user(user, True).filter(import_status=ImportStatus.SUCCESS)
@@ -130,8 +155,9 @@ class VCFAutocompleteView(GenomeBuildAutocompleteView):
 
 
 @method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')
-class SampleAutocompleteView(GenomeBuildAutocompleteView):
+class SampleAutocompleteView(VariantContentsResultsMixin, GenomeBuildAutocompleteView):
     fields = ['name']
+    get_variant_contents = staticmethod(get_sample_variant_contents)
 
     def get_user_queryset(self, user):
         sample_qs = Sample.filter_for_user(user, True).filter(import_status=ImportStatus.SUCCESS)

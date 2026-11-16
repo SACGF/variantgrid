@@ -4,6 +4,7 @@
 {% load model_tags %}
 {% load ui_utils %}
 {% load cohort_sample_actions_tag %}
+{% load variant_contents_tags %}
 {% if vcf %}
     {# VCF mode - the file fixes which samples exist, so the table edits their details #}
     <div id="samples">
@@ -23,6 +24,7 @@
                     {% if vcf.vcffiltercollection %}
                     (passed)
                     {% endif %}
+                    <th data-help="{% variant_contents_help %}">Contents</th>
                 {% endif %}
                 <th>VCF Sample Name
                 <th>Name
@@ -59,6 +61,7 @@
                     {% endif %}
                 {% endwith %}
                 </td>
+                <td>{% variant_contents sample_variant_contents|get_item:form.instance.pk %}</td>
             {% endif %}
                 <td class="vcf-sample-name">{{ form.vcf_sample_name }}{{ form.vcf_sample_name.errors }}</td>
                 <td class="sample-name">{{ form.name }}{{ form.name.errors }}</td>

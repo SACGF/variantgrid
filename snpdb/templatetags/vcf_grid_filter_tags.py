@@ -1,6 +1,6 @@
 from django.template import Library
 
-from snpdb.enums import VariantOrigin
+from snpdb.enums import VariantContent, VariantOrigin
 from snpdb.forms import ProjectChoiceForm, VariantsTypeMultipleChoiceForm
 
 register = Library()
@@ -15,6 +15,7 @@ def vcf_grid_filter(context, table_id, variants_type=False):
     context = {
         'table_id': table_id,
         "project_form": project_form,
+        "variant_contents": VariantContent,
     }
 
     if variants_type:

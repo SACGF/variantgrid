@@ -177,7 +177,7 @@ class CohortMembershipEditor {
         const baselineSet = new Set(this.baseline);
         const table = $(`<table class="table membership-table">
             <thead><tr><th><input type="checkbox" class="sample-select-all" title="Select all samples"></th>
-            <th></th><th>Sample</th><th>Source VCF</th><th>Het / Hom</th><th>Sex</th><th>Phenotype</th><th></th></tr></thead>
+            <th></th><th>Sample</th><th>Source VCF</th><th>Contents</th><th>Het / Hom</th><th>Sex</th><th>Phenotype</th><th></th></tr></thead>
             <tbody></tbody></table>`);
         const tbody = $("tbody", table);
 
@@ -198,6 +198,7 @@ class CohortMembershipEditor {
                 <td class="drag-handle" title="Drag to reorder">&#8942;&#8942;</td>
                 <td class="sample-name"><a href="${sample.url}">${escapeHtml(sample.name)}</a>${newChip}</td>
                 <td class="vcf-name">${escapeHtml(sample.vcf_name)}</td>
+                <td>${TableFormat.variantContents(sample.variant_contents)}</td>
                 <td class="num">${sample.het_hom || "N/A"}</td>
                 <td>${escapeHtml(sample.sex)}</td>
                 <td class="sample-phenotype">${patientPhenotypeHtml(this.patientPhenotypes[sample.patient_id])}</td>
@@ -205,7 +206,7 @@ class CohortMembershipEditor {
             </tr>`);
         }
         if (!this.order.length) {
-            tbody.append('<tr><td colspan="8" class="text-muted">No samples - add some below.</td></tr>');
+            tbody.append('<tr><td colspan="9" class="text-muted">No samples - add some below.</td></tr>');
         }
 
         this.tableContainer.empty().append(table);

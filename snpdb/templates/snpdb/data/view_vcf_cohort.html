@@ -12,6 +12,7 @@
 {% load cohort_sample_actions_tag %}
 {% load phenotype_tags %}
 {% load import_status_tags %}
+{% load variant_contents_tags %}
 
 {% block title %}{{ page_title }}{% endblock %}
 {% block head %}
@@ -384,6 +385,10 @@ $(document).ready(function() {
             {% csrf_token %}
             {% crispy vcf_form form_helper.horizontal %}
             {% labelled label="Import Status" %}{% import_status_icon vcf.import_status %}{% endlabelled %}
+            {% if vcf.import_status == 'S' %}
+                {% variant_contents_help as variant_contents_help_text %}
+                {% labelled label="Contents" help=variant_contents_help_text %}{% variant_contents vcf_variant_contents counts=False placeholder=True %}{% endlabelled %}
+            {% endif %}
 
             {% if vcf.uploadedvcf.file_upload.exists or annotated_download_files and not vcf.data_archived %}
                 <div class="form-group-row row">

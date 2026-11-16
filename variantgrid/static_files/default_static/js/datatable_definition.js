@@ -838,6 +838,17 @@ TableFormat.importStatus = (data, type, row) => {
     return $('<i>', {class: data.icon_css, title: data.label}).prop('outerHTML');
 };
 
+// What kinds of call a VCF or sample holds, a chip each - the grids' side of the variant_contents template tag.
+// data is variant_contents_chips() (snpdb/variant_contents.py); styled by .variant-content-* in global.css
+TableFormat.variantContents = (data, type, row) => {
+    const dom = $('<span>', {class: 'variant-contents'});
+    for (const chip of data || []) {
+        $('<span>', {class: `variant-content-chip variant-content-${chip.content}`, title: chip.title,
+                     text: chip.label}).appendTo(dom);
+    }
+    return dom.children().length ? dom.prop('outerHTML') : '';
+};
+
 TableFormat.flags = (data, type, row) => {
     if (data) {
         return $('<div>', {'data-flags': data, class:'flags', text:'...'}).prop('outerHTML');

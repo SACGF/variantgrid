@@ -6,8 +6,17 @@ from django.utils.safestring import mark_safe
 
 from patients.enums import Sex
 from snpdb.models import DETECTED_SEX_HELP, CohortGenotypeStats, Duo, Quad, Trio
+from snpdb.variant_contents import get_sample_variant_contents
 
 register = Library()
+
+
+def _with_variant_contents(members: list[dict]) -> list[dict]:
+    """ Each family member's row gets the kinds of call its sample holds, looked up for the family at once """
+    contents = get_sample_variant_contents([member["cohort_sample"].sample_id for member in members])
+    for member in members:
+        member["variant_contents"] = contents.get(member["cohort_sample"].sample_id)
+    return members
 
 
 @register.inclusion_tag("snpdb/tags/trio_table.html", takes_context=False)
@@ -18,7 +27,7 @@ def trio_table(trio: Trio):
         {"role": "Mother", "cohort_sample": trio.mother, "affected": trio.mother_affected},
         {"role": "Proband", "cohort_sample": trio.proband, "affected": True},
     ]
-    return {"trio": trio, "members": members}
+    return {"trio": trio, "members": _with_variant_contents(members)}
 
 
 @register.inclusion_tag("snpdb/tags/quad_table.html", takes_context=False)
@@ -30,7 +39,7 @@ def quad_table(quad: Quad):
         {"role": "Proband", "cohort_sample": quad.proband, "affected": True},
         {"role": "Sibling", "cohort_sample": quad.sibling, "affected": quad.sibling_affected},
     ]
-    return {"quad": quad, "members": members}
+    return {"quad": quad, "members": _with_variant_contents(members)}
 
 
 @register.inclusion_tag("snpdb/tags/duo_table.html", takes_context=False)
@@ -40,7 +49,7 @@ def duo_table(duo: Duo):
         {"role": "Proband", "cohort_sample": duo.proband, "affected": True},
         {"role": duo.relationship_label, "cohort_sample": duo.relative, "affected": duo.relative_affected},
     ]
-    return {"duo": duo, "members": members}
+    return {"duo": duo, "members": _with_variant_contents(members)}
 
 
 @register.simple_tag
