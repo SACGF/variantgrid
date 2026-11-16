@@ -697,9 +697,6 @@ class DamageNodeForm(BaseNodeForm):
         }
 
     GROUPS = ((ANY_OF, "Any of"), (ALL_OF, "All of"))
-    # One-click chips beside each group's Add filter, where the filter is offered and not already in use
-    QUICK_ADD = {ANY_OF: ("impact_min", "splice_min", "damage_predictions_min"),
-                 ALL_OF: ("variant_types", "gene_loeuf_max")}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -772,9 +769,7 @@ class DamageNodeForm(BaseNodeForm):
             "defaultRequired": model_default(f.required_field),
             "defaultAllowNull": model_default(f.allow_null_field),
         } for f in self.effect_filters]
-        offered = {f.key for f in self.effect_filters}
-        quick = {group: [key for key in keys if key in offered] for group, keys in self.QUICK_ADD.items()}
-        return {"filters": filters, "quick": quick, "sentence": SENTENCE}
+        return {"filters": filters, "sentence": SENTENCE}
 
 
 class FilterNodeForm(BaseNodeForm):

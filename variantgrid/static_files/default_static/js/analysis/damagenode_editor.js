@@ -133,8 +133,7 @@ function effectFilterSentence(anyOf, allOf, sentence) {
 }
 
 /**
- * @param {{filters: EffectFilter[], quick: {any: string[], all: string[]}, sentence: Object<string, string>,
- *          canEdit: boolean}} options
+ * @param {{filters: EffectFilter[], sentence: Object<string, string>, canEdit: boolean}} options
  */
 function initDamageNodeEditor(options) {
     $(document).ready(function() {
@@ -293,12 +292,6 @@ function initDamageNodeEditor(options) {
 
         function renderAddControls(group, used) {
             const add = $(".effect-group[data-group='" + group + "'] .effect-add", editor).empty();
-            for (const key of options.quick[group]) {
-                if (!used.has(key)) {
-                    $("<button/>", {type: "button", class: "effect-quick", "data-add": key, "data-group": group,
-                                    text: "+ " + filtersByKey[key].label}).appendTo(add);
-                }
-            }
             $("<button/>", {type: "button", class: "effect-add-button", "data-palette": group,
                             "aria-expanded": String(openPalette === group), text: "+ Add filter"}).appendTo(add);
 
@@ -359,11 +352,11 @@ function initDamageNodeEditor(options) {
                                             : "Nothing here, so this group removes nothing.";
                 }
                 $(".effect-group-empty", groupDiv).text(empty).toggle(!rows.length);
-                let hint = "a variant must pass every one. Each one added removes variants";
+                let hint = "a variant must pass every one, so adding one can only narrow the results";
                 if (group === "any") {
                     hint = "a variant needs at least one of these";
                     if (rows.length > 1) {
-                        hint += ". Each one added lets more variants through";
+                        hint += ", so adding one can only widen the results";
                     }
                 }
                 $(".effect-group-hint", groupDiv).text(hint);
@@ -409,12 +402,18 @@ function initDamageNodeEditor(options) {
         editor.on("click", "button", function () {
             const button = $(this);
             const rowKey = button.closest(".effect-filter").attr("data-filter");
+            if (button.attr("data-palette")) {
+                openPalette = openPalette === button.attr("data-palette") ? null : button.attr("data-palette");
+                layout();
+                return;
+            }
+            if (button.hasClass("effect-palette-done")) {
+                openPalette = null;
+                layout();
+                return;
+            }
             if (button.attr("data-add")) {
                 addFilter(filtersByKey[button.attr("data-add")], button.attr("data-group"));
-            } else if (button.attr("data-palette")) {
-                openPalette = openPalette === button.attr("data-palette") ? null : button.attr("data-palette");
-            } else if (button.hasClass("effect-palette-done")) {
-                openPalette = null;
             } else if (button.hasClass("effect-move")) {
                 const f = filtersByKey[rowKey];
                 setRequired(f, groupOf(f) === "any");
@@ -426,6 +425,7 @@ function initDamageNodeEditor(options) {
                 return;
             }
             layout();
+            form.trigger("change");  // these set fields without the browser's change event, which node_presets.js watches
         });
 
         // A second slider on a row (AlphaGenome splicing) switches on and off by itself

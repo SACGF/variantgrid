@@ -1955,22 +1955,6 @@ span.node-counts {
 	padding: 4px 0 0 36px;
 }
 
-.effect-quick {
-	padding: 1px 10px;
-	border: 1px dashed #c6cdd6;
-	border-radius: 999px;
-	background: none;
-	font-size: 12px;
-	color: #3d4550;
-	cursor: pointer;
-}
-
-.effect-quick:hover {
-	border-style: solid;
-	border-color: #3455a4;
-	color: #3455a4;
-}
-
 .effect-add-button {
 	padding: 2px 10px;
 	border: 1px solid #c6cdd6;
