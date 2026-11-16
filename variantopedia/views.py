@@ -71,7 +71,12 @@ from variantopedia.interesting_nearby import (
     get_nearby_qs,
     get_nearby_summaries,
 )
-from variantopedia.variant_types import get_size_limits, get_unsupported, get_variant_type_rows
+from variantopedia.variant_types import (
+    get_display_examples,
+    get_size_limits,
+    get_unsupported,
+    get_variant_type_rows,
+)
 
 
 def variants(request, genome_build_name=None):
@@ -353,6 +358,7 @@ def search(request):
 def variant_types(request):
     context = {
         "groups": get_variant_type_rows(),
+        "display_examples": get_display_examples(),
         "size_limits": get_size_limits(),
         "unsupported": get_unsupported(),
         "symbolic_alt_size": format_bp(settings.VARIANT_SYMBOLIC_ALT_SIZE),
