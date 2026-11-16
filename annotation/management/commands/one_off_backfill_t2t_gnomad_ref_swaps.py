@@ -3,9 +3,9 @@
 Fills the gnomAD columns of T2T variants annotated from gnomAD 4.1.t2t_liftover, which has no record where CHM13's
 reference allele differs from GRCh38's, from the 4.1.t2t_liftover_ref_swaps file that adds them (#2788).
 
-Runs on each VariantAnnotationVersion with backfilled_gnomad_ref_swaps False (migration 0018 sets it on the ACTIVE
-T2T version): dumps its variants with no gnomAD AF, `bcftools annotate`s them against the settings' gnomAD file,
-imports the result and sets the flag.
+Runs on each VariantAnnotationVersion with backfilled_gnomad_ref_swaps False (migrations 0018 and 0019 set it on the
+ACTIVE and NEW T2T versions): dumps its variants with no gnomAD AF, `bcftools annotate`s them against the settings'
+gnomAD file, imports the result and sets the flag.
 """
 import os
 import subprocess
