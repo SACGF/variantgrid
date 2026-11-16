@@ -103,10 +103,36 @@ jobs:
         # deploys generate it via the upgrader, a fresh checkout doesn't have it
         run: .venv/bin/python manage.py collectstatic_js_reverse
 
+      - name: Restore migrated test database
+        # Building the test database from the migrations is half the job (~3 min of ~6), and the result only
+        # changes when a migration, an installed package or what the runner seeds does - so it is cached on those
+        id: test-db
+        uses: actions/cache@v4
+        with:
+          path: test_snpdb.dump
+          key: test-db-v1-${{ hashFiles('*/migrations/*.py', '*/fake_data.py', 'variantgrid/test_runner.py', 'requirements.txt', 'requirements-dev.txt') }}
+
+      - name: Load cached test database
+        if: steps.test-db.outputs.cache-hit == 'true'
+        # pg_restore from the service container, so client and server versions always match
+        run: |
+          docker exec "$POSTGRES_CONTAINER" createdb -U snpdb test_snpdb
+          docker exec -i "$POSTGRES_CONTAINER" pg_restore -U snpdb --no-owner -d test_snpdb < test_snpdb.dump
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+
       - name: Run unit tests
         # data/ is PRIVATE_DATA_ROOT (untracked) - some upload tests write output files there
         # --parallel 4: the runner clones the test DB per worker; the whole suite ran clean this way
         # on vg-test2 in ~2 min (claude/guides/testing.md#running-tests)
+        # --keepdb: uses the cached database when one was loaded (the tests run in the per-worker clones,
+        # so test_snpdb itself only ever holds the migrations and the runner's seed) and leaves it to dump
         run: |
           mkdir -p data media_root
-          .venv/bin/python manage.py test --parallel 4
+          .venv/bin/python manage.py test --parallel 4 --keepdb
+
+      - name: Dump test database for the cache
+        if: steps.test-db.outputs.cache-hit != 'true'
+        run: docker exec "$POSTGRES_CONTAINER" pg_dump -U snpdb -Fc test_snpdb > test_snpdb.dump
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
