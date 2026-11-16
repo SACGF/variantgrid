@@ -176,14 +176,13 @@ class TestDamageNodeVersionWithoutPredictors(_ColumnsVersionMixin, TestCase):
     def test_editor_hides_filters_without_data(self):
         with patch.object(VariantAnnotationVersion, "visible_columns", frozenset({"nmd_escaping_variant"})):
             html = self._editor_html()
-        for element_id in ["damage-predictions-slider", "cosmic-count-slider", "revel_rankscore-slider",
-                           "id_aloft", "show-individual-pathogenic-prediction"]:
-            self.assertNotIn(f'id="{element_id}"', html)
-        self.assertIn('id="id_nmd_escaping_variant"', html)
+        for key in ["damage_predictions_min", "cosmic_count_min", "revel_rankscore_min", "aloft"]:
+            self.assertNotIn(f'data-filter="{key}"', html)
+        self.assertIn('data-filter="nmd_escaping_variant"', html)
 
     def test_editor_shows_saved_filter_without_data_so_it_can_be_cleared(self):
         with patch.object(VariantAnnotationVersion, "visible_columns", frozenset()):
             html = self._editor_html(revel_rankscore_min=0.5, cosmic_count_min=3)
-        self.assertIn('id="revel_rankscore-slider"', html)
-        self.assertIn('id="cosmic-count-slider"', html)
-        self.assertNotIn('id="vest4_rankscore-slider"', html)
+        self.assertIn('data-filter="revel_rankscore_min"', html)
+        self.assertIn('data-filter="cosmic_count_min"', html)
+        self.assertNotIn('data-filter="vest4_rankscore_min"', html)

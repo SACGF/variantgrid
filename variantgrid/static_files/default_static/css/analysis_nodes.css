@@ -475,8 +475,8 @@ button.add-analysis-variable-button {
 	padding-left: 3px;
 }
 
-/* Hover card (analysis_nodes.js:setupNodeHoverCard) - the node's whole name, each chip with its full text, then the
-   class help. A Bootstrap popover appended to body, so nothing here is under .design-a-node */
+/* Hover card (analysis_nodes.js:setupNodeHoverCard) - the node's whole name, its description where it has one, each
+   chip with its full text, then the class help. A Bootstrap popover appended to body, so nothing here is under .design-a-node */
 .node-hover-card {
 	max-width: 360px;
 }
@@ -497,6 +497,12 @@ button.add-analysis-variable-button {
 	list-style: none;
 	margin: 0;
 	padding: 0;
+}
+
+.node-hover-card .node-hover-card-description {
+	margin-top: 4px;
+	font-size: 12px;
+	overflow-wrap: anywhere;
 }
 
 .node-hover-card .node-hover-card-chips {
@@ -1789,14 +1795,341 @@ span.node-counts {
 	opacity: 0.4;
 }
 
-#node-editor-wrapper .enable-slider {
-	margin-right: 4px;
-	vertical-align: middle;
+/* Effect node editor (damagenode_editor.html) - an "Any of" and an "All of" group holding only the filters in use */
+.effect-editor {
+	container-type: inline-size;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin: 6px 0;
 }
 
-/* The tick and its slider stay on one line */
-.editor-table td:has(> .enable-slider) {
+.effect-lead {
+	font-weight: 600;
+	color: #3d4550;
+}
+
+.effect-group {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 6px 10px 8px;
+	border: 1px solid #e3e7ec;
+	border-radius: 6px;
+	background-color: white;
+}
+
+.effect-group-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 2px 10px;
+}
+
+.effect-group-name {
+	padding: 1px 7px;
+	border-radius: 4px;
+	background-color: rgba(52, 85, 164, .09);
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: .06em;
+	text-transform: uppercase;
+}
+
+.effect-group-hint,
+.effect-group-empty {
+	color: #6b7280;
+	font-size: 12px;
+}
+
+.effect-group-empty {
+	padding: 5px 0 5px 36px;
+}
+
+.effect-joiner {
+	margin-left: 12px;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: .06em;
+	text-transform: uppercase;
+	color: #6b7280;
+}
+
+.effect-filter {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 2px 10px;
+	min-height: 30px;
+	padding: 3px 0;
+}
+
+.effect-filter + .effect-filter {
+	border-top: 1px solid #e3e7ec;
+}
+
+.effect-filter-conj {
+	flex: 0 0 26px;
+	font-size: 12px;
+	font-style: italic;
+	color: #6b7280;
+}
+
+.effect-filter-label {
+	flex: 0 0 200px;
+	font-weight: 600;
+	color: #3d4550;
+}
+
+.effect-filter-op {
+	margin-left: 2px;
+	font-weight: normal;
+	color: #6b7280;
+}
+
+.effect-filter-control {
+	display: flex;
+	flex: 1 1 240px;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px 12px;
+	min-width: 0;
+}
+
+#node-editor-wrapper .effect-filter-control .slider-container {
+	margin-left: 0;
+}
+
+.effect-filter-option {
 	white-space: nowrap;
+	color: #3d4550;
+}
+
+/* A second slider on the row (AlphaGenome in Splicing) wraps with its on/off box and licence link */
+.effect-filter-option-group {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px 8px;
+}
+
+.effect-filter-actions {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin-left: auto;
+}
+
+.effect-action {
+	padding: 2px 7px;
+	border: 1px solid transparent;
+	border-radius: 6px;
+	background: none;
+	font-size: 12px;
+	color: #6b7280;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.effect-action:hover {
+	border-color: #c6cdd6;
+	background-color: #f4f6f8;
+	color: #24292f;
+}
+
+.effect-add {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 0 0 36px;
+}
+
+.effect-quick {
+	padding: 1px 10px;
+	border: 1px dashed #c6cdd6;
+	border-radius: 999px;
+	background: none;
+	font-size: 12px;
+	color: #3d4550;
+	cursor: pointer;
+}
+
+.effect-quick:hover {
+	border-style: solid;
+	border-color: #3455a4;
+	color: #3455a4;
+}
+
+.effect-add-button {
+	padding: 2px 10px;
+	border: 1px solid #c6cdd6;
+	border-radius: 6px;
+	background-color: white;
+	font-size: 12px;
+	font-weight: 600;
+	color: #3455a4;
+	cursor: pointer;
+}
+
+.effect-add-button:hover,
+.effect-add-button[aria-expanded="true"] {
+	border-color: #3455a4;
+	background-color: rgba(52, 85, 164, .09);
+}
+
+.effect-palette {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin: 6px 0 2px 36px;
+	padding: 8px 10px;
+	border: 1px solid #e3e7ec;
+	border-radius: 6px;
+	background-color: #f4f6f8;
+}
+
+.effect-palette[hidden] {
+	display: none;
+}
+
+.effect-palette-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	font-weight: 600;
+	color: #3d4550;
+}
+
+.effect-palette-category {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 4px 8px;
+}
+
+.effect-palette-category-name {
+	flex: 0 0 150px;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+	color: #6b7280;
+}
+
+.effect-palette-items {
+	display: flex;
+	flex: 1 1 260px;
+	flex-wrap: wrap;
+	gap: 4px;
+	min-width: 0;
+}
+
+.effect-palette-items button {
+	padding: 1px 8px;
+	border: 1px solid #c6cdd6;
+	border-radius: 6px;
+	background-color: white;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.effect-palette-items button:hover:not(:disabled) {
+	border-color: #3455a4;
+	color: #3455a4;
+}
+
+.effect-palette-items button:disabled {
+	opacity: .45;
+	cursor: default;
+}
+
+.effect-words {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 7px 10px;
+	border-radius: 6px;
+	background-color: #f4f6f8;
+}
+
+.effect-words-label {
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+	color: #6b7280;
+}
+
+.effect-sentence-term {
+	white-space: nowrap;
+}
+
+.effect-sentence-separator {
+	color: #6b7280;
+}
+
+/* Calibrated ClinGen PP3/BP4 cutoff bands drawn over a raw-score slider track, and the value coloured by its band */
+.effect-editor .cutoff-band {
+	position: absolute;
+	top: 50%;
+	z-index: 1;
+	height: 8px;
+	transform: translateY(-50%);
+	opacity: .35;
+	pointer-events: none;
+}
+
+.effect-editor .cutoff-band-benign {
+	background-color: #2c7fb8;
+}
+
+.effect-editor .cutoff-band-pathogenic {
+	background-color: #d7301f;
+}
+
+.effect-editor .slider-value.in-benign {
+	color: #2c7fb8;
+}
+
+.effect-editor .slider-value.in-pathogenic {
+	color: #d7301f;
+}
+
+.effect-editor .slider-value.in-intermediate {
+	color: #888;
+}
+
+/* A narrow editor panel: the label takes its own line, the control and actions go under it */
+@container (max-width: 560px) {
+	.effect-filter-label {
+		flex-basis: calc(100% - 40px);
+	}
+
+	.effect-filter-control {
+		flex-basis: 100%;
+		padding-left: 36px;
+	}
+
+	.effect-filter-actions {
+		margin-left: 36px;
+	}
+
+	.effect-palette-category-name {
+		flex-basis: 100%;
+	}
+
+	.effect-palette,
+	.effect-add,
+	.effect-group-empty {
+		margin-left: 0;
+		padding-left: 0;
+	}
+
+	.effect-palette {
+		padding: 8px 10px;
+	}
 }
 
 /* Allele frequency ranges (allele_frequency_tag.html) */

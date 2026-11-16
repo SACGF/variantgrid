@@ -12,6 +12,7 @@ from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.intersection_node import IntersectionNode
 from analysis.tests.utils import AnalysisSetupMixin
 from analysis.views.views_node import NODE_DISPATCHER
+from annotation.enums import Pathogenicity, PathogenicityImpact
 from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.variant_filters import VariantType
 
@@ -35,7 +36,8 @@ class _FormSubmitDataParser(HTMLParser):
         elif tag == "input":
             name = attrs.get("name")
             if name and (attrs.get("type") not in ("checkbox", "radio") or "checked" in attrs):
-                self.data[name] = attrs.get("value", "")
+                default = "on" if attrs.get("type") == "checkbox" else ""
+                self.data[name] = attrs.get("value", default)
         elif tag == "select":
             self._select_name = attrs.get("name")
         elif tag == "option" and self._select_name and "selected" in attrs:
@@ -90,6 +92,27 @@ class NodeEditorRenderTest(AnalysisSetupMixin, TestCase):
             self.assertIn(label, content)
         # The checkbox for the node's stored value comes back ticked
         self.assertIn(f'value="{VariantType.SNV}" id="id_variant_types_0" checked>', content)
+
+    def test_damage_node_editor_posts_back_unchanged(self):
+        """ The editor lays its rows out in groups client side - unedited, it posts the same node back """
+        node = DamageNode.objects.create(analysis=self.analysis, impact_min=PathogenicityImpact.HIGH,
+                                         annotsv_acmg_class_min=Pathogenicity.LIKELY_PATHOGENIC,
+                                         gene_loeuf_max=0.6, gene_loeuf_required=True, gene_loeuf_allow_null=False,
+                                         splice_min=0.5, splice_required=True, in_cosmic=True,
+                                         variant_types=[VariantType.SNV])
+        response = self._get_editor(node)
+        content = response.content.decode()
+        self.assertIn('data-filter="gene_loeuf_max"', content)
+        # A field the version's editor doesn't draw posts nothing, as it always has
+        drawn = [f.name for f in DamageNode._meta.fields if f'name="{f.name}"' in content]
+        before = {name: getattr(node, name) for name in drawn}
+
+        client = Client()
+        client.force_login(self.user)
+        post_response = client.post(response.request["PATH_INFO"], form_submit_data(content, "damage-filter"))
+        self.assertEqual({}, post_response.json())
+        node.refresh_from_db()
+        self.assertEqual(before, {name: getattr(node, name) for name in drawn})
 
     def test_intersection_node_variant_text(self):
         node = IntersectionNode.objects.create(analysis=self.analysis,

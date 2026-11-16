@@ -2,60 +2,17 @@
 {% load js_tags %}
 {% load static %}
 {% block content %}
-<style>
-	.individual-pathogenic-prediction {
-	    display: none;
-	}
-
-	#damage-table th.filter-required,
-	#damage-table td.filter-required {
-	    text-align: center;
-	}
-
-	/* Calibrated ClinGen PP3/BP4 cutoff bands drawn over the raw-score slider track */
-	.cutoff-band {
-	    position: absolute;
-	    top: 50%;
-	    height: 8px;
-	    transform: translateY(-50%);
-	    z-index: 1;
-	    opacity: 0.35;
-	    pointer-events: none;
-	}
-	.cutoff-band-benign {
-	    background-color: #2c7fb8;
-	}
-	.cutoff-band-pathogenic {
-	    background-color: #d7301f;
-	}
-
-	/* Colour the chosen threshold value by which calibrated band it falls in */
-	.slider-value.in-benign {
-	    color: #2c7fb8;
-	}
-	.slider-value.in-pathogenic {
-	    color: #d7301f;
-	}
-	.slider-value.in-intermediate {
-	    color: #888;
-	}
-</style>
+{% comment %}
+    The layout is the node's logic (#2836): every "All of" filter, and at least one "Any of". Each filter's row is
+    rendered once, into the hidden pool; damagenode_editor.js moves the rows that have a value into their group
+    (the filter's _required field) and writes that field back when a row moves, so the form posts what it always has.
+{% endcomment %}
 <script src="{% static 'js/analysis/damagenode_editor.js' %}"></script>
 <script>
-    initDamageNodeEditor({
-        columnsVersion: {{ node.columns_version | jsonify }},
-        showRequiredFilter: {{ node.has_required | jsonify }},
-        hasIndividualPathogenicPredictions: {{ node.has_individual_pathogenic_predictions | jsonify }},
-        hasRankscorePredictions: {{ node.has_rankscore_predictions | jsonify }},
-        sliders: {{ form.get_slider_setups | jsonify }},
-    });
+    initDamageNodeEditor(Object.assign({{ form.get_editor_options | jsonify }},
+                                       {canEdit: {{ has_write_permission | jsonify }}}));
 </script>
 <div>
-    <div class="editor-help">
-        Shows variants meeting <b>any</b> of the filters below, unless some are made mandatory via 'Required'.
-        Tick the box beside a slider to enable it - that tells "not set" apart from a minimum of 0.
-    </div>
-
 	<form id="damage-filter" method="post" action="{{ request.path }}">
         {% csrf_token %}
         {% for hidden in form.hidden_fields %}
@@ -64,381 +21,84 @@
 
 		{{ form.non_field_errors }}
         {% include "analysis/node_editors/_node_presets.html" with form_id="form#damage-filter" %}
-        <table class="editor-table" id="damage-table">
-            <tr class="editor-table-head">
-                <th></th>
-                <th></th>
-                <th><a class="hover-link" href="#" id="toggle-required-filter"
-                       title="Show/hide the Required and Allow Null columns. Variants must pass every Required filter, plus at least one of the others">Required</a></th>
-                <th class="collapse filter-required">
-                    <span class="hover-detail" data-toggle="tooltip"
-                          title="For a Required filter, also keep variants the tool has no score for (eg pathogenicity predictors only score non-synonymous SNVs) rather than filtering them out. For Damage predictions, a tool with no prediction is not counted as benign">Allow Null</span>
-                </th>
-            </tr>
-            <tr>
-                <th>{{ form.variant_types.label }}</th>
-                <td>{{ form.variant_types.errors }}<div class="editor-choices">{{ form.variant_types }}</div></td>
-                <td class="collapse filter-required"> <!-- variant type always restricts --> </td>
-                <td class="collapse filter-required"> <!-- variant_types is non-nullable --> </td>
-            </tr>
-            <tr>
-                <th>{{ form.impact_min.label }}</th>
-                <td>{{ form.impact_min.errors }} {{ form.impact_min }}</td>
-                <td class="collapse filter-required">{{ form.impact_required }}</td>
-                <td class="collapse filter-required"> <!-- impact_min is non-nullable --> </td>
-            </tr>
-            <tr>
-                <th>{{ form.splice_min.label }}</th>
-                <td>{{ form.splice_min.errors }}
-                    <input id="enable-splice"  title="Enable Splicing slider" class="enable-slider" type="checkbox" />
-                    <span class='slider-container'>
-                        <div class="display-flex">
-                            <span class="slider-track"><input type="range" id="splice-slider" class='slider' /></span>
-                            <div class='label slider-value'></div>
-                        </div>
-                        <div class='slider-labels'>
-                            <span class='label min-value left'></span>
-                            <span class='label max-value right'></span>
-                        </div>
-                    </span>
-                    {% if node.has_alphagenome_splicing %}
-                        <div class="mt-1">
-                            <label for="enable-alphagenome-splicing" class="mb-0"
-                                   title="AlphaGenome merged splicing score (0 to ~3), kept as another OR term in this filter beside SpliceAI and dbscSNV. No published cutoff - uncalibrated">AlphaGenome splicing &ge;</label>
-                            <a class="text-muted small" href="https://deepmind.google.com/science/alphagenome/downloads" target="_blank"
-                               title="AlphaGenome merged splicing scores are licensed for non-commercial use only, and not for diagnostic procedures">non-commercial use only</a>
-                            {{ form.alphagenome_splicing_min.errors }}
-                            <div>
-                                <input id="enable-alphagenome-splicing" title="Enable AlphaGenome splicing slider" class="enable-slider" type="checkbox" />
-                                <span class='slider-container'>
-                                    <div class="display-flex">
-                                        <span class="slider-track"><input type="range" id="alphagenome-splicing-slider" class='slider' /></span>
-                                        <div class='label slider-value'></div>
-                                    </div>
-                                    <div class='slider-labels'>
-                                        <span class='label min-value left'></span>
-                                        <span class='label max-value right'></span>
-                                    </div>
-                                </span>
-                            </div>
-                        </div>
+
+        <div id="effect-filter-editor" class="effect-editor{% if not has_write_permission %} effect-editor-readonly{% endif %}">
+            <div class="effect-lead">Keep variants that match</div>
+            {% for group, name in form.GROUPS %}
+                {% if not forloop.first %}<div class="effect-joiner">and</div>{% endif %}
+                <div class="effect-group" data-group="{{ group }}">
+                    <div class="effect-group-head">
+                        <span class="effect-group-name">{{ name }}</span>
+                        <span class="effect-group-hint"></span>
+                    </div>
+                    <div class="effect-group-rows"></div>
+                    <div class="effect-group-empty"></div>
+                    {% if has_write_permission %}
+                        <div class="effect-add"></div>
+                        <div class="effect-palette" hidden></div>
                     {% endif %}
-                </td>
-                <td class="collapse filter-required">{{ form.splice_required }}</td>
-                <td class="collapse filter-required">{{ form.splice_allow_null }}</td>
-            </tr>
-            {% if node.shows_damage_predictions %}
-            <tr>
-                <th>{{ form.damage_predictions_min.label }}
-                    <span class="hover-detail" data-toggle="tooltip"
-                          title="{{ node.damage_predictions_description }}">
-                    <i class="far fa-question-circle"></i></span>
-                </th>
-                <td>
-                    {{ form.damage_predictions_min.errors }}
-                    <input id="enable-damage-predictions" title="Enable Damage Predictions slider" class="enable-slider" type="checkbox" />
-                    <span class='slider-container'>
-                        <div class="display-flex">
-                            <span class="slider-track"><input type="range" id="damage-predictions-slider" class='slider' /></span>
-                            <div class='label slider-value'></div>
-                        </div>
-                        <div class='slider-labels'>
-                            <span class='label min-value left'></span>
-                            <span class='label max-value right'></span>
-                        </div>
-                    </span>
-                </td>
-                <td class="collapse filter-required">{{ form.damage_predictions_required }}</td>
-                <td class="collapse filter-required">{{ form.damage_predictions_allow_null }}</td>
-            </tr>
-            {% endif %}
-            {% if form.has_individual_prediction_rows %}
-                <tr id="show-individual-pathogenic-prediction">
-                    <td colspan="2">
-                        <a class="hover-link" href="#">Show individual pathogenicity predictions</a>
-                    </td>
-                    <td></td>
-                    <td></td>
-                </tr>
-            {% endif %}
-            {% if node.columns_version >= 4 and form.get_rankscore_rows %}
-                <tr id="show-rankscore-prediction">
-                    <td colspan="2">
-                        <a class="hover-link" href="#">Show rankscores (legacy)</a>
-                    </td>
-                    <td></td>
-                    <td></td>
-                </tr>
-            {% endif %}
-            {% if node.columns_version == 1 %}
-                <tr class="individual-pathogenic-prediction">
-                    <th>{{ form.cadd_score_min.label }}</th>
-                    <td>{{ form.cadd_score_min.errors }}
-                        <input id="enable-cadd" title="Enable CADD slider" class="enable-slider" type="checkbox" />
-                        <span class='slider-container'>
-                            <div class="display-flex">
-                                <span class="slider-track"><input type="range" id="cadd-slider" class='slider' /></span>
-                                <div class='label slider-value'></div>
-                            </div>
-                            <div class='slider-labels'>
-                                <span class='label min-value left'></span>
-                                <span class='label max-value right'></span>
-                            </div>
+                </div>
+            {% endfor %}
+            <div class="effect-words">
+                <span class="effect-words-label">In words</span>
+                <span class="effect-sentence"></span>
+            </div>
+
+            <div class="effect-filter-pool" hidden>
+                {% for row in form.filter_rows %}
+                    <div class="effect-filter" data-filter="{{ row.filter.key }}">
+                        <span class="effect-filter-conj"></span>
+                        <span class="effect-filter-label"{% if row.filter.help %} title="{{ row.filter.help }}"{% endif %}>{{ row.filter.label }}{% if row.filter.op %} <span class="effect-filter-op">{{ row.filter.op }}</span>{% endif %}</span>
+                        <span class="effect-filter-control">
+                            {% for value in row.values %}
+                                {{ value.field.errors }}
+                                {% if value.slider %}
+                                    {% if value.optional %}
+                                        <span class="effect-filter-option-group">
+                                        <label class="effect-filter-option" title="AlphaGenome merged splicing score (0 to ~3), another OR term in this filter beside SpliceAI and dbscSNV. No published cutoff - uncalibrated">
+                                            <input type="checkbox" class="effect-slider-enable" data-field="{{ value.field.name }}"> or AlphaGenome &ge;
+                                        </label>
+                                    {% endif %}
+                                    <span class="slider-container">
+                                        <span class="display-flex">
+                                            <span class="slider-track"><input type="range" class="slider effect-slider" id="{{ value.field.name }}-slider" data-field="{{ value.field.name }}" aria-label="{% if value.optional %}AlphaGenome splicing{% else %}{{ row.filter.label }}{% endif %}"></span>
+                                            <span class="label slider-value"></span>
+                                        </span>
+                                    </span>
+                                    {% if value.optional %}
+                                        <a class="text-muted small" href="https://deepmind.google.com/science/alphagenome/downloads" target="_blank"
+                                           title="AlphaGenome merged splicing scores are licensed for non-commercial use only, and not for diagnostic procedures">non-commercial use only</a>
+                                        </span>
+                                    {% endif %}
+                                {% elif value.choices %}
+                                    <span class="editor-choices">{{ value.field }}</span>
+                                {% elif value.flag %}
+                                    <span class="d-none">{{ value.field }}</span>
+                                {% else %}
+                                    {{ value.field }}
+                                {% endif %}
+                            {% endfor %}
+                            {% if row.allow_null_field %}
+                                <label class="effect-filter-option effect-filter-null">{{ row.allow_null_field }} {{ row.filter.null_label }}</label>
+                            {% endif %}
                         </span>
-                    </td>
-                    <td class="collapse filter-required">{{ form.cadd_score_required }}</td>
-                    <td class="collapse filter-required">{{ form.cadd_score_allow_null }}</td>
-                </tr>
-                <tr class="individual-pathogenic-prediction">
-                    <th>{{ form.revel_score_min.label }}</th>
-                    <td>{{ form.revel_score_min.errors }}
-                        <input id="enable-revel"  title="Enable Revel slider" class="enable-slider" type="checkbox" />
-                        <span class='slider-container'>
-                            <div class="display-flex">
-                                <span class="slider-track"><input type="range" id="revel-slider" class='slider' /></span>
-                                <div class='label slider-value'></div>
-                            </div>
-                            <div class='slider-labels'>
-                                <span class='label min-value left'></span>
-                                <span class='label max-value right'></span>
-                            </div>
-                        </span>
-                    </td>
-                    <td class="collapse filter-required">{{ form.revel_score_required }}</td>
-                    <td class="collapse filter-required">{{ form.revel_score_allow_null }}</td>
-                </tr>
-            {% elif node.columns_version >= 2 %}
-                {% for row in form.get_rankscore_rows %}
-                    <tr class="individual-pathogenic-prediction rankscore-prediction">
-                        <th>{{ row.min_field.label }}</th>
-                        <td>{{ row.min_field.errors }}
-                            <input id="enable-{{ row.field }}" title="Enable {{ row.tool.name }} rankscore slider" class="enable-slider" type="checkbox" />
-                            <span class='slider-container'>
-                                <div class="display-flex">
-                                    <span class="slider-track"><input type="range" id="{{ row.field }}-slider" class='slider' /></span>
-                                    <div class='label slider-value'></div>
-                                </div>
-                                <div class='slider-labels'>
-                                    <span class='label min-value left'></span>
-                                    <span class='label max-value right'></span>
-                                </div>
+                        {% if row.required_field %}<span class="d-none">{{ row.required_field }}</span>{% endif %}
+                        {% if has_write_permission %}
+                            <span class="effect-filter-actions">
+                                {% if row.required_field %}<button type="button" class="effect-action effect-move"></button>{% endif %}
+                                <button type="button" class="effect-action effect-remove" title="Remove" aria-label="Remove {{ row.filter.label }}">&#x2715;</button>
                             </span>
-                        </td>
-                        <td class="collapse filter-required">{{ row.required_field }}</td>
-                        <td class="collapse filter-required">{{ row.allow_null_field }}</td>
-                    </tr>
+                        {% endif %}
+                    </div>
                 {% endfor %}
-                {% if node.columns_version >= 4 %}
-                    {% for row in form.get_raw_score_rows %}
-                        <tr class="individual-pathogenic-prediction">
-                            <th>{{ row.min_field.label }}</th>
-                            <td>{{ row.min_field.errors }}
-                                <input id="enable-{{ row.field }}" title="Enable {{ row.tool.name }} raw slider" class="enable-slider" type="checkbox" />
-                                <span class='slider-container'>
-                                    <div class="display-flex">
-                                        <span class="slider-track"><input type="range" id="{{ row.field }}-slider" class='slider' /></span>
-                                        <div class='label slider-value'></div>
-                                    </div>
-                                    <div class='slider-labels'>
-                                        <span class='label min-value left'></span>
-                                        <span class='label max-value right'></span>
-                                    </div>
-                                </span>
-                            </td>
-                            <td class="collapse filter-required">{{ row.required_field }}</td>
-                            <td class="collapse filter-required">{{ row.allow_null_field }}</td>
-                        </tr>
-                    {% endfor %}
-                    {% for row in form.get_pred_rows %}
-                        <tr>
-                            <th>{{ row.pred_field.label }}</th>
-                            <td>{{ row.pred_field.errors }} {{ row.pred_field }}</td>
-                            <td class="collapse filter-required">{{ row.required_field }}</td>
-                            <td class="collapse filter-required">{{ row.allow_null_field }}</td>
-                        </tr>
-                    {% endfor %}
-                {% endif %}
-            {% endif %}
-            {% if node.shows_cosmic_count %}
-            <tr>
-                <th>{{ form.cosmic_count_min.label }}</th>
-                <td>{{ form.cosmic_count_min.errors }}
-                    <input id="enable-cosmic-count"  title="Enable COSMIC count slider" class="enable-slider" type="checkbox" />
-                    <span class='slider-container'>
-                        <div class="display-flex">
-                            <span class="slider-track"><input type="range" id="cosmic-count-slider" class='slider' /></span>
-                            <div class='label slider-value'></div>
-                        </div>
-                        <div class='slider-labels'>
-                            <span class='label min-value left'></span>
-                            <span class='label max-value right'></span>
-                        </div>
-                    </span>
-                </td>
-                <td class="collapse filter-required">{{ form.cosmic_count_required }}</td>
-                <td class="collapse filter-required"> <!-- cosmic_count is non-nullable --> </td>
-            </tr>
-            {% endif %}
-
-            {% if node.columns_version >= 2 %}
-                {% if node.shows_aloft %}
-                <tr>
-                    <th title="Annotation of Loss-of-Function Transcripts - predicts whether a loss-of-function variant is tolerated, or causes recessive or dominant disease. Only high-confidence predictions match">ALoFT</th>
-                    <td>{{ form.aloft.errors }} {{ form.aloft }}</td>
-                    <td class="collapse filter-required">{{ form.aloft_required }}</td>
-                    <td class="collapse filter-required">{{ form.aloft_allow_null }}</td>
-                </tr>
-                {% endif %}
-                {% if node.shows_nmd_escaping_variant %}
-                <tr>
-                    <th title="Nonsense Mediated Decay Escaping Variant">NMD Escaping variant</th>
-                    <td>{{ form.nmd_escaping_variant.errors }} {{ form.nmd_escaping_variant }}</td>
-                    <td class="collapse filter-required">{{ form.nmd_escaping_variant_required }}</td>
-                    <td class="collapse filter-required"> <!-- nmd_escaping_variant is non-nullable --> </td>
-                </tr>
-                {% endif %}
-                {% if node.columns_version >= 5 %}
-                    <tr>
-                        <th title="Nonsense Mediated Decay predicted from where a frameshift's premature termination codon lands. 'Escapes NMD' keeps frameshifts making a truncated protein, 'Escapes NMD or NMD predicted' every frameshift whose new stop codon was located">PTC NMD</th>
-                        <td>{{ form.ptc_nmd.errors }} {{ form.ptc_nmd }}</td>
-                        <td class="collapse filter-required">{{ form.ptc_nmd_required }}</td>
-                        <td class="collapse filter-required"> <!-- nmd_escape_status is only null before the PTC backfill, when the filter is skipped --> </td>
-                    </tr>
-                {% endif %}
-                {% if node.has_splicevault %}
-                    <tr>
-                        <th title="SpliceVault's top mis-splicing events at a splice site SpliceAI predicts lost. 'All top events' keeps a variant whose top events are all out of frame (Dawes 2023's consistent-with-null case), 'Top event' one whose most frequent event is. A looser 'any event' screen isn't offered because nearly every SpliceVault-annotated variant has one">SpliceVault</th>
-                        <td>{{ form.splicevault_out_of_frame.errors }} {{ form.splicevault_out_of_frame }}</td>
-                        <td class="collapse filter-required">{{ form.splicevault_out_of_frame_required }}</td>
-                        <td class="collapse filter-required">{{ form.splicevault_out_of_frame_allow_null }}</td>
-                    </tr>
-                {% endif %}
-                {% if node.has_utr_annotator %}
-                    <tr>
-                        <th title="UTRAnnotator: uAUG gain or uFrameshift creating an oORF, or uSTOP loss with no alternative stop, each with strong/moderate Kozak; or uAUG loss with strong Kozak (Martin-Geary 2025). Out-of-frame only drops an oORF in frame with the CDS - an N-terminal extension, not necessarily loss of function (Ellingford 2022)">5' UTR (UTRAnnotator)</th>
-                        <td>{{ form.utr_high_impact.errors }} {{ form.utr_high_impact }}</td>
-                        <td class="collapse filter-required">{{ form.utr_high_impact_required }}</td>
-                        <td class="collapse filter-required">{{ form.utr_high_impact_allow_null }}</td>
-                    </tr>
-                {% endif %}
-            {% endif %}
-
-            {% if node.has_gene_constraint %}
-                <tr>
-                    <th title="gnomAD v4 LOEUF of the gene's MANE Select transcript - the upper bound of the loss-of-function observed/expected 90% CI. Lower is more intolerant of loss of function (PVS1's 'LoF is a known mechanism'). Starts at gnomAD v4's constrained-gene cutoff, 0.6">gnomAD LOEUF &le;</th>
-                    <td>{{ form.gene_loeuf_max.errors }}
-                        <input id="enable-gene-loeuf" title="Enable gnomAD LOEUF slider" class="enable-slider" type="checkbox" />
-                        <span class='slider-container'>
-                            <div class="display-flex">
-                                <span class="slider-track"><input type="range" id="gene-loeuf-slider" class='slider' /></span>
-                                <div class='label slider-value'></div>
-                            </div>
-                            <div class='slider-labels'>
-                                <span class='label min-value left'></span>
-                                <span class='label max-value right'></span>
-                            </div>
-                        </span>
-                    </td>
-                    <td class="collapse filter-required">{{ form.gene_loeuf_required }}</td>
-                    <td class="collapse filter-required">{{ form.gene_loeuf_allow_null }}</td>
-                </tr>
-                <tr>
-                    <th title="gnomAD v4 missense Z of the gene's MANE Select transcript - higher means fewer missense variants than expected (PP2 / BP1). Starts at 3.09, ExAC's missense-constrained gene cutoff">gnomAD missense Z &ge;</th>
-                    <td>{{ form.gene_mis_z_min.errors }}
-                        <input id="enable-gene-mis-z" title="Enable gnomAD missense Z slider" class="enable-slider" type="checkbox" />
-                        <span class='slider-container'>
-                            <div class="display-flex">
-                                <span class="slider-track"><input type="range" id="gene-mis-z-slider" class='slider' /></span>
-                                <div class='label slider-value'></div>
-                            </div>
-                            <div class='slider-labels'>
-                                <span class='label min-value left'></span>
-                                <span class='label max-value right'></span>
-                            </div>
-                        </span>
-                    </td>
-                    <td class="collapse filter-required">{{ form.gene_mis_z_required }}</td>
-                    <td class="collapse filter-required">{{ form.gene_mis_z_allow_null }}</td>
-                </tr>
-            {% endif %}
-
-            <tr>
-                <th title="Has a COSMIC id (from VEP's Existing_variation) - unlike COSMIC count, which needs the licensed COSMIC data">In COSMIC</th>
-                <td>{{ form.in_cosmic.errors }} {{ form.in_cosmic }}</td>
-                <td class="collapse filter-required">{{ form.in_cosmic_required }}</td>
-                <td class="collapse filter-required"> <!-- in_cosmic is non-nullable --> </td>
-            </tr>
-
-            <tr>
-                <th title="The variant's gene has OMIM phenotypes">OMIM phenotype</th>
-                <td>{{ form.omim_phenotype.errors }} {{ form.omim_phenotype }}</td>
-                <td class="collapse filter-required">{{ form.omim_phenotype_required }}</td>
-                <td class="collapse filter-required"> <!-- omim_phenotype is non-nullable --> </td>
-            </tr>
-
-            <tr>
-                <th>{{ form.protein_domain.label }}</th>
-                <td>{{ form.protein_domain.errors }} {{ form.protein_domain }}</td>
-                <td class="collapse filter-required">{{ form.protein_domain_required }}</td>
-                <td class="collapse filter-required"> <!-- protein_domain is non-nullable --> </td>
-            </tr>
-
-            <tr>
-                <th>{{ form.published.label }}</th>
-                <td>{{ form.published.errors }} {{ form.published }}</td>
-                <td class="collapse filter-required">{{ form.published_required }}</td>
-                <td class="collapse filter-required"> <!-- published is non-nullable --> </td>
-            </tr>
-            {% if node.has_repeat_masker %}
-                <tr>
-                    <th title="Keep only variants with no RepeatMasker overlap - PM4's in-frame indel or stop loss 'in a non-repeat region'. Always restricts, like Variant type">Outside repeat region</th>
-                    <td>{{ form.outside_repeat_region.errors }} {{ form.outside_repeat_region }}</td>
-                    <td class="collapse filter-required"> <!-- outside_repeat_region always restricts --> </td>
-                    <td class="collapse filter-required"> <!-- outside_repeat_region is non-nullable --> </td>
-                </tr>
-            {% endif %}
-            {% if node.has_annotsv %}
-                <tr class="editor-table-head">
-                    <th colspan="4" title="AnnotSV annotates structural variants only - every small variant has these empty, so make a filter Required with Allow Null to apply it to SVs and leave small variants to the filters above">Structural variants (AnnotSV)</th>
-                </tr>
-                <tr>
-                    <th title="AnnotSV's ACMG class for the SV, from its ranking score on the ACMG/ClinGen CNV points system">AnnotSV ACMG class &ge;</th>
-                    <td>{{ form.annotsv_acmg_class_min.errors }} {{ form.annotsv_acmg_class_min }}</td>
-                    <td class="collapse filter-required">{{ form.annotsv_acmg_class_required }}</td>
-                    <td class="collapse filter-required">{{ form.annotsv_acmg_class_allow_null }}</td>
-                </tr>
-                <tr>
-                    <th title="AnnotSV ranking score: 0.90 and above is likely pathogenic, 0.99 and above pathogenic. Starts at 0.90">AnnotSV ranking score &ge;</th>
-                    <td>{{ form.annotsv_acmg_score_min.errors }}
-                        <input id="enable-annotsv-acmg-score" title="Enable AnnotSV ranking score slider" class="enable-slider" type="checkbox" />
-                        <span class='slider-container'>
-                            <div class="display-flex">
-                                <span class="slider-track"><input type="range" id="annotsv-acmg-score-slider" class='slider' /></span>
-                                <div class='label slider-value'></div>
-                            </div>
-                            <div class='slider-labels'>
-                                <span class='label min-value left'></span>
-                                <span class='label max-value right'></span>
-                            </div>
-                        </span>
-                    </td>
-                    <td class="collapse filter-required">{{ form.annotsv_acmg_score_required }}</td>
-                    <td class="collapse filter-required">{{ form.annotsv_acmg_score_allow_null }}</td>
-                </tr>
-                <tr>
-                    <th title="Keep only variants with no SV breakpoint in an ENCODE blacklist region, segmental duplication or repeat (AnnotSV) - where SV callers most often report false positives. Small variants pass. Always restricts, like Variant type">Exclude SV artefact regions</th>
-                    <td>{{ form.exclude_sv_artefact_regions.errors }} {{ form.exclude_sv_artefact_regions }}</td>
-                    <td class="collapse filter-required"> <!-- exclude_sv_artefact_regions always restricts --> </td>
-                    <td class="collapse filter-required"> <!-- exclude_sv_artefact_regions is non-nullable --> </td>
-                </tr>
-            {% endif %}
-        </table>
+            </div>
+        </div>
 
         <div class="editor-note">
             {% if not node.shows_damage_predictions %}
                 This annotation version has no pathogenicity predictor scores, so filters on them aren't offered.
             {% endif %}
-            {% if node.columns_version == 1%}
+            {% if node.columns_version == 1 %}
                 Damage, CADD and REVEL only apply to non-synonymous SNVs (ie not indels or intergenic).
             {% else %}
                 Pathogenicity predictions only apply to non-synonymous SNVs (ie not indels or intergenic).

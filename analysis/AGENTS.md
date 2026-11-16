@@ -93,6 +93,12 @@ Patterns here:
   The All Variants and Effect editors' variant type checkboxes are one `snpdb/forms.py:VariantTypesField` over
   a `variant_types` ArrayField of `snpdb/variant_filters.py:VariantType` tokens, rendered inside
   `.editor-choices`; the tokens, labels, name text and Q all come from `snpdb/variant_filters.py`.
+- The Effect editor is laid out as its query (#2836): "Any of" (filters with `_required` off) and "All of" (`_required`
+  on, plus variant type and the repeat / SV artefact regions, which always narrow). Each row is one
+  `analysis/models/nodes/filters/damage_node_filters.py:EffectFilter` - its fields, group and words. The editor draws
+  only the rows with a value and moves one by writing its `_required`, so the form posts what it always has; the
+  sentence under the groups, the node's summary, hover card and chip titles all read those words. A new filter is an
+  `EffectFilter` there, not template markup.
 - ACMG presets on the Effect, Population and ClinVar editors (`analysis/node_presets.py`, #2605) fill the form
   client side; the only thing saved is the node's name - the hidden `preset` field carries the picked key, and
   `BaseNodeForm._post_clean` names the node `NodePreset.name` with auto name off. `BaseNodeForm.get_preset_data`

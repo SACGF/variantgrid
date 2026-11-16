@@ -67,7 +67,6 @@ class TestDamageNodeV5(_ColumnsVersion5Mixin, TestCase):
     def test_raw_score_modifies_parents(self):
         node = DamageNode(analysis=self.analysis, alphamissense_score_min=0.5)
         self.assertTrue(node.modifies_parents())
-        self.assertTrue(node.has_individual_pathogenic_predictions())
 
     def test_pred_field_modifies_parents(self):
         node = DamageNode(analysis=self.analysis, alphamissense_pred="P")
@@ -76,8 +75,6 @@ class TestDamageNodeV5(_ColumnsVersion5Mixin, TestCase):
     def test_ptc_nmd_modifies_parents(self):
         node = DamageNode(analysis=self.analysis, ptc_nmd=PTCNMDFilter.ESCAPING)
         self.assertTrue(node.modifies_parents())
-        # Categorical LoF flag, not a per-tool pathogenicity prediction
-        self.assertFalse(node.has_individual_pathogenic_predictions())
 
     def test_ptc_nmd_escaping_keeps_only_escaping(self):
         node = DamageNode(analysis=self.analysis, ptc_nmd=PTCNMDFilter.ESCAPING)
@@ -87,7 +84,6 @@ class TestDamageNodeV5(_ColumnsVersion5Mixin, TestCase):
         """ Required, it drops a variant the OR pool (AlphaMissense) would keep, and the pool still applies """
         node = DamageNode(analysis=self.analysis, ptc_nmd=PTCNMDFilter.ESCAPING, ptc_nmd_required=True,
                           alphamissense_score_min=0.5)
-        self.assertTrue(node.has_required())
         self.assertEqual({"escaping_alphamissense"}, self._filtered(node))
 
     def test_ptc_nmd_escaping_or_predicted_keeps_nmd_predicted(self):
@@ -99,19 +95,16 @@ class TestDamageNodeV5(_ColumnsVersion5Mixin, TestCase):
         """ EVE is GRCh38 only, so a value left on a GRCh37 node filters nothing (#2345) """
         node = DamageNode(analysis=self.analysis, eve_score_min=0.5, eve_score_required=True)
         self.assertFalse(node.modifies_parents())
-        self.assertFalse(node.has_required())
 
     def test_empty_node_does_not_modify_parents(self):
         node = DamageNode(analysis=self.analysis)
         self.assertFalse(node.modifies_parents())
-        self.assertFalse(node.has_required())
 
     def test_rankscore_set_still_filters_and_shows_sliders(self):
         """ Legacy rankscore filters keep applying at v5, so the node keeps reporting them. """
         node = DamageNode(analysis=self.analysis, revel_rankscore_min=0.5, revel_rankscore_required=True)
         self.assertTrue(node.show_rankscore_sliders())
         self.assertTrue(node.modifies_parents())
-        self.assertTrue(node.has_required())
         self.assertIn("variantannotation__revel_rankscore__gte", str(node._get_node_q()))
 
     def test_no_rankscore_hides_sliders(self):

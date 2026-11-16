@@ -16,6 +16,10 @@ from analysis.enums import (
     UTRHighImpact,
 )
 from analysis.models.nodes.analysis_node import AnalysisNode
+from analysis.models.nodes.filters.damage_node_filters import (
+    describe_effect_filters,
+    get_effect_filter_terms,
+)
 from analysis.models.nodes.node_display import NodeChip, NodeIcon
 from annotation.annotsv_columns import ANNOTSV_ARTEFACT_REGION_COLUMNS
 from annotation.effect_filters import (
@@ -463,22 +467,8 @@ class DamageNode(AnalysisNode):
                         self._applies_outside_repeat_region(), self._applies_annotsv()]
         return any(all_versions) or any(cf.is_set(self) for cf in self._column_filters())
 
-    def has_required(self) -> bool:
-        all_versions = [self.impact_required, self.splice_required, self.cosmic_count_required,
-                        self.in_cosmic_required, self.omim_phenotype_required,
-                        self.damage_predictions_required, self.protein_domain_required, self.published_required,
-                        *(required for _, _, _, required, _ in self._gene_constraint_filters()),
-                        *(required for _, _, required, _ in self._annotsv_threshold_filters())]
-        # A rankscore's required checkbox is only on screen while the rankscore sliders are
-        show_rankscores = self.show_rankscore_sliders()
-        return any(all_versions) or any(getattr(self, cf.required_field) for cf in self._column_filters()
-                                        if show_rankscores or not cf.rankscore)
-
-    def has_individual_pathogenic_predictions(self) -> bool:
-        return any(cf.is_set(self) for cf in self._column_filters() if cf.prediction)
-
     def has_rankscore_predictions(self) -> bool:
-        """ v4 hides rankscore sliders by default - used to auto-reveal them when one is still set. """
+        """ From v4 rankscores are legacy - a node still carrying one keeps them on offer in the editor """
         return any(cf.is_set(self) for cf in _COLUMN_FILTERS if cf.rankscore)
 
     def _rankscore_fields(self) -> list[str]:
@@ -898,12 +888,10 @@ class DamageNode(AnalysisNode):
         return len(vav.get_rankscore_pathogenic_prediction_funcs())
 
     def _get_method_summary(self):
-        if self.modifies_parents():
-            method_summary = self.get_node_name()
-        else:
-            method_summary = 'No filters applied.'
+        return describe_effect_filters(self, as_html=True)
 
-        return method_summary
+    def get_node_description(self) -> str:
+        return describe_effect_filters(self)
 
     def get_node_name(self):
         """ The headline filters, a line each - everything else is a chip """
@@ -926,61 +914,40 @@ class DamageNode(AnalysisNode):
         return "Variant type, impact, damage predictions, conservation and splicing filter"
 
     def get_node_chips(self) -> list[NodeChip]:
+        """ A chip per filter set, its title the filter in the words of the node's description """
         chips = super().get_node_chips()
-        if restricts_variant_types(self.variant_types):
-            labels = ", ".join(get_variant_type_labels(self.variant_types))
-            chips.append(NodeChip(text=labels, icon="fa-solid fa-shapes", title=f"Variant type: {labels}"))
-        splice_titles = []
-        if self.splice_min is not None:
-            splice_titles.append(f"Splicing prediction score >= {self.splice_min}")
-        if self.alphagenome_splicing_min is not None:
-            splice_titles.append(f"AlphaGenome splicing >= {self.alphagenome_splicing_min}")
-        if splice_titles:
-            chips.append(NodeChip(text="splice", icon="fa-solid fa-scissors", title="\n".join(splice_titles)))
-        if self.splicevault_out_of_frame:
-            chips.append(NodeChip(text="SpliceVault", icon="fa-solid fa-scissors",
-                                  title=f"SpliceVault: {SpliceVaultOutOfFrame(self.splicevault_out_of_frame).label}"))
-        if self.utr_high_impact:
-            chips.append(NodeChip(text="5' UTR", title=f"{UTRHighImpact(self.utr_high_impact).label} (UTRAnnotator)"))
-        chips += self._score_chips()
-        if self.cosmic_count_min is not None:
-            chips.append(self._filter_chip("COSMIC", f"COSMIC count ≥ {self.cosmic_count_min}",
-                                           self.cosmic_count_required))
-        if self.in_cosmic:
-            chips.append(self._filter_chip("COSMIC", "Has a COSMIC id", self.in_cosmic_required))
-        if self.omim_phenotype:
-            chips.append(self._filter_chip("OMIM", "Gene has OMIM phenotypes", self.omim_phenotype_required))
-        if self.protein_domain:
-            chips.append(self._filter_chip("domain", "In a protein domain", self.protein_domain_required))
-        if self.published:
-            chips.append(self._filter_chip("published", "Published (PubMed / Mastermind)", self.published_required))
-        if self.nmd_escaping_variant:
-            chips.append(self._filter_chip("NMD escaping", "NMD escaping variant (LOFTEE)",
-                                           self.nmd_escaping_variant_required))
-        if self.aloft:
-            chips.append(self._filter_chip("ALoFT", f"ALoFT: {ALoFTPredictionOptions(self.aloft).label}",
-                                           self.aloft_required, self.aloft_allow_null))
-        if self.gene_loeuf_max is not None:
-            chips.append(self._filter_chip("LOEUF", f"gnomAD LOEUF ≤ {self.gene_loeuf_max:g}",
-                                           self.gene_loeuf_required, self.gene_loeuf_allow_null))
-        if self.gene_mis_z_min is not None:
-            chips.append(self._filter_chip("missense Z", f"gnomAD missense Z ≥ {self.gene_mis_z_min:g}",
-                                           self.gene_mis_z_required, self.gene_mis_z_allow_null))
-        if self.outside_repeat_region:
-            chips.append(NodeChip(text="no repeat", title="Outside RepeatMasker repeat regions"))
+        terms = get_effect_filter_terms(self)
+
+        def add_chip(key: str, text: str, **kwargs):
+            if key in terms:
+                chips.append(NodeChip(text=text, title=terms[key][1], **kwargs))
+
+        add_chip("variant_types", ", ".join(get_variant_type_labels(self.variant_types)), icon="fa-solid fa-shapes")
+        add_chip("splice_min", "splice", icon="fa-solid fa-scissors")
+        add_chip("splicevault_out_of_frame", "SpliceVault", icon="fa-solid fa-scissors")
+        add_chip("utr_high_impact", "5' UTR")
+        add_chip("cadd_score_min", "CADD")  # columns v1 - REVEL's v1 field is the raw tool's
+        for tool in TOOLS:
+            if tool.raw_field:
+                add_chip(tool.node_threshold_field, tool.node_label or tool.name)
+            if tool.rankscore_field:
+                add_chip(f"{tool.rankscore_field}_min", f"{tool.name} rank")
+            if tool.pred_field:
+                add_chip(tool.pred_field, tool.name)
+        add_chip("cosmic_count_min", "COSMIC")
+        add_chip("in_cosmic", "COSMIC")
+        add_chip("omim_phenotype", "OMIM")
+        add_chip("protein_domain", "domain")
+        add_chip("published", "published")
+        add_chip("nmd_escaping_variant", "NMD escaping")
+        add_chip("aloft", "ALoFT")
+        add_chip("gene_loeuf_max", "LOEUF")
+        add_chip("gene_mis_z_min", "missense Z")
+        add_chip("outside_repeat_region", "no repeat")
         if self.annotsv_acmg_class_min is not None:
-            pathogenicity = Pathogenicity(self.annotsv_acmg_class_min)
-            chips.append(self._filter_chip(f"AnnotSV ≥ {pathogenicity.short_label}",
-                                           f"AnnotSV ACMG class ≥ {pathogenicity.label}",
-                                           self.annotsv_acmg_class_required, self.annotsv_acmg_class_allow_null))
-        if self.annotsv_acmg_score_min is not None:
-            chips.append(self._filter_chip("AnnotSV score",
-                                           f"AnnotSV ranking score ≥ {self.annotsv_acmg_score_min:g}",
-                                           self.annotsv_acmg_score_required, self.annotsv_acmg_score_allow_null))
-        if self.exclude_sv_artefact_regions:
-            chips.append(NodeChip(text="no SV artefact",
-                                  title="No SV breakpoint in an ENCODE blacklist, segmental duplication or repeat "
-                                        "region (AnnotSV)"))
+            add_chip("annotsv_acmg_class_min", f"AnnotSV ≥ {Pathogenicity(self.annotsv_acmg_class_min).short_label}")
+        add_chip("annotsv_acmg_score_min", "AnnotSV score")
+        add_chip("exclude_sv_artefact_regions", "no SV artefact")
         return chips
 
     def _get_node_extra_grid_columns(self) -> list[str]:
@@ -990,48 +957,6 @@ class DamageNode(AnalysisNode):
         if self._applies_exclude_sv_artefact_regions():
             grid_columns.append(ANNOTSV_REGION_GRID_COLUMN)
         return grid_columns
-
-    def _score_chips(self) -> list[NodeChip]:
-        """ A chip per tool with a threshold or prediction set - off the TOOLS metadata, so a new tool has one """
-        chips = []
-        if self.cadd_score_min is not None:  # columns v1 - REVEL's v1 field is the raw tool's
-            chips.append(self._filter_chip("CADD", f"CADD phred ≥ {self.cadd_score_min}",
-                                           self.cadd_score_required, self.cadd_score_allow_null))
-        for tool in TOOLS:
-            label = tool.node_label or tool.name
-            if tool.raw_field and (value := getattr(self, tool.node_threshold_field)) is not None:
-                if tool.raw_direction == RawScoreDirection.LOWER:
-                    threshold = f"≤ {value:g}"
-                elif tool.raw_direction == RawScoreDirection.MAGNITUDE:
-                    threshold = f"|score| ≥ {value:g}"
-                else:
-                    threshold = f"≥ {value:g}"
-                chips.append(self._filter_chip(label, f"{label} {threshold}",
-                                               getattr(self, f"{tool.raw_field}_required"),
-                                               getattr(self, f"{tool.raw_field}_allow_null")))
-            if tool.rankscore_field and (value := getattr(self, f"{tool.rankscore_field}_min")) is not None:
-                chips.append(self._filter_chip(f"{tool.name} rank", f"{tool.name} rankscore ≥ {value:g}",
-                                               getattr(self, f"{tool.rankscore_field}_required"),
-                                               getattr(self, f"{tool.rankscore_field}_allow_null")))
-            if tool.pred_field and getattr(self, tool.pred_field):
-                prediction = getattr(self, f"get_{tool.pred_field}_display")()
-                chips.append(self._filter_chip(tool.name, f"{tool.name}: {prediction}",
-                                               getattr(self, f"{tool.pred_field}_required"),
-                                               getattr(self, f"{tool.pred_field}_allow_null")))
-        return chips
-
-    @staticmethod
-    def _filter_chip(text: str, title: str, required: bool, allow_null: Optional[bool] = None) -> NodeChip:
-        """ A required filter is marked * - the rest are OR'd together """
-        qualifiers = []
-        if required:
-            text += "*"
-            qualifiers.append("required")
-        if allow_null:
-            qualifiers.append("allows null")
-        if qualifiers:
-            title += f" ({', '.join(qualifiers)})"
-        return NodeChip(text=text, title=title)
 
     @staticmethod
     def get_node_class_label():
