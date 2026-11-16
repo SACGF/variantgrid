@@ -6,11 +6,9 @@ TOO_LONG (#1271, @see annotation.vcf_files.bulk_vep_vcf_annotation_inserter), an
 fusion caller writes, where position is the caller-spelling-independent evidence of which gene a
 side is (@see genes.gene_fusions).
 
-A TranscriptVersion keeps its extents inside the cdot JSON rather than in columns, so there is no
-SQL predicate for "overlaps this range" - the transcripts of a contig go into an IntervalTree
-instead. Trees are built per contig on first use: a release is ~180k transcripts and a fusion file
-asks about a handful of positions, so building every contig up front would cost most of a gigabyte
-to answer six lookups.
+The transcripts of a contig go into an IntervalTree, built per contig on first use from the span
+columns TranscriptVersion copies out of its cdot data (#2826) - never the JSON rows themselves, which
+make the table ~4 GB and a cold read of one contig's transcripts tens of seconds.
 """
 import logging
 import time
@@ -65,22 +63,16 @@ class SVGeneOverlapResolver:
         tv_qs = TranscriptVersion.objects.filter(
             releasetranscriptversion__release=self.gene_annotation_release,
             contig=contig,
-        ).select_related("gene_version")
+            start__isnull=False,
+        ).values_list("start", "end", "gene_version__gene_id", "gene_version__gene_symbol_id",
+                      "gene_version__hgnc_id")
 
         count = 0
-        for tv in tv_qs:
-            try:
-                start = tv.start
-                end = tv.end
-            except (KeyError, IndexError):
-                continue
+        for start, end, gene_id, symbol, hgnc_id in tv_qs:
             if end <= start:
                 # intervaltree treats zero-length intervals as empty
                 end = start + 1
-            gene_version = tv.gene_version
-            tree.addi(start, end, GeneOverlap(gene_id=gene_version.gene_id,
-                                              symbol=gene_version.gene_symbol_id,
-                                              hgnc_id=gene_version.hgnc_id))
+            tree.addi(start, end, GeneOverlap(gene_id=gene_id, symbol=symbol, hgnc_id=hgnc_id))
             count += 1
 
         self._trees[contig.pk] = tree

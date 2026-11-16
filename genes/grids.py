@@ -273,7 +273,7 @@ class GenesColumns(DatatableConfig[ReleaseGeneVersion]):
             if start and end:
                 contig = get_object_or_404(Contig, pk=contig_id)
                 genome_build = GenomeBuild.get_name_or_alias(self.get_query_param("genome_build_name"))
-                # Evaluated once here, rather than the JSON scan running again for the count and the page
+                # Evaluated once here, rather than the overlap query running again for the count and the page
                 gene_versions = list(TranscriptVersion.get_gene_version_ids_in_region(genome_build, contig,
                                                                                       int(start), int(end)))
             else:

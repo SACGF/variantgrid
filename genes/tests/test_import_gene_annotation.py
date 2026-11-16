@@ -59,6 +59,8 @@ class ImportCdotDataTest(TestCase):
 
     def test_only_changed_transcripts_restamped(self):
         self._import(self._cdot_file("0.2.34"))
+        runx1_tv = TranscriptVersion.objects.get(genome_build=self.genome_build, transcript_id="NM_001754", version=4)
+        self.assertEqual((36164432, 36164908, "-"), (runx1_tv.start, runx1_tv.end, runx1_tv.strand))
         self._import(self._cdot_file("0.2.35"))
         self.assertEqual({"NM_001754.4": "0.2.34", "NM_032638.4": "0.2.34"}, self._cdot_by_accession())
         self.assertEqual("0.2.35", CdotDataVersion.get_version(self.genome_build, AnnotationConsortium.REFSEQ))
@@ -72,6 +74,7 @@ class ImportCdotDataTest(TestCase):
         self.assertEqual({"NM_001754.4": "0.2.34", "NM_032638.4": "0.2.36"}, self._cdot_by_accession())
         gata2_tv = TranscriptVersion.objects.get(genome_build=self.genome_build, transcript_id="NM_032638", version=4)
         self.assertEqual(gata2_build_data["exons"], gata2_tv.genome_build_data["exons"])
+        self.assertEqual(36164999, gata2_tv.end, "The span follows the changed exons")
         self.assertEqual("0.2.36", CdotDataVersion.get_version(self.genome_build, AnnotationConsortium.REFSEQ))
 
     def test_transcript_stats_counted(self):

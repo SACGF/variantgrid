@@ -4,6 +4,7 @@ from collections import defaultdict
 from matplotlib.patches import Rectangle
 
 from genes.models import GeneList
+from genes.models.models_gene import GeneVersion
 from library.graphs.chromosomes_graph import centromere_mid, read_cytoband
 from library.utils import sha256sum_str
 from snpdb.enums import AssemblyMoleculeType
@@ -224,20 +225,21 @@ class GeneListChromosomeGraph(CacheableGraph):
         gene_list = GeneList.objects.get(pk=self.gene_list_id)
         chrom_genes = defaultdict(list)
 
+        gene_version_by_symbol = {}
         for glgs in gene_list.genelistgenesymbol_set.filter(
                 gene_symbol__isnull=False).select_related('gene_symbol'):
             gs = glgs.gene_symbol
-            gv = gs.latest_gene_version(genome_build)
-            if gv is None:
-                continue
-            try:
-                chrom = gv.chrom        # '1', '17', 'X' etc. (no 'chr' prefix)
-                midpoint = (gv.start + gv.end) / 2
-                strand = gv.strand
-            except Exception:
+            if gv := gs.latest_gene_version(genome_build):
+                gene_version_by_symbol[gs] = gv
+
+        extents_by_gene_version = GeneVersion.get_transcript_extents(gv.pk for gv in gene_version_by_symbol.values())
+        for gs, gv in gene_version_by_symbol.items():
+            if extents := extents_by_gene_version.get(gv.pk):
+                midpoint = (extents["start"] + extents["end"]) / 2
+                # chrom is '1', '17', 'X' etc. (no 'chr' prefix)
+                chrom_genes[extents["chrom"]].append((midpoint, str(gs), extents["strand"]))
+            else:
                 logging.warning("Could not get coordinates for %s", gs)
-                continue
-            chrom_genes[chrom].append((midpoint, str(gs), strand))
 
         return chrom_genes
 
