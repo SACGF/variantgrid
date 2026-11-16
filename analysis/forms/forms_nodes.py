@@ -746,6 +746,7 @@ class DamageNodeForm(BaseNodeForm):
                 "values": values,
                 "required_field": self[effect_filter.required_field] if effect_filter.required_field else None,
                 "allow_null_field": self[effect_filter.allow_null_field] if effect_filter.allow_null_field else None,
+                "legacy_null_field": self[effect_filter.legacy_null_field] if effect_filter.legacy_null_field else None,
             })
         return rows
 
@@ -763,6 +764,8 @@ class DamageNodeForm(BaseNodeForm):
             "requiredField": f.required_field,
             "allowNullField": f.allow_null_field,
             "nullWords": f.null_words,
+            "legacyNullField": f.legacy_null_field,
+            "legacyNullWords": f.legacy_null_words,
             "defaultRequired": model_default(f.required_field),
             "defaultAllowNull": model_default(f.allow_null_field),
         } for f in self.effect_filters]

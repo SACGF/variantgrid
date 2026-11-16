@@ -94,25 +94,32 @@ class NodeEditorRenderTest(AnalysisSetupMixin, TestCase):
         self.assertIn(f'value="{VariantType.SNV}" id="id_variant_types_0" checked>', content)
 
     def test_damage_node_editor_posts_back_unchanged(self):
-        """ The editor lays its rows out in groups client side - unedited, it posts the same node back """
-        node = DamageNode.objects.create(analysis=self.analysis, impact_min=PathogenicityImpact.HIGH,
-                                         annotsv_acmg_class_min=Pathogenicity.LIKELY_PATHOGENIC,
-                                         gene_loeuf_max=0.6, gene_loeuf_required=True, gene_loeuf_allow_null=False,
-                                         splice_min=0.5, splice_required=True, in_cosmic=True,
-                                         variant_types=[VariantType.SNV])
-        response = self._get_editor(node)
-        content = response.content.decode()
-        self.assertIn('data-filter="gene_loeuf_max"', content)
-        # A field the version's editor doesn't draw posts nothing, as it always has
-        drawn = [f.name for f in DamageNode._meta.fields if f'name="{f.name}"' in content]
-        before = {name: getattr(node, name) for name in drawn}
+        """ The editor lays its rows out in groups client side - unedited, it posts the same node back, a node on
+            the earlier splicing allow null rule included (#2836) """
+        common = {"impact_min": PathogenicityImpact.HIGH, "annotsv_acmg_class_min": Pathogenicity.LIKELY_PATHOGENIC,
+                  "gene_loeuf_max": 0.6, "gene_loeuf_required": True, "gene_loeuf_allow_null": False,
+                  "splice_min": 0.5, "splice_required": True, "in_cosmic": True, "variant_types": [VariantType.SNV]}
+        for splice_allow_null_any_missing in (False, True):
+            with self.subTest(splice_allow_null_any_missing=splice_allow_null_any_missing):
+                node = DamageNode.objects.create(analysis=self.analysis, **common,
+                                                 splice_allow_null_any_missing=splice_allow_null_any_missing)
+                response = self._get_editor(node)
+                content = response.content.decode()
+                self.assertIn('data-filter="gene_loeuf_max"', content)
+                self.assertEqual(splice_allow_null_any_missing,
+                                 'name="splice_allow_null_any_missing" id="id_splice_allow_null_any_missing" checked'
+                                 in content)
+                # A field the version's editor doesn't draw posts nothing, as it always has
+                drawn = [f.name for f in DamageNode._meta.fields if f'name="{f.name}"' in content]
+                before = {name: getattr(node, name) for name in drawn}
 
-        client = Client()
-        client.force_login(self.user)
-        post_response = client.post(response.request["PATH_INFO"], form_submit_data(content, "damage-filter"))
-        self.assertEqual({}, post_response.json())
-        node.refresh_from_db()
-        self.assertEqual(before, {name: getattr(node, name) for name in drawn})
+                client = Client()
+                client.force_login(self.user)
+                post_response = client.post(response.request["PATH_INFO"],
+                                            form_submit_data(content, "damage-filter"))
+                self.assertEqual({}, post_response.json())
+                node.refresh_from_db()
+                self.assertEqual(before, {name: getattr(node, name) for name in drawn})
 
     def test_intersection_node_variant_text(self):
         node = IntersectionNode.objects.create(analysis=self.analysis,

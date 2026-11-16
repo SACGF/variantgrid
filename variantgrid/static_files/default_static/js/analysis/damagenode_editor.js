@@ -8,10 +8,9 @@
  * when it has no requiredField or that field is ticked, otherwise in "any" (Any of).
  * @typedef {{key: string, label: string, category: string, valueFields: string[], words: string[],
  *            requiredField: ?string, allowNullField: ?string, nullWords: string,
+ *            legacyNullField: ?string, legacyNullWords: string,
  *            defaultRequired: ?boolean, defaultAllowNull: ?boolean}} EffectFilter
  */
-
-const EFFECT_GROUP_NAMES = {any: "Any of", all: "All of"};
 
 // Draw the calibrated PP3/BP4 cutoff bands over a raw-score slider track. The thresholds come
 // from data-pathogenic-min / data-benign-max (set in DamageNodeForm from the per-tool TOOLS table);
@@ -239,6 +238,15 @@ function initDamageNodeEditor(options) {
             sliders[name].slider.prop("disabled", !fieldHasValue(name));
         }
 
+        // A node saved under an earlier allow null rule keeps it until switched (splicing, #2836)
+        const usesLegacyNull = f => Boolean(f.legacyNullField) && fieldInputs(f.legacyNullField).prop("checked");
+
+        function setLegacyNull(f, on) {
+            if (f.legacyNullField) {
+                fieldInputs(f.legacyNullField).prop("checked", on);
+            }
+        }
+
         const hasValue = f => f.valueFields.some(fieldHasValue);
         const groupOf = f => (!f.requiredField || fieldInputs(f.requiredField).prop("checked")) ? "all" : "any";
         const shown = f => hasValue(f) || pending.has(f.key);
@@ -256,7 +264,7 @@ function initDamageNodeEditor(options) {
             }
             let term = parts.join(" or ");
             if (f.allowNullField && groupOf(f) === "all" && fieldInputs(f.allowNullField).prop("checked")) {
-                term += " (" + f.nullWords + ")";
+                term += " (" + (usesLegacyNull(f) ? f.legacyNullWords : f.nullWords) + ")";
             }
             return term;
         }
@@ -289,7 +297,7 @@ function initDamageNodeEditor(options) {
                 return;
             }
             $("<div/>", {class: "effect-palette-head"}).append(
-                $("<span/>", {text: "Add to " + EFFECT_GROUP_NAMES[group]}),
+                $("<span/>", {text: "Add to " + (group === "any" ? "Any of" : "All of")}),
                 $("<button/>", {type: "button", class: "effect-action effect-palette-done", text: "Done"})).appendTo(palette);
             const categories = [...new Set(filters.map(f => f.category))];
             for (const category of categories) {
@@ -325,6 +333,10 @@ function initDamageNodeEditor(options) {
                     $(".effect-filter-conj", row).text(i === 0 ? "" : (group === "any" ? "or" : "and"));
                     // Allow null only means something in All of
                     $(".effect-filter-null", row).toggle(group === "all");
+                    const legacy = usesLegacyNull(filtersByKey[row.attr("data-filter")]);
+                    $(".effect-null-current", row).toggle(!legacy);
+                    $(".effect-null-legacy", row).toggle(legacy);
+                    $(".effect-filter-legacy-note", row).toggle(legacy && group === "all");
                     $(".effect-move", row)
                         .text(group === "any" ? "↓ All of" : "↑ Any of")
                         .attr("title", group === "any" ? "Every variant must pass this filter"
@@ -365,6 +377,7 @@ function initDamageNodeEditor(options) {
             if (f.allowNullField) {
                 fieldInputs(f.allowNullField).prop("checked", Boolean(f.defaultAllowNull));
             }
+            setLegacyNull(f, false);
             setFieldStart(f.valueFields[0]);  // a second slider on the row (AlphaGenome) starts off
             pending.add(f.key);
         }
@@ -375,6 +388,7 @@ function initDamageNodeEditor(options) {
             if (f.allowNullField) {
                 fieldInputs(f.allowNullField).prop("checked", Boolean(f.defaultAllowNull));
             }
+            setLegacyNull(f, false);
             pending.delete(f.key);
         }
 
@@ -392,6 +406,8 @@ function initDamageNodeEditor(options) {
                 setRequired(f, groupOf(f) === "any");
             } else if (button.hasClass("effect-remove")) {
                 removeFilter(filtersByKey[rowKey]);
+            } else if (button.hasClass("effect-null-switch")) {
+                setLegacyNull(filtersByKey[rowKey], false);
             } else {
                 return;
             }

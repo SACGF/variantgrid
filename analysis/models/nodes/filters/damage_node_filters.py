@@ -47,6 +47,10 @@ class EffectFilter:
     allow_null_field: Optional[str] = None  # only has an effect in All of
     null_label: str = "keep if not scored"
     null_words: str = "or not scored"
+    # A node saved under an earlier allow null rule keeps it while this field is set, and reads it in its own words
+    legacy_null_field: Optional[str] = None
+    legacy_null_label: str = ""
+    legacy_null_words: str = ""
     help: str = ""
     default: Any = None  # a dropdown's value when the filter is added (None: its first option)
 
@@ -74,7 +78,8 @@ class EffectFilter:
             return None
         text = " or ".join(parts)
         if self.allow_null_field and self.group(node) == ALL_OF and getattr(node, self.allow_null_field):
-            text += f" ({self.null_words})"
+            legacy = self.legacy_null_field and getattr(node, self.legacy_null_field)
+            text += f" ({self.legacy_null_words if legacy else self.null_words})"
         return text
 
 
@@ -144,6 +149,10 @@ def _all_effect_filters(node, editor: bool) -> Iterator[tuple[EffectFilter, Call
     splice_words = ("splicing ≥ {}", "AlphaGenome splicing ≥ {}")
     splice_filter = EffectFilter("Splicing (SpliceAI, dbscSNV)", splicing, splice_fields, splice_words, op="≥",
                                  required_field="splice_required", allow_null_field="splice_allow_null",
+                                 null_words="or no splicing score",
+                                 legacy_null_field="splice_allow_null_any_missing",
+                                 legacy_null_label="keep if any splicing score is missing",
+                                 legacy_null_words="or any splicing score missing",
                                  help="SpliceAI or dbscSNV score, or an indel in a splice region")
     yield splice_filter, always
     if from_version(2):

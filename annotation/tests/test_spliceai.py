@@ -200,8 +200,12 @@ class TestDamageNodeSpliceAIQ(TestCase):
         return {name_by_pk[pk] for pk in matched_pks.values_list("pk", flat=True)}
 
     def test_splice_required_with_allow_null_includes_isnull(self):
+        """ "null" has no SpliceAI score but has dbscSNV ones, so is scored - only the earlier rule (#2836), where
+            any one missing score passes, keeps it """
         variants_by_name = self._high_low_null_variants()
         node = DamageNode(analysis=self.analysis, splice_min=0.5, splice_required=True, splice_allow_null=True)
+        self.assertEqual(self._matching_names(node, variants_by_name), {"high"})
+        node.splice_allow_null_any_missing = True
         self.assertEqual(self._matching_names(node, variants_by_name), {"high", "null"})
 
     def test_splice_required_without_allow_null_excludes_isnull(self):

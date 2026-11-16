@@ -126,6 +126,10 @@ class DamageNode(AnalysisNode):
     splice_min = models.FloatField(null=True, blank=True)
     splice_required = models.BooleanField(default=False)
     splice_allow_null = models.BooleanField(default=True)
+    # The earlier allow null rule, kept by the nodes saved under it so they return what they always have (#2836): a
+    # variant missing any one splicing score passes, and dbscSNV only scores splice-consensus SNVs, so nearly all do.
+    # Otherwise a variant passes as unscored only with none of the scores the filter reads
+    splice_allow_null_any_missing = models.BooleanField(default=False)
     # GRCh38 SNVs, licence-restricted data (#2561). Its own threshold (0 to ~3) but part of the splicing filter
     alphagenome_splicing_min = models.FloatField(null=True, blank=True)
 
@@ -612,20 +616,67 @@ class DamageNode(AnalysisNode):
             case _:
                 return Q(**{f"{field}__gte": threshold})
 
-    def _splice_score_q_list(self, vav) -> list[Q]:
-        allow_null = self.splice_required and self.splice_allow_null
+    @staticmethod
+    def _splice_score_fields(vav) -> list[str]:
         # SpliceAI: use the optimised spliceai_max_ds column when the VAV has been backfilled, otherwise fall
         # back to the per-DS-field loop (pre-c6f3c4e6f). See VariantAnnotationVersion.backfilled_spliceai_max_ds.
         if vav.backfilled_spliceai_max_ds:
             spliceai_fields = ["spliceai_max_ds"]
         else:
             spliceai_fields = [ds for ds, _ in VariantAnnotation.SPLICEAI_DS_DP.values()]
+        return ["dbscsnv_ada_score", "dbscsnv_rf_score", *spliceai_fields]
+
+    def _splice_score_q_list(self, vav) -> list[Q]:
+        """ The earlier rule (splice_allow_null_any_missing): each score's null is its own OR term """
+        allow_null = self.splice_required and self.splice_allow_null
         q_list = []
-        for field in ["dbscsnv_ada_score", "dbscsnv_rf_score", *spliceai_fields]:
+        for field in self._splice_score_fields(vav):
             q_list.append(Q(**{f"variantannotation__{field}__gte": self.splice_min}))
             if allow_null:
                 q_list.append(Q(**{f"variantannotation__{field}__isnull": True}))
         return q_list
+
+    def _splicing_q_list(self, vav) -> list[Q]:
+        """ A score at or above its threshold, or a splice-region indel - and, required with allow null, a variant
+            with none of the scores read here """
+        if self.splice_allow_null_any_missing:
+            return self._splicing_q_list_any_missing(vav)
+        splicing_q_list = []
+        null_fields = []
+        if self.splice_min is not None:
+            splicing_q_list.append(self._splice_indels_q())
+            # Without scores (T2T) allow null would let every variant through a required splicing filter
+            if self._has_splice_scores():
+                null_fields = self._splice_score_fields(vav)
+                splicing_q_list.extend(Q(**{f"variantannotation__{field}__gte": self.splice_min})
+                                       for field in null_fields)
+        if self.alphagenome_splicing_min is not None and self._filter_column_applied("alphagenome_splicing"):
+            splicing_q_list.append(Q(variantannotation__alphagenome_splicing__gte=self.alphagenome_splicing_min))
+            null_fields = [*null_fields, "alphagenome_splicing"]
+        if self.splice_required and self.splice_allow_null and null_fields:
+            splicing_q_list.append(Q(**{f"variantannotation__{field}__isnull": True for field in null_fields}))
+        return splicing_q_list
+
+    def _splicing_q_list_any_missing(self, vav) -> list[Q]:
+        splicing_q_list = []
+        if self.splice_min is not None:
+            splicing_q_list.append(self._splice_indels_q())
+            # Without scores (T2T) allow null would let every variant through a required splicing filter
+            if self._has_splice_scores():
+                splicing_q_list.extend(self._splice_score_q_list(vav))
+
+        if self.alphagenome_splicing_min is not None and self._filter_column_applied("alphagenome_splicing"):
+            splicing_q_list.append(Q(variantannotation__alphagenome_splicing__gte=self.alphagenome_splicing_min))
+            if self.splice_required and self.splice_allow_null:
+                splicing_q_list.append(Q(variantannotation__alphagenome_splicing__isnull=True))
+        return splicing_q_list
+
+    @staticmethod
+    def _splice_indels_q() -> Q:
+        # [consequence contains 'splice' OR not null splice region] AND [variant class not SNV]
+        q_splice_indels = Q(variantannotation__consequence__contains='splice') | Q(variantannotation__splice_region__isnull=False)
+        q_splice_indels &= Q(variantannotation__variant_class__ne="SN")
+        return q_splice_indels
 
     def _get_node_q_hash(self) -> str:
         return str(self._get_node_q())
@@ -645,22 +696,7 @@ class DamageNode(AnalysisNode):
                 or_filters.append(q_impact)
 
         vav = self.analysis.annotation_version.variant_annotation_version
-        splicing_q_list = []
-        if self.splice_min is not None:
-            # [consequence contains 'splice' OR not null splice region] AND [variant class not SNV]
-            q_splice_indels = Q(variantannotation__consequence__contains='splice') | Q(variantannotation__splice_region__isnull=False)
-            q_splice_indels &= Q(variantannotation__variant_class__ne="SN")
-            splicing_q_list.append(q_splice_indels)
-            # Without scores (T2T) allow null would let every variant through a required splicing filter
-            if self._has_splice_scores():
-                splicing_q_list.extend(self._splice_score_q_list(vav))
-
-        if self.alphagenome_splicing_min is not None and self._filter_column_applied("alphagenome_splicing"):
-            splicing_q_list.append(Q(variantannotation__alphagenome_splicing__gte=self.alphagenome_splicing_min))
-            if self.splice_required and self.splice_allow_null:
-                splicing_q_list.append(Q(variantannotation__alphagenome_splicing__isnull=True))
-
-        if splicing_q_list:
+        if splicing_q_list := self._splicing_q_list(vav):
             q_splicing = reduce(operator.or_, splicing_q_list)
             if self.splice_required:
                 and_filters.append(q_splicing)

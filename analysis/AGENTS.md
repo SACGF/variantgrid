@@ -99,6 +99,11 @@ Patterns here:
   only the rows with a value and moves one by writing its `_required`, so the form posts what it always has; the
   sentence under the groups, the node's summary, hover card and chip titles all read those words. A new filter is an
   `EffectFilter` there, not template markup.
+- A required splicing filter with allow null keeps a variant with none of the splicing scores it reads. Nodes saved
+  before that (#2836) kept any variant missing one score - nearly all, as dbscSNV only scores splice-consensus SNVs -
+  and keep that rule while `DamageNode.splice_allow_null_any_missing` is set (migration 0021, exports without the key
+  via `analysis/analysis_import_export.py:upgrade_legacy_node_fields`), so their Q and cached results don't change.
+  The editor only offers that rule on such nodes, with a switch off it.
 - ACMG presets on the Effect, Population and ClinVar editors (`analysis/node_presets.py`, #2605) fill the form
   client side; the only thing saved is the node's name - the hidden `preset` field carries the picked key, and
   `BaseNodeForm._post_clean` names the node `NodePreset.name` with auto name off. `BaseNodeForm.get_preset_data`

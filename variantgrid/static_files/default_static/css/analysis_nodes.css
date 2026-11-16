@@ -1913,6 +1913,11 @@ span.node-counts {
 	gap: 4px 8px;
 }
 
+/* A node saved under the earlier splicing allow null rule says so under its tick-box (#2836) */
+.effect-filter-legacy-note {
+	flex-basis: 100%;
+}
+
 .effect-filter-actions {
 	display: flex;
 	align-items: center;

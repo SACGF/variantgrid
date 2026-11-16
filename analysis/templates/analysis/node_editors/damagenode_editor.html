@@ -79,7 +79,17 @@
                                 {% endif %}
                             {% endfor %}
                             {% if row.allow_null_field %}
-                                <label class="effect-filter-option effect-filter-null">{{ row.allow_null_field }} {{ row.filter.null_label }}</label>
+                                <label class="effect-filter-option effect-filter-null">{{ row.allow_null_field }}
+                                    <span class="effect-null-current">{{ row.filter.null_label }}</span>
+                                    {% if row.legacy_null_field %}<span class="effect-null-legacy">{{ row.filter.legacy_null_label }}</span>{% endif %}
+                                </label>
+                            {% endif %}
+                            {% if row.legacy_null_field %}
+                                <span class="d-none">{{ row.legacy_null_field }}</span>
+                                <span class="effect-null-legacy effect-filter-legacy-note editor-help">
+                                    This node was saved with this rule. dbscSNV only scores splice-consensus SNVs, so it keeps most variants.
+                                    {% if has_write_permission %}<button type="button" class="effect-add-button effect-null-switch">Switch to "{{ row.filter.null_label }}"</button>{% endif %}
+                                </span>
                             {% endif %}
                         </span>
                         {% if row.required_field %}<span class="d-none">{{ row.required_field }}</span>{% endif %}
