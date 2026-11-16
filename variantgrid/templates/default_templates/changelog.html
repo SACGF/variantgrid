@@ -358,6 +358,47 @@
 
     {% else %}
        <div class="card mt-4">
+            <div class="card-header">16 November 2026</div>
+            <div class="card-body">
+                <h4>Analysis</h4>
+                <ul>
+                    <li>#2784 - Zoom the analysis node graph, with a slider in analysis settings (saved as a user setting)</li>
+                    <li>#2767 - All Variants node filters by cytoband (eg 11p13, 17p) as well as chromosome</li>
+                    <li>#2769 - Region filters place fusions, gene copy number and splice variants by their genes</li>
+                    <li>#2759 - Sample, Cohort, Pedigree, Duo, Trio and Quad nodes show what kinds of calls the VCF holds</li>
+                    <li>#2760 - Duo / Trio / Quad wizards have a Name field, prefilled from the VCF or sample names</li>
+                    <li>#2745 - Duo / Trio / Quad wizards let any sample take any role, warning when detected sex disagrees</li>
+                    <li>#2787 - T2T: Effect and Conservation nodes only offer filters the annotation has, and warn on unavailable ones</li>
+                    <li>#2788 - T2T: gnomAD frequencies added where the T2T reference differs from GRCh38</li>
+                    <li>#2773 - Analysis export / import keeps more node settings (cytobands, tags, labs, PanelApp panels)</li>
+                </ul>
+                <h4>Samples / VCFs</h4>
+                <ul>
+                    <li>#2759 - VCF and sample pages show their contents (Small, CNV, SV, Fusion, Gene CN, Splice), with a Contents column and filter on the VCF and Samples grids</li>
+                </ul>
+                <h4>Variants / Search</h4>
+                <ul>
+                    <li>#1946 - HGVS using n. on a coding transcript (or c. on a non-coding one) is an error, rather than finding the wrong variant</li>
+                    <li>#2804 - Search and manual variant entry show a variant kind badge (DEL / DUP / INV, copy number, fusion)</li>
+                    <li>#2828 - Gene level splice variants in grids are labelled by gene, without repeating coordinates</li>
+                    <li>#2612 - Long HGVS / coordinates shortened in search results and on the variant page</li>
+                    <li>#2757 - External Beacon copy number counts only match events of similar size</li>
+                </ul>
+                <h4>Classification</h4>
+                <ul>
+                    <li>#2737 - Classify &amp; Report lists the samples the variant was called in first</li>
+                    <li>#2743 - Classify &amp; Report - "Build multiple variant report" waits for classifications still populating</li>
+                    <li>Condition matching automatically matches on exact MONDO synonyms</li>
+                </ul>
+                <h4>Accounts</h4>
+                <ul>
+                    <li>#2800 - Self-service API tokens with names, expiry and revoke (not on Shariant)</li>
+                    <li>New self-registered users get their own private lab, and can request to join their institution's lab</li>
+                </ul>
+            </div>
+       </div>
+
+       <div class="card mt-4">
             <div class="card-header">9 November 2026</div>
             <div class="card-body">
                 <h4>Classification</h4>
