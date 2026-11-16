@@ -850,10 +850,9 @@ span.node-counts {
 	overflow: hidden;
 }
 
-/* A zero count holds its slot rather than disappearing, and there are no variants to click through to */
+/* A zero count is blank but holds its slot, so the card is the same height whatever the counts are */
 .node-counts .node-count.zero-count {
-	opacity: .35;
-	pointer-events: none;
+	visibility: hidden;
 }
 
 /* Tag counts sit below the built-in counts, behind a tag icon so it's clear they're tags */

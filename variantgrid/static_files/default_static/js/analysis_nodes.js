@@ -725,7 +725,7 @@ function setNodeCounts(node, data) {
 		} else if (count === 0 && vc.hasClass("hide-zero")) {
 			vc.hide();
 		} else {
-			// A zero keeps its slot (dimmed) so the card is the same height whatever the counts are (#2770)
+			// A zero keeps its slot (blank) so the card is the same height whatever the counts are (#2770)
 			setVariantCount(vc, formatNodeCount(count, deterministic));
 			vc.toggleClass("zero-count", count === 0 && !vc.hasClass("show-zero"));
 		}
@@ -865,7 +865,7 @@ function createNodeCountDiv(nodeCountType) {
 		nodeCountDiv.addClass("show-zero");
 	}
 	if (isTagNodeCount(nodeCountType)) {
-		nodeCountDiv.addClass("hide-zero");  // A dozen dimmed tag zeros on every node would bury the ones that matter
+		nodeCountDiv.addClass("hide-zero");  // The tag row packs its counts, so a zero tag takes no space
 	}
 	return nodeCountDiv;
 }
