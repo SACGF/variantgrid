@@ -97,9 +97,9 @@ class ClassificationGroupingExportFilter:
 
         if exclude_sources := self.exclude_sources:
             if exclude_orgs := [item for item in exclude_sources if isinstance(item, Organization)]:
-                groupings = groupings.filter(lab__organization__in=exclude_orgs)
+                groupings = groupings.exclude(lab__organization__in=exclude_orgs)
             if exclude_labs := [item for item in exclude_sources if isinstance(item, Lab)]:
-                groupings = groupings.filter(lab__in=exclude_labs)
+                groupings = groupings.exclude(lab__in=exclude_labs)
         if include_sources := self.include_sources:
             groupings = groupings.filter(lab__in=include_sources)
 
