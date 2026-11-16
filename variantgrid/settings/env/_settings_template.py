@@ -61,17 +61,17 @@ if _use_refseq:
     })
 
 
-# The following will auto-assign people to an "Unknown" lab - if you keep careful control of who joins you server
-# and what lab they belong to, you probably want to remove this
+# The following gives each self-registered user a private lab in an "Unknown" organisation, from which they can request
+# their institution's lab - if you keep careful control of who joins your server and what lab they belong to, you
+# probably want to remove this
 
 USER_CREATE_ORG_LABS = {
-    "unknown": "unknown",
+    "unknown": "user_group_%(username)s",
 }
 
 USER_CREATE_ORG_MESSAGE = {
-    "unknown": "Users must belong to a lab and organisation to perform classifications, and share data with others. "
-               "Because we don't know who you are yet, we've assigned you to 'Unknown'. If you want "
-               "to properly set things up, please contact david.lawrence@"
-               "sa.gov.au (using your institutional email). Thanks!",
+    "unknown": "Because we don't know who you are yet, we've put you in your own private lab, so data you upload is "
+               "visible only to you. To share data and classifications with colleagues, request your institution's "
+               "lab from your user settings page (using your institutional email).",
 }
 

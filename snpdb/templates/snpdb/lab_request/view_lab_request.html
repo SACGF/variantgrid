@@ -1,0 +1,44 @@
+{% extends "uicore/page/base.html" %}
+{% load crispy_forms_tags %}
+{% load js_tags %}
+{% block title %}Lab Request{% endblock title %}
+{% block content %}
+<div class="container">
+    <h3>Lab Request</h3>
+    <p><a class="hover-link" href="{% url 'lab_requests' %}">All lab requests</a></p>
+    <dl class="row">
+        <dt class="col-sm-3">User</dt><dd class="col-sm-9"><a class="hover-link" href="{% url 'view_user' lab_request.user.pk %}">{{ lab_request.user.username }}</a> ({{ lab_request.user.get_full_name }})</dd>
+        <dt class="col-sm-3">Organisation</dt><dd class="col-sm-9">{{ lab_request.organization_name }}</dd>
+        <dt class="col-sm-3">Lab</dt><dd class="col-sm-9">{{ lab_request.lab_name }}</dd>
+        <dt class="col-sm-3">Website</dt><dd class="col-sm-9"><span class="mono" title="Not a link - check it yourself">{{ lab_request.website }}</span></dd>
+        <dt class="col-sm-3">Email</dt><dd class="col-sm-9">{{ lab_request.email }}{% if lab_request.email_confirmed %} - confirmed {% timestamp lab_request.email_confirmed %}{% else %} - <b>not confirmed</b>{% endif %}</dd>
+        <dt class="col-sm-3">Requested</dt><dd class="col-sm-9">{% timestamp lab_request.created %}</dd>
+        <dt class="col-sm-3">Status</dt><dd class="col-sm-9">{{ lab_request.get_status_display }}{% if lab_request.reviewed_by %} by {{ lab_request.reviewed_by.username }} {% timestamp lab_request.reviewed %}{% endif %}</dd>
+        {% if private_lab %}
+            <dt class="col-sm-3">Private lab</dt><dd class="col-sm-9"><a class="hover-link" href="{% url 'view_lab' private_lab.pk %}">{{ private_lab }}</a></dd>
+        {% endif %}
+    </dl>
+
+    {% if approve_form %}
+        <p>
+            Check by hand that the institution is real and the website looks legit. Approving renames the user's private
+            lab into the organisation, makes them its lab head and keeps their data.
+        </p>
+        <form method="post" id="lab-request-approve-form">
+            {% csrf_token %}
+            {% crispy approve_form form_helper.horizontal %}
+            <button type="submit" class="btn btn-primary" name="action" value="approve">Approve</button>
+        </form>
+        <form method="post" class="mt-3" id="lab-request-reject-form">
+            {% csrf_token %}
+            <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" name="notify" id="reject-notify" checked>
+                <label class="form-check-label" for="reject-notify">Tell the user</label>
+            </div>
+            <button type="submit" class="btn btn-outline-danger" name="action" value="reject">Reject</button>
+        </form>
+    {% elif lab_request.can_review %}
+        <div class="alert alert-warning">{{ lab_request.user.username }} has no private lab, so there is nothing to approve.</div>
+    {% endif %}
+</div>
+{% endblock content %}

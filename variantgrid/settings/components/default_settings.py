@@ -562,8 +562,9 @@ PUBLIC_GROUP_NAME = "public"
 LOGGED_IN_USERS_GROUP_NAME = "logged_in_users"
 
 # key/value = Organization.group_name : lab group name pattern. Both are created if missing; the lab pattern is
-# filled with User values (if you want to create a group for each user). Not for OIDC deployments, where Keycloak
-# owns group membership (system check variantgrid.E003)
+# filled with User values. A pattern with user values gives each user a private lab in a holding organisation, whose
+# group they don't join, and lets them request their institution's lab (snpdb/models/models_lab_request.py).
+# Not for OIDC deployments, where Keycloak owns group membership (system check variantgrid.E003)
 USER_CREATE_ORG_LABS = {
     # "test_organization": "test_lab",
     # "test_organization": "user_group_%(username)s",

@@ -139,6 +139,9 @@
                 {% endfor %}
                 </ul>
             {% endif %}
+            {% if private_lab %}
+                <p class="mt-2" id="request-lab">Your lab is private to you. <a class="hover-link" href="{% url 'lab_request' %}">Request your institution's lab</a> to share with colleagues.</p>
+            {% endif %}
             <div id="user-settings">
                 {% settings_override form=user_settings_form override_level="User" override_source=override_source override_values=override_values %}
             </div>

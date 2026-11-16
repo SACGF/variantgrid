@@ -91,14 +91,13 @@ SOMALIER["enabled"] = True
 SOMALIER["annotation_base_dir"] = os.path.join(ANNOTATION_BASE_DIR, "somalier")
 
 USER_CREATE_ORG_LABS = {
-    "unknown": "unknown",
+    "unknown": "user_group_%(username)s",
 }
 
 USER_CREATE_ORG_MESSAGE = {
-    "unknown": "Users must belong to a lab and organisation to perform classifications, and share data with others. "
-               "Because we don't know who you are yet, we've assinged you to 'Unknown'. If you want "
-               "to properly set things up, please contact david.lawrence@"
-               "sa.gov.au (using your institutional email). Thanks!",
+    "unknown": "Because we don't know who you are yet, we've put you in your own private lab, so data you upload is "
+               "visible only to you. To share data and classifications with colleagues, request your institution's "
+               "lab from your user settings page (using your institutional email).",
 }
 
 # Latest annotation (VEP 115, columns_version 4, dbNSFP 5.x, gnomAD 4.1, ...) is the package default now (#1625)

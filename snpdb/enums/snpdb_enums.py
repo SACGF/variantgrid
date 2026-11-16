@@ -3,8 +3,8 @@ snpdb's enums, and the classification enums that apps below classification also 
 lifecycles (ImportStatus, ProcessingStatus, DataState), where uploads came from (ImportSource), allele linking
 (AlleleOrigin, AlleleConversionTool, AlleleOriginFilterDefault), contig roles (SequenceRole - including the
 gene-level fake contig), sample and file kinds, the grid's built-in and per-tag filter keys
-(BuiltInFilters, TagFilter), lab membership roles (LabUserRole), grid loading animations, the user award scale,
-and what kinds of calls a VCF holds (VariantContent).
+(BuiltInFilters, TagFilter), lab membership roles (LabUserRole) and lab requests (LabRequestStatus), grid loading
+animations, the user award scale, and what kinds of calls a VCF holds (VariantContent).
 Codes are stored in the database: add values, never renumber. Zygosity lives in patients/enums/patients_enums.py.
 
 AlleleOriginBucket and the ClinicalSignificance / SomaticClinicalSignificance value helpers live here so apps
@@ -426,6 +426,12 @@ class DuoRelationship(models.TextChoices):
 class LabUserRole(TextChoices):
     HEAD = "head", "Lab Head"
     USER = "user", "User"
+
+
+class LabRequestStatus(TextChoices):
+    PENDING = "P", "Pending"
+    APPROVED = "A", "Approved"
+    REJECTED = "R", "Rejected"
 
 
 class GridLoadingAnimation(models.TextChoices):

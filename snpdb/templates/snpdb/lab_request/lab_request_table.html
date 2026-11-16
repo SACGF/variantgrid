@@ -1,0 +1,20 @@
+{% load js_tags %}
+{% if lab_requests %}
+<table class="table table-sm" id="{{ table_id }}">
+    <thead><tr><th>Requested</th><th>User</th><th>Organisation</th><th>Lab</th><th>Email</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for lr in lab_requests %}
+        <tr>
+            <td><a class="hover-link" href="{% url 'view_lab_request' lr.pk %}">{% timestamp lr.created text_only=True %}</a></td>
+            <td>{{ lr.user.username }}</td>
+            <td>{{ lr.organization_name }}</td>
+            <td>{% if lr.lab %}<a class="hover-link" href="{% url 'view_lab' lr.lab.pk %}">{{ lr.lab }}</a>{% else %}{{ lr.lab_name }}{% endif %}</td>
+            <td>{{ lr.email }}</td>
+            <td>{{ lr.get_status_display }}{% if lr.reviewed_by %} ({{ lr.reviewed_by.username }}){% endif %}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="text-muted">None</p>
+{% endif %}

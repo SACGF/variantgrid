@@ -21,3 +21,4 @@ from .models_partition_archive import *
 from .models_zygosity_counts import *
 from .models_cached_web_resource import *
 from .models_api_token import *
+from .models_lab_request import *
