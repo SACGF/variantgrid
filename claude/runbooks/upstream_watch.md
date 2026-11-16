@@ -18,6 +18,7 @@ column (the fifth `|`-separated field), so keep the table shape.
 | AnnotSV regulatory element sort | lgmgeo/AnnotSV#356 fixed in a released Annotations_Human bundle | 2026-11-10 | 2026-12-10 |
 | chrX PAR table | a bioutils release with `bioutils.par` that installs on Python 3.14 (0.6.2 caps `<3.14`, biocommons/bioutils#97) | 2026-11-11 | 2026-12-11 |
 | HPO phenotype synonyms | an HPO release after 2026-10-24 carrying obophenotype/human-phenotype-ontology#11777-#11799 | 2026-11-12 | 2026-12-12 |
+| Transcript span from cdot | SACGF/cdot#246 (per-build `start`/`stop` written into the JSON) | 2026-11-16 | 2027-01-16 |
 
 ## chrX PAR table
 
@@ -215,3 +216,21 @@ a test deployment, then for each special-case key check whether the matcher's al
 (several keys differ from the synonym that was added - "increased renin" vs "Elevated renin", "recurrent urtis" vs
 "Recurrent URTI" - so only the exact matches go), run `patients.tests.test_phenotype_matching`, and delete this row.
 If #11806 is still open, carry it as its own row.
+
+## Transcript span from cdot
+
+`genes/models/models_gene.py:TranscriptVersion.set_span_from_data` and the backfill in
+`genes/migrations/0006_transcriptversion_span.py` take a transcript's span from its first and last exon, because cdot
+documents per-build `start`/`stop` but has never written them (SACGF/cdot#246). The columns and index stay either way:
+they exist so position lookups don't read the JSON rows (#2826).
+
+Check:
+
+```bash
+gh issue view 246 --repo SACGF/cdot --json state,closedAt -q '"\(.state) \(.closedAt)"'
+gh release list --repo SACGF/cdot --limit 3
+```
+
+When resolved (a cdot data release carrying the fields): have `set_span_from_data` read `build_data["start"]` /
+`build_data["stop"]`, or cdot's span helper if #246 adds one, keeping the exon fallback for rows imported from older
+files, and delete this row.
