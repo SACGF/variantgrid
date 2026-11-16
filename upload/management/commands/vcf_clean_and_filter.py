@@ -6,6 +6,9 @@ several pipeline stages later. When '--unsorted-marker-file' is given, the reaso
 failing, so the caller can tell an unsorted VCF apart from any other failure and retry through 'bcftools sort'
 (pass '--allow-unsorted' on that second pass).
 
+It writes the FORMAT keys the records it keeps actually use ('--record-format-fields-file'), as a header can
+declare ones no record carries - @see upload.vcf.vcf_import.clear_format_fields_not_in_records
+
 We also rename chromosomes to the RefSeq contig IDs used in our fasta file
 
 We don't use "bcftools annotate --rename-chrs" to do this as it fails if contigs are not defined in the header
@@ -45,6 +48,7 @@ class Command(BaseCommand):
         parser.add_argument('--skipped-contigs-stats-file', help='File name')
         parser.add_argument('--skipped-records-stats-file', help='File name')
         parser.add_argument('--skipped-filters-stats-file', help='File name')
+        parser.add_argument('--record-format-fields-file', help='Write the FORMAT keys records use here, one per line')
         parser.add_argument('--unsorted-marker-file', help='Write reason here if VCF is unsorted')
         parser.add_argument('--allow-unsorted', action='store_true', help='Skip the sorted check')
 
@@ -61,6 +65,7 @@ class Command(BaseCommand):
         skipped_contigs_stats_file = options.get("skipped_contigs_stats_file")
         skipped_records_stats_file = options.get("skipped_records_stats_file")
         skipped_filters_stats_file = options.get("skipped_filters_stats_file")
+        record_format_fields_file = options.get("record_format_fields_file")
         unsorted_marker_file = options.get("unsorted_marker_file")
         allow_unsorted = options.get("allow_unsorted")
 
@@ -78,6 +83,7 @@ class Command(BaseCommand):
         skipped_contigs = Counter()
         skipped_records = Counter()
         skipped_filters = Counter()
+        record_format_columns = set()  # Whole FORMAT column - a caller writes very few distinct ones
 
         ref_standard_bases_pattern = re.compile(r"[GATCN]")  # Reference can be N (and FreeBayes often writes these)
 
@@ -175,6 +181,8 @@ class Command(BaseCommand):
                         self._write_unsorted_marker(unsorted_marker_file, reason)
                         raise CommandError(reason) from e
 
+                if len(columns) > VCFColumns.FORMAT:
+                    record_format_columns.add(columns[VCFColumns.FORMAT])
                 sys.stdout.write("\t".join(columns))
 
         if first_non_header_line:
@@ -184,6 +192,7 @@ class Command(BaseCommand):
         self._write_skip_counts(skipped_contigs, skipped_contigs_stats_file)
         self._write_skip_counts(skipped_records, skipped_records_stats_file)
         self._write_skip_counts(skipped_filters, skipped_filters_stats_file)
+        self._write_record_format_fields(record_format_columns, record_format_fields_file)
 
     @staticmethod
     def _add_undeclared_filters_info(info_column: str, undeclared_filters: list[str]) -> str:
@@ -224,6 +233,15 @@ class Command(BaseCommand):
             with open(filename, "w") as f:
                 for name, count in counts.items():
                     f.write('%s\t%d\n' % (name, count))
+
+    @staticmethod
+    def _write_record_format_fields(record_format_columns: set[str], filename):
+        if filename:
+            fields = {field for column in record_format_columns for field in column.rstrip("\n").split(":")}
+            fields.discard(".")
+            with open(filename, "w") as f:
+                for field in sorted(fields):
+                    f.write(field + "\n")
 
     @staticmethod
     def _check_skip_line(skip_patterns: dict, line: str):

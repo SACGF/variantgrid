@@ -37,6 +37,10 @@ Patterns here:
   with bcftools sort when the unsorted marker file appears. Normalisation history rides in the INFO tag
   upload/models/models.py:ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG. Change record filtering in
   upload/management/commands/vcf_clean_and_filter.py:Command, not in the processors.
+- A VCF's sample fields (genotype_field, read_depth_field...) are bound from the header's FORMAT definitions, then
+  unbound by upload/vcf/vcf_preprocess.py:clear_unused_format_fields when no record uses them (DRAGEN's shared header
+  declares GT/AD/DP on a CNV VCF whose records are only FC) - before the split files are processed, so the genotype
+  processor and has_genotype / has_depth see only what the records carry.
 - upload/vcf/vcf_preprocess.py:run_pipe detects failure from a `${PIPESTATUS[*]}` status file, not pipefail, and gives
   every stage its own stderr file. The stage blamed (upload/vcf/vcf_preprocess.py:_failed_stage) is the first non-zero
   exit that is not SIGPIPE-shaped (141, or a Python `BrokenPipeError`) - those stages were killed because the one after

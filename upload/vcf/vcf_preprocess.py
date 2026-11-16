@@ -22,6 +22,7 @@ from typing import Optional
 
 import pandas as pd
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 
 from library.django_utils.django_file_utils import get_import_processing_filename
@@ -47,6 +48,7 @@ from upload.tasks.vcf.unknown_variants_task import (
     AnnotateImportedVCFTask,
     SeparateUnknownVariantsTask,
 )
+from upload.vcf.vcf_import import clear_format_fields_not_in_records
 from upload.vcf.vcf_ref_check import check_vcf_ref_matches_build
 
 MAX_STDERR_OUTPUT = 5000  # How much stderr output per process to store in DB
@@ -130,12 +132,14 @@ class PreprocessFiles:
     skipped_filters_stats: str
     skipped_alts_stats: str
     converted_alts_stats: str
+    record_format_fields: str
     swap_skipped: Optional[str] = None
 
     @property
     def written_by_pipe(self) -> list[str]:
         filenames = [self.unsorted_marker, self.skipped_contigs_stats, self.skipped_records_stats,
-                     self.skipped_filters_stats, self.skipped_alts_stats, self.converted_alts_stats]
+                     self.skipped_filters_stats, self.skipped_alts_stats, self.converted_alts_stats,
+                     self.record_format_fields]
         if self.swap_skipped:
             filenames.append(self.swap_skipped)
         return filenames
@@ -158,6 +162,7 @@ def _get_preprocess_files(upload_pipeline, vcf_filename: str, cleaned_vcf_header
                            skipped_filters_stats=_processing_filename("skipped_filters.tsv"),
                            skipped_alts_stats=_processing_filename("skipped_alts.tsv"),
                            converted_alts_stats=_processing_filename("converted_alts.tsv"),
+                           record_format_fields=_processing_filename("record_format_fields.txt"),
                            swap_skipped=swap_skipped_file)
 
 
@@ -193,7 +198,9 @@ def _build_pipe_commands(upload_step, files: PreprocessFiles, disable_swap=False
                                           "--skipped-records-stats-file",
                                           files.skipped_records_stats,
                                           "--skipped-filters-stats-file",
-                                          files.skipped_filters_stats]
+                                          files.skipped_filters_stats,
+                                          "--record-format-fields-file",
+                                          files.record_format_fields]
     if sort_vcf:
         read_variants_cmd.append("--allow-unsorted")
     else:
@@ -426,6 +433,7 @@ def preprocess_vcf(upload_step, annotate_gnomad_af=False, disable_swap=False, ch
     _store_vcf_stats(files.skipped_filters_stats, clean_sub_step, "FILTER")
     _store_vcf_stats(files.skipped_alts_stats, clean_sub_step, "ALTs")
     _store_vcf_stats(files.converted_alts_stats, clean_sub_step, "ALTs", operation='Converted')
+    clear_unused_format_fields(upload_step, files.record_format_fields, clean_sub_step)
 
     schedule_split_file_steps(upload_step, files.split_vcf_dir, annotate_gnomad_af=annotate_gnomad_af)
 
@@ -469,6 +477,23 @@ def schedule_split_file_steps(upload_step, split_vcf_dir: str, annotate_gnomad_a
         # We don't know how big the last split file is, so leave items_to_process as null so no check
         UploadStepMultiFileOutput.objects.create(upload_step=upload_step,
                                                  output_filename=output_filename)
+
+
+def clear_unused_format_fields(upload_step, record_format_fields_filename: str, clean_sub_step):
+    """ Before the split files are processed, so the genotype import only reads what the records carry """
+    try:
+        vcf = upload_step.get_uploaded_vcf().vcf
+    except ObjectDoesNotExist:
+        return
+    if not (vcf and vcf.has_sample_columns and os.path.exists(record_format_fields_filename)):
+        return
+
+    with open(record_format_fields_filename) as f:
+        record_format_fields = {line.strip() for line in f}
+    if unbound := clear_format_fields_not_in_records(vcf, record_format_fields):
+        unused = ", ".join(sorted(set(unbound.values())))
+        message_string = f"Not using FORMAT {unused}: declared in the VCF header, but no record has them"
+        SimpleVCFImportInfo.objects.create(upload_step=clean_sub_step, message_string=message_string)
 
 
 def _store_vcf_stats(filename, upload_step, description, operation='Skipped'):
