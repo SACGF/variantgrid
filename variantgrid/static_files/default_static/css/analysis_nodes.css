@@ -419,15 +419,8 @@ button.add-analysis-variable-button {
 }
 
 /* NodeChip.dots - what kinds of call a VCF chip's files hold (snpdb VariantContent, #2759). On the card a dot per
-   kind; the hover card shows each as a chip in the same colour. A kind the grid's variant badge also shows wears that
-   badge's text colour (.rv-kind-* in global/_variant_grid.scss); small variants have no badge, so stay neutral, and
-   CNV - gains and losses together - takes a colour no badge uses */
-.variant-content-small { --variant-content-color: #78909c; }
-.variant-content-cnv { --variant-content-color: #ad1457; }
-.variant-content-sv { --variant-content-color: #a15c00; }
-.variant-content-fusion { --variant-content-color: #5e35b1; }
-.variant-content-gene_cn { --variant-content-color: #b3261e; }
-.variant-content-splice { --variant-content-color: #00695c; }
+   kind; the hover card shows each as a chip in the same colour - --variant-content-color, set per kind by
+   .variant-content-* in global/_variant_grid.scss, which the VCF and sample pages and grids draw their chips with */
 
 .node-chip-dots {
 	display: inline-flex;

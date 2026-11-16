@@ -2,6 +2,7 @@
 {% load genome_build_tags %}
 {% load js_tags %}
 {% load ui_utils %}
+{% load variant_contents_tags %}
 <div class="vcf-grid-filter-tags-{{ table_id }}">
     <style>
     .grid-filter-container {
@@ -34,6 +35,15 @@
             {% endlabelled %}
             {% labelled label="Project" %}
             {{ project_form.project }}
+            {% endlabelled %}
+            {% variant_contents_help as variant_contents_help_text %}
+            {% labelled label="Contents" help=variant_contents_help_text %}
+            <select class="form-control vcf-grid-filter-variant-content">
+                <option value="">Any</option>
+                {% for variant_content in variant_contents %}
+                <option value="{{ variant_content.value }}">{{ variant_content.label }}</option>
+                {% endfor %}
+            </select>
             {% endlabelled %}
             {% if variants_type_form %}
             {% labelled label="Variants type" %}

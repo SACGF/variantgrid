@@ -3,16 +3,20 @@
 {{ block.super }}
 {% load related_data_tags %}
 {% load ui_utils %}
+{% load js_tags %}
+{% load variant_contents_tags %}
 
 <div id="samples">
     <h4>Samples for patient</h4>
     {% if samples %}
+        {% sample_variant_contents samples as sample_contents %}
         <table class="table">
             <thead>
             <tr>
             <th>ID
             <th>Sample Name
             <th>VCF
+            <th data-help="{% variant_contents_help %}">Contents</th>
             <th>VCF date
             <th>Genome build
             <th>Specimen
@@ -25,6 +29,7 @@
             <td>{% preview_icon sample %} <a href="{% url 'view_sample' sample.pk %}">{{ sample.pk }}</a>
             <td>{{ sample.name }}
             <td>{% preview_icon sample.vcf %} <a href="{% url 'view_vcf' sample.vcf.pk %}">{{ sample.vcf.name }}</a>
+            <td>{% variant_contents sample_contents|get_item:sample.pk %}
             <td>{{ sample.vcf.date }}
             <td>{{ sample.vcf.genome_build }}
             <td>{% if sample.specimen %}{% preview_icon sample.specimen %} <a href="{{ sample.specimen.get_absolute_url }}">{{ sample.specimen }}</a>{% endif %}

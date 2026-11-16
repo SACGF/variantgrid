@@ -49,6 +49,12 @@ badge answers "is this a small variant?" where `variant_class` answers "what sor
 filters (the All Variants grid, the All Variants and Effect nodes) read the same alt as the badge
 (`snpdb/variant_filters.py:VariantType`), never `variant_class`. Drawn client side by `VariantGridFormat.variantKindBadge` in `variantgrid/static_files/default_static/js/variantgrid_formats.js`, which the variant page's locus table reuses.
 
+**Variant contents** - what kinds of call a sample or VCF holds (`snpdb/enums/snpdb_enums.py:VariantContent`): `Small`, `CNV`, `SV`,
+`Fusion`, `Gene CN`, `Splice`. Counted per sample when its stats are calculated, and shown as coloured chips wherever samples
+and VCFs are listed and as dots on an analysis node's VCF chip. CNV and SV are the same symbolic alts: a VCF that declares a
+copy number field is a CNV caller's, one that doesn't is an SV caller's. Where **Variant kind** says what one row is, this
+says what a whole file brings.
+
 **VariantCoordinate** - `snpdb/models/models_variant.py:VariantCoordinate`, a pydantic value object (chrom, position, ref,
 alt, svlen), the currency between HGVS, VCF and Variant. Canonicalise before lookup or insert.
 

@@ -30,6 +30,7 @@ from snpdb.models import (
     Trio,
 )
 from snpdb.models.models_somalier import SomalierAncestry
+from snpdb.variant_contents import get_sample_variant_contents, variant_contents_chips
 
 FAMILY_GROUP_MODELS = (Trio, Duo, Quad)
 
@@ -44,6 +45,7 @@ def sample_membership_rows(samples: list[Sample]) -> list[dict]:
             cohort_genotype_collection__cohort__vcf=F("sample__vcf"),
             cohort_genotype_collection__cohort_version=F("cohort_genotype_collection__cohort__version"))
         stats_by_sample_id = {stats.sample_id: stats for stats in stats_qs}
+    sample_variant_contents = get_sample_variant_contents(samples)
 
     rows = []
     for sample in samples:
@@ -55,6 +57,7 @@ def sample_membership_rows(samples: list[Sample]) -> list[dict]:
             "vcf_id": sample.vcf_id,
             "vcf_name": sample.vcf.name,
             "het_hom": f"{stats.het_count:,} / {stats.hom_count:,}" if stats else None,
+            "variant_contents": variant_contents_chips(sample_variant_contents.get(sample.pk)),
             "sex": (stats.chrx_sex_guess if stats else Sex.UNKNOWN).label,
             "patient_id": sample.patient_id,
         })

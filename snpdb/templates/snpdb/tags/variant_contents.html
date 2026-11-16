@@ -1,0 +1,13 @@
+{% load humanize %}{% spaceless %}
+{% if chips %}
+    <span class="variant-contents">
+    {% for chip in chips %}
+        <span class="variant-content-chip variant-content-{{ chip.content }}" title="{{ chip.title }}">{{ chip.label }}{% if show_counts %}<span class="variant-content-count">{{ chip.count|intcomma }}</span>{% endif %}</span>
+    {% endfor %}
+    </span>
+{% elif placeholder and counted %}
+    <span class="text-muted">No calls</span>
+{% elif placeholder %}
+    <span class="text-muted" title="Counted when sample stats are calculated. Opening a sample's page recalculates stats that are out of date.">Not counted yet</span>
+{% endif %}
+{% endspaceless %}

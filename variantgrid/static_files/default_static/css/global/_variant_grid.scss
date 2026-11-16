@@ -66,6 +66,39 @@
 	color: #00695c;
 }
 
+// What kinds of call a VCF or sample holds (snpdb VariantContent, #2759): a chip per kind on the VCF and
+// sample pages and grids, and the dots on an analysis node's VCF chip (analysis_nodes.css). A kind the kind
+// badge above also shows wears that badge's text colour; small variants have no badge, so stay neutral, and
+// CNV - gains and losses together - takes a colour no badge uses
+.variant-content-small { --variant-content-color: #78909c; }
+.variant-content-cnv { --variant-content-color: #ad1457; }
+.variant-content-sv { --variant-content-color: #a15c00; }
+.variant-content-fusion { --variant-content-color: #5e35b1; }
+.variant-content-gene_cn { --variant-content-color: #b3261e; }
+.variant-content-splice { --variant-content-color: #00695c; }
+
+.variant-contents {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 3px;
+	vertical-align: middle;
+}
+
+.variant-content-chip {
+	padding: 0 6px;
+	border-radius: 8px;
+	background: var(--variant-content-color);
+	color: white;
+	font-size: 11px;
+	line-height: 16px;
+	white-space: nowrap;
+}
+
+.variant-content-count {
+	margin-left: 4px;
+	opacity: 0.85;
+}
+
 table.variantgrid-datatable {
 	table-layout: fixed;
 	width: auto;

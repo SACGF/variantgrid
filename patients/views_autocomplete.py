@@ -12,6 +12,7 @@ from library.constants import MINUTE_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
 from patients.enums import SampleSourceLevel
 from patients.models import ExternalPK, Extraction, Patient, Specimen
+from snpdb.variant_contents import get_sample_variant_contents, label_with_variant_contents
 from snpdb.views.views_autocomplete import GenomeBuildAutocompleteView, SampleAutocompleteView
 
 
@@ -118,8 +119,12 @@ class SampleSourceAutocompleteView(AutocompleteView):
             view.forwarded = self.forwarded
             get_text = SAMPLE_SOURCE_TEXT.get(level, str)
             qs = view.get_queryset().select_related(*SAMPLE_SOURCE_SELECT_RELATED.get(level, ()))
-            children = [{"id": f"{level}:{obj.pk}", "text": get_text(obj)}
-                        for obj in qs[:self.MAX_PER_GROUP]]
+            objs = list(qs[:self.MAX_PER_GROUP])
+            # As SampleAutocompleteView's own results say - the samples are what can share a name
+            contents = get_sample_variant_contents(objs) if level == SampleSourceLevel.SAMPLE else {}
+            children = [{"id": f"{level}:{obj.pk}",
+                         "text": label_with_variant_contents(get_text(obj), contents.get(obj.pk))}
+                        for obj in objs]
             if children:
                 results.append({"text": label, "children": children})
         return JsonResponse({"results": results, "pagination": {"more": False}})

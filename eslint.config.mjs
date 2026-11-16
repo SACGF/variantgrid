@@ -96,6 +96,7 @@ export default [
                 SampleSelectionActions: "readonly", // sample_selection_actions.js
                 VariantGridFilterBuilder: "readonly", // variantgrid_filter_builder.js
                 VariantGridFormat: "readonly", // variantgrid_formats.js
+                TableFormat: "readonly", // datatable_definition.js
                 getValue: "readonly", // global.js
                 setAutocompleteValue: "readonly", // global.js
                 setCrossLink: "readonly", // global.js

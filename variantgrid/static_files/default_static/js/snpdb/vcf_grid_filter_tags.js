@@ -39,6 +39,11 @@ function initVcfGridFilter(tableId, options) {
                 descriptions.push("Project = " + project);
             }
 
+            const variantContent = vcfGridParams["variant_content"];
+            if (variantContent) {
+                descriptions.push("Contents = " + $(".vcf-grid-filter-variant-content option:selected", tagContainer).text());
+            }
+
             const variantsType = vcfGridParams["variants_type"];
             if (variantsType) {
                 const variantsTypeDescriptions = variantsType.map(vt => variantsTypeLabels[vt]).join(", ");
@@ -60,6 +65,7 @@ function initVcfGridFilter(tableId, options) {
         $("select[data-autocomplete-light-function=select2]", tagContainer).each(function() {
             clearAutocompleteChoice(this);
         });
+        $(".vcf-grid-filter-variant-content", tagContainer).val("");
         ignoreFilterTable = false;
         vcfGridParams = {};
         filterTable();
@@ -84,6 +90,16 @@ function initVcfGridFilter(tableId, options) {
                 vcfGridParams["genome_build_name"] = genomeBuildName;
             } else {
                 delete vcfGridParams["genome_build_name"];
+            }
+            filterTable();
+        });
+
+        $(".vcf-grid-filter-variant-content", tagContainer).change(function() {
+            const variantContent = $(this).val();
+            if (variantContent) {
+                vcfGridParams["variant_content"] = variantContent;
+            } else {
+                delete vcfGridParams["variant_content"];
             }
             filterTable();
         });

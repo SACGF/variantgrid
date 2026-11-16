@@ -48,6 +48,7 @@ from snpdb.enums import (
     ImportStatus,
     ProcessingStatus,
     SuperPopulationCode,
+    VariantContent,
     VariantOrigin,
 )
 from snpdb.grid_columns.custom_columns import (
@@ -77,6 +78,14 @@ from snpdb.models import (
     VariantZygosityCountCollection,
 )
 from snpdb.sample_filters import get_sample_ontology_q, get_sample_qc_gene_list_gene_symbol_q
+from snpdb.variant_contents import (
+    VARIANT_CONTENTS_HELP,
+    get_sample_variant_contents,
+    get_vcf_variant_contents,
+    sample_variant_content_exists,
+    variant_contents_chips,
+    vcf_variant_content_exists,
+)
 from snpdb.views.datatable_view import DC, CellData, DatatableConfig, RichColumn, SortOrder
 from uicore.templatetags.js_tags import jsonify_pretty_for_html
 from variantgrid.perm_path import get_visible_url_names
@@ -121,6 +130,9 @@ class VCFListColumns(DatatableConfig[VCF]):
                        css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
             RichColumn(key="import_status", label="Import Status", orderable=True, search=False,
                        **import_status_client_renderer()),
+            RichColumn(name="variant_contents", label="Contents", extra_columns=["id"], search=False,
+                       renderer=self._render_variant_contents, client_renderer='TableFormat.variantContents',
+                       header_title=VARIANT_CONTENTS_HELP),
             RichColumn(key="data_archived_date", label="Archived", orderable=True, search=False,
                        css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
             RichColumn(key="genome_build__name", label="Genome Build", orderable=True),
@@ -139,6 +151,14 @@ class VCFListColumns(DatatableConfig[VCF]):
                        renderer=self.render_delete, client_renderer='TableFormat.deleteRow'),
         ]
 
+    def pre_render(self, qs: QuerySet[VCF], rows: list[dict]):
+        super().pre_render(qs, rows)
+        self._page_variant_contents = get_vcf_variant_contents([row["id"] for row in rows])
+
+    def _render_variant_contents(self, cell: CellData) -> JsonDataType:
+        # Presence only - a VCF's counts are sums over its samples
+        return variant_contents_chips(self._page_variant_contents.get(cell["id"]), counts=False)
+
     def get_initial_queryset(self) -> QuerySet[VCF]:
         user_grid_config = UserGridConfig.get(self.user, 'VCFs')
         return VCF.filter_for_user(self.user, group_data=user_grid_config.show_group_data)
@@ -149,6 +169,8 @@ class VCFListColumns(DatatableConfig[VCF]):
         if genome_build_name := self.get_query_param("genome_build_name"):
             genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
             qs = qs.filter(genome_build=genome_build)
+        if (variant_content := self.get_query_param("variant_content")) in VariantContent.values:
+            qs = qs.filter(vcf_variant_content_exists(VariantContent(variant_content)))
         return qs
 
 
@@ -189,6 +211,9 @@ class SamplesListColumns(DatatableConfig[Sample]):
                        css_class="text-nowrap", client_renderer='TableFormat.timestamp'),
             RichColumn(key="import_status", label="Import Status", orderable=True, search=False,
                        **import_status_client_renderer()),
+            RichColumn(name="variant_contents", label="Contents", extra_columns=["id"], search=False,
+                       renderer=self._render_variant_contents, client_renderer='TableFormat.variantContents',
+                       header_title=VARIANT_CONTENTS_HELP),
             RichColumn(key="vcf__genome_build__name", label="Genome Build", orderable=True),
             RichColumn(key="variants_type", label="Variants Type", orderable=True, search=False,
                        **RichColumn.choices_client_renderer(VariantOrigin.choices)),
@@ -234,6 +259,13 @@ class SamplesListColumns(DatatableConfig[Sample]):
             RichColumn(key="id", name="delete", label="", orderable=False, search=False,
                        renderer=self.render_delete, client_renderer='TableFormat.deleteRow'),
         ]
+
+    def pre_render(self, qs: QuerySet[Sample], rows: list[dict]):
+        super().pre_render(qs, rows)
+        self._page_variant_contents = get_sample_variant_contents([row["id"] for row in rows])
+
+    def _render_variant_contents(self, cell: CellData) -> JsonDataType:
+        return variant_contents_chips(self._page_variant_contents.get(cell["id"]))
 
     @staticmethod
     def _render_age(cell: CellData) -> JsonDataType:
@@ -298,6 +330,8 @@ class SamplesListColumns(DatatableConfig[Sample]):
             qs = qs.filter(vcf__genome_build=genome_build)
         if (variants_type := self.get_query_json("variants_type")) is not None:
             qs = qs.filter(variants_type__in=variants_type)
+        if (variant_content := self.get_query_param("variant_content")) in VariantContent.values:
+            qs = qs.filter(sample_variant_content_exists(VariantContent(variant_content)))
         return qs
 
 

@@ -1,5 +1,6 @@
 {% load model_tags %}
 {% load ui_utils %}
+{% load variant_contents_tags %}
 
 <div class="card mb-3">
     <div class="card-header">Family</div>
@@ -8,6 +9,7 @@
             <tr>
                 <th>Role</th>
                 <th>Sample</th>
+                <th data-help="{% variant_contents_help %}">Contents</th>
                 <th>Affected</th>
                 <th data-help="{% detected_sex_help %}">Detected Sex</th>
                 <th>Patient</th>
@@ -22,6 +24,7 @@
                     {% preview_icon sample %}
                     <a href="{% url 'view_sample' sample.pk %}">{{ sample.name }}</a>
                 </td>
+                <td>{% variant_contents member.variant_contents %}</td>
                 <td>
                     {% if member.affected %}
                         <span class="badge badge-dark">Affected</span>
