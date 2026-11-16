@@ -2,22 +2,38 @@
 Unbinds VCF sample fields (genotype_field, read_depth_field...) bound to a FORMAT key the header declares but no record
 uses, for VCFs imported before the import checked the records (#2833) - a DRAGEN TSO500 CNV VCF declares GT, AD, DP and
 GQ but every record is only FC, so its calls were counted as nothing and the Sample node offered zygosity and depth
-filters. Which keys the records used comes from the stored CohortGenotype.format JSON; a VCF whose rows predate that
-column being filled is skipped. Sample stats are recalculated for a VCF that changed, so its contents show.
+filters. Candidates come from sample stats alone: a GT field where every sample has no ref/het/hom call and some unknown
+ones means no record had a GT. Only those VCFs (small CNV/SV files) have their genotype rows read, for which bound keys
+the stored CohortGenotype.format JSON holds, so this never scans a large partition. A VCF whose records have GT but not
+a declared depth field keeps it until reloaded; one without sample stats is skipped. Sample stats are recalculated for
+a VCF that changed, so its contents show.
 --dry-run reports without writing.
 Registered as a deploy-time ManualOperation (upload/migrations/0005_one_off_clear_unused_vcf_format_fields.py).
 """
 from django.core.management.base import BaseCommand
 from django.db import connection
+from django.db.models import F, Sum
 
 from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.tasks.calculate_sample_stats import calculate_vcf_stats
 from snpdb.enums import ImportStatus
 from snpdb.models import VCF, VCFSourceSettings
+from snpdb.models.models_cohort_stats import CohortGenotypeStats
 from upload.vcf.vcf_import import (
     clear_format_fields_not_in_records,
     get_format_fields_not_in_records,
 )
+
+
+def get_no_genotype_call_vcf_ids() -> set[int]:
+    """ VCFs with a GT field whose own cohort's per-sample stats show no ref/het/hom call at all """
+    stats_qs = CohortGenotypeStats.objects.filter(
+        sample__isnull=False, filter_key__isnull=True, passing_filter=False,
+        sample__vcf__genotype_field__isnull=False,
+        cohort_genotype_collection__cohort__vcf_id=F("sample__vcf_id"))
+    vcf_calls_qs = stats_qs.values("sample__vcf_id").annotate(
+        calls=Sum("ref_count") + Sum("het_count") + Sum("hom_count"), unknown=Sum("unk_count"))
+    return set(vcf_calls_qs.filter(calls=0, unknown__gt=0).values_list("sample__vcf_id", flat=True))
 
 
 def get_genotype_tables(vcf: VCF) -> list[str]:
@@ -54,18 +70,13 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
         existing_tables = set(connection.introspection.table_names())
-        vcf_qs = VCF.objects.filter(genotype_samples__gt=0, cohort__isnull=False, data_archived_date__isnull=True,
-                                    import_status=ImportStatus.SUCCESS).select_related("genome_build").order_by("pk")
-        num_vcfs = vcf_qs.count()
+        vcf_qs = VCF.objects.filter(pk__in=get_no_genotype_call_vcf_ids(), genotype_samples__gt=0, cohort__isnull=False,
+                                    data_archived_date__isnull=True, import_status=ImportStatus.SUCCESS)
         num_changed = 0
-        num_no_format = 0
-        for vcf in vcf_qs:
+        for vcf in vcf_qs.select_related("genome_build").order_by("pk"):
             tables = [t for t in get_genotype_tables(vcf) if t in existing_tables]
-            if not tables:
-                continue
-            if not _exists(tables, "jsonb_array_length(format) > 0"):
-                num_no_format += 1  # Imported before FORMAT was stored - nothing to tell used from unused
-                continue
+            if not (tables and _exists(tables, "jsonb_array_length(format) > 0")):
+                continue  # Imported before FORMAT was stored - nothing to tell used from unused
 
             record_format_fields = get_record_format_fields(vcf, tables)
             if dry_run:
@@ -84,5 +95,4 @@ class Command(BaseCommand):
                 calculate_vcf_stats(vcf.pk, annotation_version.pk)
 
         mode = " (dry run)" if dry_run else ""
-        self.stdout.write(f"Checked {num_vcfs} VCFs{mode}: {num_changed} with unused FORMAT fields, "
-                          f"{num_no_format} skipped as imported before FORMAT was stored")
+        self.stdout.write(f"{num_changed} VCFs{mode} with a GT field but no genotype calls had unused FORMAT fields")
