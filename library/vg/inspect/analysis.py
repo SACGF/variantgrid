@@ -43,7 +43,8 @@ def inspect(key: str, depth: int) -> dict[str, Any]:
     }
     run = AnalysisTemplateRun.objects.filter(analysis=analysis).select_related("template_version__template").first()
     if run:
-        data["from_template"] = {"template": run.template_version.template.name, "version": run.template_version.version}
+        data["from_template"] = {"template": run.template_version.template.name, "version": run.template_version.version,
+                                 "trigger": run.get_trigger_display()}
     nodes_qs = AnalysisNode.objects.filter(analysis=analysis).select_subclasses()
     nodes = list(nodes_qs)
     data["node_count"] = len(nodes)

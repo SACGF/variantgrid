@@ -6,6 +6,7 @@ from typing import Optional
 from auditlog.context import disable_auditlog
 from django.contrib.auth.models import User
 
+from analysis.enums import AnalysisTemplateRunTrigger
 from analysis.models import (
     Analysis,
     AnalysisNode,
@@ -29,11 +30,12 @@ from snpdb.models import Cohort, GenomeBuild, Sample
 
 def run_analysis_template(analysis_template: AnalysisTemplate,
                           genome_build: GenomeBuild,
+                          trigger: AnalysisTemplateRunTrigger,
                           user: User = None,
                           template_version: AnalysisTemplateVersion = None,
                           annotation_version: AnnotationVersion = None,
                           **kwargs) -> AnalysisTemplateRun:
-    template_run = AnalysisTemplateRun.create(analysis_template, genome_build, user=user,
+    template_run = AnalysisTemplateRun.create(analysis_template, genome_build, trigger, user=user,
                                               template_version=template_version,
                                               annotation_version=annotation_version)
     template_run.populate_arguments(kwargs)
@@ -83,7 +85,7 @@ def populate_analysis_from_template_run(template_run):
 
 
 def _get_single_template_run_analysis(klass, analysis_template: AnalysisTemplate,
-                                      obj, field_name,
+                                      obj, field_name, trigger: AnalysisTemplateRunTrigger,
                                       annotation_version: Optional[AnnotationVersion] = None) -> Analysis:
     """ One per sample (or cohort), template version and annotation version - a run left on a superseded
         annotation version is passed over for a new one, so the sample tab and the annotated exports show
@@ -106,7 +108,7 @@ def _get_single_template_run_analysis(klass, analysis_template: AnalysisTemplate
         if satr:
             return satr.analysis_template_run.analysis
 
-        at_run = run_analysis_template(analysis_template, obj.genome_build, template_version=template_version,
+        at_run = run_analysis_template(analysis_template, obj.genome_build, trigger, template_version=template_version,
                                        annotation_version=annotation_version, **kwargs)
         at_run.analysis.visible = False
         at_run.analysis.save()
@@ -118,13 +120,15 @@ def _get_single_template_run_analysis(klass, analysis_template: AnalysisTemplate
 def get_sample_analysis(sample: Sample, analysis_template: AnalysisTemplate,
                         annotation_version: Optional[AnnotationVersion] = None) -> Analysis:
     return _get_single_template_run_analysis(SampleAnalysisTemplateRun, analysis_template,
-                                             sample, "sample", annotation_version=annotation_version)
+                                             sample, "sample", AnalysisTemplateRunTrigger.SAMPLE,
+                                             annotation_version=annotation_version)
 
 
 def get_cohort_analysis(cohort: Cohort, analysis_template: AnalysisTemplate,
                         annotation_version: Optional[AnnotationVersion] = None) -> Analysis:
     return _get_single_template_run_analysis(CohortAnalysisTemplateRun, analysis_template,
-                                             cohort, "cohort", annotation_version=annotation_version)
+                                             cohort, "cohort", AnalysisTemplateRunTrigger.COHORT,
+                                             annotation_version=annotation_version)
 
 
 def _get_auto_launch_analysis_templates_for_sample(user, sample, skip_already_analysed=False):
@@ -171,7 +175,8 @@ def get_auto_launch_analysis_template_matches(user, sample_enrichment_kit_name, 
         matches.append(match)
     return matches
 
-def auto_launch_analysis_templates_for_sample(user, sample, analysis_description=None, skip_already_analysed=False):
+def auto_launch_analysis_templates_for_sample(user, sample, trigger: AnalysisTemplateRunTrigger,
+                                              skip_already_analysed=False):
     for analysis_template in _get_auto_launch_analysis_templates_for_sample(user, sample,
                                                                             skip_already_analysed=skip_already_analysed):
         template_version = analysis_template.active
@@ -187,10 +192,7 @@ def auto_launch_analysis_templates_for_sample(user, sample, analysis_description
             except ActiveSampleGeneList.DoesNotExist:
                 logging.warning("Skipping auto analysis '%s' for sample: %s. Will try again if QC Gene Lists created", analysis_template, sample)
                 continue
-        template_run = AnalysisTemplateRun.create(analysis_template, sample.genome_build, user=user,
+        template_run = AnalysisTemplateRun.create(analysis_template, sample.genome_build, trigger, user=user,
                                                   template_version=template_version)
-        if analysis_description:
-            template_run.analysis.description = analysis_description
-            template_run.analysis.save()
         template_run.populate_arguments(template_arguments)
         populate_analysis_from_template_run(template_run)

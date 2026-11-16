@@ -30,7 +30,12 @@ from analysis.analysis_templates import (
     get_auto_launch_analysis_template_matches,
     populate_analysis_from_template_run,
 )
-from analysis.enums import AnalysisType, MinimisationResultType, NodeStatus
+from analysis.enums import (
+    AnalysisTemplateRunTrigger,
+    AnalysisType,
+    MinimisationResultType,
+    NodeStatus,
+)
 from analysis.forms import (
     AnalysisChoiceForm,
     AnalysisNodeIssuesFilterForm,
@@ -233,7 +238,8 @@ def create_analysis_from_template(request, genome_build_name):
     template_version.template.check_permission(request.user, write=not template_version.active)
 
     genome_build = GenomeBuild.get_name_or_alias(genome_build_name)
-    template_run = AnalysisTemplateRun.create(template_version.template, genome_build, user=request.user,
+    template_run = AnalysisTemplateRun.create(template_version.template, genome_build,
+                                              AnalysisTemplateRunTrigger.USER, user=request.user,
                                               template_version=template_version)
     template_run.populate_arguments(data)
 

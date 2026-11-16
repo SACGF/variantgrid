@@ -11,7 +11,7 @@ from django.utils import timezone
 from guardian.shortcuts import assign_perm
 
 from analysis.analysis_templates import get_sample_analysis, run_analysis_template
-from analysis.enums import AnalysisTemplateType
+from analysis.enums import AnalysisTemplateRunTrigger, AnalysisTemplateType
 from analysis.forms.forms_nodes import VCFLocusFiltersMixin
 from analysis.models import (
     Analysis,
@@ -154,14 +154,14 @@ class TestTemplateRunVersion(AnalysisTemplateDraftTestCase):
     def test_no_active_version_is_an_error(self):
         self._new_version()  # draft only
         with self.assertRaises(ValueError):
-            AnalysisTemplateRun.create(self.template, self.grch37, user=self.owner)
+            AnalysisTemplateRun.create(self.template, self.grch37, AnalysisTemplateRunTrigger.USER, user=self.owner)
 
     def test_run_uses_the_version_it_was_given(self):
         active = self._new_version()
         active.activate()
         draft = self._new_version()
 
-        template_run = AnalysisTemplateRun.create(self.template, self.grch37, user=self.owner,
+        template_run = AnalysisTemplateRun.create(self.template, self.grch37, AnalysisTemplateRunTrigger.USER, user=self.owner,
                                                   template_version=draft)
         self.assertEqual(template_run.template_version, draft)
         self.assertEqual(template_run.analysis.analysistemplaterun.template_version, draft)
@@ -363,7 +363,8 @@ class TestTemplateRunSampleNodeFilters(AnalysisTemplateDraftTestCase):
 
     def _run(self, sample) -> SampleNode:
         self._new_version().activate()
-        template_run = run_analysis_template(self.template, self.grch37, user=self.owner, sample=sample)
+        template_run = run_analysis_template(self.template, self.grch37, AnalysisTemplateRunTrigger.USER, user=self.owner,
+                                             sample=sample)
         return SampleNode.objects.get(analysis=template_run.analysis)
 
     def test_filters_carry_over_to_a_vcf_declaring_them_all(self):

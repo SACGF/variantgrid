@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
 from analysis.analysis_templates import populate_analysis_from_template_run
-from analysis.enums import AnalysisTemplateType
+from analysis.enums import AnalysisTemplateRunTrigger, AnalysisTemplateType
 from analysis.forms.forms_nodes import PhenotypeNodeForm
 from analysis.models import (
     Analysis,
@@ -283,7 +283,8 @@ class TestPhenotypeNodeTemplateRun(TestCase):
 
         template = AnalysisTemplate.objects.create(name="phenotype template", user=self.user, analysis=analysis)
         version = template.new_version("%(template)s for %(input)s")
-        template_run = AnalysisTemplateRun.create(template, self.grch37, user=self.user, template_version=version)
+        template_run = AnalysisTemplateRun.create(template, self.grch37, AnalysisTemplateRunTrigger.USER, user=self.user,
+                                                  template_version=version)
         template_run.populate_arguments({"cohort": self.cohort})
         populate_analysis_from_template_run(template_run)
 

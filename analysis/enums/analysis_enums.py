@@ -1,5 +1,5 @@
 """
-analysis' enums: analysis and template types, NodeStatus (the load lifecycle, with LOADING / CLAIMABLE /
+analysis' enums: analysis and template types, what launched a template run, NodeStatus (the load lifecycle, with LOADING / CLAIMABLE /
 ERROR sets the scheduler reads), the inheritance modes and sample roles for Trio, Quad and Duo nodes, set
 and group operations, tag-node modes and tag locations, node error sources, the candidate search types
 and statuses, and the damage node's ALoFT and PTC NMD filter options. Stored codes: add values, never
@@ -27,6 +27,15 @@ class AnalysisType(models.TextChoices):
 class AnalysisTemplateType(models.TextChoices):
     TEMPLATE = 'T', 'Template'
     SNAPSHOT = 'S', 'Snapshot'
+
+
+class AnalysisTemplateRunTrigger(models.TextChoices):
+    """ What launched an AnalysisTemplateRun - for admins debugging auto-launch, not shown to users """
+    USER = 'U', 'User'
+    VCF_IMPORT = 'V', 'VCF import'
+    SAMPLE_GENE_LIST = 'G', 'Sample gene list created'  # auto-launch retried once the sample's gene list arrived
+    SAMPLE = 'S', 'Sample analysis'  # the hidden per-sample analysis (sample variants tab, auto exports)
+    COHORT = 'C', 'Cohort analysis'  # the hidden per-cohort analysis (auto exports)
 
 
 class SetOperations(models.TextChoices):

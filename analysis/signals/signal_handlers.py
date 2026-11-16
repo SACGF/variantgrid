@@ -3,6 +3,7 @@ import logging
 import celery
 from django.db import transaction
 
+from analysis.enums import AnalysisTemplateRunTrigger
 from analysis.models.nodes.node_utils import cancel_node_tasks
 from analysis.models.nodes.node_version import NodeTask
 from analysis.tasks.auto_analysis_tasks import (
@@ -56,7 +57,7 @@ def handle_vcf_import_success(*args, **kwargs):
     # Chain: create new auto-analyses for samples that don't have one, then reload nodes in any
     # existing auto-analyses (handles re-imports where node counts may be stale)
     celery.chain(
-        auto_run_analyses_for_vcf.si(vcf.pk, "Auto Created from vcf_import_success signal", skip_already_analysed=True),
+        auto_run_analyses_for_vcf.si(vcf.pk, AnalysisTemplateRunTrigger.VCF_IMPORT, skip_already_analysed=True),
         reload_auto_analyses_for_vcf.si(vcf.pk),
     ).apply_async()
 
@@ -71,7 +72,7 @@ def handle_active_sample_gene_list_created(sender, instance, created, **kwargs):
         sample = instance.sample
         if sample.import_status == ImportStatus.SUCCESS:
             # Launch tasks using celery, so that it doesn't take down the VCF import if something fails
-            celery_task = auto_run_analyses_for_sample.si(sample.pk, "Auto Created from sample_gene_list_created signal",
+            celery_task = auto_run_analyses_for_sample.si(sample.pk, AnalysisTemplateRunTrigger.SAMPLE_GENE_LIST,
                                                           skip_already_analysed=True)
             transaction.on_commit(lambda: celery_task.apply_async())
         else:
