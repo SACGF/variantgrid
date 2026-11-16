@@ -27,7 +27,7 @@ from django.utils import timezone
 from guardian.shortcuts import assign_perm
 from model_utils.models import TimeStampedModel
 
-from analysis.enums import AnalysisTemplateType, AnalysisType
+from analysis.enums import AnalysisTemplateRunTrigger, AnalysisTemplateType, AnalysisType
 from annotation.models import AnnotationVersion, InvalidAnnotationVersionError
 from classification.models import Classification
 from genes.models import CanonicalTranscriptCollection
@@ -737,9 +737,12 @@ class AnalysisTemplateVersion(TimeStampedModel):
 class AnalysisTemplateRun(TimeStampedModel):
     template_version = models.ForeignKey(AnalysisTemplateVersion, null=True, on_delete=PROTECT)
     analysis = models.OneToOneField(Analysis, on_delete=CASCADE)  # Created new analysis
+    # null: an auto-launched run from before this was recorded, which can't be told apart from a user's
+    trigger = models.CharField(max_length=1, choices=AnalysisTemplateRunTrigger.choices, null=True)
 
     @staticmethod
-    def create(analysis_template: AnalysisTemplate, genome_build: GenomeBuild, user: User = None,
+    def create(analysis_template: AnalysisTemplate, genome_build: GenomeBuild,
+               trigger: AnalysisTemplateRunTrigger, user: User = None,
                template_version: 'AnalysisTemplateVersion' = None,
                annotation_version: AnnotationVersion = None):
         """ annotation_version: the build's latest unless the caller has already settled on one """
@@ -764,7 +767,8 @@ class AnalysisTemplateRun(TimeStampedModel):
         analysis.save()
 
         assign_permission_to_user_and_groups(user, analysis)
-        return AnalysisTemplateRun.objects.create(template_version=template_version, analysis=analysis)
+        return AnalysisTemplateRun.objects.create(template_version=template_version, analysis=analysis,
+                                                  trigger=trigger)
 
     def populate_arguments(self, data: dict):
         with disable_auditlog():

@@ -35,7 +35,8 @@ class AnalysisTemplateAdmin(ModelAdminBasics):
 
 @admin.register(models.AnalysisTemplateRun)
 class AnalysisTemplateRunAdmin(ModelAdminBasics):
-    pass
+    list_display = ("pk", "analysis", "template_version", "trigger", "created")
+    list_filter = ("trigger",)
 
 
 @admin.register(models.AnalysisTemplateVersion)

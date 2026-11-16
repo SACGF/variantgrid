@@ -26,7 +26,7 @@ from django.urls.base import reverse
 from django.utils import timezone
 
 from analysis.analysis_templates import run_analysis_template
-from analysis.enums import AnalysisTemplateType, NodeStatus, TagLocation
+from analysis.enums import AnalysisTemplateRunTrigger, AnalysisTemplateType, NodeStatus, TagLocation
 from analysis.forms.forms_nodes import SampleFiltersMixin, SampleNodeForm, ZygosityNodeForm
 from analysis.grid_export import node_grid_get_export_iterator
 from analysis.grids import VariantGrid
@@ -897,7 +897,7 @@ class TestSampleNodeAnalysisVariables(SampleNodeLevelsTestCase):
         template = AnalysisTemplate.objects.create(name="specimen template", user=self.user,
                                                    analysis=analysis)
         template.new_version().activate()
-        template_run = run_analysis_template(template, self.grch37, user=self.user,
+        template_run = run_analysis_template(template, self.grch37, AnalysisTemplateRunTrigger.USER, user=self.user,
                                              specimen=self.specimen)
 
         run_node = SampleNode.objects.get(analysis=template_run.analysis)
