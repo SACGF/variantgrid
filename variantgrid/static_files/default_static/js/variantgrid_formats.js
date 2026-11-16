@@ -953,6 +953,10 @@ const GENE_LEVEL_KINDS = {
     'LOSS': {code: 'LOSS', css: 'loss', title: 'Gene-level copy number loss'},
     'SPLICE': {code: 'SPLICE', css: 'splice', title: 'Splice event'},
 };
+// @see CANONICAL_COORDINATE_PATTERN and SPLICE_DISPLAY_SUFFIX in genes/gene_splice.py - the alt holds the
+// label upper-cased (GRCH37_17_58011621_58012553)
+const SPLICE_COORDINATE_LABEL = /^.+_([0-9]{1,2}|MT|M|X|Y)_[0-9]+_[0-9]+$/i;
+const SPLICE_DISPLAY_SUFFIX = / splice$/;
 const SV_KIND_CSS = {'DEL': 'del', 'DUP': 'dup', 'INV': 'inv', 'CNV': 'cnv', 'INS': 'ins'};
 
 // Returns {code, cssClass, title}, or null for a variant with an explicit ref/alt
@@ -964,11 +968,11 @@ VariantGridFormat.variantKind = (alt, svlen, chrom, position) => {
     const kind = altParts[0];
     const geneLevel = GENE_LEVEL_KINDS[kind];
     if (geneLevel) {
-        // A splice alt carries the junction's label as a fourth segment (<SPLICE:HGNC:644:V7>) -
-        // which event it is, so the badge says it beside the kind
+        // A splice alt carries the junction's label as a fourth segment (<SPLICE:HGNC:644:V_7>), in its
+        // upper-case storage form - the row's label already names the event, so only the tooltip has it
         const label = (kind === 'SPLICE') ? altParts[3] : null;
         return {
-            code: label ? `${geneLevel.code} ${label}` : geneLevel.code,
+            code: geneLevel.code,
             cssClass: `rv-kind-${geneLevel.css}`,
             title: label ? `${geneLevel.title} - ${label}` : geneLevel.title,
         };
@@ -1030,11 +1034,18 @@ VariantGridFormat.representativeVariantLabel = (variantId, rowData) => {
         if (!c) {
             // Gene-level nomenclature has no accession prefix. A copy number call is "RAF1 loss" - the
             // kind badge already says the direction (and says GAIN where the report says amplification),
-            // so the label is the gene alone; the tooltip keeps the canonical form. A fusion is shown whole
-            const geneLevelKind = String(alt).slice(1, -1).split(":")[0];
-            if (geneLevelKind === 'GAIN' || geneLevelKind === 'LOSS') {
-                const gene = symbol || hgvsC.split(" ")[0];
+            // so the label is the gene alone; the tooltip keeps the canonical form. A splice event is
+            // named without the " splice" the badge says ("AR-V7"), and one named only by its breakpoints
+            // by its gene ("RPS6KB1", not the coordinates). A fusion is shown whole
+            const [geneLevelKind, , , spliceLabel] = String(alt).slice(1, -1).split(":");
+            const gene = symbol || hgvsC.split(" ")[0];
+            if (geneLevelKind === 'GAIN' || geneLevelKind === 'LOSS'
+                || (geneLevelKind === 'SPLICE' && SPLICE_COORDINATE_LABEL.test(spliceLabel || ''))) {
                 return {html: `<span class='rv-gene'>${escapeHtml(gene)}</span>`, title: hgvsC};
+            }
+            if (geneLevelKind === 'SPLICE') {
+                const name = hgvsC.replace(SPLICE_DISPLAY_SUFFIX, '');
+                return {html: `<span class='rv-hgvs'>${escapeHtml(name)}</span>`, title: hgvsC};
             }
             return {html: `<span class='rv-hgvs'>${escapeHtml(hgvsC)}</span>`, title: hgvsC};
         }

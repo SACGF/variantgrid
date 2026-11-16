@@ -1,6 +1,24 @@
 {% extends "uicore/page/base.html" %}
 {% block title %}Variant Types{% endblock title %}
 
+{% block jshead %}
+    $(document).ready(function() {
+        // Named the way every grid's Variant column names a row - @see renderVariantTagVariant
+        const examples = JSON.parse(document.getElementById('display-examples').textContent);
+        $('[data-display-example]').each(function() {
+            const row = examples[Number($(this).attr('data-display-example'))].row;
+            const label = VariantGridFormat.representativeVariantLabel(row.variant_id, row);
+            const cell = $('<span>', {class: 'rv-label', title: label.title, html: label.html});
+            $(this).append(cell);
+            const badge = VariantGridFormat.variantKindBadge(row["alt__seq"], row["svlen"],
+                                                             row["locus__contig__name"], row["locus__position"]);
+            if (badge) {
+                $(this).append(' ').append(badge);
+            }
+        });
+    });
+{% endblock jshead %}
+
 {% block content %}
     <div class="container-fluid">
         <h3>Variant Types</h3>
@@ -45,6 +63,32 @@
                     includes the size stated. An inversion has no padding base, so it is stored symbolic one base
                     later than a deletion of the same size.
                 </p>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header"><b>How they are shown</b></div>
+            <div class="card-body">
+                <p>Well-known variants of each kind, named as the analysis and other variant grids name them.</p>
+                {{ display_examples|json_script:"display-examples" }}
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>Variant</th>
+                            <th>Example</th>
+                            <th>In a grid</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for example in display_examples %}
+                            <tr>
+                                <th>{{ example.kind }}</th>
+                                <td>{{ example.name }}</td>
+                                <td data-display-example="{{ forloop.counter0 }}"></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
 

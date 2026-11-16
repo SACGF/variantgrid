@@ -3,7 +3,8 @@ The variant types page: how each kind of variant is stored and annotated, by siz
 of the features that have one. Every cell is computed by the rule the code itself uses
 (annotation.annotation_pipeline_routing, snpdb.bcftools_liftover, snpdb.clingen_allele) at the thresholds
 in settings, so the page changes with them. Entry points: get_variant_type_rows, get_size_limits,
-get_unsupported.
+get_unsupported, and get_display_examples - well-known variants of each kind, which the page renders with the
+grids' own label and badge JS.
 
 Two of the thresholds are deliberately apart (#1358): a del/dup/inv is stored symbolic from
 VARIANT_SYMBOLIC_ALT_SIZE, but annotated as a structural variant only from ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE.
@@ -21,7 +22,7 @@ from django.conf import settings
 from annotation.annotation_pipeline_routing import pipeline_type_for_alt
 from annotation.enums import VariantAnnotationPipelineType
 from library.genomics import format_bp
-from library.genomics.vcf_enums import VCFSymbolicAllele
+from library.genomics.vcf_enums import GeneIdNamespace, GeneLevelSymbolicAlt, VCFSymbolicAllele
 from snpdb.models import ClinGenAllele, VariantCoordinate
 
 _CHROM = "1"
@@ -317,3 +318,77 @@ def get_unsupported() -> list[dict]:
                         "text": "eg N, IUPAC ambiguity codes or breakend notation - any ALT with a base other "
                                 "than A, C, G or T."})
     return unsupported
+
+
+def _grid_row(hgvs_c: Optional[str] = None, hgvs_p: Optional[str] = None, symbol: Optional[str] = None,
+              chrom: Optional[str] = None, position: Optional[int] = None, ref: Optional[str] = None,
+              alt: Optional[str] = None, svlen: Optional[int] = None, overlapping_symbols: Optional[str] = None) -> dict:
+    """ The keys a grid row hands VariantGridFormat.representativeVariantLabel and variantKindBadge """
+    return {
+        "variant_id": 0,
+        "locus__contig__name": chrom,
+        "locus__position": position,
+        "locus__ref__seq": ref,
+        "alt__seq": alt,
+        "svlen": svlen,
+        "variantannotation__hgvs_c": hgvs_c,
+        "variantannotation__hgvs_p": hgvs_p,
+        "variantannotation__hgvs_g": None,
+        "variantannotation__symbol": symbol,
+        "variantannotation__overlapping_symbols": overlapping_symbols,
+    }
+
+
+def _gene_level_alt(kind: str, hgnc_id: int, label: Optional[str] = None) -> str:
+    return GeneLevelSymbolicAlt.format(kind, GeneIdNamespace.HGNC, hgnc_id, label)
+
+
+def get_display_examples() -> list[dict]:
+    """ Well-known variants of each kind as a grid row would carry them (GRCh37), for the page to render
+        with the grids' own JS - so the page shows exactly what an analysis grid shows """
+    examples = [
+        ("SNV", "BRAF V600E", _grid_row(
+            "NM_004333.6(BRAF):c.1799T>A", "NP_004324.2:p.(Val600Glu)", "BRAF", "7", 140453136, "A", "T")),
+        ("Deletion", "CFTR F508del", _grid_row(
+            "NM_000492.4(CFTR):c.1521_1523del", "NP_000483.3:p.(Phe508del)", "CFTR", "7", 117199644, "ATCT", "A")),
+        ("Duplication", "BRCA1 5382insC", _grid_row(
+            "NM_007294.4(BRCA1):c.5266dup", "NP_009225.1:p.(Gln1756ProfsTer74)", "BRCA1", "17", 41209079,
+            "T", "TG")),
+        ("Insertion", "CALR type 2", _grid_row(
+            "NM_004343.4(CALR):c.1154_1155insTTGTC", "NP_004334.1:p.(Lys385AsnfsTer47)", "CALR", "19", 13054726,
+            "A", "ATTGTC")),
+        ("Complex substitution", "EGFR exon 19 delins", _grid_row(
+            "NM_005228.5(EGFR):c.2239_2248delinsC", "NP_005219.2:p.(Leu747_Ala750delinsPro)", "EGFR", "7",
+            55242467, "TTAAGAGAAG", "C")),
+        ("Symbolic deletion", "22q11.2 deletion", _grid_row(
+            chrom="22", position=18900000, alt=VCFSymbolicAllele.DEL, svlen=-2600000,
+            overlapping_symbols="COMT,CRKL,DGCR8,HIRA,TBX1")),
+        ("Symbolic duplication", "CMT1A (PMP22)", _grid_row(
+            symbol="PMP22", chrom="17", position=14097000, alt=VCFSymbolicAllele.DUP, svlen=1400000,
+            overlapping_symbols="CDRT4,COX10,HS3ST3B1,PMP22,TEKT3")),
+        ("Symbolic inversion", "F8 intron 22", _grid_row(
+            symbol="F8", chrom="X", position=154200000, alt=VCFSymbolicAllele.INV, svlen=500000,
+            overlapping_symbols="F8")),
+        ("Copy number", "ERBB2 amplicon", _grid_row(
+            chrom="17", position=37844000, alt=VCFSymbolicAllele.CNV, svlen=120000,
+            overlapping_symbols="ERBB2,GRB7,MIEN1,PGAP3")),
+    ]
+    if settings.VARIANT_GENE_LEVEL_ENABLED:
+        # HGNC ids: ABL1 76, BCR 1014, EGFR 3236, PTEN 9588, AR 644, MET 7029
+        examples.extend([
+            ("Gene fusion", "BCR::ABL1", _grid_row(
+                "BCR::ABL1", symbol="BCR", alt=_gene_level_alt(GeneLevelSymbolicAlt.FUSION, 76))),
+            ("Gene copy number gain", "EGFR amplification", _grid_row(
+                "EGFR amplification", symbol="EGFR", alt=_gene_level_alt(GeneLevelSymbolicAlt.GAIN, 3236))),
+            ("Gene copy number loss", "PTEN loss", _grid_row(
+                "PTEN loss", symbol="PTEN", alt=_gene_level_alt(GeneLevelSymbolicAlt.LOSS, 9588))),
+            ("Splice event", "AR-V7", _grid_row(
+                "AR-V7 splice", symbol="AR", alt=_gene_level_alt(GeneLevelSymbolicAlt.SPLICE, 644, "v_7"))),
+            ("Splice event", "MET exon 14 skipping", _grid_row(
+                "MET exon 14 skipping", symbol="MET",
+                alt=_gene_level_alt(GeneLevelSymbolicAlt.SPLICE, 7029, "exon_14_skipping"))),
+            ("Splice event", "A junction with no name, by its breakpoints", _grid_row(
+                "AR GRCh37 X:66905968-66914514 splice", symbol="AR",
+                alt=_gene_level_alt(GeneLevelSymbolicAlt.SPLICE, 644, "grch37_x_66905968_66914514"))),
+        ])
+    return [{"kind": kind, "name": name, "row": row} for kind, name, row in examples]
