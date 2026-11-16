@@ -96,7 +96,8 @@ class Command(BaseCommand):
     # How many transcript versions to hold in memory before flushing to the DB. Bounds peak RAM
     # when importing large streamed files (see import_cdot_data_file).
     CDOT_CHUNK_SIZE = 10000
-    TRANSCRIPT_VERSION_COMPARE_FIELDS = ["gene_version_id", "import_source_id", "biotype", "contig_id", "data"]
+    TRANSCRIPT_VERSION_COMPARE_FIELDS = ["gene_version_id", "import_source_id", "biotype", "contig_id", "data",
+                                         *TranscriptVersion.SPAN_FIELDS]
 
     @classmethod
     def read_cdot_version(cls, file_obj) -> str:
@@ -310,6 +311,7 @@ class Command(BaseCommand):
                                                    biotype=biotype,
                                                    data=tv_data,
                                                    modified_cdot_version=cdot_version)
+            transcript_version.set_span_from_data()  # bulk_create/bulk_update don't call save()
             # Keyed 'transcript_id.version' - a cdot fake transcript's accession has no version to match on
             if pk := transcript_version_ids_by_accession.get(f"{transcript_id}.{version}"):
                 transcript_version.pk = pk

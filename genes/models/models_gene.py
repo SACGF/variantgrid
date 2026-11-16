@@ -22,10 +22,9 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.db import models
-from django.db.models import Count, IntegerField, Max, Min, QuerySet, TextField
+from django.db.models import Count, Max, Min, QuerySet, TextField
 from django.db.models.deletion import CASCADE, SET_NULL
-from django.db.models.fields.json import KeyTextTransform, KeyTransform
-from django.db.models.functions import Cast, Collate, Upper
+from django.db.models.functions import Collate, Upper
 from django.db.models.query_utils import Q
 from django.urls.base import reverse
 from model_utils.models import TimeStampedModel
@@ -675,19 +674,19 @@ class GeneVersion(models.Model):
 
     @property
     def chrom(self):
-        return self._transcript_extents["chrom"]
+        return self._extents["chrom"]
 
     @property
     def start(self):
-        return int(self._transcript_extents["start"])
+        return int(self._extents["start"])
 
     @property
     def end(self):
-        return int(self._transcript_extents["end"])
+        return int(self._extents["end"])
 
     @property
     def strand(self):
-        return self._transcript_extents["strand"]
+        return self._extents["strand"]
 
     @cached_property
     def coordinate(self) -> str:
@@ -698,32 +697,27 @@ class GeneVersion(models.Model):
             return ""
 
     @cached_property
-    def _transcript_extents(self):
-        """ Stores chroms/min_start/max_end/strands - calculated from all linked TranscriptVersions """
+    def _extents(self) -> dict:
+        if extents := self.get_transcript_extents([self.pk]).get(self.pk):
+            return extents
+        raise ValueError(f"{self}: transcripts not on exactly 1 contig and strand")
 
-        FIELDS = ["contig", "strand"]
-        all_transcripts_data = defaultdict(set)
-        for tv in self.transcriptversion_set.all():
-            for f in FIELDS:
-                all_transcripts_data[f].add(tv.genome_build_data[f])
-            all_transcripts_data["start"].add(tv.start)
-            all_transcripts_data["end"].add(tv.end)
-
-        # Sometimes chrom is a contig so we'll end up with chrom as "3,NC_000003.11" - check only 1 and convert to name
-        chrom_set = all_transcripts_data["contig"]
-        contigs = {self.genome_build.chrom_contig_mappings[chrom] for chrom in chrom_set}
-        if len(contigs) != 1:
-            raise ValueError(f"{self}: 'chrom' ({all_transcripts_data['contig']}) didn't map to exactly 1 contig: '{contigs}'")
-
-        strand_set = all_transcripts_data["strand"]
-        if len(strand_set) != 1:
-            raise ValueError(f"{self}: Not exactly 1 value for 'strand', was: {strand_set}")
+    @staticmethod
+    def get_transcript_extents(gene_version_ids: Iterable[int]) -> dict[int, dict]:
+        """ gene_version_id -> {chrom, start, end, strand} spanning its transcripts (start 0-based, end half-open).
+            Left out: a gene version with no transcripts, or with them on more than one contig or strand
+            (PAR genes, copies on two chromosomes) """
+        tv_qs = TranscriptVersion.objects.filter(gene_version_id__in=gene_version_ids, start__isnull=False)
+        tv_qs = tv_qs.values("gene_version_id", "contig__name", "strand")
+        tv_qs = tv_qs.annotate(span_start=Min("start"), span_end=Max("end")).order_by()
+        spans_by_gene_version = defaultdict(list)
+        for span in tv_qs:
+            spans_by_gene_version[span["gene_version_id"]].append(span)
 
         return {
-            "chrom": contigs.pop().name,
-            "start": min(all_transcripts_data["start"]),
-            "end": max(all_transcripts_data["end"]),
-            "strand": strand_set.pop(),
+            gene_version_id: {"chrom": span["contig__name"], "start": span["span_start"],
+                              "end": span["span_end"], "strand": span["strand"]}
+            for gene_version_id, (span, *others) in spans_by_gene_version.items() if not others
         }
 
     @staticmethod
@@ -830,6 +824,11 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     data = models.JSONField(null=False, blank=True, default=dict)  # for cdot data
     # cdot release this row's data came from - an import only rewrites rows whose data changed
     modified_cdot_version = models.TextField(null=True, blank=True)
+    # Copied out of data's exons (0-based half-open, as cdot) so position lookups read an index, not the JSON (#2826).
+    # Null for a legacy row with no data for its build. Set from data on save() - @see set_span_from_data
+    start = models.IntegerField(null=True)
+    end = models.IntegerField(null=True)
+    strand = models.CharField(max_length=1, null=True)
 
     @classmethod
     def preview_icon(cls) -> str:
@@ -849,8 +848,31 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
         # Some way to find canonical in Ensembl GRCh37?
     }
 
+    SPAN_FIELDS = ("start", "end", "strand")
+
     class Meta:
         unique_together = ("transcript", "version", "genome_build")
+        indexes = [
+            # Covers "transcripts on a contig overlapping a position" without visiting the wide JSON rows
+            models.Index(fields=["contig", "start"], include=["end", "gene_version", "genome_build", "id"],
+                         name="genes_tv_contig_span_idx"),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.set_span_from_data()
+        if (update_fields := kwargs.get("update_fields")) is not None and "data" in update_fields:
+            kwargs["update_fields"] = {*update_fields, *self.SPAN_FIELDS}
+        super().save(*args, **kwargs)
+
+    def set_span_from_data(self):
+        """ start/end/strand from the cdot data for this row's build (all None when it has none) """
+        build_data = self.data.get("genome_builds", {}).get(self.genome_build_id) if self.data else None
+        if build_data and (exons := build_data.get("exons")):
+            self.start = exons[0][0]
+            self.end = exons[-1][1]
+            self.strand = build_data.get("strand")
+        else:
+            self.start = self.end = self.strand = None
 
     @cached_property
     def _transcript_regions(self) -> tuple[list, list, list]:
@@ -1186,46 +1208,33 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     def get_gene_version_ids_in_region(cls, genome_build: GenomeBuild, contig: Contig,
                                        start: int, end: int) -> QuerySet:
         """ Distinct gene_version_ids of the build's transcripts on contig overlapping start-end
-            (1-based inclusive, as Cytoband / Locus). The span is the cdot exons' first start and last end,
-            which are 0-based half-open - so a transcript overlaps when exon_start < end and exon_end >= start.
-            Coordinates are only in the JSON, a scan of a whole chromosome's transcripts is ~130ms (#2723) """
-        qs = cls.filter_overlapping(cls.objects.filter(genome_build=genome_build, contig=contig), genome_build,
-                                    start, end)
+            (1-based inclusive, as Cytoband / Locus) """
+        qs = cls.filter_overlapping(cls.objects.filter(genome_build=genome_build, contig=contig), start, end)
         return qs.order_by().values_list("gene_version_id", flat=True).distinct()
 
-    @classmethod
-    def filter_overlapping(cls, qs: QuerySet, genome_build: GenomeBuild, start: int, end: int) -> QuerySet:
-        """ Narrows a queryset of the build's transcripts to those overlapping start-end (1-based inclusive) """
-        return qs.alias(**cls._exon_span(genome_build)).filter(tx_start__lt=end, tx_end__gte=start)
+    @staticmethod
+    def filter_overlapping(qs: QuerySet, start: int, end: int) -> QuerySet:
+        """ Narrows a queryset of transcripts to those overlapping start-end (1-based inclusive). The span is
+            0-based half-open, so a transcript overlaps when span_start < end and span_end >= start """
+        return qs.filter(start__lt=end, end__gte=start)
 
     @classmethod
     def get_gene_spans(cls, genome_build: GenomeBuild, gene_ids: Iterable[str]) -> list[tuple[str, int, int, int]]:
         """ (gene_id, contig_id, tx_start, tx_end) for each of the genes' transcripts in the build - 0-based half-open """
-        qs = cls.objects.filter(genome_build=genome_build, gene_version__gene_id__in=gene_ids)
-        qs = qs.annotate(**cls._exon_span(genome_build))
-        return list(qs.values_list("gene_version__gene_id", "contig_id", "tx_start", "tx_end"))
+        qs = cls.objects.filter(genome_build=genome_build, gene_version__gene_id__in=gene_ids, start__isnull=False)
+        return list(qs.values_list("gene_version__gene_id", "contig_id", "start", "end"))
 
     @classmethod
     def get_gene_symbol_span(cls, genome_build: GenomeBuild,
                              gene_symbol: 'GeneSymbol') -> Optional[tuple[Contig, int, int]]:
         """ (contig, start, end) - 1-based inclusive - spanning the symbol's transcripts in the build, on the contig
             most of them are on (a PAR gene also has Y copies) """
-        qs = cls.objects.filter(genome_build=genome_build, gene_version__gene_symbol=gene_symbol)
-        qs = qs.alias(**cls._exon_span(genome_build)).values("contig")
-        qs = qs.annotate(start=Min("tx_start"), end=Max("tx_end"), num_transcripts=Count("pk"))
+        qs = cls.objects.filter(genome_build=genome_build, gene_version__gene_symbol=gene_symbol, start__isnull=False)
+        qs = qs.values("contig").annotate(span_start=Min("start"), span_end=Max("end"), num_transcripts=Count("pk"))
         if span := qs.order_by("-num_transcripts", "contig").first():
             contig = Contig.objects.get(pk=span["contig"])
-            return contig, span["start"] + 1, span["end"]  # cdot exons are 0-based half-open
+            return contig, span["span_start"] + 1, span["span_end"]  # 0-based half-open
         return None
-
-    @staticmethod
-    def _exon_span(genome_build: GenomeBuild) -> dict:
-        """ tx_start/tx_end from the cdot exons - 0-based half-open """
-        exons = KeyTransform("exons", KeyTransform(genome_build.name, KeyTransform("genome_builds", "data")))
-        return {
-            "tx_start": Cast(KeyTextTransform(0, KeyTransform(0, exons)), IntegerField()),
-            "tx_end": Cast(KeyTextTransform(1, KeyTransform(-1, exons)), IntegerField()),
-        }
 
     @classmethod
     def data_is_current_cdot_format(cls, genome_build: Optional['GenomeBuild'] = None) -> bool:
@@ -1270,11 +1279,8 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
 
     def get_coordinates(self) -> Optional[GenomicCoordinates]:
         """ Where this transcript sits on the genome for its build, or None if the cdot data lacks it
-            (older imports can be sparse - @see genome_build_data). Reuses the start/end/chrom/strand
-            properties so there's one source of truth for reading the cdot coordinates. """
-        build_data = self.data.get("genome_builds", {}).get(self.genome_build.name)
-        if not (build_data and build_data.get("contig") is not None
-                and build_data.get("exons") and build_data.get("strand") is not None):
+            (older imports can be sparse - @see genome_build_data) """
+        if self.start is None or self.strand is None:
             return None
         return GenomicCoordinates(contig=self.contig, chrom=self.chrom,
                                   start=self.start, end=self.end, strand=self.strand)
@@ -1283,20 +1289,6 @@ class TranscriptVersion(SortByPKMixin, models.Model, PreviewModelMixin):
     def chrom(self):
         raw_contig = self.genome_build_data["contig"]
         return self.genome_build.chrom_contig_mappings[raw_contig].name
-
-    @property
-    def start(self) -> int:
-        exons = self.genome_build_data["exons"]
-        return exons[0][0]
-
-    @property
-    def end(self) -> int:
-        exons = self.genome_build_data["exons"]
-        return exons[-1][1]
-
-    @property
-    def strand(self) -> str:
-        return self.genome_build_data["strand"]
 
     @property
     def coordinates(self):
