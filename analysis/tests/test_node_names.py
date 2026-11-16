@@ -49,11 +49,13 @@ class TestNodeNames(AnalysisSetupMixin, TestCase):
         self.assertEqual("Escapes NMD", lines[2])
 
     def test_damage_node_score_chips(self):
+        """ A chip's title is the filter in the description's words - "or not scored" only where it has an effect """
         node = DamageNode(analysis=self.analysis, popeve_score_max=-5.0, popeve_score_required=True,
-                          popeve_score_allow_null=False, revel_score_min=0.7)
+                          revel_score_min=0.7, gene_loeuf_max=0.6, gene_loeuf_required=True)
         chips = {chip.text: chip.title for chip in node.get_node_chips()}
-        self.assertEqual("popEVE score ≤ -5 (required)", chips["popEVE score*"])
-        self.assertEqual("REVEL ≥ 0.7 (allows null)", chips["REVEL"])
+        self.assertEqual("popEVE score ≤ -5 (or not scored)", chips["popEVE score"])
+        self.assertEqual("REVEL ≥ 0.7", chips["REVEL"])
+        self.assertEqual("gnomAD LOEUF ≤ 0.6 (or gene has no score)", chips["LOEUF"])
 
     def test_gene_list_node_several_lists(self):
         node = GeneListNode.objects.create(analysis=self.analysis)

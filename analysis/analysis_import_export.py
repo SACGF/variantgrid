@@ -79,6 +79,11 @@ def upgrade_legacy_node_fields(model_name: str, data: dict):
         if old_field in data:
             required = data.pop(old_field)
             data[new_field] = ZygosityRequirement.CALL_REQUIRED if required else ZygosityRequirement.ALLOW_NO_CALL
+    # Exports written before the corrected splicing allow null (#2836) keep the earlier rule wherever it applied, as
+    # analysis/migrations/0021_damagenode_splice_allow_null_any_missing.py did for the nodes in the database
+    if model_name == "analysis.DamageNode" and "splice_allow_null_any_missing" not in data:
+        data["splice_allow_null_any_missing"] = bool(data.get("splice_required") and data.get("splice_allow_null")
+                                                     and data.get("splice_min") is not None)
 
 
 def analysis_export_to_dict(analysis: Analysis) -> dict:

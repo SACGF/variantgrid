@@ -10,6 +10,7 @@ class NodeDisplayMixin:
         get_help_text, get_node_class_label and get_node_class_icon. Optional hooks:
         - get_node_class_label_short / get_node_strip_label: the class strip on the node card
         - get_node_icon / get_node_chips: config-dependent badge icon and the pills under the name
+        - get_node_description: the node's filter in a sentence, for the hover card
         - get_css_classes, get_rendering_args, get_connection_data, get_grid_post_data """
     # Above this the class strip's ~45px runs out at 7px, so the card asks for the smaller rule
     MAX_STRIP_LABEL_CHARS = 8
@@ -103,3 +104,7 @@ class NodeDisplayMixin:
     def get_node_chips(self) -> list[NodeChip]:
         """ Pills under the node name - what this node is reading, from its saved config """
         return []
+
+    def get_node_description(self) -> str:
+        """ What the node keeps, in a sentence - shown on the node's hover card where it is set """
+        return ""

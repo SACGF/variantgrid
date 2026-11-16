@@ -402,14 +402,17 @@ _POLLARD_2010 = (
     "https://doi.org/10.1101/gr.097857.109",
 )
 
+# SpliceAI - Jaganathan 2019 gives 0.2 (high recall), 0.5 (recommended) and 0.8 (high precision) delta score cutoffs.
+# The recommended one is where the Effect node's splicing slider starts
+SPLICEAI_DELTA_CUTOFF = 0.5
+
 COLOUR_BANDS: tuple[ColourBand, ...] = (
-    # SpliceAI - Jaganathan 2019 gives 0.2 (high recall), 0.5 (recommended) and 0.8 (high precision)
-    # delta score cutoffs; we band on the first two.
+    # SpliceAI - we band on the high recall and recommended cutoffs
     ColourBand(
         name="SpliceAI delta scores",
         fields=("spliceai_pred_ds_ag", "spliceai_pred_ds_al", "spliceai_pred_ds_dg", "spliceai_pred_ds_dl"),
         max_benign_threshold=0.2,
-        pathogenic_threshold=0.5,
+        pathogenic_threshold=SPLICEAI_DELTA_CUTOFF,
         source="Jaganathan 2019",
         source_detail="Jaganathan K, Kyriazopoulou Panagiotopoulou S, McRae JF, et al. Predicting Splicing "
                       "from Primary Sequence with Deep Learning. Cell. 2019;176(3):535-548. Delta score "

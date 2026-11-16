@@ -248,6 +248,9 @@ function nodeHoverCardContent(node) {
 			$("<div/>", {text: line}).appendTo(name);
 		}
 	}
+	if (nodeData.description) {
+		$("<div/>", {class: "node-hover-card-description", text: nodeData.description}).appendTo(card);
+	}
 	const chips = nodeData.chips || [];
 	if (chips.length) {
 		$("<ul/>", {class: "node-hover-card-chips"}).append(chips.map(renderHoverCardChip)).appendTo(card);

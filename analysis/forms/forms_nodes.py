@@ -9,6 +9,7 @@ locus filters, sample filters) or a single picker standing in for several FKs (`
 """
 import json
 import re
+from functools import cached_property
 from typing import Any
 
 from dal import forward
@@ -16,7 +17,7 @@ from django import forms
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q, QuerySet
 from django.forms.models import fields_for_model
-from django.forms.widgets import HiddenInput, RadioSelect, TextInput
+from django.forms.widgets import CheckboxInput, HiddenInput, RadioSelect, TextInput
 from django.http import Http404
 from django.utils.text import slugify
 
@@ -27,6 +28,12 @@ from analysis.models.nodes.filters.classifications_node import ClassificationsNo
 from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.models.nodes.filters.conservation_node import ConservationNode
 from analysis.models.nodes.filters.damage_node import DamageNode
+from analysis.models.nodes.filters.damage_node_filters import (
+    ALL_OF,
+    ANY_OF,
+    SENTENCE,
+    get_effect_filters,
+)
 from analysis.models.nodes.filters.gene_list_node import GeneListNode
 from analysis.models.nodes.filters.intersection_node import IntersectionNode
 from analysis.models.nodes.filters.merge_node import MergeNode
@@ -68,6 +75,7 @@ from annotation.pathogenicity_predictions import (
     GENE_MIS_Z_MAX,
     GENE_MIS_Z_MIN,
     GENE_MIS_Z_STEP,
+    SPLICEAI_DELTA_CUTOFF,
     TOOLS,
 )
 from genes.custom_text_gene_list import create_custom_text_gene_list
@@ -660,7 +668,7 @@ class DamageNodeForm(BaseNodeForm):
         exclude = ANALYSIS_NODE_FIELDS
         widgets = {
             "accordion_panel": HiddenInput(),
-            "splice_min": HiddenInput(attrs={"min": 0, "max": 1, "step": 0.1}),
+            "splice_min": HiddenInput(attrs={"min": 0, "max": 1, "step": 0.1, "data-default": SPLICEAI_DELTA_CUTOFF}),
             "alphagenome_splicing_min": HiddenInput(attrs={"min": ALPHAGENOME_SPLICING_MIN,
                                                            "max": ALPHAGENOME_SPLICING_MAX,
                                                            "step": ALPHAGENOME_SPLICING_STEP}),
@@ -673,9 +681,9 @@ class DamageNodeForm(BaseNodeForm):
             "annotsv_acmg_score_min": HiddenInput(attrs={"min": ANNOTSV_ACMG_SCORE_MIN, "max": ANNOTSV_ACMG_SCORE_MAX,
                                                          "step": ANNOTSV_ACMG_SCORE_STEP,
                                                          "data-default": ANNOTSV_ACMG_SCORE_CUTOFF}),
-            "damage_predictions_min": HiddenInput(attrs={"min": 0}),
+            "damage_predictions_min": HiddenInput(attrs={"min": 0, "step": 1}),
             # Columns v1
-            "cadd_score_min": HiddenInput(attrs={"min": 0, "max": 70}),
+            "cadd_score_min": HiddenInput(attrs={"min": 0, "max": 70, "step": 1}),
             "revel_score_min": HiddenInput(attrs={"min": 0, "max": 1, "step": 0.05}),
             # Columns v2
             'bayesdel_noaf_rankscore_min': HiddenInput(attrs={"min": 0, "max": 1, "step": 0.05}),
@@ -688,11 +696,16 @@ class DamageNodeForm(BaseNodeForm):
             'alphamissense_rankscore_min': HiddenInput(attrs={"min": 0, "max": 1, "step": 0.05}),
         }
 
+    GROUPS = ((ANY_OF, "Any of"), (ALL_OF, "All of"))
+    # One-click chips beside each group's Add filter, where the filter is offered and not already in use
+    QUICK_ADD = {ANY_OF: ("impact_min", "splice_min", "damage_predictions_min"),
+                 ALL_OF: ("variant_types", "gene_loeuf_max")}
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["damage_predictions_min"].widget.attrs["max"] = self.instance.num_prediction_fields
         # Columns v4 raw-score sliders driven by the per-tool table. data-* threshold attrs drive the
-        # calibrated ClinGen colour bands and value colouring in damagenode_editor.html (omitted when None).
+        # calibrated ClinGen colour bands and value colouring in damagenode_editor.js (omitted when None).
         for tool in TOOLS:
             if tool.raw_field:
                 attrs = {"min": tool.raw_min, "max": tool.raw_max, "step": tool.raw_step}
@@ -700,76 +713,68 @@ class DamageNodeForm(BaseNodeForm):
                     attrs["data-pathogenic-min"] = tool.raw_pathogenic_threshold
                 if tool.raw_max_benign_threshold is not None:
                     attrs["data-benign-max"] = tool.raw_max_benign_threshold
-                field = self.fields[tool.node_threshold_field]
-                field.widget = HiddenInput(attrs=attrs)
-                if tool.node_label:
-                    # Only where the auto label would mislead - a signed or inverted score
-                    field.label = f"{tool.node_label} {tool.raw_direction.comparison}"
+                self.fields[tool.node_threshold_field].widget = HiddenInput(attrs=attrs)
+        for effect_filter in self.effect_filters:
+            if effect_filter.default is not None:
+                self.fields[effect_filter.key].widget.attrs["data-default"] = effect_filter.default
 
-    def get_raw_score_rows(self) -> list[dict]:
-        """ Per-tool bound fields for the raw-score slider rows and their setup calls in the editor,
-            so a tool added to TOOLS gets a slider without touching the template (#1808) """
-        return [{
-            "tool": tool,
-            "field": tool.raw_field,
-            "threshold_field": tool.node_threshold_field,
-            "min_field": self[tool.node_threshold_field],
-            "required_field": self[f"{tool.raw_field}_required"],
-            "allow_null_field": self[f"{tool.raw_field}_allow_null"],
-        } for tool in self.instance.get_editor_raw_score_tools()]
+    @cached_property
+    def effect_filters(self):
+        return get_effect_filters(self.instance)
 
-    def get_rankscore_rows(self) -> list[dict]:
-        """ Rankscore slider rows (columns v2 on), the same shape as get_raw_score_rows """
-        return [{
-            "tool": tool,
-            "field": tool.rankscore_field,
-            "threshold_field": f"{tool.rankscore_field}_min",
-            "min_field": self[f"{tool.rankscore_field}_min"],
-            "required_field": self[f"{tool.rankscore_field}_required"],
-            "allow_null_field": self[f"{tool.rankscore_field}_allow_null"],
-        } for tool in self.instance.get_editor_rankscore_tools()]
-
-    def has_individual_prediction_rows(self) -> bool:
-        """ Whether "Show individual pathogenicity predictions" has any rows to reveal - none on T2T (#2787) """
+    @cached_property
+    def filter_rows(self) -> list[dict]:
+        """ The editor's rows, each filter with its bound fields - damagenode_editor.js places them in their group """
         node = self.instance
-        if node.columns_version == 1:
-            return True
-        if node.columns_version >= 4 and self.get_raw_score_rows():
-            return True
-        return node.columns_version < 4 and bool(self.get_rankscore_rows())
+        rows = []
+        for effect_filter in self.effect_filters:
+            values = []
+            for i, field_name in enumerate(effect_filter.value_fields):
+                if field_name == "alphagenome_splicing_min" and not node.has_alphagenome_splicing():
+                    continue
+                widget = self.fields[field_name].widget
+                values.append({
+                    "field": self[field_name],
+                    "slider": isinstance(widget, HiddenInput),
+                    "flag": isinstance(widget, CheckboxInput),
+                    "choices": field_name == "variant_types",
+                    "control": effect_filter.value_controls[i] if effect_filter.value_controls else None,
+                })
+            # A row drawing more than one value gives each its own on/off - with one, the row being there is the switch
+            multi = len(values) > 1
+            rows.append({
+                "filter": effect_filter,
+                "label": effect_filter.multi_label if multi else effect_filter.label,
+                "multi": multi,
+                "values": values,
+                "required_field": self[effect_filter.required_field] if effect_filter.required_field else None,
+                "allow_null_field": self[effect_filter.allow_null_field] if effect_filter.allow_null_field else None,
+                "legacy_null_field": self[effect_filter.legacy_null_field] if effect_filter.legacy_null_field else None,
+            })
+        return rows
 
-    def get_slider_setups(self) -> list[dict]:
-        """ Selectors for each slider the editor draws: the hidden form field, the range input and its enable
-            checkbox - passed to initDamageNodeEditor (damagenode_editor.js) """
-        node = self.instance
-        sliders = [("splice_min", "splice")]
-        if node.shows_cosmic_count():
-            sliders.append(("cosmic_count_min", "cosmic-count"))
-        if node.shows_damage_predictions():
-            sliders.append(("damage_predictions_min", "damage-predictions"))
-        if node.has_alphagenome_splicing():
-            sliders.append(("alphagenome_splicing_min", "alphagenome-splicing"))
-        if node.has_gene_constraint:
-            sliders.extend([("gene_loeuf_max", "gene-loeuf"), ("gene_mis_z_min", "gene-mis-z")])
-        if node.has_annotsv:
-            sliders.append(("annotsv_acmg_score_min", "annotsv-acmg-score"))
-        if node.columns_version == 1:
-            sliders.extend([("cadd_score_min", "cadd"), ("revel_score_min", "revel")])
-        elif node.columns_version >= 2:
-            sliders.extend((row["threshold_field"], row["field"]) for row in self.get_rankscore_rows())
-            if node.columns_version >= 4:
-                sliders.extend((row["threshold_field"], row["field"]) for row in self.get_raw_score_rows())
-        return [{"input": f"#id_{field}", "slider": f"#{name}-slider", "enable": f"input#enable-{name}"}
-                for field, name in sliders]
+    def get_editor_options(self) -> dict:
+        """ What initDamageNodeEditor (damagenode_editor.js) needs to place, add and describe the rows """
+        def model_default(field_name):
+            return DamageNode._meta.get_field(field_name).get_default() if field_name else None
 
-    def get_pred_rows(self) -> list[dict]:
-        """ Per-tool bound fields for the categorical prediction dropdown rows """
-        return [{
-            "tool": tool,
-            "pred_field": self[tool.pred_field],
-            "required_field": self[f"{tool.pred_field}_required"],
-            "allow_null_field": self[f"{tool.pred_field}_allow_null"],
-        } for tool in self.instance.get_editor_pred_tools()]
+        filters = [{
+            "key": f.key,
+            "label": f.label,
+            "category": f.category,
+            "valueFields": f.value_fields,
+            "words": f.words,
+            "requiredField": f.required_field,
+            "allowNullField": f.allow_null_field,
+            "nullWords": f.null_words,
+            "legacyNullField": f.legacy_null_field,
+            "legacyNullWords": f.legacy_null_words,
+            "defaultRequired": model_default(f.required_field),
+            "defaultAllowNull": model_default(f.allow_null_field),
+        } for f in self.effect_filters]
+        offered = {f.key for f in self.effect_filters}
+        quick = {group: [key for key in keys if key in offered] for group, keys in self.QUICK_ADD.items()}
+        return {"filters": filters, "quick": quick, "sentence": SENTENCE}
 
 
 class FilterNodeForm(BaseNodeForm):

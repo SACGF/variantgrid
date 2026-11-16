@@ -86,8 +86,10 @@ class TestDamageNodeSpliceAIBackfillFlag(_AnnotatedVariantsMixin, TestCase):
         self.assertEqual({"acceptor_gain", "donor_loss_only"}, self._filtered(node))
 
     def test_unbackfilled_required_allow_null_true_includes_isnulls(self):
+        """ The earlier allow null rule (#2836) - each DS field's null is its own term """
         self._unbackfilled()
-        node = DamageNode(analysis=self.analysis, splice_min=0.5, splice_required=True, splice_allow_null=True)
+        node = DamageNode(analysis=self.analysis, splice_min=0.5, splice_required=True, splice_allow_null=True,
+                          splice_allow_null_any_missing=True)
         self.assertEqual({"acceptor_gain", "donor_loss_only", "no_spliceai"}, self._filtered(node))
 
 

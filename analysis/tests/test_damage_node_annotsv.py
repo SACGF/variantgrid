@@ -86,7 +86,7 @@ class TestDamageNodeAnnotSV(TestCase):
         node = DamageNode(analysis=self.analysis, impact_min=HIGH)
         with patch.object(AnnotationPipelineVersion, "get_active") as get_active:
             node.modifies_parents()
-            node.has_required()
+            node.get_node_chips()
             node._get_node_q()
             node.get_warnings()
         get_active.assert_not_called()

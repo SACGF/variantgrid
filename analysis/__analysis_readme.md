@@ -30,13 +30,14 @@ Thresholds page (`annotation/pathogenicity_predictions.py:EFFECT_NODE_FILTERS`).
 
 The gene constraint filters read the representative transcript's `symbol` against gnomAD's MANE Select rows (gnomAD
 v4 has a row per transcript, and a MANE gene has an Ensembl and a RefSeq row with the same values). They are offered
-when the gnomAD gene constraint has been imported; Allow Null keeps a variant with no symbol or whose gene has no
-MANE Select value. Outside repeat region is a restriction (ANDed), offered where the version populates `repeat_masker`.
+when the gnomAD gene constraint has been imported; in "All of", "keep genes with no score" (`_allow_null`) keeps a
+variant with no symbol or whose gene has no MANE Select value. Outside repeat region is a restriction (ANDed), offered where the version populates `repeat_masker`.
 
 SVs and small variants go through the one Effect node, so the AnnotSV filters are offered when the AnnotSV pipeline is
 active for the build (`AnnotationPipelineVersion.get_active`) and lean on the `_required` / `_allow_null` pair: every
-`annotsv_*` column is null for a small variant, so "ACMG class ≥ LP, required, allow null" filters SVs and leaves small
-variants to the other filters, and in the OR pool it is one more kind of damaging evidence. Exclude SV artefact regions
+`annotsv_*` column is null for a small variant, so "ACMG class ≥ LP" in "All of" with "keep small variants" (required,
+allow null) filters SVs and leaves small variants to the other filters, and in "Any of" it is one more kind of damaging
+evidence. Exclude SV artefact regions
 is a restriction like outside repeat region, and small variants pass it. A node using them adds the AnnotSV ACMG and
 region columns to its grid and its descendants' (`AnalysisNode.get_extra_grid_columns`). The terms are column checks
 on the annotation row the node already joins, and the pipeline is only looked up when one is set: on a 3.9M variant

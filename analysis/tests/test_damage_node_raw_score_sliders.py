@@ -34,6 +34,7 @@ GRCH38_VEP116 = {"eve_score", "popeve_score", "promoter_ai_score"}
 # Needs its plugin data file in vep_config, which the fake annotation settings leave unset
 AVI = {"avi_phred"}
 DBNSFP_RAW_FIELDS = {t.raw_field for t in TOOLS if t.raw_field} - PROTVAR - GRCH38_VEP116 - AVI
+THRESHOLD_FIELDS = {t.raw_field: t.node_threshold_field for t in TOOLS if t.raw_field}
 
 
 class _RawScoreSliderMixin:
@@ -114,13 +115,11 @@ class TestPluginSlidersOffered(_RawScoreSliderMixin, TestCase):
     def test_eve_min_filters(self):
         node = DamageNode(analysis=self.analysis, eve_score_min=0.7)
         self.assertTrue(node.modifies_parents())
-        self.assertTrue(node.has_individual_pathogenic_predictions())
         self.assertEqual({"eve_0.8"}, self._filtered(node, {"eve_0.8", "eve_0.5", "eve_null"}))
 
     def test_eve_required_allows_null(self):
         node = DamageNode(analysis=self.analysis, eve_score_min=0.7, eve_score_required=True,
                           eve_score_allow_null=True)
-        self.assertTrue(node.has_required())
         self.assertEqual({"eve_0.8", "eve_null"}, self._filtered(node, {"eve_0.8", "eve_0.5", "eve_null"}))
 
     def test_eve_class_filters_on_the_word(self):
@@ -154,8 +153,7 @@ class TestPluginSlidersOffered(_RawScoreSliderMixin, TestCase):
     def test_form_row_carries_slider_bounds(self):
         """ Uncalibrated, so bounds but no colour-band data attrs """
         form = DamageNodeForm(instance=DamageNode(analysis=self.analysis))
-        row = next(r for r in form.get_raw_score_rows() if r["field"] == "eve_score")
-        attrs = row["min_field"].field.widget.attrs
+        attrs = form.fields["eve_score_min"].widget.attrs
         self.assertEqual(attrs["min"], 0.0)
         self.assertEqual(attrs["max"], 1.0)
         self.assertNotIn("data-pathogenic-min", attrs)
@@ -164,14 +162,14 @@ class TestPluginSlidersOffered(_RawScoreSliderMixin, TestCase):
     def test_inverted_and_signed_tools_are_labelled(self):
         """ 'Popeve score max' / 'Promoter ai score min' would not say which side is kept """
         form = DamageNodeForm(instance=DamageNode(analysis=self.analysis))
-        labels = {r["field"]: str(r["min_field"].label) for r in form.get_raw_score_rows()}
-        self.assertEqual("popEVE score ≤", labels["popeve_score"])
-        self.assertEqual("PromoterAI |score| ≥", labels["promoter_ai_score"])
+        labels = {f.key: f"{f.label} {f.op}" for f in form.effect_filters}
+        self.assertEqual("popEVE score ≤", labels["popeve_score_max"])
+        self.assertEqual("PromoterAI |score| ≥", labels["promoter_ai_score_min"])
 
     def test_editor_renders_plugin_sliders(self):
         html = self._editor_html()
         for raw_field in GRCH38_VEP116 | PROTVAR:
-            self.assertIn(f'id="{raw_field}-slider"', html)
+            self.assertIn(f'data-filter="{THRESHOLD_FIELDS[raw_field]}"', html)
         self.assertIn('name="popeve_score_max"', html)
         self.assertIn('name="eve_class"', html)
 
@@ -202,9 +200,9 @@ class TestGRCh38OnlyToolsNotOfferedOnGRCh37(_RawScoreSliderMixin, TestCase):
     def test_editor_renders_dbnsfp_sliders_without_the_grch38_tools(self):
         html = self._editor_html()
         for raw_field in GRCH38_VEP116:
-            self.assertNotIn(f'id="{raw_field}-slider"', html)
+            self.assertNotIn(f'data-filter="{THRESHOLD_FIELDS[raw_field]}"', html)
         for raw_field in DBNSFP_RAW_FIELDS | PROTVAR:
-            self.assertIn(f'id="{raw_field}-slider"', html)
+            self.assertIn(f'data-filter="{THRESHOLD_FIELDS[raw_field]}"', html)
 
 
 @override_settings(**get_fake_annotation_settings_dict(columns_version=4))

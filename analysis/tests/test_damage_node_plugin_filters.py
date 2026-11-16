@@ -114,11 +114,16 @@ class DamageNodePluginFiltersTest(TestCase):
         self.assertEqual(1, len([w for w in warnings if "AlphaGenome splicing filter is NOT being applied" in w]))
 
     def test_alphagenome_splicing_is_a_splicing_or_term(self):
-        """ Required splicing keeps a variant passing SpliceAI or AlphaGenome, or with no AlphaGenome score """
+        """ Required splicing keeps a variant passing SpliceAI or AlphaGenome. With allow null, one with failing
+            SpliceAI / dbscSNV scores and no AlphaGenome score is scored, so dropped - the earlier rule (#2836)
+            kept it for the missing AlphaGenome score """
         self._set_backfilled(True)
         node = DamageNode(analysis=self.analysis, splice_min=0.5, alphagenome_splicing_min=1.0,
                           splice_required=True, splice_allow_null=True)
         among = {"spliceai_only", "alphagenome_only", "null_alphagenome", "fails_both_splicing"}
+        self.assertEqual({"spliceai_only", "alphagenome_only"}, self._filtered(node, among))
+
+        node.splice_allow_null_any_missing = True
         self.assertEqual({"spliceai_only", "alphagenome_only", "null_alphagenome"}, self._filtered(node, among))
 
     def test_alphagenome_splicing_without_splice_min(self):
