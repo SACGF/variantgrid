@@ -245,3 +245,31 @@ class TestVCFCleanAndFilterReferenceSpans(TestCase):
                                       ("<DEL>", "SVTYPE=CNV;END=104714")])
         self.assertEqual(len(written.splitlines()), 2)
         self.assertEqual(skipped, {})
+
+
+@override_settings(ANNOTATION=_fake_annotation_settings())
+class TestVCFCleanAndFilterRecordFormatFields(TestCase):
+    """ The FORMAT keys the records use, which preprocess binds the VCF's sample fields to (#2833) """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        _write_placeholder_fasta(cls.genome_build)
+
+    def test_keys_of_kept_records_only(self):
+        header = VCF_HEADER.replace("#CHROM", '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n#CHROM')
+        header = header.replace("\tINFO\n", "\tINFO\tFORMAT\tSAMPLE\n")
+        vcf_filename = os.path.join(_TEST_DIR, f"{self.id()}.vcf")
+        with open(vcf_filename, "w", encoding="utf-8") as f:
+            f.write(header)
+            f.write("1\t100000\t.\tA\t<CNV>\t.\tPASS\tEND=200000\tFC\t1.29\n")
+            f.write("1\t300000\t.\tA\t<CNV>\t.\tPASS\tEND=400000\tFC:SM\t1.3:0.9\n")
+            f.write("MT_NOT_A_CONTIG\t100\t.\tA\tT\t.\tPASS\t.\tGT\t0/1\n")  # Skipped, so its GT doesn't count
+
+        record_format_fields_file = os.path.join(_TEST_DIR, f"{self.id()}.format_fields.txt")
+        with redirect_stdout(StringIO()):
+            call_command("vcf_clean_and_filter", vcf=vcf_filename, genome_build=self.genome_build.name,
+                         allow_unsorted=True, record_format_fields_file=record_format_fields_file)
+        with open(record_format_fields_file, encoding="utf-8") as f:
+            self.assertEqual(f.read().splitlines(), ["FC", "SM"])

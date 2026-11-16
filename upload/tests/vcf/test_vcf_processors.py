@@ -1,4 +1,5 @@
 import os
+import tempfile
 from unittest.mock import patch
 
 import cyvcf2
@@ -24,6 +25,7 @@ from upload.vcf.bulk_genotype_vcf_processor import BulkGenotypeVCFProcessor
 from upload.vcf.bulk_no_genotype_vcf_processor import BulkNoGenotypeVCFProcessor
 from upload.vcf.sql_copy_files import COHORT_GENOTYPE_HEADER
 from upload.vcf.vcf_import import create_cohort_genotype_collection_from_vcf, create_vcf_from_vcf
+from upload.vcf.vcf_preprocess import clear_unused_format_fields
 
 
 class TestVCFProcessors(TestCase):
@@ -153,6 +155,34 @@ class TestVCFProcessors(TestCase):
     def _create_vcf_with_metadata(self, vcf_filename, metadata):
         upload_step = self._create_fake_upload_step(vcf_filename, metadata)
         return create_vcf_from_vcf(upload_step, cyvcf2.VCF(vcf_filename))
+
+    def _clear_unused_format_fields(self, vcf_filename, record_format_fields: list[str]):
+        upload_step = self._create_fake_upload_step(vcf_filename)
+        vcf = create_vcf_from_vcf(upload_step, cyvcf2.VCF(vcf_filename))
+        with tempfile.NamedTemporaryFile("w", suffix=".txt") as f:
+            f.write("".join(f"{field}\n" for field in record_format_fields))
+            f.flush()
+            clear_unused_format_fields(upload_step, f.name, upload_step)
+        vcf.refresh_from_db()
+        return vcf, SimpleVCFImportInfo.objects.filter(upload_step=upload_step)
+
+    def test_header_format_fields_no_record_uses_are_unbound(self):
+        """ TSO500 cnv.vcf declares GT, AD, DP and GQ in the shared DRAGEN header, but every record is only FC """
+        vcf, import_infos = self._clear_unused_format_fields(
+            os.path.join(self.TEST_DATA_DIR, "symbolic_alt", "TSO500_cnv.vcf"), ["FC"])
+        self.assertFalse(vcf.has_genotype)
+        self.assertFalse(vcf.has_depth)
+        self.assertIsNone(vcf.genotype_quality_field)
+        self.assertEqual(vcf.copy_number_field, "FC")
+        self.assertEqual([i.message_string for i in import_infos],
+                         ["Not using FORMAT AD, DP, GQ, GT: declared in the VCF header, but no record has them"])
+
+    def test_format_fields_records_use_are_kept(self):
+        vcf_filename = os.path.join(self.TEST_DATA_DIR, "sample1_hg19.vcf")
+        vcf, import_infos = self._clear_unused_format_fields(vcf_filename, ["GT", "AD", "DP", "GQ", "PL"])
+        self.assertTrue(vcf.has_genotype)
+        self.assertTrue(vcf.has_depth)
+        self.assertFalse(import_infos.exists())
 
     def test_declared_genome_build_reaches_the_vcf(self):
         """ _DragenExonCNV.vcf has no contigs and an unresolvable '##reference', so without a declared

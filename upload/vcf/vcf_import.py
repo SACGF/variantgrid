@@ -2,7 +2,8 @@
 Creating the VCF and Sample rows from an uploaded file's header: create_vcf_from_uploaded_vcf and
 create_vcf_from_vcf read the header only, resolve_genome_build (header, then what was declared at
 upload, then the source's fallback), configure_vcf_from_header binds the sample FORMAT fields
-(overridable per source through VCFSourceSettings in handle_vcf_source), create_cohort_genotype_collection_from_vcf
+(overridable per source through VCFSourceSettings in handle_vcf_source), clear_format_fields_not_in_records
+unbinds the ones no record uses once preprocess has read them all, create_cohort_genotype_collection_from_vcf
 makes the automatic cohort, and uploaded_vcf_configured_signal lets seqauto link sequencing records. import_vcf_file
 is the per-split-file genotype import that runs in parallel. Steps are wired in
 upload/import_task_factories/.
@@ -407,6 +408,34 @@ def handle_vcf_source(vcf):
         # Runs last in configure_vcf_from_header, so this lands on top of the by-name defaults
         vss.apply_sample_field_overrides(vcf)
         vcf.save()
+
+
+def get_format_fields_not_in_records(vcf: VCF, record_format_fields: set[str]) -> dict[str, str]:
+    """ A header can declare FORMAT fields its records never use - a DRAGEN TSO500 CNV VCF has the shared DRAGEN
+        header (GT, AD, DP, GQ...) but every record is only FC. A field bound to one of those makes has_genotype /
+        has_depth claim calls and depths there are none of (#2833). A field bound to a key the header doesn't
+        declare (a VCFSourceSettings override) is left alone.
+        Returns {VCF field: the FORMAT key no record uses} """
+    header_formats = set(vcf.vcfformat_set.values_list("identifier", flat=True))
+    return {field: key for field in sorted(VCFSourceSettings.OVERRIDABLE_SAMPLE_FIELDS)
+            if (key := getattr(vcf, field)) in header_formats and key not in record_format_fields}
+
+
+def clear_format_fields_not_in_records(vcf: VCF, record_format_fields: set[str]) -> dict[str, str]:
+    """ Unbinds get_format_fields_not_in_records, and returns them """
+    unbound = get_format_fields_not_in_records(vcf, record_format_fields)
+    for field in unbound:
+        setattr(vcf, field, None)
+
+    if "copy_number_field" in unbound:
+        # Copy number can also come from INFO, which header binding only falls back to when FORMAT has none
+        vcf_infos = set(vcf.vcfinfo_set.values_list("identifier", flat=True))
+        vcf.copy_number_field = get_copy_number_field(record_format_fields, vcf_infos,
+                                                      single_sample=vcf.genotype_samples == 1)
+
+    if unbound:
+        vcf.save(update_fields=list(unbound))
+    return unbound
 
 
 def genotype_vcf_processor_factory(upload_step, cohort_genotype_collection, uploaded_vcf, preprocess_vcf_import_info):
