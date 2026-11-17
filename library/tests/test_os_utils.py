@@ -10,7 +10,7 @@ def _process_is_running(pid: int) -> bool:
     try:
         with open(f"/proc/{pid}/stat", encoding="utf-8") as f:
             return f.read().rsplit(")", 1)[1].split()[0] != "Z"  # a zombie has exited
-    except FileNotFoundError:
+    except (FileNotFoundError, ProcessLookupError):  # reaped between the open and the read
         return False
 
 
