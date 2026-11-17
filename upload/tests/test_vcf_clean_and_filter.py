@@ -35,12 +35,20 @@ POSITION_BACKWARDS_RECORDS = [("1", 154560359), ("1", 154560345), ("2", 100000)]
 UNGROUPED_CONTIG_RECORDS = [("1", 100000), ("2", 100000), ("1", 200000)]
 
 
+def _write_atomically(filename: str, content: str):
+    """ _TEST_DIR is created at import, before the parallel test runner forks, so every worker shares these
+        files - write then rename, so a worker never reads one another is half way through rewriting """
+    fd, tmp_filename = tempfile.mkstemp(dir=_TEST_DIR)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(content)
+    os.replace(tmp_filename, filename)
+
+
 def _write_placeholder_fasta(genome_build):
-    with open(_TEST_FASTA, "w", encoding="utf-8") as f:
-        f.write(">placeholder\nN\n")  # Sequence is never read - only the index below
-    with open(_TEST_FASTA + ".fai", "w", encoding="utf-8") as f:
-        for accession, length in genome_build.standard_contigs.values_list("refseq_accession", "length"):
-            f.write(f"{accession}\t{length}\t0\t60\t61\n")
+    _write_atomically(_TEST_FASTA, ">placeholder\nN\n")  # Sequence is never read - only the index below
+    fai_lines = [f"{accession}\t{length}\t0\t60\t61\n"
+                 for accession, length in genome_build.standard_contigs.values_list("refseq_accession", "length")]
+    _write_atomically(_TEST_FASTA + ".fai", "".join(fai_lines))
 
 
 def _fake_annotation_settings() -> dict:
