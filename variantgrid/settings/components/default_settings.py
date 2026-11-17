@@ -694,6 +694,7 @@ CLASSIFICATION_ALLOW_DELETE = True
 Is a hard-delete offered to classification owners (if false admins will have to delete from admin screen)
 """
 CLASSIFICATION_ALLOW_UNKNOWN_KEYS = True  # default to true for the sake of environments syncing from other environments
+CLASSIFICATION_MENU_LINK_TO_EVIDENCE_KEYS = True  # if there should bea  link to Evidence Keys as a menu item for regular users
 
 ONTOLOGY_EXTERNAL_LINKS = False  # Generate external or internal links for ontology terms
 
