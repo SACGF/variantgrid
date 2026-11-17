@@ -105,6 +105,47 @@
 
                     <table id="vav-{{ build_name|slugify }}" data-datatable-url="{% url 'variant_annotation_version_datatable' build_name %}" class="sticky-header responsive"></table>
                 </div>
+
+                {% for pipeline in av_data.5 %}
+                    <div class='mt-4'>
+                        <h4>{{ pipeline.label }} Versions</h4>
+                        {% if not pipeline.enabled %}
+                            <p class="text-muted">Disabled in settings</p>
+                        {% endif %}
+                        {% if pipeline.command %}
+                            <a href="#pipeline-command-{{ pipeline.slug|slugify }}" class="toggle-link" data-toggle="collapse">Show {{ pipeline.label }} command</a>
+                            <div id="pipeline-command-{{ pipeline.slug|slugify }}" class="collapse">
+                                <pre class="border border-info p-2">{{ pipeline.command }}</pre>
+                            </div>
+                        {% endif %}
+                        <table class='table'>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Code Version</th>
+                                    <th>Data Version</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Runs</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for version in pipeline.versions %}
+                                    <tr>
+                                        <td>{{ version.pk }}</td>
+                                        <td>{{ version.code_version }}</td>
+                                        <td>{{ version.data_version|default_if_none:'' }}</td>
+                                        <td>{{ version.get_status_display }}</td>
+                                        <td>{% timestamp version.created %}</td>
+                                        <td>{{ version.num_runs }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr><td colspan="6" class="text-muted">No version registered - see <a href="{% url 'variant_annotation_runs' %}">annotation runs</a></td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endfor %}
             {% end_ui_register_tab_embedded %}
         {% endfor %}
         {% ui_render_tabs tab_set="annotation_versions" %}
