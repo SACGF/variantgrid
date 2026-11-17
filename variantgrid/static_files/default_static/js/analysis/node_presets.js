@@ -64,15 +64,36 @@ function initNodePresets(options) {
             row.removeClass("d-none");
         }
     });
+    const form = $(options.form);
+    const presetKey = $("input[name='preset']", form);
+    let applying = false;
+
+    function clearPreset() {
+        select.val("");
+        presetKey.val("");
+        description.text("");
+    }
+
     select.on("change", function () {
         const preset = presets.find(p => p.key === this.value);
         if (!preset) {
+            clearPreset();
             return;
         }
-        const form = $(options.form);
-        applyNodePreset(form, preset.values);
-        $("input[name='preset']", form).val(preset.key); // saving names the node after it (#2605)
+        applying = true;
+        try {
+            applyNodePreset(form, preset.values);
+        } finally {
+            applying = false;
+        }
+        presetKey.val(preset.key); // saving names the node after it (#2605)
         description.text(preset.description);
-        this.value = ""; // the dropdown is an action - what the form now holds is what the node will filter on
+    });
+
+    // The dropdown shows the preset only while the form still holds it: any edit and it no longer describes the node
+    form.on("input change", function (event) {
+        if (!applying && event.target !== select[0] && presetKey.val()) {
+            clearPreset();
+        }
     });
 }

@@ -4,7 +4,8 @@
     CSS selector, and presets_admin_url where the presets are rows an administrator edits. This editor is cached, so
     the presets themselves are fetched from node_presets when it opens: an admin edit to a preset shows straight away.
     node_presets.js fills the form; nothing is saved until the user does, and then the picked preset (form.preset)
-    names the node.
+    names the node. Changing any field afterwards clears the pick, so the dropdown never names a preset the form no
+    longer matches.
 {% endcomment %}
 {% if form.has_presets %}
 <script src="{% static 'js/analysis/node_presets.js' %}"></script>
@@ -16,10 +17,10 @@
     </select>
     {% if presets_admin_url %}
         <span class="editor-help">Sets the filters below to the criterion's lines, which are lab policy configured by
-            administrators - adjust, then Save
+            administrators. Saving names the node after it; changing a filter afterwards clears it
             {% if user.is_superuser %}(<a class="hover-link node-presets-admin-link" target="_blank" href="{{ presets_admin_url }}">edit presets</a>){% endif %}</span>
     {% else %}
-        <span class="editor-help">Sets the filters below to the criterion's published cutoffs - adjust, then Save</span>
+        <span class="editor-help">Sets the filters below to the criterion's published cutoffs. Saving names the node after it; changing a filter afterwards clears it</span>
     {% endif %}
     <div class="editor-help node-preset-description"></div>
 </div>
