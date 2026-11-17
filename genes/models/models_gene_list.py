@@ -314,8 +314,14 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
     def set_modified_to_now(self):
         GeneList.objects.filter(pk=self.pk).update(modified=timezone.now())
 
-    def __str__(self):
+    @property
+    def name_and_size(self) -> str:
         return f"{self.name} ({self.genelistgenesymbol_set.count()} x genes)"
+
+    def __str__(self):
+        if source := self.get_source():
+            return f"{self.name_and_size} - from {source}"
+        return self.name_and_size
 
     def get_absolute_url(self):
         return reverse('view_gene_list', args=[str(self.id)])

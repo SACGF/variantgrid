@@ -1,5 +1,5 @@
 {# A node's gene list with where its genes came from - pinned to a PanelApp version, or following the panel's latest #}
-<div class="editor-section-title">{{ gene_list }}</div>
+<div class="editor-section-title">{{ gene_list.name_and_size }}</div>
 {% if not gene_list.category.hidden %}
     <a href="{{ gene_list.get_absolute_url }}" target="_blank">view gene list</a>
 {% endif %}

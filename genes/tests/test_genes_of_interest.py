@@ -106,6 +106,8 @@ class GenesOfInterestTest(TestCase):
         self.assertEqual("PanelApp: GOI Panel v1.0 (Intermediate) + GOID, - GOIA", source.label)
         self.assertEqual([(self.user, ["GOID"], ["GOIA"]), (self.user, ["GOIC"], []), (self.user, [], ["GOIC"])],
                          [(m.user, m.added, m.removed) for m in source.modifications])
+        self.assertEqual(f"{copy.name} (2 x genes) - from PanelApp: GOI Panel v1.0 (Intermediate) + GOID, - GOIA",
+                         str(copy))
 
         # Many changes are counted, not named
         symbols = [f"GOIX{i}" for i in range(GeneListSource.MAX_NAMED_CHANGES)]
@@ -123,6 +125,20 @@ class GenesOfInterestTest(TestCase):
         response = self.client.get(reverse("view_gene_list", kwargs={"gene_list_id": gene_list.pk}))
         self.assertContains(response, "PanelApp: GOI Panel v1.0 (Intermediate) + GOID, - GOIA")
         self.assertContains(response, "Create from latest version")
+
+    @patch("genes.views.views.create_gene_list_from_panel_app")
+    def test_create_from_panel_app_picks_a_panel_from_any_server(self, mock_create):
+        mock_create.return_value = _create_gene_list(self.user, ["GOIA"])
+        self.client.force_login(self.user)
+        # Unscoped by server, so a result says which server it is from
+        response = self.client.get(reverse("panel_app_panel_autocomplete"), {"q": "GOI Panel"})
+        self.assertEqual(["GOI Panel (Test PanelApp GOI)"], [r["text"] for r in response.json()["results"]])
+
+        response = self.client.post(reverse("gene_lists"), {"action": "panel_app",
+                                                            "panel_app-panel_app_panel": self.panel.pk,
+                                                            "panel_app-min_confidence": PanelAppConfidence.HIGH})
+        self.assertRedirects(response, mock_create.return_value.get_absolute_url(), fetch_redirect_response=False)
+        mock_create.assert_called_once_with(self.panel, PanelAppConfidence.HIGH, self.user)
 
     def test_panel_app_cache_gene_list_reused(self):
         """ One shared list per panel version and confidence - including one made before they were linked """

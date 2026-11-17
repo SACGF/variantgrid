@@ -153,20 +153,15 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
         if self.accordion_panel == self.PANEL_APP_GENE_LIST:
             # The panel's local cache (and so its version) is only made when the node loads
             confidence = PanelAppConfidence(self.min_panel_app_confidence).label
-            panels_qs = self.genelistnodepanelapppanel_set.select_related("panel_app_panel",
-                                                                          "panel_app_panel_local_cache").order_by("pk")
-            for gln_pap in panels_qs:
+            for gln_pap in self.genelistnodepanelapppanel_set.order_by("pk"):
                 name = str(gln_pap.panel_app_panel)
                 title = name
                 if local_cache := gln_pap.panel_app_panel_local_cache:
                     title += f" v{local_cache.version}"
                 names_and_titles.append((name, f"{title} - PanelApp (latest), min confidence {confidence}"))
         elif self.accordion_panel == self.SELECTED_GENE_LIST:
-            for gln_gl in self.genelistnodegenelist_set.order_by("pk").select_related("gene_list"):
-                gene_list = gln_gl.gene_list
-                source = gene_list.get_source()
-                title = f"{gene_list.name} - from {source}" if source else gene_list.name
-                names_and_titles.append((gene_list.name, title))
+            for gln_gl in self.genelistnodegenelist_set.order_by("pk"):
+                names_and_titles.append((gln_gl.gene_list.name, str(gln_gl.gene_list)))
         return names_and_titles
 
     def get_node_name(self):
@@ -330,12 +325,29 @@ def post_delete_gene_list_node(sender, instance, **kwargs):  # pylint: disable=u
         instance.custom_text_gene_list.delete()
 
 
+class GeneListNodeGeneListManager(models.Manager):
+    """ A row is only ever read for its gene list. The node isn't joined: rows are reached through
+        node.genelistnodegenelist_set, which already sets it """
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("gene_list")
+
+
 class GeneListNodeGeneList(NodeAuditLogMixin, models.Model):
     gene_list_node = models.ForeignKey(GeneListNode, on_delete=CASCADE)
     gene_list = models.ForeignKey(GeneList, on_delete=CASCADE)
 
+    objects = GeneListNodeGeneListManager()
+
     def _get_node(self):
         return self.gene_list_node
+
+
+class GeneListNodePanelAppPanelManager(models.Manager):
+    """ As GeneListNodeGeneListManager: a row is read for its panel and that panel's cached version """
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("panel_app_panel", "panel_app_panel_local_cache")
 
 
 class GeneListNodePanelAppPanel(NodeAuditLogMixin, models.Model):
@@ -344,6 +356,8 @@ class GeneListNodePanelAppPanel(NodeAuditLogMixin, models.Model):
     gene_list_node = models.ForeignKey(GeneListNode, on_delete=CASCADE)
     panel_app_panel = models.ForeignKey(PanelAppPanel, on_delete=CASCADE)
     panel_app_panel_local_cache = models.ForeignKey(PanelAppPanelLocalCache, null=True, on_delete=CASCADE)
+
+    objects = GeneListNodePanelAppPanelManager()
 
     def _get_node(self):
         return self.gene_list_node
