@@ -104,7 +104,8 @@ jobs:
           restore-keys: test-db-v1-
 
       - name: Load cached test database
-        if: steps.test-db.outputs.cache-matched-key != ''
+        # Any restored dump, exact or from restore-keys (actions/cache only outputs cache-hit, true for an exact match)
+        if: hashFiles('test_snpdb.dump') != ''
         # pg_restore from the service container, so client and server versions always match
         run: |
           docker exec "$POSTGRES_CONTAINER" createdb -U snpdb test_snpdb
