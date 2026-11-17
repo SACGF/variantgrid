@@ -182,9 +182,12 @@ new pipeline version (`annotation/pipelines/base.py:AnnotationPipelineRunner.che
 matching the installed version (`AnnotSV -version`), `v3.5.8-vg1` or `v3.5.10-vg1`:
 
 ```bash
-git clone --branch v3.5.10-vg1 https://github.com/davmlaw/AnnotSV.git && cd AnnotSV
-make PREFIX=/data/annotation/AnnotSV install  # code only - the annotations bundle is separate
+git clone --branch v3.5.10-vg1 https://github.com/davmlaw/AnnotSV.git /data/annotation/AnnotSV_src_v3.5.10-vg1
+cd /data/annotation/AnnotSV_src_v3.5.10-vg1 && make PREFIX=/data/annotation/AnnotSV install
 ```
+
+`make install` replaces only the code; the annotations bundle stays. A deployment on a version the fork has no tag
+for moves to the latest tag and registers it as a new pipeline version.
 
 `manage.py deployment_check` warns while the installed AnnotSV is not the fork, and a manual migration step asks
 existing deployments to switch. `claude/runbooks/upstream_watch.md` says when the fork can go.

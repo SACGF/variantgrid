@@ -71,13 +71,24 @@ def is_annotsv_fork_installed() -> bool:
 
 
 def get_annotsv_fork_install_instructions() -> str:
+    """ Shell to install the fork over the existing AnnotSV: code only - make install leaves the annotations bundle
+        alone. A version the fork has no tag for moves to the latest tag, which is a new pipeline version. """
     version = get_annotsv_command_line_version()
-    tag = ANNOTSV_FORK_TAGS.get(version, f"the v<version>-vg<N> tag matching AnnotSV {version}")
     install_dir = os.path.dirname(os.path.dirname(settings.ANNOTATION_ANNOTSV_BIN))
-    return (f"Install AnnotSV from {ANNOTSV_FORK_URL} ({tag}) as the owner of {install_dir}:\n"
-            f"git clone --branch {tag} {ANNOTSV_FORK_URL}.git AnnotSV_src && cd AnnotSV_src\n"
-            f"make PREFIX={shlex.quote(install_dir)} install\n"
-            "Same -version and output as upstream, so no new pipeline version is needed. "
+    latest_tag = list(ANNOTSV_FORK_TAGS.values())[-1]
+    if tag := ANNOTSV_FORK_TAGS.get(version):
+        version_note = f"AnnotSV {version} is installed, so use {tag}: same -version, so no new pipeline version."
+    else:
+        tag = latest_tag
+        version_note = (f"The fork has no tag for the installed AnnotSV {version!r}, so this moves to {tag}: afterwards "
+                        "register and promote it (manage.py create_new_annotation_pipeline_version --pipeline-type=A).")
+    src_dir = os.path.join(os.path.dirname(install_dir), f"AnnotSV_src_{tag}")
+    return (f"{version_note} Only AnnotSV's code is replaced - the annotations bundle in "
+            f"{settings.ANNOTATION_ANNOTSV_ANNOTATIONS_DIR} is not downloaded again. On the machine that runs AnnotSV "
+            f"(the annotation workers), as the owner of {install_dir}:\n"
+            f"git clone --branch {tag} {ANNOTSV_FORK_URL}.git {shlex.quote(src_dir)}\n"
+            f"cd {shlex.quote(src_dir)} && make PREFIX={shlex.quote(install_dir)} install\n"
+            "Check: 'python3 manage.py deployment_check' no longer warns about the AnnotSV fork. "
             "https://github.com/SACGF/variantgrid/wiki/Install-AnnotSV")
 
 

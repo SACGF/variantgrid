@@ -14,9 +14,11 @@ def _runs_stock_annotsv(_apps) -> bool:
 
 def _fork_note(_apps) -> str:
     return ("Stock AnnotSV's regulatory elements step is killed for memory on ranges with many large SVs, on every "
-            "retry (#2841). Our fork fixes it with byte-identical output. "
+            "retry (#2841). Our fork fixes it with byte-identical output.\n"
             f"{get_annotsv_fork_install_instructions()}\n"
-            "Then retry any AnnotSV runs that failed for memory (exit -9) on the annotation runs page.")
+            "Then retry the AnnotSV runs that failed for memory (exit -9, no stderr) on the annotation runs page. A retry "
+            f"removes everything earlier attempts left in the run's {settings.ANNOTATION_VCF_DUMP_DIR}/annotsv_<run> "
+            "directory, often several GB.")
 
 
 class Migration(migrations.Migration):
