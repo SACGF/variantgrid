@@ -7,6 +7,7 @@ from snpdb.fake_data import create_fake_cohort
 from snpdb.models import CohortGenotypeStats, GenomeBuild
 from upload.management.commands.one_off_clear_unused_vcf_format_fields import (
     get_no_genotype_call_vcf_ids,
+    get_uncounted_unknown_call_vcf_ids,
 )
 
 
@@ -30,10 +31,18 @@ class NoGenotypeCallVCFsTest(TestCase):
 
         cls.no_calls_vcf = vcf_with_stats("no_calls", unk_count=9)
         cls.called_vcf = vcf_with_stats("called", het_count=3, unk_count=9)
-        cls.no_gt_field_vcf = vcf_with_stats("no_gt_field", genotype_field=None, unk_count=9)
+        cls.no_gt_field_vcf = vcf_with_stats("no_gt_field", genotype_field=None, unk_count=9, variant_count=9)
+        cls.no_gt_field_uncounted_vcf = vcf_with_stats("no_gt_field_uncounted", genotype_field=None, unk_count=9)
 
     def test_only_a_gt_field_with_no_calls_is_a_candidate(self):
         vcf_ids = get_no_genotype_call_vcf_ids()
         self.assertIn(self.no_calls_vcf.pk, vcf_ids)
         self.assertNotIn(self.called_vcf.pk, vcf_ids)
         self.assertNotIn(self.no_gt_field_vcf.pk, vcf_ids)
+        self.assertNotIn(self.no_gt_field_uncounted_vcf.pk, vcf_ids)
+
+    def test_no_gt_field_with_uncounted_unknown_calls_is_recounted(self):
+        vcf_ids = get_uncounted_unknown_call_vcf_ids()
+        self.assertIn(self.no_gt_field_uncounted_vcf.pk, vcf_ids)
+        self.assertNotIn(self.no_gt_field_vcf.pk, vcf_ids)
+        self.assertNotIn(self.no_calls_vcf.pk, vcf_ids)

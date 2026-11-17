@@ -29,7 +29,7 @@ from snpdb.models.models_cohort_stats import CohortGenotypeStats
 from snpdb.models.models_family import Trio
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import VariantCoordinate
-from snpdb.models.models_vcf import VCFLengthStats
+from snpdb.models.models_vcf import VCF, VCFLengthStats
 from snpdb.tests.utils.vcf_testing_utils import (
     slowly_create_test_variant,
     slowly_create_test_variant_from_coordinate,
@@ -257,6 +257,20 @@ class CohortStatsCountsTest(TestCase):
             self.assertEqual(trio_count, stats_qs.get(filter_key=self.trio.get_stats_filter_key(mode)).variant_count)
             self.assertEqual(other_trio_count,
                              stats_qs.get(filter_key=other_trio.get_stats_filter_key(mode)).variant_count)
+
+    def test_force_recounts_fresh_stats(self):
+        """ Unbinding the VCF's GT field makes unknown zygosity a call without changing the stats version (#2833) """
+        def mother_variant_count():
+            return CohortGenotypeStats.objects.get(cohort_genotype_collection=self.cohort.cohort_genotype_collection,
+                                                   sample__name="mother", passing_filter=False).variant_count
+
+        calculate_sample_stats.calculate_cohort_stats(self.cohort, self.annotation_version)
+        self.assertEqual(4, mother_variant_count())
+        VCF.objects.filter(pk=self.cohort.vcf.pk).update(genotype_field=None)
+        calculate_sample_stats.calculate_cohort_stats(self.cohort, self.annotation_version)
+        self.assertEqual(4, mother_variant_count())  # fresh
+        calculate_sample_stats.calculate_cohort_stats(self.cohort, self.annotation_version, force=True)
+        self.assertEqual(6, mother_variant_count())  # its two unknown zygosity rows are now calls
 
     def test_vcf_stats(self):
         cohort_pass_counts = calculate_sample_stats.calculate_cohort_stats(self.cohort, self.annotation_version,
