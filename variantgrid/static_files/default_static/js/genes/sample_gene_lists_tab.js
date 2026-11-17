@@ -36,7 +36,7 @@ function drawInitialSampleGeneLists(sampleGeneListData) {
     for (let i=0 ; i<sampleGeneListData.length ; i++) {
         populateSampleGeneListFromJSON(sampleGeneListData[i]);
     }
-    $("#sample-gene-lists").show();
+    $("#sample-gene-list-items").show();
 }
 
 function modifySampleGeneList(that, data) {
