@@ -1,6 +1,7 @@
 """
 deployment_check "Tool versions": every external binary the server shells out to, checked the way it is
-used. check_tool_versions is the entry point (it also warns about AnnotSV bundle files that cost memory);
+used. check_tool_versions is the entry point (it also warns about AnnotSV bundle files that cost memory,
+and about stock AnnotSV in place of our fork);
 check_vcf_split_pipe runs the real VCF import split stage
 (GNU split --filter | bash | bgzip) on a tiny VCF, since a tool missing inside that filter only fails
 at import time rather than on the command line.
@@ -16,8 +17,10 @@ import tempfile
 from django.conf import settings
 
 from annotation.annotsv_annotation import (
+    get_annotsv_fork_install_instructions,
     get_annotsv_sort_regulatory_elements_script,
     get_annotsv_unsorted_regulatory_element_files,
+    is_annotsv_fork_installed,
 )
 from pedigree.graphs.pedigree_chart import get_ped_parser_command
 from snpdb.models import SomalierConfig
@@ -103,6 +106,16 @@ def check_annotsv_regulatory_elements_sorted() -> dict:
     return check
 
 
+def check_annotsv_fork_installed() -> dict:
+    """ A warning, not invalid: stock AnnotSV gives the same output, but is killed for memory on ranges with many
+        large SVs (#2841) """
+    check = {"valid": True}
+    if not is_annotsv_fork_installed():
+        check["warning"] = ("AnnotSV is not the fork with the fixed regulatory elements step. "
+                            + get_annotsv_fork_install_instructions())
+    return check
+
+
 def check_tool_versions() -> dict:
     # If it returns True then everything is good, exception or anything else, bad
     tools = {
@@ -154,5 +167,6 @@ def check_tool_versions() -> dict:
 
     if settings.ANNOTATION_ANNOTSV_ENABLED:
         tool_versions["AnnotSV regulatory elements sorted"] = check_annotsv_regulatory_elements_sorted()
+        tool_versions["AnnotSV fork (#2841)"] = check_annotsv_fork_installed()
 
     return tool_versions

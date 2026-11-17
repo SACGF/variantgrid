@@ -8,7 +8,11 @@ from django.test.utils import override_settings
 
 from annotation.annotation_run_files import get_annotsv_dir, write_qs_to_vcf
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
-from annotation.annotsv_annotation import get_annotsv_command, get_annotsv_tsv_filename
+from annotation.annotsv_annotation import (
+    get_annotsv_command,
+    get_annotsv_tsv_filename,
+    is_annotsv_fork_installed,
+)
 from annotation.annotsv_columns import ANNOTSV_COLUMNS, all_variant_grid_column_ids
 from annotation.fake_data import (
     get_fake_annotation_settings_dict,
@@ -218,6 +222,31 @@ class TestGetAnnotsvCommand(TestCase):
                                   AnnotationConsortium.ENSEMBL)
         tx_idx = cmd.index("-tx")
         self.assertEqual(cmd[tx_idx + 1], "ENSEMBL")
+
+
+class TestAnnotsvForkInstalled(TestCase):
+    """ #2841: the fork keeps upstream's -version, so it is told apart by its Tcl sources, found the way the AnnotSV
+        launcher finds them. """
+    def _install(self, install_dir: str, tcl_dir_name: str, regulatory_elements_tcl: str):
+        os.makedirs(os.path.join(install_dir, "bin"))
+        tcl_dir = os.path.join(install_dir, "share", tcl_dir_name, "AnnotSV")
+        os.makedirs(tcl_dir)
+        with open(os.path.join(tcl_dir, "AnnotSV-regulatoryelements.tcl"), "w", encoding="utf-8") as f:
+            f.write(regulatory_elements_tcl)
+        return os.path.join(install_dir, "bin", "AnnotSV")
+
+    def test_fork_and_stock(self):
+        for tcl_dir_name in ["tcl8.6", "tcl"]:
+            for tcl, expected in [("proc recordRegulatedGenes {f selectOnRead} {", True),
+                                  ("proc regulatoryElementsAnnotation {L_allGenesOverlapped} {", False)]:
+                with self.subTest(tcl_dir_name=tcl_dir_name, expected=expected), tempfile.TemporaryDirectory() as d:
+                    annotsv_bin = self._install(d, tcl_dir_name, tcl)
+                    with override_settings(ANNOTATION_ANNOTSV_BIN=annotsv_bin):
+                        self.assertEqual(is_annotsv_fork_installed(), expected)
+
+    def test_not_installed(self):
+        with override_settings(ANNOTATION_ANNOTSV_BIN="/nonexistent/AnnotSV/bin/AnnotSV"):
+            self.assertFalse(is_annotsv_fork_installed())
 
 
 @override_settings(

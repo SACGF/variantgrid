@@ -18,6 +18,7 @@ from annotation.pipelines import get_runner
 from annotation.signals.manual_signals import (
     annotation_run_complete_signal,
     annotation_run_discarded_signal,
+    annotation_run_reset_signal,
 )
 from annotation.vep_annotation import (
     VEPVersionMismatchError,
@@ -216,6 +217,7 @@ def reset_annotation_run_for_retry(annotation_run_id):
         state (keeping its range lock). Runs on a worker because the row-clear can take a minute or two for
         a large range; the retry request just queues this ahead of the dispatch trigger. """
     annotation_run = AnnotationRun.objects.get(pk=annotation_run_id)
+    annotation_run_reset_signal.send(sender=os.path.basename(__file__), annotation_run=annotation_run)
     annotation_run.reset_for_retry()
 
 

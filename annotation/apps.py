@@ -26,12 +26,14 @@ class AnnotationConfig(AppConfig):
             annotation_run_discarded_cleanup_handler,
             annotation_run_post_delete_handler,
             annotation_run_pre_delete_handler,
+            annotation_run_reset_cleanup_handler,
         )
         from annotation.signals.citation_search import search_citations
         from annotation.signals.gene_symbol_wiki_citations import gene_symbol_wiki_post_save_handler
         from annotation.signals.manual_signals import (
             annotation_run_complete_signal,
             annotation_run_discarded_signal,
+            annotation_run_reset_signal,
             clinvar_citations_post_save_handler,
             gene_counts_classification_publish_handler,
             gene_counts_classification_withdraw_handler,
@@ -60,6 +62,7 @@ class AnnotationConfig(AppConfig):
         # #1670: every route by which an AnnotationRun's on-disk output is reclaimed
         annotation_run_complete_signal.connect(annotation_run_complete_cleanup_handler)
         annotation_run_discarded_signal.connect(annotation_run_discarded_cleanup_handler)
+        annotation_run_reset_signal.connect(annotation_run_reset_cleanup_handler)
         pre_delete.connect(annotation_run_pre_delete_handler, sender=AnnotationRun)
         post_delete.connect(annotation_run_post_delete_handler, sender=AnnotationRun)
 

@@ -174,6 +174,21 @@ instead of plain collectstatic on a dev box.
 `vg status` reports free space on each. The root filesystem on vg-test2 is small (about 30 GB) and usually above 85 %;
 large scratch output belongs under `/data`.
 
+AnnotSV (`ANNOTATION_ANNOTSV_BIN`) is built from a tag on our fork, `v<upstream version>-vg<N>` on davmlaw/AnnotSV,
+rather than an upstream release: stock AnnotSV's regulatory elements step holds every SV / regulatory element
+intersection in memory, so a range with many SVs over 10 Mb is killed for memory on every retry (#2841). The fork's
+output is byte-identical and it keeps upstream's `-version`, so swapping it in for the same upstream version needs no
+new pipeline version (`annotation/pipelines/base.py:AnnotationPipelineRunner.check_tool_version` compares it). Use the tag
+matching the installed version (`AnnotSV -version`), `v3.5.8-vg1` or `v3.5.10-vg1`:
+
+```bash
+git clone --branch v3.5.10-vg1 https://github.com/davmlaw/AnnotSV.git && cd AnnotSV
+make PREFIX=/data/annotation/AnnotSV install  # code only - the annotations bundle is separate
+```
+
+`manage.py deployment_check` warns while the installed AnnotSV is not the fork, and a manual migration step asks
+existing deployments to switch. `claude/runbooks/upstream_watch.md` says when the fork can go.
+
 Installing an AnnotSV annotations bundle (`ANNOTATION_ANNOTSV_ANNOTATIONS_DIR`) ends with sorting its regulatory
 element files, or every AnnotSV run on GRCh38 and T2T takes 1.4 GB more: `manage.py deployment_check` warns with
 the shell to run, as the files' owner on the machine that holds them (the directory is read-only to VariantGrid on

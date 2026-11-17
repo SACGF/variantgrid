@@ -130,3 +130,25 @@ class AnnotationRunRetryTestCase(TestCase):
                 reset_annotation_run_for_retry(run.pk)
 
                 self.assertFalse(os.path.exists(scratch_dir))
+
+    def test_reset_task_removes_failed_attempt_output(self):
+        """ #2841: the reset row no longer names the failed attempt's files, so the reset removes them -
+            the AnnotSV directory whole, as AnnotSV names some of its temp files by timestamp and pid. """
+        run = self._make_errored_run()
+        with tempfile.TemporaryDirectory() as dump_dir:
+            with override_settings(ANNOTATION_VCF_DUMP_DIR=dump_dir):
+                run.pipeline_type = VariantAnnotationPipelineType.ANNOTSV
+                run.vcf_dump_filename = os.path.join(dump_dir, "dump_task1.vcf")
+                run.save()
+                annotsv_dir = os.path.join(dump_dir, f"annotsv_{run.pk}")
+                os.makedirs(annotsv_dir)
+                for filename in [run.vcf_dump_filename,
+                                 os.path.join(annotsv_dir, "dump_task1.SV_RE_intersect.tmp"),
+                                 os.path.join(annotsv_dir, "20261117-110658_74377_AnnotSV_inputSVfile.bed")]:
+                    with open(filename, "w", encoding="utf-8") as f:
+                        f.write("from the failed attempt")
+
+                reset_annotation_run_for_retry(run.pk)
+
+                self.assertFalse(os.path.exists(run.vcf_dump_filename))
+                self.assertFalse(os.path.exists(annotsv_dir))

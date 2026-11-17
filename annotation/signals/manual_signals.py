@@ -14,6 +14,11 @@ annotation_run_complete_signal = django.dispatch.Signal()
 # alone - the attempt that won is still using it.
 annotation_run_discarded_signal = django.dispatch.Signal()
 
+# A failed run is being reset for a full retry (#2841): the failed attempt's output is superseded, and as
+# no attempt holds an errored run the whole run-keyed AnnotSV directory goes with it. Sent with
+# annotation_run before the reset, while the row still names the files.
+annotation_run_reset_signal = django.dispatch.Signal()
+
 clinvar_citations_post_save_handler = CachedWebResource.named_handler_factory(settings.CACHED_WEB_RESOURCE_CLINVAR_CITATIONS,
                                                                               ClinVarCitationsWebResourceTask)
 

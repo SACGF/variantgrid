@@ -50,6 +50,37 @@ def get_annotsv_command_line_version() -> str:
     return out.strip()
 
 
+# #2841: stock AnnotSV's regulatory elements step holds every SV / regulatory element intersection in memory, so a
+# range with many large SVs is killed for memory on every retry. Deployments run a fork with that step fixed
+# (lgmgeo/AnnotSV#358) until a release carries it; its -version is upstream's, so this is how to tell them apart.
+ANNOTSV_FORK_URL = "https://github.com/davmlaw/AnnotSV"
+ANNOTSV_FORK_TAGS = {"3.5.8": "v3.5.8-vg1", "3.5.10": "v3.5.10-vg1"}
+_ANNOTSV_FORK_MARKER = "proc recordRegulatedGenes"
+
+
+def is_annotsv_fork_installed() -> bool:
+    """ Whether ANNOTATION_ANNOTSV_BIN runs the fork's regulatory elements step, found where the AnnotSV launcher
+        looks for its Tcl sources (<install>/share/tcl<version>/AnnotSV, else share/tcl/AnnotSV). """
+    install_dir = os.path.dirname(os.path.dirname(os.path.realpath(settings.ANNOTATION_ANNOTSV_BIN)))
+    for tcl_dir in sorted(glob.glob(os.path.join(install_dir, "share", "tcl*", "AnnotSV"))):
+        regulatory_elements_tcl = os.path.join(tcl_dir, "AnnotSV-regulatoryelements.tcl")
+        if os.path.exists(regulatory_elements_tcl):
+            with open(regulatory_elements_tcl, encoding="utf-8") as f:
+                return _ANNOTSV_FORK_MARKER in f.read()
+    return False
+
+
+def get_annotsv_fork_install_instructions() -> str:
+    version = get_annotsv_command_line_version()
+    tag = ANNOTSV_FORK_TAGS.get(version, f"the v<version>-vg<N> tag matching AnnotSV {version}")
+    install_dir = os.path.dirname(os.path.dirname(settings.ANNOTATION_ANNOTSV_BIN))
+    return (f"Install AnnotSV from {ANNOTSV_FORK_URL} ({tag}) as the owner of {install_dir}:\n"
+            f"git clone --branch {tag} {ANNOTSV_FORK_URL}.git AnnotSV_src && cd AnnotSV_src\n"
+            f"make PREFIX={shlex.quote(install_dir)} install\n"
+            "Same -version and output as upstream, so no new pipeline version is needed. "
+            "https://github.com/SACGF/variantgrid/wiki/Install-AnnotSV")
+
+
 def _regulatory_elements_glob() -> str:
     return os.path.join(settings.ANNOTATION_ANNOTSV_ANNOTATIONS_DIR, "Annotations_Human", "FtIncludedInSV",
                         "RegulatoryElements", "*", "*.sorted.bed")
