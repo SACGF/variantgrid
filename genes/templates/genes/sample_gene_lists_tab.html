@@ -52,7 +52,7 @@
 {% endif %}
 
 
-<div id="sample-gene-lists" class="hidden">
+<div id="sample-gene-list-items" class="hidden">
     {% for sample_gene_list in sample.samplegenelist_set.all %}
     <div class="sample-gene-list-container" sample-gene-list-id="{{ sample_gene_list.pk }}">
         <a data-toggle="collapse" href="#sample-gene-list-{{ sample_gene_list.pk }}" class="hover-link show-sample-gene-list-toggle">
