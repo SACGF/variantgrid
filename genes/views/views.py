@@ -479,13 +479,15 @@ def view_gene_list(request, gene_list_id):
     # Unmatched symbols are shown by the name entered, so they can be removed by editing the text
     symbol_or_name = gene_list.genelistgenesymbol_set.values_list("gene_symbol_id", "original_name")
     gene_symbols = sorted({gene_symbol or original_name for gene_symbol, original_name in symbol_or_name})
-    provenance = gene_list.get_panel_app_provenance()
-    if provenance and provenance.has_newer_version:
-        msg = (f"{provenance.panel_app_panel} is now v{provenance.panel_app_panel.current_version} - this list was "
-               f"created from v{provenance.version}")
+    source = gene_list.get_source()
+    if source and (panel_app_version := source.panel_app_version) and panel_app_version.has_newer_version:
+        panel_app_panel = panel_app_version.panel_app_panel
+        msg = (f"{panel_app_panel} is now v{panel_app_panel.current_version} - this list was "
+               f"created from v{panel_app_version.version}")
         messages.add_message(request, messages.INFO, msg)
     context = {'gene_list': gene_list,
-               'provenance': provenance,
+               'source': source,
+               'modifications': source.modifications if source else gene_list.get_modifications(),
                'gene_list_form': gl_form,
                'gene_symbols_text': "\n".join(gene_symbols),
                'num_gene_symbols': len(gene_symbols),
@@ -499,7 +501,8 @@ def set_gene_list_genes_from_text(request, gene_list_id):
     gene_list.check_can_write(request.user)
     modification_info = f"Added manually by {request.user} on {timezone.now()}"
     added, removed = GeneSymbolMatcher().set_gene_list_gene_symbols_from_text(gene_list, request.POST["gene_text"],
-                                                                              modification_info=modification_info)
+                                                                              modification_info=modification_info,
+                                                                              user=request.user)
     if added or removed:
         messages.add_message(request, messages.INFO, f"Added {len(added)}, removed {len(removed)} genes")
     else:
@@ -519,15 +522,17 @@ def copy_gene_list(request, gene_list_id):
 def create_gene_list_from_panel_app_latest(request, gene_list_id):
     """ A new list from the latest version of the panel gene_list was created from - gene_list is unchanged """
     gene_list = GeneList.get_for_user(request.user, gene_list_id)
-    if not (provenance := gene_list.get_panel_app_provenance()):
+    source = gene_list.get_source()
+    if not (source and (panel_app_version := source.panel_app_version)):
         raise Http404(f"{gene_list} was not created from PanelApp")
+    panel_app_panel = panel_app_version.panel_app_panel
     try:
-        new_gene_list = create_gene_list_from_panel_app(provenance.panel_app_panel, provenance.confidence,
+        new_gene_list = create_gene_list_from_panel_app(panel_app_panel, panel_app_version.panel_app_confidence,
                                                         request.user)
     except (NotFound, RequestException) as e:
         messages.add_message(request, messages.ERROR, f"Could not retrieve panel from PanelApp: {e}")
         return redirect(gene_list)
-    messages.add_message(request, messages.INFO, f"Created from latest version of {provenance.panel_app_panel}")
+    messages.add_message(request, messages.INFO, f"Created from latest version of {panel_app_panel}")
     return redirect(new_gene_list)
 
 
@@ -594,7 +599,7 @@ def sample_gene_lists_tab(request, sample_id):
             source_gene_list = GeneList.get_for_user(request.user, apply_gene_list_form.cleaned_data["gene_list"].pk)
             gene_list = source_gene_list.copy_for_user(request.user, name=source_gene_list.name, category=category)
         if gene_list:
-            SampleGeneList.objects.create(sample=sample, gene_list=gene_list, user=request.user)
+            SampleGeneList.objects.create(sample=sample, gene_list=gene_list)
 
     sample_gene_list_cards = get_sample_gene_list_cards(sample)
     sample_gene_lists_data = []

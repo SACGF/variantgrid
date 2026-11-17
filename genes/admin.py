@@ -72,6 +72,11 @@ class PanelAppPanelLocalCacheAdmin(ModelAdminBasics):
     pass
 
 
+@admin.register(models.PanelAppPanelLocalCacheGeneList)
+class PanelAppPanelLocalCacheGeneListAdmin(ModelAdminBasics):
+    pass
+
+
 @admin.register(models.SampleGeneList)
 class SampleGeneListAdmin(ModelAdminBasics):
     pass

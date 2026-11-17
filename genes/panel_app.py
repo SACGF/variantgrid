@@ -279,15 +279,13 @@ def get_panel_app_local_cache(panel_app_panel: PanelAppPanel) -> PanelAppPanelLo
 def create_gene_list_from_panel_app(panel_app_panel: PanelAppPanel, panel_app_confidence: PanelAppConfidence,
                                     user) -> GeneList:
     """ A user-owned, editable copy of the panel's latest version - the cache's own list is public and shared
-        by every Gene List node, so is never handed out to edit. The copy records the panel version and
-        confidence it came from (@see GeneList.get_panel_app_provenance) """
+        by every Gene List node, so is never handed out to edit. The cache list is the copy's source_gene_list,
+        so it stays pinned to that panel version (@see GeneList.get_source) """
     local_cache = get_panel_app_local_cache(panel_app_panel)
     panel_gene_list = local_cache.get_gene_list(panel_app_confidence)
     confidence = PanelAppConfidence(panel_app_confidence)
     name = f"{panel_app_panel.name} v{local_cache.version} ({confidence.label} confidence)"
     gene_list = panel_gene_list.copy_for_user(user, name=name)
     gene_list.url = panel_app_panel.web_url
-    gene_list.panel_app_panel_local_cache = local_cache
-    gene_list.panel_app_confidence = confidence
     gene_list.save()
     return gene_list

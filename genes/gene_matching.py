@@ -99,10 +99,12 @@ class GeneSymbolMatcher:
 
         return gene_list_gene_symbols
 
-    def set_gene_list_gene_symbols_from_text(self, gene_list, gene_text, modification_info=None) -> tuple[list[str], list[str]]:
+    def set_gene_list_gene_symbols_from_text(self, gene_list, gene_text, modification_info=None,
+                                             user=None) -> tuple[list[str], list[str]]:
         """ Makes gene_list contain the names in gene_text, leaving rows that are still named untouched.
             A row is kept if the text has its original name or its resolved symbol (an alias row shows as
-            its symbol in the text box). Returns (added_names, removed_names) """
+            its symbol in the text box). The edit is recorded in the list's history as made by user.
+            Returns (added_names, removed_names) """
         tokens = tokenize_gene_symbols(gene_text)
         names = tokens.valid
 
@@ -131,6 +133,7 @@ class GeneSymbolMatcher:
                 gene_list.set_modified_to_now()
             for ambiguous_alias in self.ambiguous_alias_warnings(kept_unmatched):
                 append_gene_list_warning(gene_list, ambiguous_alias)
+            gene_list.log_modification(user, added, removed.values())
         return added, sorted(removed.values())
 
     def ambiguous_alias_warnings(self, names: Iterable[str]) -> list[str]:

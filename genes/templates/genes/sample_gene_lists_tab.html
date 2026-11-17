@@ -98,8 +98,8 @@
                 </div>
                 {% endif %}
 
-                {% if card.provenance %}
-                    {% include "genes/gene_list_provenance.html" with provenance=card.provenance gene_list_id=sample_gene_list.gene_list.pk %}
+                {% if card.source %}
+                    {% include "genes/gene_list_source.html" with source=card.source gene_list_id=sample_gene_list.gene_list.pk %}
                 {% endif %}
 
                 <div class="sample-gene-list-analysis-templates">

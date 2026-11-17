@@ -165,7 +165,8 @@ def apply_pathology_test_modifications(request, pathology_test_version, gene_add
     handle_modification_requests(request.POST, pathology_test_version, "del", gene_deletion_requests, gene_symbol_deletions)
 
     if any([gene_symbol_additions, gene_symbol_deletions]):
-        pathology_test_version.gene_list.add_and_remove_gene_symbols(gene_symbol_additions, gene_symbol_deletions, gene_additions_modification_info=gami)
+        pathology_test_version.gene_list.add_and_remove_gene_symbols(gene_symbol_additions, gene_symbol_deletions,
+                                                                     gene_additions_modification_info=gami, user=request.user)
         modifications = []
         if gene_symbol_additions:
             num_genes = len(gene_symbol_additions)

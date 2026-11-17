@@ -6,6 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from genes.enums import PanelAppConfidence
+from genes.gene_matching import GeneSymbolMatcher
 from genes.models import (
     ActiveSampleGeneList,
     GeneCoverageCanonicalTranscript,
@@ -13,6 +14,7 @@ from genes.models import (
     GeneList,
     GeneListCategory,
     GeneListGeneSymbol,
+    GeneListSource,
     GeneSymbol,
     PanelAppPanel,
     PanelAppPanelLocalCache,
@@ -27,8 +29,8 @@ from snpdb.models import VCF, Sample
 from snpdb.models.models_genome import GenomeBuild
 
 
-def _create_gene_list(user, symbols, **kwargs) -> GeneList:
-    gene_list = GeneList.objects.create(name="goi", user=user, import_status=ImportStatus.SUCCESS, **kwargs)
+def _create_gene_list(user, symbols, name="goi") -> GeneList:
+    gene_list = GeneList.objects.create(name=name, user=user, import_status=ImportStatus.SUCCESS)
     GeneListGeneSymbol.objects.bulk_create([GeneListGeneSymbol(gene_list=gene_list, original_name=symbol,
                                                                gene_symbol_id=symbol) for symbol in symbols])
     return gene_list
@@ -41,7 +43,7 @@ class GenesOfInterestTest(TestCase):
     def setUpTestData(cls):
         cls.user = User.objects.create_user(username="goi_user")
         cls.genome_build = GenomeBuild.grch37()
-        for symbol in cls.SYMBOLS + ["GOID"]:
+        for symbol in [*cls.SYMBOLS, "GOID"]:
             GeneSymbol.objects.get_or_create(symbol=symbol)
 
         vcf = VCF.objects.create(name="goi_vcf", genotype_samples=1, genome_build=cls.genome_build,
@@ -64,49 +66,71 @@ class GenesOfInterestTest(TestCase):
         return ActiveSampleGeneList.objects.get(sample=self.sample).sample_gene_list
 
     def test_new_sample_gene_list_becomes_active_unless_pipeline_replaces_user(self):
-        pipeline_1 = SampleGeneList.objects.create(sample=self.sample, gene_list=_create_gene_list(self.user, ["GOIA"]))
-        active_pk = ActiveSampleGeneList.objects.get(sample=self.sample).pk
-        self.assertEqual(pipeline_1, self._active_sample_gene_list())
+        def create_sample_gene_list(name, symbol):
+            gene_list = _create_gene_list(self.user, [symbol], name=name)
+            return SampleGeneList.objects.create(sample=self.sample, gene_list=gene_list)
 
-        pipeline_2 = SampleGeneList.objects.create(sample=self.sample, gene_list=_create_gene_list(self.user, ["GOIB"]))
-        self.assertEqual(pipeline_2, self._active_sample_gene_list())
+        # A pipeline list has a seqauto QCGeneList behind it
+        from_pipeline = property(lambda sample_gene_list: sample_gene_list.gene_list.name == "pipeline")
+        with patch.object(SampleGeneList, "from_pipeline", from_pipeline):
+            pipeline_1 = create_sample_gene_list("pipeline", "GOIA")
+            active_pk = ActiveSampleGeneList.objects.get(sample=self.sample).pk
+            self.assertEqual(pipeline_1, self._active_sample_gene_list())
 
-        user_applied = SampleGeneList.objects.create(sample=self.sample, user=self.user,
-                                                     gene_list=_create_gene_list(self.user, ["GOIC"]))
-        self.assertEqual(user_applied, self._active_sample_gene_list())
+            pipeline_2 = create_sample_gene_list("pipeline", "GOIB")
+            self.assertEqual(pipeline_2, self._active_sample_gene_list())
 
-        SampleGeneList.objects.create(sample=self.sample, gene_list=_create_gene_list(self.user, ["GOID"]))
-        self.assertEqual(user_applied, self._active_sample_gene_list())
+            user_applied = create_sample_gene_list("user", "GOIC")
+            self.assertEqual(user_applied, self._active_sample_gene_list())
+
+            create_sample_gene_list("pipeline", "GOID")
+            self.assertEqual(user_applied, self._active_sample_gene_list())
         # Switched in place, so the 'created' signal that auto-runs templates only fired for the first
         self.assertEqual(active_pk, ActiveSampleGeneList.objects.get(sample=self.sample).pk)
 
     @patch("genes.panel_app.get_panel_app_local_cache")
-    def test_panel_app_provenance(self, mock_get_local_cache):
+    def test_gene_list_from_panel_app_source_and_edits(self, mock_get_local_cache):
         mock_get_local_cache.return_value = self.local_cache
         gene_list = create_gene_list_from_panel_app(self.panel, PanelAppConfidence.INTERMEDIATE, self.user)
         self.assertEqual({"GOIA", "GOIB"}, set(gene_list.get_gene_names()))
+        self.assertEqual("PanelApp: GOI Panel v1.0 (Intermediate)", gene_list.get_source().label)
+        self.assertEqual([], gene_list.get_modifications())
 
-        provenance = gene_list.get_panel_app_provenance()
-        self.assertFalse(provenance.is_edited)
-        self.assertTrue(provenance.label.startswith("PanelApp: GOI Panel v1.0 (Intermediate), created by goi_user"))
+        gene_list.add_and_remove_gene_symbols(["GOID"], ["GOIA"], user=self.user)
+        GeneSymbolMatcher().set_gene_list_gene_symbols_from_text(gene_list, "GOIB GOIC GOID", user=self.user)
+        gene_list.add_and_remove_gene_symbols([], ["GOIC"], user=self.user)  # added then removed: no net change
 
-        gene_list.add_and_remove_gene_symbols(["GOID"], ["GOIA"], {"GOID": "Added by goi_user"})
+        # A copy came from the same panel, with the same edits
         copy = gene_list.copy_for_user(self.user)
-        provenance = copy.get_panel_app_provenance()
-        self.assertEqual("PanelApp: GOI Panel v1.0 (Intermediate) + manual changes: 1 added, 1 removed",
-                         provenance.label)
-        self.assertEqual([("GOID", "Added by goi_user")],
-                         [(a.name, a.modification_info) for a in provenance.added])
-        self.assertEqual(["GOIA"], provenance.removed)
+        source = copy.get_source()
+        self.assertEqual("PanelApp: GOI Panel v1.0 (Intermediate) + GOID, - GOIA", source.label)
+        self.assertEqual([(self.user, ["GOID"], ["GOIA"]), (self.user, ["GOIC"], []), (self.user, [], ["GOIC"])],
+                         [(m.user, m.added, m.removed) for m in source.modifications])
 
-        self.assertFalse(provenance.has_newer_version)
+        # Many changes are counted, not named
+        symbols = [f"GOIX{i}" for i in range(GeneListSource.MAX_NAMED_CHANGES)]
+        for symbol in symbols:
+            GeneSymbol.objects.get_or_create(symbol=symbol)
+        copy.add_and_remove_gene_symbols(symbols, [], user=self.user)
+        self.assertEqual(f"PanelApp: GOI Panel v1.0 (Intermediate) + {len(symbols) + 1} added, - 1 removed",
+                         copy.get_source().label)
+        # ...and editing the copy left the list it was copied from alone
+        self.assertEqual(3, len(gene_list.get_modifications()))
+
+        self.assertFalse(source.panel_app_version.has_newer_version)
         PanelAppPanel.objects.filter(pk=self.panel.pk).update(current_version="1.1")
-        self.assertTrue(GeneList.objects.get(pk=copy.pk).get_panel_app_provenance().has_newer_version)
-
         self.client.force_login(self.user)
-        response = self.client.get(reverse("view_gene_list", kwargs={"gene_list_id": copy.pk}))
-        self.assertContains(response, "PanelApp v1.0 (pinned)")
+        response = self.client.get(reverse("view_gene_list", kwargs={"gene_list_id": gene_list.pk}))
+        self.assertContains(response, "PanelApp: GOI Panel v1.0 (Intermediate) + GOID, - GOIA")
         self.assertContains(response, "Create from latest version")
+
+    def test_panel_app_cache_gene_list_reused(self):
+        """ One shared list per panel version and confidence - including one made before they were linked """
+        unlinked = self.local_cache.get_gene_list(PanelAppConfidence.HIGH)
+        unlinked.panel_app_version.delete()
+        self.assertEqual(unlinked, self.local_cache.get_gene_list(PanelAppConfidence.HIGH))
+        self.assertEqual(unlinked, self.local_cache.get_gene_list(PanelAppConfidence.HIGH))
+        self.assertNotEqual(unlinked, self.local_cache.get_gene_list(PanelAppConfidence.LOW))
 
     def test_coverage_splits_below_threshold_from_no_data(self):
         gcc = GeneCoverageCollection.objects.create(path="/tmp/goi.cov.tsv", data_state=DataState.COMPLETE,
@@ -137,10 +161,10 @@ class GenesOfInterestTest(TestCase):
         response = self.client.post(url, {"action": "apply", "apply-gene_list": source.pk})
         self.assertEqual(200, response.status_code)
 
-        sample_gene_list = self._active_sample_gene_list()
-        self.assertEqual(self.user, sample_gene_list.user)
-        applied = sample_gene_list.gene_list
+        applied = self._active_sample_gene_list().gene_list
         self.assertNotEqual(source, applied)  # a copy, so editing the source doesn't change the GOI
         self.assertEqual(("goi", GeneListCategory.SAMPLE_GENE_LIST), (applied.name, applied.category.name))
         self.assertEqual({"GOIA", "GOIB"}, set(applied.get_gene_names()))
+        self.assertEqual(source, applied.source_gene_list)
         self.assertContains(response, "Applied by goi_user")
+        self.assertContains(response, "gene list &#x27;goi&#x27;")

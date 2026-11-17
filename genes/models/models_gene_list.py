@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Union
 
+from auditlog.models import LogEntry
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
 from django.db import models
@@ -18,7 +19,6 @@ from django.utils.timezone import localtime
 from guardian.shortcuts import get_objects_for_user
 from model_utils.models import TimeStampedModel
 
-from genes.enums import PanelAppConfidence
 from genes.models.models_gene import Gene, GeneSymbol, GeneSymbolAlias
 from genes.models.models_gene_annotation_release import GeneAnnotationRelease, ReleaseGeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
@@ -105,11 +105,10 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
     error_message = models.TextField(null=True, blank=True)
     locked = models.BooleanField(default=False)
     url = models.TextField(null=True, blank=True)
-    # The PanelApp panel version and minimum confidence a list was created from (#2846). The PanelApp cache's own
-    # lists (category PANEL_APP_CACHE) leave these blank: they follow the panel's latest version
-    panel_app_panel_local_cache = models.ForeignKey('genes.PanelAppPanelLocalCache', null=True, blank=True,
-                                                    on_delete=SET_NULL)
-    panel_app_confidence = models.CharField(max_length=1, choices=PanelAppConfidence.choices, null=True, blank=True)
+    # The list this one's genes were copied from - for a list created from PanelApp, the PanelApp cache's list
+    # for that panel version. Edits since the copy are in the history (@see get_source) #2846
+    source_gene_list = models.ForeignKey('self', null=True, blank=True, on_delete=SET_NULL,
+                                         related_name="copied_gene_lists")
 
     @staticmethod
     def get_gene_ids_for_gene_lists(release: GeneAnnotationRelease, gene_lists: list['GeneList']):
@@ -140,6 +139,14 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
             glgs.gene_list = gene_list
         GeneListGeneSymbol.objects.bulk_create(gene_list_gene_symbols)
 
+    def _copy_history_to(self, gene_list: 'GeneList'):
+        log_entries = list(self._modification_log_entries())
+        for log_entry in log_entries:
+            log_entry.pk = None
+            log_entry.object_pk = str(gene_list.pk)
+            log_entry.object_id = gene_list.pk
+        LogEntry.objects.bulk_create(log_entries)
+
     def clone(self):
         """ Needed to clone analysis node GeneListNode. Leaves self as the original """
         copy = GeneList.objects.get(pk=self.pk)
@@ -147,41 +154,48 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
         copy._state.adding = True
         copy.save()
         self._copy_gene_symbols_to(copy)
+        self._copy_history_to(copy)
         return copy
 
     def copy_for_user(self, user, name: Optional[str] = None, category: Optional[GeneListCategory] = None) -> 'GeneList':
         """ An unlocked copy owned by user - unlike clone(), which keeps the owner, lock and category, and is
-            used to snapshot a list for an analysis node or pathology test. Keeps where the list came from """
+            used to snapshot a list for an analysis node or pathology test.
+            The copy's source is where this list's genes came from: this list's own source along with the edits
+            made to it since, otherwise this list """
         copy = GeneList.objects.create(name=name or f"Copy of {self.name}", user=user, category=category,
                                        import_status=self.import_status,
-                                       panel_app_panel_local_cache=self.panel_app_panel_local_cache,
-                                       panel_app_confidence=self.panel_app_confidence)
+                                       source_gene_list_id=self.source_gene_list_id or self.pk)
         self._copy_gene_symbols_to(copy)
+        if self.source_gene_list_id:
+            self._copy_history_to(copy)
         return copy
 
-    def get_panel_app_provenance(self) -> Optional['PanelAppProvenance']:
-        """ Where a list created from PanelApp came from and how it has been edited since. Edits are derived
-            by comparing with the PanelApp cache's list for the same panel version and confidence """
-        if not self.panel_app_panel_local_cache_id:
+    def _modification_log_entries(self):
+        """ LogEntry is shared with everything auditlog tracks, so only the entries log_modification wrote """
+        return LogEntry.objects.get_for_object(self).filter(additional_data__has_key="added").order_by("timestamp", "pk")
+
+    def log_modification(self, user: Optional[User], added, removed):
+        """ Record genes added to / removed from the list after it was created. Every edit goes through
+            add_and_remove_gene_symbols or genes/gene_matching.py:GeneSymbolMatcher.set_gene_list_gene_symbols_from_text,
+            which call this - so a list with no modifications is as it was created.
+            GeneListGeneSymbol isn't registered with auditlog: bulk_create fires no signals for it to see, and
+            an edit is one entry rather than one per gene """
+        if added or removed:
+            LogEntry.objects.log_create(self, force_log=True, action=LogEntry.Action.UPDATE, actor=user,
+                                        additional_data={"added": sorted(added), "removed": sorted(removed)})
+
+    def get_modifications(self) -> list['GeneListModification']:
+        """ Edits since the list was created, oldest first """
+        return [GeneListModification(user=log_entry.actor, date=log_entry.timestamp,
+                                     added=log_entry.additional_data["added"],
+                                     removed=log_entry.additional_data["removed"])
+                for log_entry in self._modification_log_entries().select_related("actor")]
+
+    def get_source(self) -> Optional['GeneListSource']:
+        """ Where a copied list's genes came from, and how it has been edited since """
+        if not self.source_gene_list_id:
             return None
-        local_cache = self.panel_app_panel_local_cache
-        panel_gene_list = local_cache.get_gene_list(self.panel_app_confidence)
-        panel_names = {gene_symbol or original_name for gene_symbol, original_name in
-                       panel_gene_list.genelistgenesymbol_set.values_list("gene_symbol_id", "original_name")}
-        names = set()
-        added = []
-        for gene_symbol, original_name, modification_info in \
-                self.genelistgenesymbol_set.values_list("gene_symbol_id", "original_name", "modification_info"):
-            name = gene_symbol or original_name
-            names.add(name)
-            if name not in panel_names:
-                added.append(GeneListAddedGene(name=name, modification_info=modification_info))
-        return PanelAppProvenance(local_cache=local_cache,
-                                  confidence=PanelAppConfidence(self.panel_app_confidence),
-                                  user=self.user,
-                                  created=self.created,
-                                  added=sorted(added, key=lambda a: a.name),
-                                  removed=sorted(panel_names - names))
+        return GeneListSource(gene_list=self.source_gene_list, modifications=self.get_modifications())
 
     def save(self, *args, **kwargs):
         assign_permissions = kwargs.pop("assign_permissions", False)
@@ -226,7 +240,7 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
         return self.genelistgenesymbol_set.annotate(matched_genes=string_agg).filter(matched_genes__isnull=True)
 
     def add_and_remove_gene_symbols(self, gene_symbol_additions, gene_symbol_deletions,
-                                    gene_additions_modification_info=None):
+                                    gene_additions_modification_info=None, user: Optional[User] = None):
         """ Either works for all, or fails and makes no modification
             returns (num_added, num_deleted) """
         if gene_additions_modification_info is None:
@@ -236,25 +250,27 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
             msg = "Can't modify a locked GeneList!"
             raise PermissionDenied(msg)
 
-        num_added = 0
-
+        added = []
         for gene_symbol in gene_symbol_additions:
             modification_info = gene_additions_modification_info.get(gene_symbol)
             defaults = {"original_name": gene_symbol, "modification_info": modification_info}
             _, created = GeneListGeneSymbol.objects.get_or_create(gene_list=self, gene_symbol_id=gene_symbol,
                                                                   defaults=defaults)
             if created:
-                num_added += 1
+                added.append(gene_symbol)
 
         # Match original name and symbol so we can delete non-matched
         name_or_symbol_match = Q(original_name__in=gene_symbol_deletions) | Q(gene_symbol__in=gene_symbol_deletions)
         qs = self.genelistgenesymbol_set.filter(name_or_symbol_match)
-        num_deleted, _ = qs.delete()
+        removed = [original_name or gene_symbol for original_name, gene_symbol
+                   in qs.values_list("original_name", "gene_symbol_id")]
+        qs.delete()
 
-        if num_added or num_deleted:
+        if added or removed:
             self.set_modified_to_now()
+            self.log_modification(user, added, removed)
 
-        return num_added, num_deleted
+        return len(added), len(removed)
 
     @staticmethod
     def get_for_user(user, gene_list_id, success_only=True):
@@ -310,46 +326,62 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
 
 
 @dataclass(frozen=True)
-class GeneListAddedGene:
-    name: str
-    modification_info: Optional[str]  # who added it and when
+class GeneListModification:
+    """ One edit of a gene list @see GeneList.log_modification """
+    user: Optional[User]
+    date: datetime
+    added: list[str]
+    removed: list[str]
 
 
 @dataclass(frozen=True)
-class PanelAppProvenance:
-    """ @see GeneList.get_panel_app_provenance """
-    local_cache: models.Model  # PanelAppPanelLocalCache (models_panel_app imports this module)
-    confidence: PanelAppConfidence
-    user: User
-    created: datetime
-    added: list[GeneListAddedGene]
-    removed: list[str]
+class GeneListSource:
+    """ @see GeneList.get_source """
+    MAX_NAMED_CHANGES = 5
+
+    gene_list: GeneList
+    modifications: list[GeneListModification]
 
     @property
-    def panel_app_panel(self):
-        return self.local_cache.panel_app_panel
+    def panel_app_version(self):
+        """ The PanelApp panel version and confidence a PanelApp cache list holds, else None
+            (PanelAppPanelLocalCacheGeneList - models_panel_app imports this module) """
+        return getattr(self.gene_list, "panel_app_version", None)
 
     @property
-    def version(self) -> str:
-        return self.local_cache.version
+    def description(self) -> str:
+        if panel_app_version := self.panel_app_version:
+            return str(panel_app_version)
+        return f"gene list '{self.gene_list.name}'"
 
     @property
-    def is_edited(self) -> bool:
-        return bool(self.added or self.removed)
-
-    @property
-    def has_newer_version(self) -> bool:
-        return self.panel_app_panel.current_version != self.version
-
-    @property
-    def source(self) -> str:
-        return f"PanelApp: {self.panel_app_panel} v{self.version} ({self.confidence.label})"
+    def net_changes(self) -> tuple[list[str], list[str]]:
+        """ (added, removed) against the source - a gene added then removed again is in neither """
+        added = set()
+        removed = set()
+        for modification in self.modifications:
+            for name in modification.added:
+                if name in removed:
+                    removed.discard(name)
+                else:
+                    added.add(name)
+            for name in modification.removed:
+                if name in added:
+                    added.discard(name)
+                else:
+                    removed.add(name)
+        return sorted(added), sorted(removed)
 
     @property
     def label(self) -> str:
-        if self.is_edited:
-            return f"{self.source} + manual changes: {len(self.added)} added, {len(self.removed)} removed"
-        return f"{self.source}, created by {self.user} {localtime(self.created).date()}"
+        """ The source first, so the common "PanelApp panel plus a gene" reads as that """
+        added, removed = self.net_changes
+        if len(added) + len(removed) <= self.MAX_NAMED_CHANGES:
+            changes = [f"{sign} {', '.join(names)}" for sign, names in (("+", added), ("-", removed)) if names]
+        else:
+            changes = [f"{sign} {len(names)} {verb}" for sign, names, verb
+                       in (("+", added, "added"), ("-", removed, "removed")) if names]
+        return " ".join([self.description, ", ".join(changes)]).strip()
 
     def __str__(self):
         return self.label
@@ -419,8 +451,6 @@ class SampleGeneList(TimeStampedModel):
     sample = models.ForeignKey(Sample, on_delete=CASCADE)
     gene_list = models.ForeignKey(GeneList, on_delete=CASCADE)
     visible = models.BooleanField(default=True, blank=False)
-    # Who created or applied it on the sample page - null when the pipeline submitted it (QCGeneList)
-    user = models.ForeignKey(User, null=True, blank=True, on_delete=SET_NULL)
 
     class Meta:
         unique_together = ('sample', 'gene_list')
@@ -429,6 +459,12 @@ class SampleGeneList(TimeStampedModel):
     @staticmethod
     def filter_for_user(user):
         return SampleGeneList.objects.filter(sample__in=Sample.filter_for_user(user))
+
+    @property
+    def from_pipeline(self) -> bool:
+        """ Submitted through the API with the sequencing run (a QCGeneList), not created or applied by a user -
+            who is gene_list.user """
+        return GeneList.objects.filter(pk=self.gene_list_id, customtextgenelist__qcgenelist__isnull=False).exists()
 
     def __str__(self):
         s = f"{self.sample}: {localtime(self.modified)}"
@@ -447,7 +483,7 @@ def sample_gene_list_created(sender, instance, created, **kwargs):  # pylint: di
         active = ActiveSampleGeneList.objects.filter(sample=sample).select_related("sample_gene_list").first()
         if active is None:
             ActiveSampleGeneList.objects.get_or_create(sample=sample, defaults={"sample_gene_list": instance})
-        elif instance.user_id or not active.sample_gene_list.user_id:
+        elif not instance.from_pipeline or active.sample_gene_list.from_pipeline:
             active.sample_gene_list = instance
             active.save()
 
