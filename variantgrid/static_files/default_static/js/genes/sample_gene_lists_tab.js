@@ -23,7 +23,9 @@ function populateSampleGeneListFromJSON(data) {
 
     const myActiveIcon = $(".active-sample-gene-list", details);
     if (data.active) {
-        $(".active-sample-gene-list").hide();  // hide all others
+        // Only one list is active - the others lose the tick and can be made active again
+        $(".active-sample-gene-list").hide();
+        $("button.make-active").show();
         myActiveIcon.show();
         $("button.make-active", details).hide();
     } else {

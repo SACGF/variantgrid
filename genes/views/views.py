@@ -582,7 +582,7 @@ def sample_gene_lists_tab(request, sample_id):
     has_write_permission = sample.can_write(request.user)
 
     # A user's GOI is a copy in the hidden sample category, so later edits to the list it came from don't change it
-    action = request.POST.get("action", "custom_text")
+    action = request.POST.get("action")
     create_gene_list_form = NamedCustomGeneListForm(request.POST if action == "custom_text" else None,
                                                     username=request.user,
                                                     initial={"name": "Sample Gene List"})

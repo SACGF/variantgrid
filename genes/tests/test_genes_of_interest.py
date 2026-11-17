@@ -174,6 +174,9 @@ class GenesOfInterestTest(TestCase):
         source = _create_gene_list(self.user, ["GOIA", "GOIB"])
         self.client.force_login(self.user)
         url = reverse("sample_gene_lists_tab", kwargs={"sample_id": self.sample.pk})
+        response = self.client.get(url)
+        self.assertFalse(response.context["create_gene_list_form"].is_bound)  # no "field is required" on opening
+
         response = self.client.post(url, {"action": "apply", "apply-gene_list": source.pk})
         self.assertEqual(200, response.status_code)
 
