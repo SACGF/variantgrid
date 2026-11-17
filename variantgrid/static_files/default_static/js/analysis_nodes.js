@@ -46,9 +46,12 @@ function getNodeOrientation() {
 let jsPlumbInstance = null;
 
 // Node graph zoom (#2784) - #analysis is scaled as a whole so saved node positions keep their spacing,
-// and jsPlumb is told so drags and connectors map back to unscaled coordinates
+// and jsPlumb is told so drags and connectors map back to unscaled coordinates.
+// The user's 100% is drawn at NODE_ZOOM_BASE_SCALE, so the default nodes and text are larger than the raw CSS
+const NODE_ZOOM_BASE_SCALE = 1.1;
+
 function getNodeZoom() {
-	return ANALYSIS_NODE_ZOOM_PERCENT / 100;
+	return NODE_ZOOM_BASE_SCALE * ANALYSIS_NODE_ZOOM_PERCENT / 100;
 }
 
 function setNodeZoomPercent(percent) {
