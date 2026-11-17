@@ -1,0 +1,22 @@
+{# Where a gene list created from PanelApp came from - include with provenance=gene_list.get_panel_app_provenance gene_list_id=gene_list.pk #}
+<div class="gene-list-provenance">
+    <span class="badge badge-info" title="Pinned to the PanelApp version it was created from">PanelApp v{{ provenance.version }} (pinned)</span>
+    {{ provenance.label }}
+    {% if provenance.is_edited %}
+        <a class="hover-link" data-toggle="collapse" href="#gene-list-provenance-changes-{{ gene_list_id }}">show changes</a>
+        <div id="gene-list-provenance-changes-{{ gene_list_id }}" class="collapse">
+            {% if provenance.added %}
+                <div>Added:</div>
+                <ul class="text-success">
+                {% for added in provenance.added %}
+                    <li>{{ added.name }}{% if added.modification_info %} <span class="text-muted">{{ added.modification_info }}</span>{% endif %}</li>
+                {% endfor %}
+                </ul>
+            {% endif %}
+            {% if provenance.removed %}
+                <div>Removed:</div>
+                <div class="text-danger">{{ provenance.removed|join:", " }}</div>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>

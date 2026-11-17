@@ -73,6 +73,9 @@
                         {% labelled label="Modified" %}{{ gene_list.modified|localtime }}{% endlabelled %}
                         {% crispy gene_list_form form_helper.horizontal %}
                         {% labelled label="Import Status" %}{% import_status_icon gene_list.import_status %}{% endlabelled %}
+                        {% if provenance %}
+                            {% labelled label="Source" %}{% include "genes/gene_list_provenance.html" with provenance=provenance gene_list_id=gene_list.pk %}{% endlabelled %}
+                        {% endif %}
                     </div>
                     {% if has_write_permission %}
                     <div class="card-footer">
@@ -86,6 +89,12 @@
                     You can view but not modify this data.
                 {% endif %}
             </form>
+            {% if provenance.has_newer_version %}
+            <form method="post" action="{% url 'create_gene_list_from_panel_app_latest' gene_list.pk %}" class="mt-2">
+                {% csrf_token %}
+                <button class="btn btn-outline-primary" title="Makes a new list from v{{ provenance.panel_app_panel.current_version }} - this one is left unchanged, and manual changes are not carried over"><i class="fas fa-sync"></i> Create from latest version</button>
+            </form>
+            {% endif %}
             {% if gene_list.import_status == 'S' %}
             <form method="post" action="{% url 'copy_gene_list' gene_list.pk %}" class="mt-2">
                 {% csrf_token %}

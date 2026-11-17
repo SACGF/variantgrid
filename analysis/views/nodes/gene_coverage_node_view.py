@@ -1,12 +1,8 @@
-from django.conf import settings
-
 from analysis.views.nodes.node_view import NodeView
 
 
 class GeneCoverageNodeView(NodeView):
-
-    def _get_minimum_coverage_required(self) -> int:
-        return settings.SEQAUTO_MIN_COVERAGE
+    """ Editor for a node with genes of interest - its Genes/Coverage tab @see GeneCoverageMixin """
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -15,15 +11,16 @@ class GeneCoverageNodeView(NodeView):
         context['gene_lists'] = gene_lists
         context['gene_list_id_list'] = "/".join([str(gl.pk) for gl in gene_lists])
 
-        sample_coverage_and_uncovered = self.object.get_sample_coverage_and_uncovered()
+        sample_gene_coverage = []
         incomplete_gene_coverage = []
-        if not self.object.has_gene_coverage:
-            for sample, gene_coverage_collection, uncovered_genes in sample_coverage_and_uncovered:
-                if uncovered_genes and uncovered_genes.exists():
-                    uncovered_gene_names = ','.join(map(str, uncovered_genes))
-                    incomplete_gene_coverage.append((sample, gene_coverage_collection, uncovered_gene_names))
+        for sample_coverage in self.object.get_sample_gene_coverage():
+            summary = None
+            if gcc := sample_coverage.gene_coverage_collection:
+                summary = gcc.get_gene_lists_coverage_summary(gene_lists, sample_coverage.min_coverage)
+                if sample_coverage.has_complete_coverage is False:
+                    incomplete_gene_coverage.append(sample_coverage)
+            sample_gene_coverage.append((sample_coverage, summary))
 
-        context.update({"min_coverage": self._get_minimum_coverage_required(),
-                        "sample_coverage_and_uncovered": sample_coverage_and_uncovered,
+        context.update({"sample_gene_coverage": sample_gene_coverage,
                         "incomplete_gene_coverage": incomplete_gene_coverage})
         return context

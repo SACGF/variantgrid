@@ -54,11 +54,13 @@ class GCCArchiveTests(TestCase):
                          (gcc.data_archived_date, gcc.data_archived_by, gcc.data_archive_reason))
         self.assertFalse(Event.objects.filter(name="gene_coverage_collection_archived").exists())
 
-    def test_get_uncovered_gene_symbols_raises_when_archived(self):
-        """ Read entry point raises DataArchivedError when the GCC is archived. """
+    def test_coverage_reads_raise_when_archived(self):
+        """ Read entry points raise DataArchivedError when the GCC is archived. """
         gcc = self._make_gcc()
         gcc.data_archived_date = timezone.now()
         gcc.save()
         gene_symbols = GeneSymbol.objects.none()
         with self.assertRaises(DataArchivedError):
-            gcc.get_uncovered_gene_symbols(gene_symbols, min_coverage=20)
+            gcc.get_below_threshold_gene_symbols(gene_symbols, min_coverage=20)
+        with self.assertRaises(DataArchivedError):
+            gcc.get_no_coverage_gene_symbols(gene_symbols)

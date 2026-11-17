@@ -1,9 +1,11 @@
 import types
-from typing import Union
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional, Union
 
 from django.contrib.auth.models import Group, User
 from django.core.exceptions import PermissionDenied
-from django.db import IntegrityError, models, transaction
+from django.db import models
 from django.db.models import StringAgg, TextField, Value
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.query_utils import Q
@@ -16,6 +18,7 @@ from django.utils.timezone import localtime
 from guardian.shortcuts import get_objects_for_user
 from model_utils.models import TimeStampedModel
 
+from genes.enums import PanelAppConfidence
 from genes.models.models_gene import Gene, GeneSymbol, GeneSymbolAlias
 from genes.models.models_gene_annotation_release import GeneAnnotationRelease, ReleaseGeneSymbol
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
@@ -102,6 +105,11 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
     error_message = models.TextField(null=True, blank=True)
     locked = models.BooleanField(default=False)
     url = models.TextField(null=True, blank=True)
+    # The PanelApp panel version and minimum confidence a list was created from (#2846). The PanelApp cache's own
+    # lists (category PANEL_APP_CACHE) leave these blank: they follow the panel's latest version
+    panel_app_panel_local_cache = models.ForeignKey('genes.PanelAppPanelLocalCache', null=True, blank=True,
+                                                    on_delete=SET_NULL)
+    panel_app_confidence = models.CharField(max_length=1, choices=PanelAppConfidence.choices, null=True, blank=True)
 
     @staticmethod
     def get_gene_ids_for_gene_lists(release: GeneAnnotationRelease, gene_lists: list['GeneList']):
@@ -125,30 +133,55 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
     def get_gene_names(self):
         return self.genelistgenesymbol_set.filter(gene_symbol__isnull=False).values_list("gene_symbol", flat=True).distinct()
 
+    def _copy_gene_symbols_to(self, gene_list: 'GeneList'):
+        gene_list_gene_symbols = list(self.genelistgenesymbol_set.all())
+        for glgs in gene_list_gene_symbols:
+            glgs.pk = None
+            glgs.gene_list = gene_list
+        GeneListGeneSymbol.objects.bulk_create(gene_list_gene_symbols)
+
     def clone(self):
         """ Needed to clone analysis node GeneListNode. Leaves self as the original """
         copy = GeneList.objects.get(pk=self.pk)
         copy.pk = None
         copy._state.adding = True
         copy.save()
-
-        gene_list_gene_symbols = list(self.genelistgenesymbol_set.all())
-        for glgs in gene_list_gene_symbols:
-            glgs.pk = None
-            glgs.gene_list = copy
-        GeneListGeneSymbol.objects.bulk_create(gene_list_gene_symbols)
+        self._copy_gene_symbols_to(copy)
         return copy
 
-    def copy_for_user(self, user) -> 'GeneList':
-        """ An unlocked, uncategorised copy owned by user - unlike clone(), which keeps the owner, lock and
-            category, and is used to snapshot a list for an analysis node or pathology test """
-        copy = GeneList.objects.create(name=f"Copy of {self.name}", user=user, import_status=self.import_status)
-        gene_list_gene_symbols = list(self.genelistgenesymbol_set.all())
-        for glgs in gene_list_gene_symbols:
-            glgs.pk = None
-            glgs.gene_list = copy
-        GeneListGeneSymbol.objects.bulk_create(gene_list_gene_symbols)
+    def copy_for_user(self, user, name: Optional[str] = None, category: Optional[GeneListCategory] = None) -> 'GeneList':
+        """ An unlocked copy owned by user - unlike clone(), which keeps the owner, lock and category, and is
+            used to snapshot a list for an analysis node or pathology test. Keeps where the list came from """
+        copy = GeneList.objects.create(name=name or f"Copy of {self.name}", user=user, category=category,
+                                       import_status=self.import_status,
+                                       panel_app_panel_local_cache=self.panel_app_panel_local_cache,
+                                       panel_app_confidence=self.panel_app_confidence)
+        self._copy_gene_symbols_to(copy)
         return copy
+
+    def get_panel_app_provenance(self) -> Optional['PanelAppProvenance']:
+        """ Where a list created from PanelApp came from and how it has been edited since. Edits are derived
+            by comparing with the PanelApp cache's list for the same panel version and confidence """
+        if not self.panel_app_panel_local_cache_id:
+            return None
+        local_cache = self.panel_app_panel_local_cache
+        panel_gene_list = local_cache.get_gene_list(self.panel_app_confidence)
+        panel_names = {gene_symbol or original_name for gene_symbol, original_name in
+                       panel_gene_list.genelistgenesymbol_set.values_list("gene_symbol_id", "original_name")}
+        names = set()
+        added = []
+        for gene_symbol, original_name, modification_info in \
+                self.genelistgenesymbol_set.values_list("gene_symbol_id", "original_name", "modification_info"):
+            name = gene_symbol or original_name
+            names.add(name)
+            if name not in panel_names:
+                added.append(GeneListAddedGene(name=name, modification_info=modification_info))
+        return PanelAppProvenance(local_cache=local_cache,
+                                  confidence=PanelAppConfidence(self.panel_app_confidence),
+                                  user=self.user,
+                                  created=self.created,
+                                  added=sorted(added, key=lambda a: a.name),
+                                  removed=sorted(panel_names - names))
 
     def save(self, *args, **kwargs):
         assign_permissions = kwargs.pop("assign_permissions", False)
@@ -241,8 +274,10 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
 
         # Sample gene lists for samples we have permission to see
         samples_qs = Sample.filter_for_user(user)
-        sample_gene_list_qs = GeneList.objects.filter(category__name=GeneListCategory.SAMPLE_GENE_LIST,
-                                                      customtextgenelist__qcgenelist__qc__sequencing_sample__samplefromsequencingsample__sample__in=samples_qs)
+        qc_sample_q = Q(customtextgenelist__qcgenelist__qc__sequencing_sample__samplefromsequencingsample__sample__in=samples_qs)
+        sample_gene_list_q = Q(samplegenelist__sample__in=samples_qs)
+        sample_gene_list_qs = GeneList.objects.filter(qc_sample_q | sample_gene_list_q,
+                                                      category__name=GeneListCategory.SAMPLE_GENE_LIST)
 
         qs = user_qs | sample_gene_list_qs
         if success_only:
@@ -272,6 +307,52 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
     @classmethod
     def get_listing_url(cls):
         return reverse('gene_lists')
+
+
+@dataclass(frozen=True)
+class GeneListAddedGene:
+    name: str
+    modification_info: Optional[str]  # who added it and when
+
+
+@dataclass(frozen=True)
+class PanelAppProvenance:
+    """ @see GeneList.get_panel_app_provenance """
+    local_cache: models.Model  # PanelAppPanelLocalCache (models_panel_app imports this module)
+    confidence: PanelAppConfidence
+    user: User
+    created: datetime
+    added: list[GeneListAddedGene]
+    removed: list[str]
+
+    @property
+    def panel_app_panel(self):
+        return self.local_cache.panel_app_panel
+
+    @property
+    def version(self) -> str:
+        return self.local_cache.version
+
+    @property
+    def is_edited(self) -> bool:
+        return bool(self.added or self.removed)
+
+    @property
+    def has_newer_version(self) -> bool:
+        return self.panel_app_panel.current_version != self.version
+
+    @property
+    def source(self) -> str:
+        return f"PanelApp: {self.panel_app_panel} v{self.version} ({self.confidence.label})"
+
+    @property
+    def label(self) -> str:
+        if self.is_edited:
+            return f"{self.source} + manual changes: {len(self.added)} added, {len(self.removed)} removed"
+        return f"{self.source}, created by {self.user} {localtime(self.created).date()}"
+
+    def __str__(self):
+        return self.label
 
 
 def create_fake_gene_list(*args, **kwargs):
@@ -333,11 +414,13 @@ class CustomTextGeneList(models.Model):
 
 
 class SampleGeneList(TimeStampedModel):
-    """ There can be multiple SampleGeneLists per sample, but only 1 active one.
-        If multiple exist, the active one must be set manually """
+    """ A sample's genes of interest. There can be multiple SampleGeneLists per sample, but only 1 active one
+        @see sample_gene_list_created for which becomes active """
     sample = models.ForeignKey(Sample, on_delete=CASCADE)
     gene_list = models.ForeignKey(GeneList, on_delete=CASCADE)
     visible = models.BooleanField(default=True, blank=False)
+    # Who created or applied it on the sample page - null when the pipeline submitted it (QCGeneList)
+    user = models.ForeignKey(User, null=True, blank=True, on_delete=SET_NULL)
 
     class Meta:
         unique_together = ('sample', 'gene_list')
@@ -356,19 +439,17 @@ class SampleGeneList(TimeStampedModel):
 
 @receiver(post_save, sender=SampleGeneList)
 def sample_gene_list_created(sender, instance, created, **kwargs):  # pylint: disable=unused-argument
+    """ A new GOI becomes the active one, except that a pipeline one doesn't replace a user's correction.
+        Switching updates the existing ActiveSampleGeneList, so only the sample's first one is 'created' -
+        the signal that auto-runs analysis templates requiring a sample gene list """
     if created:
         sample = instance.sample
-        if SampleGeneList.objects.filter(sample=sample).count() > 1:
-            # Multiple exist, so need to set manually
-            ActiveSampleGeneList.objects.filter(sample=sample).delete()
-        else:
-            try:
-                with transaction.atomic():
-                    # There can only be 1 - if this works it's active
-                    # This will also trigger an event which is used to auto lauch analyses
-                    ActiveSampleGeneList.objects.create(sample=sample, sample_gene_list=instance)
-            except IntegrityError:
-                ActiveSampleGeneList.objects.filter(sample=sample).delete()
+        active = ActiveSampleGeneList.objects.filter(sample=sample).select_related("sample_gene_list").first()
+        if active is None:
+            ActiveSampleGeneList.objects.get_or_create(sample=sample, defaults={"sample_gene_list": instance})
+        elif instance.user_id or not active.sample_gene_list.user_id:
+            active.sample_gene_list = instance
+            active.save()
 
 
 class ActiveSampleGeneList(TimeStampedModel):

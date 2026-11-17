@@ -160,10 +160,15 @@ class GeneListNode(AncestorSampleMixin, GeneCoverageMixin, AnalysisNode):
                 title = name
                 if local_cache := gln_pap.panel_app_panel_local_cache:
                     title += f" v{local_cache.version}"
-                names_and_titles.append((name, f"{title} - PanelApp, min confidence {confidence}"))
+                names_and_titles.append((name, f"{title} - PanelApp (latest), min confidence {confidence}"))
         elif self.accordion_panel == self.SELECTED_GENE_LIST:
-            gene_list_names = self.genelistnodegenelist_set.order_by("pk").values_list("gene_list__name", flat=True)
-            names_and_titles = [(name, name) for name in gene_list_names]
+            gln_gl_qs = self.genelistnodegenelist_set.order_by("pk").select_related("gene_list__panel_app_panel_local_cache")
+            for gln_gl in gln_gl_qs:
+                name = gln_gl.gene_list.name
+                title = name
+                if local_cache := gln_gl.gene_list.panel_app_panel_local_cache:
+                    title += f" - PanelApp v{local_cache.version} (pinned)"
+                names_and_titles.append((name, title))
         return names_and_titles
 
     def get_node_name(self):

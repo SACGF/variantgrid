@@ -1,9 +1,11 @@
 from dal import forward
 from django import forms
+from django.core.exceptions import ValidationError
 from django.core.validators import URLValidator
 from django.forms.widgets import HiddenInput, TextInput
 
 from genes.custom_text_gene_list import create_custom_text_gene_list
+from genes.enums import PanelAppConfidence
 from genes.models import (
     CustomTextGeneList,
     GeneAnnotationRelease,
@@ -116,6 +118,28 @@ class UserGeneListForm(forms.Form):
     gene_list = forms.ModelChoiceField(queryset=GeneList.objects.all(),
                                        widget=ModelSelect2(url='gene_list_autocomplete',
                                                            attrs={'data-placeholder': 'Gene List...'}))
+
+
+class PanelAppGeneListForm(forms.Form):
+    """ Pick one panel, from either server, to create a gene list from """
+    panel_app_panel_aus = forms.ModelChoiceField(label="PanelApp Australia", required=False,
+                                                 queryset=PanelAppPanel.objects.filter(deleted=False),
+                                                 widget=ModelSelect2(url='panel_app_panel_aus_autocomplete',
+                                                                     attrs={'data-placeholder': 'PanelApp Australia panel...'}))
+    panel_app_panel_eng = forms.ModelChoiceField(label="Genomics England PanelApp", required=False,
+                                                 queryset=PanelAppPanel.objects.filter(deleted=False),
+                                                 widget=ModelSelect2(url='panel_app_panel_eng_autocomplete',
+                                                                     attrs={'data-placeholder': 'Genomics England PanelApp panel...'}))
+    min_confidence = forms.ChoiceField(label="Minimum confidence", choices=PanelAppConfidence.choices,
+                                       initial=PanelAppConfidence.LOW)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        panels = [p for p in (cleaned_data.get("panel_app_panel_aus"), cleaned_data.get("panel_app_panel_eng")) if p]
+        if len(panels) != 1:
+            raise ValidationError("Pick one PanelApp panel")
+        cleaned_data["panel_app_panel"] = panels[0]
+        return cleaned_data
 
 
 class GeneListCategoryAutocompleteForm(forms.Form):

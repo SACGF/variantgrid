@@ -1,0 +1,14 @@
+{# Coverage of a gene list's genes - include with summary (genes/models/models_gene_coverage.py:GeneListCoverageSummary) #}
+<div class="gene-list-coverage-summary">
+    {{ summary.num_genes }} genes, {{ summary.num_genes_with_coverage }} with coverage data,
+    mean depth {% if summary.mean_depth is not None %}{{ summary.mean_depth|floatformat:1 }}{% else %}-{% endif %},
+    lowest minimum depth {% if summary.lowest_min is not None %}{{ summary.lowest_min }}{% else %}-{% endif %},
+    {% if summary.num_below_threshold %}<span class="text-warning font-weight-bold">{{ summary.num_below_threshold }} below minimum depth {{ summary.min_coverage }}</span>{% else %}none below minimum depth {{ summary.min_coverage }}{% endif %}
+    {% if summary.no_coverage_symbols or summary.unmatched_names %}
+        <div class="text-muted">
+            No coverage data (a naming mismatch, not low depth):
+            {% if summary.no_coverage_symbols %}{{ summary.no_coverage_symbols|join:", " }}{% endif %}
+            {% if summary.unmatched_names %}{% if summary.no_coverage_symbols %}; {% endif %}unmatched symbols {{ summary.unmatched_names|join:", " }}{% endif %}
+        </div>
+    {% endif %}
+</div>
