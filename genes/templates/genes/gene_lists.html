@@ -17,7 +17,7 @@
                 window.location = Urls.view_gene_list(geneListId);
             });
 
-            $('form#new-gene-list-form').submit(function() {
+            $('form#new-gene-list-form, form#panel-app-gene-list-form').submit(function() {
                 // Gene symbol matching is synchronous and can take a while - put the form into a
                 // read-only state with a loading overlay so it doesn't look like it's hanging, and
                 // to stop the user submitting it multiple times.
@@ -46,9 +46,31 @@
     <div id="show-form-container">
         <a class='hover-link' id="show-form-link" href="javascript:showForm()">New GeneList</a>
     </div>
+    <div>
+        <a class='hover-link' data-toggle="collapse" href="#panel-app-gene-list-form-container">Create from PanelApp</a>
+    </div>
+    <div id="panel-app-gene-list-form-container" class="collapse{% if panel_app_form.errors %} show{% endif %}">
+      <form id="panel-app-gene-list-form" method="post" action="{% url 'gene_lists' %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="panel_app">
+          <div class="card">
+              <div class="card-header">Create from PanelApp</div>
+              <div class="card-body">
+                  <p>Creates your own editable gene list from the panel's current version. The list stays pinned to
+                      that version, and shows the genes added or removed since.</p>
+                  {% crispy panel_app_form form_helper.horizontal %}
+              </div>
+              <div class="card-footer">
+                  <button class="btn btn-primary">Create GeneList</button>
+              </div>
+          </div>
+          {{ panel_app_form.media }}
+      </form>
+    </div>
     <div id="new-gene-list-form-container">
       <form id="new-gene-list-form" method="post" action="{% url 'gene_lists' %}">
         {% csrf_token %}
+        <input type="hidden" name="action" value="custom_text">
           <div class="card">
               <div class="card-header">Create</div>
               <div class="card-body">

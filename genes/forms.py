@@ -4,6 +4,7 @@ from django.core.validators import URLValidator
 from django.forms.widgets import HiddenInput, TextInput
 
 from genes.custom_text_gene_list import create_custom_text_gene_list
+from genes.enums import PanelAppConfidence
 from genes.models import (
     CustomTextGeneList,
     GeneAnnotationRelease,
@@ -116,6 +117,16 @@ class UserGeneListForm(forms.Form):
     gene_list = forms.ModelChoiceField(queryset=GeneList.objects.all(),
                                        widget=ModelSelect2(url='gene_list_autocomplete',
                                                            attrs={'data-placeholder': 'Gene List...'}))
+
+
+class PanelAppGeneListForm(forms.Form):
+    """ A panel from any PanelApp server, to create a gene list from """
+    panel_app_panel = forms.ModelChoiceField(label="PanelApp panel",
+                                             queryset=PanelAppPanel.objects.filter(deleted=False),
+                                             widget=ModelSelect2(url='panel_app_panel_autocomplete',
+                                                                 attrs={'data-placeholder': 'PanelApp panel...'}))
+    min_confidence = forms.ChoiceField(label="Minimum confidence", choices=PanelAppConfidence.choices,
+                                       initial=PanelAppConfidence.LOW)
 
 
 class GeneListCategoryAutocompleteForm(forms.Form):

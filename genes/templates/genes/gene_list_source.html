@@ -1,0 +1,11 @@
+{# Where a copied gene list's genes came from and its edits since - include with source=gene_list.get_source gene_list_id=gene_list.pk #}
+<div class="gene-list-source">
+    {% if source.panel_app_version %}<span class="badge badge-info" title="Stays at the PanelApp version it was created from">pinned</span>{% endif %}
+    {{ source.label }}
+    {% if source.modifications %}
+        <a class="hover-link" data-toggle="collapse" href="#gene-list-history-{{ gene_list_id }}">show history</a>
+        <div id="gene-list-history-{{ gene_list_id }}" class="collapse">
+            {% include "genes/gene_list_history.html" with modifications=source.modifications %}
+        </div>
+    {% endif %}
+</div>

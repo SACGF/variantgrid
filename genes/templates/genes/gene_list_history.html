@@ -1,0 +1,10 @@
+{# A gene list's edits, oldest first - include with modifications=gene_list.get_modifications #}
+{% load tz %}
+<ul class="gene-list-history">
+{% for modification in modifications %}
+    <li>{{ modification.date|localtime }}{% if modification.user %} {{ modification.user }}{% endif %}:
+        {% if modification.added %}<span class="text-success">+ {{ modification.added|join:", " }}</span>{% endif %}
+        {% if modification.removed %}<span class="text-danger">- {{ modification.removed|join:", " }}</span>{% endif %}
+    </li>
+{% endfor %}
+</ul>

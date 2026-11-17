@@ -331,8 +331,9 @@ class Command(BaseCommand):
     @classmethod
     def _add_ncbi_gene_symbol_aliases(cls, aliases_by_symbol: dict[str, set[str]], known_uc_gene_symbols: set[str]):
         """ Add the NCBI aliases of each symbol in the file. An alias that is a gene symbol, or already comes from
-            another source (eg HGNC), is skipped. One NCBI no longer lists is kept: people and historical records
-            may still use it, and a gene list that matched through it would lose the row (GeneListGeneSymbol cascades) """
+            another source (eg HGNC), is skipped.
+            Aliases are only ever added, never deleted - one NCBI no longer lists stays, as people and historical
+            records may still use it, and deleting it would cascade to the GeneListGeneSymbol rows matched through it """
         other_source_qs = GeneSymbolAlias.objects.exclude(source=GeneSymbolAliasSource.NCBI)
         other_source_uc_aliases = set(other_source_qs.annotate(uc_alias=Upper("alias")).values_list("uc_alias", flat=True))
         skip_uc_aliases = known_uc_gene_symbols | other_source_uc_aliases

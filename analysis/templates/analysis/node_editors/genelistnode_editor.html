@@ -81,6 +81,7 @@
                 <label class="editor-label" for="{{ form.gene_list.id_for_label }}">Gene lists</label>
                 {{ form.gene_list }}
             </div>
+            <div class="editor-help">A gene list created from PanelApp is pinned to the version it was created from - "PanelApp Panels" below follow each panel's latest version.</div>
             <div class="editor-row">
                 <span class="editor-label">Exclude</span>
                 <label for="{{ form.exclude.id_for_label }}">{{ form.exclude }} Filter <b>out</b> these genes</label>
@@ -124,7 +125,7 @@
         </div>
         </div>
         <div class="card">
-            <div class="card-header" data-toggle="collapse" data-target="#gene-list-panel-panel-app">PanelApp Panels</div>
+            <div class="card-header" data-toggle="collapse" data-target="#gene-list-panel-panel-app">PanelApp Panels (latest)</div>
             <div id="gene-list-panel-panel-app" class="collapse" data-parent="#gene-list-node-accordion">
             <div class="card-body">
                 <div class="editor-row">

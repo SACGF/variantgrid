@@ -63,7 +63,7 @@ class TestNodeNames(AnalysisSetupMixin, TestCase):
             gene_list = GeneList.objects.create(name=name, user=self.analysis.user)
             node.genelistnodegenelist_set.create(gene_list=gene_list)
         self.assertEqual("Cardiomyopathy +1 more", node.get_node_name())
-        self.assertEqual(["Cardiomyopathy", "Epilepsy"], [chip.title for chip in node.get_node_chips()])
+        self.assertEqual(["Cardiomyopathy (0 x genes)", "Epilepsy (0 x genes)"], [chip.title for chip in node.get_node_chips()])
 
     def test_sample_node_qc_gene_list_chip(self):
         node = SampleNode(analysis=self.analysis, restrict_to_qc_gene_list=True)

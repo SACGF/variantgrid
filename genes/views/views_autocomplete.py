@@ -20,6 +20,9 @@ from genes.models import (
 from library.constants import HOUR_SECS, MINUTE_SECS, WEEK_SECS
 from library.django_utils.autocomplete_utils import AutocompleteView
 
+# A result's label is str(gene_list), which names its source (GeneList.get_source)
+GENE_LIST_SOURCE_RELATED = ("source_gene_list__panel_app_version__panel_app_panel_local_cache__panel_app_panel",)
+
 
 class AbstractPanelAppPanelAutocompleteView(abc.ABC, AutocompleteView):
     fields = ['name']
@@ -43,6 +46,15 @@ class PanelAppPanelAutocompleteView(AbstractPanelAppPanelAutocompleteView):
         if server_id := self.forwarded.get('server_id', None):
             server = PanelAppServer.objects.get(pk=server_id)
         return server
+
+    def get_user_queryset(self, user):
+        return super().get_user_queryset(user).select_related("server")
+
+    def get_result_label(self, obj):
+        """ Panels of the same name exist on each server, so across servers a result says which it is from """
+        if self._get_server():
+            return str(obj)
+        return f"{obj} ({obj.server})"
 
 
 @method_decorator(cache_page(HOUR_SECS), name='dispatch')
@@ -155,7 +167,7 @@ class GeneListAutocompleteView(AutocompleteView):
     fields = ['name']
 
     def get_user_queryset(self, user):
-        return GeneList.filter_for_user(user).filter(category__isnull=True)
+        return GeneList.filter_for_user(user).filter(category__isnull=True).select_related(*GENE_LIST_SOURCE_RELATED)
 
 
 #@method_decorator([cache_page(MINUTE_SECS), vary_on_cookie], name='dispatch')
@@ -169,4 +181,4 @@ class CategoryGeneListAutocompleteView(AutocompleteView):
             qs = qs.filter(category=category)
         else:
             qs = qs.filter(category__isnull=True)
-        return qs
+        return qs.select_related(*GENE_LIST_SOURCE_RELATED)

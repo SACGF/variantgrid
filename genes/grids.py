@@ -44,7 +44,7 @@ from snpdb.variant_queries import (
     get_variant_queryset_for_gene_symbol,
     variant_qs_filter_has_internal_data,
 )
-from snpdb.views.datatable_view import DatatableConfig, RichColumn, SortOrder
+from snpdb.views.datatable_view import CellData, DatatableConfig, RichColumn, SortOrder
 
 
 class GeneListColumns(DatatableConfig[GeneList]):
@@ -357,19 +357,28 @@ class QCGeneCoverageColumns(DatatableConfig[GeneCoverageCanonicalTranscript]):
 
     def __init__(self, request: HttpRequest):
         super().__init__(request)
+        # With a minimum depth, genes below it are highlighted and (sorting on min) come first
+        min_depth = self.get_query_param("min_depth")
+        self.min_depth = int(min_depth) if min_depth is not None else None
+        min_sort = SortOrder.ASC if self.min_depth is not None else None
         self.rich_columns = [
             RichColumn(key="gene_symbol__symbol", label="Gene Symbol", orderable=True,
                        client_renderer='renderGeneSymbol'),
             RichColumn(key="transcript__identifier", label="Transcript", orderable=True),
             RichColumn(key="original_gene_symbol", label="Original Symbol", orderable=True),
             RichColumn(key="original_transcript", label="Original Transcript", orderable=True),
-            RichColumn(key="min", label="Min", orderable=True, css_class="num"),
+            RichColumn(key="min", label="Min", orderable=True, css_class="num", default_sort=min_sort),
             RichColumn(key="mean", label="Mean", orderable=True, css_class="num"),
             RichColumn(key="std_dev", label="Std Dev", orderable=True, css_class="num"),
             RichColumn(key="percent_1x", label="% 1x", orderable=True, css_class="num"),
             RichColumn(key="percent_10x", label="% 10x", orderable=True, css_class="num"),
             RichColumn(key="percent_20x", label="% 20x", orderable=True, css_class="num"),
         ]
+
+    def row_css(self, row: CellData) -> Optional[str]:
+        if self.min_depth is not None and row["min"] < self.min_depth:
+            return "table-warning"
+        return None
 
     def get_coverage_q(self, gene_coverage_collection, gene_symbols) -> Q:
         filters = [Q(gene_coverage_collection=gene_coverage_collection)]
@@ -391,9 +400,12 @@ class QCGeneCoverageColumns(DatatableConfig[GeneCoverageCanonicalTranscript]):
 
 
 class UncoveredGenesColumns(QCGeneCoverageColumns):
+    def row_css(self, row: CellData) -> Optional[str]:
+        return None  # Every row is below the minimum depth
+
     def get_coverage_q(self, gene_coverage_collection, gene_symbols) -> Q:
         q = super().get_coverage_q(gene_coverage_collection, gene_symbols)
-        return q & Q(min__lt=int(self.get_query_param("min_depth")))
+        return q & Q(min__lt=self.min_depth)
 
 
 class GeneSymbolWikiColumns(DatatableConfig[GeneSymbolWiki]):

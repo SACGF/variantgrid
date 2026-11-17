@@ -14,6 +14,7 @@ from django.utils.datastructures import OrderedSet
 from django.views.decorators.cache import cache_page
 from django.views.decorators.http import require_POST
 from requests import RequestException
+from rest_framework.exceptions import NotFound
 
 from annotation.models.models_annotation_version import AnnotationVersion
 from classification.views.exports import ClassificationExportFormatterCSV
@@ -25,6 +26,7 @@ from genes.forms import (
     GeneListForm,
     GeneSymbolForm,
     NamedCustomGeneListForm,
+    PanelAppGeneListForm,
     UserGeneListForm,
 )
 from genes.gene_matching import GeneSymbolMatcher
@@ -47,6 +49,8 @@ from genes.models import (
     TranscriptVersion,
     TranscriptVersionSequenceInfo,
 )
+from genes.panel_app import create_gene_list_from_panel_app
+from genes.sample_gene_lists import get_sample_gene_list_cards
 from genes.serializers import SampleGeneListSerializer
 from library.constants import WEEK_SECS
 from library.django_utils import add_save_message, get_field_counts
@@ -425,13 +429,25 @@ def gene_symbol_matching(request):
 
 
 def gene_lists(request):
-    create_gene_list_form = NamedCustomGeneListForm(request.POST or None, username=request.user)
-    if request.method == "POST" and create_gene_list_form.is_valid():
+    action = request.POST.get("action")
+    create_gene_list_form = NamedCustomGeneListForm(request.POST if action == "custom_text" else None,
+                                                    username=request.user)
+    panel_app_form = PanelAppGeneListForm(request.POST if action == "panel_app" else None, prefix="panel_app")
+    if create_gene_list_form.is_bound and create_gene_list_form.is_valid():
         custom_text_gene_list = create_gene_list_form.save()
         return redirect(reverse('view_gene_list', kwargs={'gene_list_id': custom_text_gene_list.gene_list.pk}))
 
+    if panel_app_form.is_bound and panel_app_form.is_valid():
+        try:
+            gene_list = create_gene_list_from_panel_app(panel_app_form.cleaned_data["panel_app_panel"],
+                                                        panel_app_form.cleaned_data["min_confidence"], request.user)
+            return redirect(gene_list)
+        except (NotFound, RequestException) as e:
+            panel_app_form.add_error(None, f"Could not retrieve panel from PanelApp: {e}")
+
     context = {
         "create_gene_list_form": create_gene_list_form,
+        "panel_app_form": panel_app_form,
         "gene_list_form": UserGeneListForm(),
     }
     return render(request, 'genes/gene_lists.html', context=context)
@@ -463,7 +479,15 @@ def view_gene_list(request, gene_list_id):
     # Unmatched symbols are shown by the name entered, so they can be removed by editing the text
     symbol_or_name = gene_list.genelistgenesymbol_set.values_list("gene_symbol_id", "original_name")
     gene_symbols = sorted({gene_symbol or original_name for gene_symbol, original_name in symbol_or_name})
+    source = gene_list.get_source()
+    if source and (panel_app_version := source.panel_app_version) and panel_app_version.has_newer_version:
+        panel_app_panel = panel_app_version.panel_app_panel
+        msg = (f"{panel_app_panel} is now v{panel_app_panel.current_version} - this list was "
+               f"created from v{panel_app_version.version}")
+        messages.add_message(request, messages.INFO, msg)
     context = {'gene_list': gene_list,
+               'source': source,
+               'modifications': source.modifications if source else gene_list.get_modifications(),
                'gene_list_form': gl_form,
                'gene_symbols_text': "\n".join(gene_symbols),
                'num_gene_symbols': len(gene_symbols),
@@ -477,7 +501,8 @@ def set_gene_list_genes_from_text(request, gene_list_id):
     gene_list.check_can_write(request.user)
     modification_info = f"Added manually by {request.user} on {timezone.now()}"
     added, removed = GeneSymbolMatcher().set_gene_list_gene_symbols_from_text(gene_list, request.POST["gene_text"],
-                                                                              modification_info=modification_info)
+                                                                              modification_info=modification_info,
+                                                                              user=request.user)
     if added or removed:
         messages.add_message(request, messages.INFO, f"Added {len(added)}, removed {len(removed)} genes")
     else:
@@ -491,6 +516,24 @@ def copy_gene_list(request, gene_list_id):
     copy = gene_list.copy_for_user(request.user)
     messages.add_message(request, messages.INFO, f"Copied from '{gene_list.name}'")
     return redirect(reverse('view_gene_list', kwargs={'gene_list_id': copy.pk}))
+
+
+@require_POST
+def create_gene_list_from_panel_app_latest(request, gene_list_id):
+    """ A new list from the latest version of the panel gene_list was created from - gene_list is unchanged """
+    gene_list = GeneList.get_for_user(request.user, gene_list_id)
+    source = gene_list.get_source()
+    if not (source and (panel_app_version := source.panel_app_version)):
+        raise Http404(f"{gene_list} was not created from PanelApp")
+    panel_app_panel = panel_app_version.panel_app_panel
+    try:
+        new_gene_list = create_gene_list_from_panel_app(panel_app_panel, panel_app_version.panel_app_confidence,
+                                                        request.user)
+    except (NotFound, RequestException) as e:
+        messages.add_message(request, messages.ERROR, f"Could not retrieve panel from PanelApp: {e}")
+        return redirect(gene_list)
+    messages.add_message(request, messages.INFO, f"Created from latest version of {panel_app_panel}")
+    return redirect(new_gene_list)
 
 
 def view_canonical_transcript_collection(request, pk):
@@ -538,25 +581,34 @@ def sample_gene_lists_tab(request, sample_id):
     sample = Sample.get_for_user(request.user, sample_id)
     has_write_permission = sample.can_write(request.user)
 
-    create_gene_list_form = NamedCustomGeneListForm(request.POST or None, username=request.user,
+    # A user's GOI is a copy in the hidden sample category, so later edits to the list it came from don't change it
+    action = request.POST.get("action", "custom_text")
+    create_gene_list_form = NamedCustomGeneListForm(request.POST if action == "custom_text" else None,
+                                                    username=request.user,
                                                     initial={"name": "Sample Gene List"})
+    apply_gene_list_form = UserGeneListForm(request.POST if action == "apply" else None, prefix="apply")
     if request.method == "POST":
         sample.check_can_write(request.user)
-        if create_gene_list_form.is_valid():
-            custom_text_gene_list = create_gene_list_form.save()
-            category = GeneListCategory.get_or_create_category(GeneListCategory.SAMPLE_GENE_LIST, hidden=True)
-            gene_list = custom_text_gene_list.gene_list
+        category = GeneListCategory.get_or_create_category(GeneListCategory.SAMPLE_GENE_LIST, hidden=True)
+        gene_list = None
+        if create_gene_list_form.is_bound and create_gene_list_form.is_valid():
+            gene_list = create_gene_list_form.save().gene_list
             gene_list.category = category
             gene_list.save()
+        elif apply_gene_list_form.is_bound and apply_gene_list_form.is_valid():
+            source_gene_list = GeneList.get_for_user(request.user, apply_gene_list_form.cleaned_data["gene_list"].pk)
+            gene_list = source_gene_list.copy_for_user(request.user, name=source_gene_list.name, category=category)
+        if gene_list:
             SampleGeneList.objects.create(sample=sample, gene_list=gene_list)
 
+    sample_gene_list_cards = get_sample_gene_list_cards(sample)
     sample_gene_lists_data = []
     gene_grid_arg_list = []
-    for sgl in sample.samplegenelist_set.all():
-        sgl_serializer = SampleGeneListSerializer(sgl)
+    for card in sample_gene_list_cards:
+        sgl_serializer = SampleGeneListSerializer(card.sample_gene_list)
         sgl_serializer.context["request"] = request
         sample_gene_lists_data.append(sgl_serializer.data)
-        gene_grid_arg_list.append(f"gene-list-{sgl.gene_list_id}")
+        gene_grid_arg_list.append(f"gene-list-{card.sample_gene_list.gene_list_id}")
 
     if gene_grid_arg_list:
         gene_grid_url = reverse("passed_gene_grid", kwargs={"columns_from_url": "/".join(gene_grid_arg_list)})
@@ -567,6 +619,9 @@ def sample_gene_lists_tab(request, sample_id):
                "has_write_permission": has_write_permission,
                "gene_grid_url": gene_grid_url,
                "create_gene_list_form": create_gene_list_form,
+               "apply_gene_list_form": apply_gene_list_form,
+               "sample_gene_list_cards": sample_gene_list_cards,
+               "has_sample_qc_tab": bool(sample.sequencing_run) and url_name_enabled("view_sample_qc_tab"),
                "sample_gene_lists_data": sample_gene_lists_data}
     return render(request, 'genes/sample_gene_lists_tab.html', context)
 

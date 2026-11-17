@@ -66,5 +66,11 @@ function initSampleGeneListsTab(sampleGeneListData) {
         modifySampleGeneList(this, {visible: true});
     });
 
-    $("form#new-gene-list-form").ajaxForm({target: "#sample-gene-list-tab-container"});
+    $("form.sample-gene-list-form").ajaxForm({target: "#sample-gene-list-tab-container"});
+
+    // The whole coverage table is on the sample page's QC tab
+    $("a.sample-qc-tab-link").click(function(event) {
+        event.preventDefault();
+        $("a.nav-link[href='#sample-qc']").tab("show");
+    });
 }

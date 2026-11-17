@@ -30,43 +30,50 @@
                 <div class="tab-content">
                 {% if incomplete_gene_coverage %}
                 <div class="tab-pane show active" role="tabpanel" id="gene-incomplete-coverage">
-                    {% for sample, cov, no_coverage_gene_names in incomplete_gene_coverage %}
-                        <div class="editor-section-title">Sample: {{ sample }}</div>
+                    {% for sample_coverage in incomplete_gene_coverage %}
+                        <div class="editor-section-title">Sample: {{ sample_coverage.sample }}</div>
+                        {% if sample_coverage.no_coverage.exists %}
                         <div class="editor-help">
-                        Genes with no coverage: {{ no_coverage_gene_names }}
+                        Genes with no coverage data (a naming mismatch - symbol, or a transcript not in the kit's canonical transcripts - not low depth):
+                        {{ sample_coverage.no_coverage|join:", " }}
                         </div>
-                        <table id="uncovered-genes-grid-{{ cov.pk }}" class="sticky-header" data-datatable-url="{% url 'uncovered_genes_datatable' gene_coverage_collection_id=cov.pk min_depth=sample.get_minimum_coverage_required gene_list_id_list=gene_list_id_list %}"></table>
+                        {% endif %}
+                        {% if sample_coverage.below_threshold.exists %}
+                        <div class="editor-help">
+                        Genes below minimum depth {{ sample_coverage.min_coverage }}: {{ sample_coverage.below_threshold|join:", " }}
+                        </div>
+                        <table id="uncovered-genes-grid-{{ sample_coverage.gene_coverage_collection.pk }}" class="sticky-header" data-datatable-url="{% url 'uncovered_genes_datatable' gene_coverage_collection_id=sample_coverage.gene_coverage_collection.pk min_depth=sample_coverage.min_coverage gene_list_id_list=gene_list_id_list %}"></table>
+                        {% endif %}
                     {% endfor %}
-
-                    <div class="editor-help">Minimum depth required is {{ min_coverage }}</div>
                 </div>
                 {% endif %}
                 <div class="tab-pane{% if not incomplete_gene_coverage %} show active{% endif %}" role="tabpanel" id="gene-list-genes">
                     {%  for gene_list in gene_lists %}
+                        {% include "analysis/node_editors/gene_list_label.html" %}
                         <table id="gene-lists-genes-datatable-{{ gene_list.pk }}" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'analysis_node_gene_list_genes_datatable' analysis_id=node.analysis_id node_id=node.pk version=node.version gene_list_id=gene_list.pk %}"></table>
                     {%  endfor %}
                 </div>
                 <div class="tab-pane" role="tabpanel" id="gene-coverage">
-                    {% for sample, cov, _ in sample_coverage_and_uncovered %}
-                        <div class="editor-section-title">{{ sample }}</div>
+                    {% for sample_coverage, summary in sample_gene_coverage %}
+                        {% with cov=sample_coverage.gene_coverage_collection %}
+                        <div class="editor-section-title">{{ sample_coverage.sample }}</div>
                         {% if cov %}
-                        <div class="editor-help">Showing genes in gene list. <a href='{% url 'view_qc' cov.qcgenecoverage.qc.pk %}'>Full coverage</a></div>
-                        <table id="gene-coverage-grid-{{ cov.pk }}" class="sticky-header" data-datatable-url="{% url 'gene_coverage_collection_gene_list_datatable' gene_coverage_collection_id=cov.pk gene_list_id_list=gene_list_id_list %}"></table>
+                        <div class="editor-help">
+                            {% include "genes/gene_list_coverage_summary.html" %}
+                            Showing genes in gene list, below minimum depth first. <a href='{% url 'view_qc' cov.qcgenecoverage.qc.pk %}'>Full coverage</a>
+                        </div>
+                        <table id="gene-coverage-grid-{{ cov.pk }}" class="sticky-header" data-datatable-url="{% url 'gene_coverage_collection_gene_list_datatable' gene_coverage_collection_id=cov.pk min_depth=sample_coverage.min_coverage gene_list_id_list=gene_list_id_list %}"></table>
                         {% else %}
                             <div class="editor-help">Sample has no coverage.</div>
                         {% endif %}
+                        {% endwith %}
                     {% endfor %}
                 </div>
                 </div>
             </div>
             {% else %}
                 {% for gene_list in gene_lists %}
-                    <div class="editor-section-title">{{ gene_list }}</div>
-
-                        {% if not gene_list.category.hidden %}
-                            <a href="{{ gene_list.get_absolute_url }}" target="_blank">view gene list</a>
-                        {% endif %}
-                        {% if gene_list.url %}{{ gene_list.url|urlize }}{% endif %}
+                    {% include "analysis/node_editors/gene_list_label.html" %}
 
                     <table id="gene-lists-genes-datatable-{{ gene_list.pk }}" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'analysis_node_gene_list_genes_datatable' analysis_id=node.analysis_id node_id=node.pk version=node.version gene_list_id=gene_list.pk %}"></table>
                 {% endfor %}

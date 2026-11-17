@@ -9,11 +9,6 @@ class SampleNodeView(GeneCoverageNodeView):
     model = SampleNode
     form_class = SampleNodeForm
 
-    def _get_minimum_coverage_required(self) -> int:
-        if self.object.sample:
-            return self.object.sample.get_minimum_coverage_required()
-        return super()._get_minimum_coverage_required()
-
     def _any_sample(self, attr: str) -> bool:
         """ The form drops a widget and the editor's tree hides it, so which samples can use it is
             worked out in one place - a group shows a widget if any of its samples can use it """

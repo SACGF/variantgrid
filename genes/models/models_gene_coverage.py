@@ -1,10 +1,13 @@
 import logging
 import os
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Optional
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
+from django.db.models import Count, F, FloatField, Min, Sum
 from django.db.models.deletion import CASCADE, DO_NOTHING, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
@@ -14,6 +17,7 @@ from model_utils.models import TimeStampedModel
 from genes.enums import AnnotationConsortium
 from genes.gene_coverage import load_gene_coverage_df
 from genes.models.models_gene import GeneSymbol, Transcript, TranscriptVersion
+from genes.models.models_gene_list import GeneList, GeneListGeneSymbol
 from library.django_utils.data_archive_mixin import DataArchivedError, DataArchiveMixin
 from library.django_utils.django_file_utils import (
     get_import_processing_dir,
@@ -200,17 +204,66 @@ class GeneCoverageCollection(DataArchiveMixin, RelatedModelsPartitionModel):
         logging.info("%d missing genes, %d missing transcripts", missing_genes, missing_transcripts)
         return warnings
 
-    def get_uncovered_gene_symbols(self, gene_symbols, min_coverage):
+    def _canonical_transcript_coverage(self):
         if self.data_archived:
             raise DataArchivedError(self)
-        # Do as inner query to ensure we restrict to gene coverage partition
-        covered_qs = GeneCoverageCanonicalTranscript.objects.filter(gene_coverage_collection=self,
-                                                                    min__gte=min_coverage)
-        covered_gene_symbols = covered_qs.values_list("gene_symbol", flat=True)
-        return gene_symbols.exclude(pk__in=covered_gene_symbols)
+        # Filter on the collection so the query stays in its partition
+        return GeneCoverageCanonicalTranscript.objects.filter(gene_coverage_collection=self)
+
+    def get_below_threshold_gene_symbols(self, gene_symbols, min_coverage):
+        """ Genes with coverage data, where none of it reaches min_coverage """
+        coverage_qs = self._canonical_transcript_coverage()
+        with_data = coverage_qs.values_list("gene_symbol", flat=True)
+        covered = coverage_qs.filter(min__gte=min_coverage).values_list("gene_symbol", flat=True)
+        return gene_symbols.filter(pk__in=with_data).exclude(pk__in=covered)
+
+    def get_no_coverage_gene_symbols(self, gene_symbols):
+        """ Genes with no coverage data at all - a naming mismatch (symbol, or a transcript not in the kit's
+            canonical transcript collection) rather than low depth """
+        with_data = self._canonical_transcript_coverage().values_list("gene_symbol", flat=True)
+        return gene_symbols.exclude(pk__in=with_data)
+
+    def get_gene_lists_coverage_summary(self, gene_lists: list[GeneList],
+                                        min_coverage: int) -> 'GeneListCoverageSummary':
+        gene_symbols = GeneSymbol.objects.filter(genelistgenesymbol__gene_list__in=gene_lists).distinct()
+        coverage_qs = self._canonical_transcript_coverage().filter(gene_symbol__in=gene_symbols)
+        data = coverage_qs.aggregate(num_genes_with_coverage=Count("gene_symbol", distinct=True),
+                                     weighted_mean=Sum(F("mean") * F("size"), output_field=FloatField()),
+                                     total_size=Sum("size"),
+                                     lowest_min=Min("min"))
+        mean_depth = None
+        if data["total_size"]:
+            mean_depth = data["weighted_mean"] / data["total_size"]
+
+        unmatched_qs = GeneListGeneSymbol.objects.filter(gene_list__in=gene_lists, gene_symbol__isnull=True)
+        unmatched_names = sorted(set(unmatched_qs.values_list("original_name", flat=True)))
+        no_coverage_symbols = list(self.get_no_coverage_gene_symbols(gene_symbols).order_by("symbol")
+                                   .values_list("symbol", flat=True))
+        return GeneListCoverageSummary(min_coverage=min_coverage,
+                                       num_genes=gene_symbols.count() + len(unmatched_names),
+                                       num_genes_with_coverage=data["num_genes_with_coverage"],
+                                       mean_depth=mean_depth,
+                                       lowest_min=data["lowest_min"],
+                                       num_below_threshold=self.get_below_threshold_gene_symbols(gene_symbols,
+                                                                                                 min_coverage).count(),
+                                       no_coverage_symbols=no_coverage_symbols,
+                                       unmatched_names=unmatched_names)
 
     def __str__(self):
         return "GeneCoverageCollection " + os.path.basename(self.path)
+
+
+@dataclass(frozen=True)
+class GeneListCoverageSummary:
+    """ A sample's coverage of the genes in gene lists (@see GeneCoverageCollection.get_gene_lists_coverage_summary) """
+    min_coverage: int
+    num_genes: int
+    num_genes_with_coverage: int
+    mean_depth: Optional[float]  # weighted by size
+    lowest_min: Optional[int]
+    num_below_threshold: int
+    no_coverage_symbols: list[str]
+    unmatched_names: list[str]  # names in the gene list that matched no gene symbol
 
 
 @receiver(pre_delete, sender=GeneCoverageCollection)

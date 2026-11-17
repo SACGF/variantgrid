@@ -7,6 +7,7 @@ from django.db.models.deletion import CASCADE, SET_NULL
 from django.utils import timezone
 from model_utils.models import TimeStampedModel
 
+from genes.enums import PanelAppConfidence
 from genes.models.models_gene import HGNC
 from genes.models.models_gene_list import GeneList, GeneListCategory
 from library.guardian_utils import (
@@ -88,11 +89,16 @@ class PanelAppPanelLocalCache(TimeStampedModel):
     def get_gene_list(self, panel_app_confidence) -> GeneList:
         from genes.gene_matching import GeneSymbolMatcher
 
-        min_level = int(panel_app_confidence)
+        confidence = PanelAppConfidence(str(panel_app_confidence))
+        cache_gene_list_qs = self.panelapppanellocalcachegenelist_set.filter(panel_app_confidence=confidence)
+        if cache_gene_list := cache_gene_list_qs.select_related("gene_list").first():
+            return cache_gene_list.gene_list
+
+        min_level = int(confidence)
         name = f"{self.panel_app_panel.name} v.{self.version}.min_{min_level}"
 
-        # We'll try to re-use gene lists - but it's possible due to race conditions we may occasionally make
-        # a duplicate, but this should work fine and won't affect much
+        # A list made before PanelAppPanelLocalCacheGeneList is found by name. Racing requests may occasionally
+        # make a duplicate list, which works fine: the first to be linked is the one handed out
         category = GeneListCategory.get_or_create_category(GeneListCategory.PANEL_APP_CACHE, hidden=True)
         gene_list_kwargs = {
             "category": category,
@@ -101,9 +107,9 @@ class PanelAppPanelLocalCache(TimeStampedModel):
             "import_status": ImportStatus.SUCCESS,
             "url": self.panel_app_panel.url,
         }
-        if gene_list := GeneList.objects.filter(**gene_list_kwargs).order_by("pk").first():
+        if gene_list := GeneList.objects.filter(**gene_list_kwargs, panel_app_version__isnull=True).order_by("pk").first():
             logging.info("Reused existing gene list: %s", gene_list.pk)
-            return gene_list
+            return self._link_gene_list(confidence, gene_list)
 
         # Only marked SUCCESS (and so reusable) once its symbols are in
         with transaction.atomic():
@@ -126,10 +132,43 @@ class PanelAppPanelLocalCache(TimeStampedModel):
             add_public_group_read_permission(gene_list)
 
         logging.info("Returning gene list: %s", gene_list.pk)
-        return gene_list
+        return self._link_gene_list(confidence, gene_list)
+
+    def _link_gene_list(self, confidence: PanelAppConfidence, gene_list: GeneList) -> GeneList:
+        cache_gene_list, _ = PanelAppPanelLocalCacheGeneList.objects.get_or_create(
+            panel_app_panel_local_cache=self, panel_app_confidence=confidence, defaults={"gene_list": gene_list})
+        return cache_gene_list.gene_list
 
     def __str__(self):
         return f"PanelApp cache for {self.panel_app_panel} v{self.version} (mod: {self.modified})"
+
+
+class PanelAppPanelLocalCacheGeneList(models.Model):
+    """ The shared, public GeneList (category PANEL_APP_CACHE) holding one panel version's genes at a minimum
+        confidence. Gene List nodes use it directly; a user's list created from PanelApp is a copy with this
+        list as its source_gene_list, which is how it knows its panel and version (#2846) """
+    panel_app_panel_local_cache = models.ForeignKey(PanelAppPanelLocalCache, on_delete=CASCADE)
+    panel_app_confidence = models.CharField(max_length=1, choices=PanelAppConfidence.choices)
+    gene_list = models.OneToOneField(GeneList, on_delete=CASCADE, related_name="panel_app_version")
+
+    class Meta:
+        unique_together = ("panel_app_panel_local_cache", "panel_app_confidence")
+
+    def __str__(self):
+        confidence = PanelAppConfidence(self.panel_app_confidence).label
+        return f"PanelApp: {self.panel_app_panel} v{self.version} ({confidence})"
+
+    @property
+    def panel_app_panel(self) -> PanelAppPanel:
+        return self.panel_app_panel_local_cache.panel_app_panel
+
+    @property
+    def version(self) -> str:
+        return self.panel_app_panel_local_cache.version
+
+    @property
+    def has_newer_version(self) -> bool:
+        return self.panel_app_panel.current_version != self.version
 
 
 class PanelAppPanelLocalCacheGeneSymbol(models.Model):
