@@ -457,6 +457,11 @@ ANNOTATION_ANNOTSV_GENOME_BUILD = {
 ANNOTATION_ANNOTSV_BUNDLE_VERSION = "3.5"  # Annotations_Human_3.5.tar.gz
 ANNOTATION_ANNOTSV_EXTRA_ARGS: list[str] = []
 ANNOTATION_ANNOTSV_TIMEOUT_SECONDS = 60 * 60
+# AnnotSV runs on its own celery pool, so its memory (GBs on a range of large CNVs, #2841) is capped by that
+# pool's --concurrency rather than taking every annotation_workers slot at once. The dispatcher sizes the
+# AnnotSV budget from the live pool on this queue; nothing dispatches AnnotSV while no worker consumes it,
+# which deployment_check warns about.
+ANNOTATION_ANNOTSV_WORKER_QUEUE = "heavy_workers"
 # Admin email used in PubMed queries to contact before throttling/banning
 ANNOTATION_ENTREZ_EMAIL = get_secret("ENTREZ.email")  # Automatically set in in annotation.apps.AnnotationConfig
 ANNOTATION_ENTREZ_API_KEY = get_secret("ENTREZ.api_key")

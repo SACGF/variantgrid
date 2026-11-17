@@ -16,7 +16,7 @@ from annotation.annotation_versions import (
     get_annotation_range_lock_and_unannotated_count,
     merge_pending_range_locks,
 )
-from annotation.celery_utils import annotation_worker_slots
+from annotation.celery_utils import worker_queue_slots
 from annotation.models import (
     AnnotationRun,
     AnnotationStatus,
@@ -25,7 +25,13 @@ from annotation.models import (
 )
 from annotation.models.models_annotation_run import AnnotationPipelineVersion, AnnotationRangeLock
 from annotation.models.models_annotation_version import AnnotationVersion
-from annotation.pipelines import PIPELINES, enabled_pipeline_types, get_runner
+from annotation.pipelines import (
+    PIPELINES,
+    enabled_pipeline_types,
+    get_pipeline,
+    get_runner,
+    worker_queue_pipeline_types,
+)
 from annotation.signals.manual_signals import annotation_run_discarded_signal
 from annotation.tasks.annotate_variants import annotate_variants, import_annotation_run
 from library.constants import HOUR_SECS, MINUTE_SECS
@@ -49,7 +55,7 @@ COUNT_LEASE_PREFIX = "count:"
 _LOW_DISK_REPORT_CACHE_KEY = "annotation_dispatch_low_disk_reported"
 _LOW_DISK_REPORT_TTL = HOUR_SECS
 # get_disk_usage_for_directory shells out to df, and the dispatcher runs on every run completion - so
-# cache it briefly, as annotation_worker_slots does with its celery inspect() broadcast. Free space over
+# cache it briefly, as worker_queue_slots does with its celery inspect() broadcast. Free space over
 # a minute moves by at most a fraction of one run's output, well inside the threshold's headroom.
 _DISK_USAGE_CACHE_KEY = "annotation_dump_dir_disk_usage"
 _DISK_USAGE_CACHE_TTL = MINUTE_SECS
@@ -359,7 +365,7 @@ def _dispatch_sweep(priority_vav: Optional[VariantAnnotationVersion] = None):
     """ The one dispatch path, across every dispatchable version. Two properties that matter when a
         build is bulk-annotating a NEW version:
 
-        1. ONE global worker-capacity budget shared across versions (the worker pool is shared, so a
+        1. ONE global worker-capacity budget per pool shared across versions (the worker pool is shared, so a
            per-version budget over-commits - each version would see the full pool minus only its own
            in-flight, and collectively lease far more than the pool can run).
         2. Upload-only (resume) runs on EVERY version are launched before ANY full-VEP CREATED run on ANY
@@ -380,18 +386,23 @@ def _dispatch_sweep(priority_vav: Optional[VariantAnnotationVersion] = None):
         # (one batched task on db_workers, not competing with VEP).
         _dispatch_counts(vav, now)
 
-    # #1649: two independent budgets - VEP (annotation_workers) and DB import (db_workers). Quick imports
-    # drain at their own concurrency and never wait behind (or eat a slot of) VEP, and vice versa.
-    vep_slots = annotation_worker_slots()
-    vep_in_flight = sum(_lane_in_flight_qs(vav, now, _VEP_RUNNING_STATUSES).count() for vav in vavs)
-    vep_capacity = vep_slots - vep_in_flight
+    # #1649: independent budgets - the tool step (annotate_variants) on each pipeline's worker queue, and DB
+    # import (db_workers). Quick imports drain at their own concurrency and never wait behind (or eat a slot
+    # of) VEP, and vice versa; AnnotSV on its own pool never holds the VEP slots (#2841).
+    tool_lanes = []
+    for queue, pipeline_types in worker_queue_pipeline_types().items():
+        slots = worker_queue_slots(queue)
+        in_flight = sum(_lane_in_flight_qs(vav, now, _VEP_RUNNING_STATUSES, pipeline_types).count() for vav in vavs)
+        tool_lanes.append((queue, pipeline_types, slots, in_flight))
 
     upload_slots = settings.ANNOTATION_UPLOAD_WORKER_SLOTS
     upload_in_flight = sum(_lane_in_flight_qs(vav, now, _IMPORT_RUNNING_STATUSES).count() for vav in vavs)
     upload_capacity = upload_slots - upload_in_flight
 
-    logging.info("dispatch sweep: vep slots=%d in_flight=%d cap=%d | import slots=%d in_flight=%d cap=%d",
-                 vep_slots, vep_in_flight, vep_capacity, upload_slots, upload_in_flight, upload_capacity)
+    tool_summary = " | ".join(f"{queue} slots={slots} in_flight={in_flight} cap={slots - in_flight}"
+                              for queue, _, slots, in_flight in tool_lanes)
+    logging.info("dispatch sweep: %s | import slots=%d in_flight=%d cap=%d",
+                 tool_summary, upload_slots, upload_in_flight, upload_capacity)
 
     worker_id = f"dispatch:{dispatch_annotation_runs.request.id or 'sync'}"
     # Import lane first so cheap DB imports (sometimes user-awaited) launch without waiting on the VEP scan.
@@ -399,9 +410,12 @@ def _dispatch_sweep(priority_vav: Optional[VariantAnnotationVersion] = None):
         _lease_across_vavs(vavs, AnnotationStatus.ANNOTATION_COMPLETED, upload_capacity, worker_id, now)
     # #1670: checked after the import lane has been dispatched, so a low-disk pause still lets the
     # already-annotated backlog drain (and free its dumps).
-    if vep_capacity > 0 and has_free_disk_for_annotation():
-        _lease_across_vavs(_unblocked_variant_annotation_versions(vavs), AnnotationStatus.CREATED,
-                           vep_capacity, worker_id, now)
+    tool_lanes_with_capacity = [lane for lane in tool_lanes if lane[2] > lane[3]]
+    if tool_lanes_with_capacity and has_free_disk_for_annotation():
+        unblocked_vavs = _unblocked_variant_annotation_versions(vavs)
+        for _, pipeline_types, slots, in_flight in tool_lanes_with_capacity:
+            _lease_across_vavs(unblocked_vavs, AnnotationStatus.CREATED, slots - in_flight, worker_id, now,
+                               pipeline_types=pipeline_types)
 
 
 def _unblocked_variant_annotation_versions(vavs) -> list[VariantAnnotationVersion]:
@@ -417,18 +431,25 @@ def _unblocked_variant_annotation_versions(vavs) -> list[VariantAnnotationVersio
     return unblocked
 
 
-def _lease_across_vavs(vavs, status, capacity, worker_id, now) -> int:
-    """ Lease + launch up to `capacity` dispatchable runs of the given status across the versions, lowest
-        min-variant-id first within each version. Returns remaining capacity. CREATED backlog is merged
-        into bigger VEP batches when it exceeds the capacity left for it. Capacity is only consumed by a
-        lease actually won - a run another dispatcher got to first costs nothing. """
+def _lease_across_vavs(vavs, status, capacity, worker_id, now, pipeline_types=None) -> int:
+    """ Lease + launch up to `capacity` dispatchable runs of the given status (and pipeline types, for one
+        tool lane) across the versions, lowest min-variant-id first within each version. Returns remaining
+        capacity. CREATED backlog is merged into bigger VEP batches when it exceeds the capacity left for
+        it. Capacity is only consumed by a lease actually won - a run another dispatcher got to first costs
+        nothing. """
+    def runs_qs():
+        qs = _dispatchable_runs_qs(vav, now).filter(status=status)
+        if pipeline_types is not None:
+            qs = qs.filter(pipeline_type__in=pipeline_types)
+        return qs
+
     for vav in vavs:
         if capacity <= 0:
             break
-        qs = _dispatchable_runs_qs(vav, now).filter(status=status)
+        qs = runs_qs()
         if status == AnnotationStatus.CREATED and qs.count() > capacity:
             merge_pending_range_locks(vav, settings.ANNOTATION_VEP_BATCH_MAX)
-            qs = _dispatchable_runs_qs(vav, now).filter(status=status)
+            qs = runs_qs()
         launched = 0
         for annotation_run in qs.order_by("annotation_range_lock__min_variant_id"):
             if capacity <= 0:
@@ -510,17 +531,20 @@ _VEP_RUNNING_STATUSES = [AnnotationStatus.CREATED, AnnotationStatus.DUMP_STARTED
 _IMPORT_RUNNING_STATUSES = [AnnotationStatus.ANNOTATION_COMPLETED, AnnotationStatus.UPLOAD_STARTED]
 
 
-def _lane_in_flight_qs(vav: VariantAnnotationVersion, now, statuses):
+def _lane_in_flight_qs(vav: VariantAnnotationVersion, now, statuses, pipeline_types=None):
     """ Runs of the given lane currently occupying one of that lane's worker slots: a live lease or a
         held task_id, in one of the lane's running statuses. A pending (un-leased, no task_id) run is
         excluded - CREATED waiting for the VEP lane, or ANNOTATION_COMPLETED waiting for the import lane,
         holds no slot yet. A count-leased run holds no run slot either - the whole batch occupies one
         db_worker via a single count_annotation_runs task, so counting it here would starve the VEP lane
         of its entire budget for the count window. """
-    return AnnotationRun.objects.filter(
+    qs = AnnotationRun.objects.filter(
         annotation_range_lock__version=vav, external=False, status__in=statuses,
     ).filter(Q(lease_expires__gte=now) | Q(task_id__isnull=False)) \
         .exclude(leased_by__startswith=COUNT_LEASE_PREFIX)
+    if pipeline_types is not None:
+        qs = qs.filter(pipeline_type__in=pipeline_types)
+    return qs
 
 
 def _lease_and_launch_run(annotation_run: AnnotationRun, worker_id: str, now) -> bool:
@@ -543,13 +567,15 @@ def _lease_and_launch_run(annotation_run: AnnotationRun, worker_id: str, now) ->
     if dispatches - annotation_run.attempt_count >= settings.ANNOTATION_MAX_RUN_ATTEMPTS:
         logging.warning("AnnotationRun %s dispatched %d times but only executed %d - its queue may not "
                         "be getting consumed", annotation_run.pk, dispatches, annotation_run.attempt_count)
-    # #1649: launch the right lane by status. VEP lane (annotate_variants) -> annotation_workers; post-VEP
-    # import lane (import_annotation_run) -> db_workers. Both routed statically in celery_settings.py; the
-    # dispatcher just picks the task. ANNOTATION_COMPLETED only ever means 'VEP done, DB upload pending'.
+    # #1649: launch the right lane by status. Tool lane (annotate_variants) -> the pipeline's worker queue;
+    # post-VEP import lane (import_annotation_run) -> db_workers, routed statically in celery_settings.py.
+    # ANNOTATION_COMPLETED only ever means 'tool done, DB upload pending'.
     if annotation_run.status == AnnotationStatus.ANNOTATION_COMPLETED:
         import_annotation_run.apply_async((annotation_run.pk,))  # @UndefinedVariable
     else:
-        annotate_variants.apply_async((annotation_run.pk,))  # @UndefinedVariable
+        worker_queue = get_pipeline(annotation_run.pipeline_type).worker_queue
+        annotate_variants.apply_async((annotation_run.pk,), queue=worker_queue,  # @UndefinedVariable
+                                     routing_key=worker_queue)
     return True
 
 

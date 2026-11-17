@@ -268,7 +268,7 @@ class AnnotationDiskGateTestCase(TestCase):
                               available_nice=f"{free_gigs}G", percent_nice="95%")
 
     def _dispatch(self, free_gigs):
-        with mock.patch.object(annotation_scheduler_task, "annotation_worker_slots", return_value=4), \
+        with mock.patch.object(annotation_scheduler_task, "worker_queue_slots", return_value=4), \
                 mock.patch.object(annotation_scheduler_task, "_annotation_dump_disk_usage",
                                   return_value=self._disk_usage(free_gigs)), \
                 mock.patch.object(annotate_variants, "apply_async") as vep_launch, \

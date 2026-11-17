@@ -67,7 +67,7 @@ HEAVY_WORKERS = {'queue': 'heavy_workers', 'routing_key': 'heavy_workers'}
 CELERY_WORKER_NAMES = ['annotation_workers', 'db_workers', 'web_workers',
                        'scheduling_single_worker', 'variant_id_single_worker']
 CELERY_ANALYSIS_WORKER_NAMES = ['analysis_workers']
-CELERY_HEAVY_WORKER_NAMES = ['heavy_workers']  # Only needed when SOMALIER is enabled
+CELERY_HEAVY_WORKER_NAMES = ['heavy_workers']  # Only needed when SOMALIER or ANNOTATION_ANNOTSV_ENABLED is on
 
 CELERY_TASK_ROUTES = {
     # Analysis

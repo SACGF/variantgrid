@@ -2,7 +2,8 @@
 AnnotSV TSV ingestion. Reads the AnnotSV-annotated TSV produced for a SV
 AnnotationRun and updates the VariantAnnotation rows VEP already wrote.
 
-Only "full" lines are persisted in this iteration. "split" lines (per-gene
+Only "full" lines are persisted in this iteration, and AnnotSV is run with
+-annotationMode full so it writes no others. "split" lines (per-gene
 overlaps) are counted for diagnostic logging only - persisting them needs a
 gene-release mapping to our Gene table that AnnotSV's bundle-pinned snapshot
 does not currently match. Tracked as a follow-up to issue #1533.

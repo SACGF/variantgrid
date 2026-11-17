@@ -55,7 +55,7 @@ def _celery_worker_status() -> dict:
     worker_names = settings.CELERY_WORKER_NAMES.copy()
     if settings.URLS_APP_REGISTER["analysis"]:
         worker_names.extend(settings.CELERY_ANALYSIS_WORKER_NAMES)
-    if settings.SOMALIER.get("enabled"):
+    if settings.SOMALIER.get("enabled") or settings.ANNOTATION_ANNOTSV_ENABLED:
         worker_names.extend(settings.CELERY_HEAVY_WORKER_NAMES)
 
     i = app.control.inspect()

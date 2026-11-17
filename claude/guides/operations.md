@@ -39,7 +39,7 @@ systemd units, all restarted by `scripts/restart_services.sh` (`stop_services.sh
 | `annotation_workers` | VEP dumps / runs / uploads |
 | `variant_id_single_worker` | one process: inserts new Loci/Variants so there is exactly one row per coordinate |
 | `scheduling_single_worker` | one process: schedulers that must not race (annotation, node tasks) |
-| `heavy_workers` | two processes: memory-hungry subprocesses (somalier), so a burst of imports can't OOM the box |
+| `heavy_workers` | two processes: memory-hungry subprocesses (somalier, AnnotSV via `ANNOTATION_ANNOTSV_WORKER_QUEUE`), so a burst of imports or large-CNV ranges can't OOM the box. Needed wherever either is enabled, on the machine that has AnnotSV installed |
 
 Memory: `db_workers`, `web_workers` and `analysis_workers` default to one process per CPU (~200 MB each idle), which a
 many-core box with little RAM can't afford - pass `--concurrency` in its `config/celery/*.env`. Install the redis drop-in
@@ -185,22 +185,26 @@ instead of plain collectstatic on a dev box.
 large scratch output belongs under `/data`.
 
 AnnotSV (`ANNOTATION_ANNOTSV_BIN`) is built from a tag on our fork, `v<upstream version>-vg<N>` on davmlaw/AnnotSV,
-rather than an upstream release: stock AnnotSV's regulatory elements step holds every SV / regulatory element
-intersection in memory, so a range with many SVs over 10 Mb is killed for memory on every retry (#2841). The fork's
-output is byte-identical and it keeps upstream's `-version`, so swapping it in for the same upstream version needs no
-new pipeline version (`annotation/pipelines/base.py:AnnotationPipelineRunner.check_tool_version` compares it). Use the tag
-matching the installed version (`AnnotSV -version`), `v3.5.8-vg1` or `v3.5.10-vg1`:
+rather than an upstream release: stock AnnotSV holds whole regulatory element intersects, and every split line until
+the output is written, in memory, so a range with many SVs over 10 Mb is killed for memory on every retry; and it never
+applies ACMG criteria 4O/2C/2F from partially overlapping benign SVs (#2841). The fork's output differs from upstream's,
+so it reports its own `-version` (`<upstream>-vg<N>`), and installing it is a new pipeline version to register and
+promote, which re-runs AnnotSV on every range (`annotation/pipelines/base.py:AnnotationPipelineRunner.check_tool_version`
+refuses runs until then). `manage.py deployment_check` prints the install for the installed version
+(`annotation/annotsv_annotation.py:get_annotsv_fork_install_instructions`): as the owner of the AnnotSV install, which is
+often not the VariantGrid user, back up the code, clone the tag into a temporary directory and
+`make PREFIX=<install> install` from it. `make install` replaces only the code - the annotations bundle stays - and
+leaves no link to the clone. It also re-clones `share/python3/variantconvert` and prints "variantconvert not installed"
+(pip refusing the system Python) and "Annotations need to be installed": harmless, as VariantGrid reads the TSV. A
+deployment on a version the fork has no tag for moves to the latest tag and registers it as a new pipeline version.
 
-```bash
-git clone --branch v3.5.10-vg1 https://github.com/davmlaw/AnnotSV.git /data/annotation/AnnotSV_src_v3.5.10-vg1
-cd /data/annotation/AnnotSV_src_v3.5.10-vg1 && make PREFIX=/data/annotation/AnnotSV install
-```
+AnnotSV runs go to the `heavy_workers` queue (`ANNOTATION_ANNOTSV_WORKER_QUEUE`), whose `--concurrency` caps how many
+run at once; the dispatcher gives that queue its own budget (`annotation/tasks/annotation_scheduler_task.py:_dispatch_sweep`).
+Run `celeryd_heavy_workers` on the machine with AnnotSV installed, or no AnnotSV run is dispatched.
 
-`make install` replaces only the code; the annotations bundle stays. A deployment on a version the fork has no tag
-for moves to the latest tag and registers it as a new pipeline version.
-
-`manage.py deployment_check` warns while the installed AnnotSV is not the fork, and a manual migration step asks
-existing deployments to switch. `claude/runbooks/upstream_watch.md` says when the fork can go.
+`manage.py deployment_check` warns while the installed AnnotSV is not the current fork or nothing consumes its queue,
+and manual migration steps ask existing deployments to switch. `claude/runbooks/upstream_watch.md` says when the fork
+can go.
 
 Installing an AnnotSV annotations bundle (`ANNOTATION_ANNOTSV_ANNOTATIONS_DIR`) ends with sorting its regulatory
 element files, or every AnnotSV run on GRCh38 and T2T takes 1.4 GB more: `manage.py deployment_check` warns with

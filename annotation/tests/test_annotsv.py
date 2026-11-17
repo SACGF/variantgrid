@@ -9,7 +9,9 @@ from django.test.utils import override_settings
 from annotation.annotation_run_files import get_annotsv_dir, write_qs_to_vcf
 from annotation.annotation_versions import get_annotation_range_lock_and_unannotated_count
 from annotation.annotsv_annotation import (
+    ANNOTSV_FORK_FIXES,
     get_annotsv_command,
+    get_annotsv_fork_fixes_installed,
     get_annotsv_tsv_filename,
     is_annotsv_fork_installed,
 )
@@ -227,21 +229,24 @@ class TestGetAnnotsvCommand(TestCase):
 class TestAnnotsvForkInstalled(TestCase):
     """ #2841: the fork keeps upstream's -version, so it is told apart by its Tcl sources, found the way the AnnotSV
         launcher finds them. """
-    def _install(self, install_dir: str, tcl_dir_name: str, regulatory_elements_tcl: str):
+    def _install(self, install_dir: str, tcl_dir_name: str, fixed: set[str]):
         os.makedirs(os.path.join(install_dir, "bin"))
         tcl_dir = os.path.join(install_dir, "share", tcl_dir_name, "AnnotSV")
         os.makedirs(tcl_dir)
-        with open(os.path.join(tcl_dir, "AnnotSV-regulatoryelements.tcl"), "w", encoding="utf-8") as f:
-            f.write(regulatory_elements_tcl)
+        for tcl_filename, marker in ANNOTSV_FORK_FIXES.items():
+            with open(os.path.join(tcl_dir, tcl_filename), "w", encoding="utf-8") as f:
+                f.write(marker if tcl_filename in fixed else "proc stock {} {")
         return os.path.join(install_dir, "bin", "AnnotSV")
 
     def test_fork_and_stock(self):
+        all_fixes = set(ANNOTSV_FORK_FIXES)
+        older_fork = {"AnnotSV-regulatoryelements.tcl"}
         for tcl_dir_name in ["tcl8.6", "tcl"]:
-            for tcl, expected in [("proc recordRegulatedGenes {f selectOnRead} {", True),
-                                  ("proc regulatoryElementsAnnotation {L_allGenesOverlapped} {", False)]:
-                with self.subTest(tcl_dir_name=tcl_dir_name, expected=expected), tempfile.TemporaryDirectory() as d:
-                    annotsv_bin = self._install(d, tcl_dir_name, tcl)
+            for fixed, expected in [(all_fixes, True), (older_fork, False), (set(), False)]:
+                with self.subTest(tcl_dir_name=tcl_dir_name, fixed=fixed), tempfile.TemporaryDirectory() as d:
+                    annotsv_bin = self._install(d, tcl_dir_name, fixed)
                     with override_settings(ANNOTATION_ANNOTSV_BIN=annotsv_bin):
+                        self.assertEqual(get_annotsv_fork_fixes_installed(), fixed)
                         self.assertEqual(is_annotsv_fork_installed(), expected)
 
     def test_not_installed(self):

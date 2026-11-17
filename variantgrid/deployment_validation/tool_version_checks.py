@@ -1,7 +1,7 @@
 """
 deployment_check "Tool versions": every external binary the server shells out to, checked the way it is
 used. check_tool_versions is the entry point (it also warns about AnnotSV bundle files that cost memory,
-and about stock AnnotSV in place of our fork);
+about stock AnnotSV in place of our fork, and about no worker on AnnotSV's queue);
 check_vcf_split_pipe runs the real VCF import split stage
 (GNU split --filter | bash | bgzip) on a tiny VCF, since a tool missing inside that filter only fails
 at import time rather than on the command line.
@@ -17,11 +17,14 @@ import tempfile
 from django.conf import settings
 
 from annotation.annotsv_annotation import (
+    ANNOTSV_FORK_FIXES,
+    get_annotsv_fork_fixes_installed,
     get_annotsv_fork_install_instructions,
     get_annotsv_sort_regulatory_elements_script,
     get_annotsv_unsorted_regulatory_element_files,
     is_annotsv_fork_installed,
 )
+from annotation.celery_utils import live_worker_queue_slots
 from pedigree.graphs.pedigree_chart import get_ped_parser_command
 from snpdb.models import SomalierConfig
 from upload.vcf.vcf_preprocess import get_bcftools_tool_version, get_split_vcf_command
@@ -111,8 +114,20 @@ def check_annotsv_fork_installed() -> dict:
         large SVs (#2841) """
     check = {"valid": True}
     if not is_annotsv_fork_installed():
-        check["warning"] = ("AnnotSV is not the fork with the fixed regulatory elements step. "
-                            + get_annotsv_fork_install_instructions())
+        if missing := sorted(set(ANNOTSV_FORK_FIXES) - get_annotsv_fork_fixes_installed()):
+            check["warning"] = (f"AnnotSV is not the current fork: {', '.join(missing)} not fixed. "
+                                + get_annotsv_fork_install_instructions())
+    return check
+
+
+def check_annotsv_worker_queue() -> dict:
+    """ A warning, not invalid: AnnotSV runs wait, CREATED, until a worker consumes their queue (#2841) """
+    check = {"valid": True}
+    queue = settings.ANNOTATION_ANNOTSV_WORKER_QUEUE
+    if not live_worker_queue_slots(queue):
+        check["warning"] = (f"No celery worker is consuming {queue} (ANNOTATION_ANNOTSV_WORKER_QUEUE), so no AnnotSV "
+                            f"run is dispatched. Start celeryd_{queue} on the machine that has AnnotSV installed "
+                            f"(config/systemd/celeryd_{queue}.service)")
     return check
 
 
@@ -168,5 +183,6 @@ def check_tool_versions() -> dict:
     if settings.ANNOTATION_ANNOTSV_ENABLED:
         tool_versions["AnnotSV regulatory elements sorted"] = check_annotsv_regulatory_elements_sorted()
         tool_versions["AnnotSV fork (#2841)"] = check_annotsv_fork_installed()
+        tool_versions["AnnotSV worker queue (#2841)"] = check_annotsv_worker_queue()
 
     return tool_versions

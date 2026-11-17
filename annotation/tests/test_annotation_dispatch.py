@@ -67,6 +67,7 @@ from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
 
 STANDARD = VariantAnnotationPipelineType.STANDARD
 STRUCTURAL = VariantAnnotationPipelineType.STRUCTURAL_VARIANT
+ANNOTSV = VariantAnnotationPipelineType.ANNOTSV
 
 
 @override_settings(**get_fake_annotation_settings_dict(columns_version=2))
@@ -118,7 +119,7 @@ class AnnotationDispatchTestCase(TestCase):
             import_annotation_run.apply_async (import lane) mock is stored on self.import_launch and the
             count_annotation_runs kick mock on self.count_kick. """
         with ExitStack() as stack:
-            stack.enter_context(mock.patch.object(annotation_scheduler_task, "annotation_worker_slots",
+            stack.enter_context(mock.patch.object(annotation_scheduler_task, "worker_queue_slots",
                                                   return_value=slots))
             launch = stack.enter_context(mock.patch.object(annotate_variants, "apply_async"))
             self.import_launch = stack.enter_context(mock.patch.object(import_annotation_run, "apply_async"))
@@ -175,7 +176,7 @@ class AnnotationDispatchTestCase(TestCase):
         self.assertIn(self.vav.pk, dispatchable_pks)  # ACTIVE still swept
 
         with ExitStack() as stack:
-            stack.enter_context(mock.patch.object(annotation_scheduler_task, "annotation_worker_slots",
+            stack.enter_context(mock.patch.object(annotation_scheduler_task, "worker_queue_slots",
                                                   return_value=2))
             launch = stack.enter_context(mock.patch.object(annotate_variants, "apply_async"))
             stack.enter_context(mock.patch.object(count_annotation_runs, "apply_async"))
@@ -183,7 +184,7 @@ class AnnotationDispatchTestCase(TestCase):
                                                   "merge_pending_range_locks", return_value=0))
             dispatch_annotation_runs()  # no arg -> beat sweep over all dispatchable versions
 
-        launch.assert_any_call((new_run.pk,))
+        launch.assert_any_call((new_run.pk,), queue="annotation_workers", routing_key="annotation_workers")
         new_run.refresh_from_db()
         self.assertEqual(new_run.dispatch_count, 1)
         self.assertIsNotNone(new_run.lease_expires)
@@ -213,7 +214,7 @@ class AnnotationDispatchTestCase(TestCase):
         self.assertEqual(upload_run.status, AnnotationStatus.ANNOTATION_COMPLETED)
 
         with ExitStack() as stack:
-            stack.enter_context(mock.patch.object(annotation_scheduler_task, "annotation_worker_slots",
+            stack.enter_context(mock.patch.object(annotation_scheduler_task, "worker_queue_slots",
                                                   return_value=1))  # one VEP slot
             launch = stack.enter_context(mock.patch.object(annotate_variants, "apply_async"))
             import_launch = stack.enter_context(mock.patch.object(import_annotation_run, "apply_async"))
@@ -342,6 +343,27 @@ class AnnotationDispatchTestCase(TestCase):
         self.assertEqual(run.status, AnnotationStatus.ERROR)
         self.assertIsNone(run.lease_expires)
         self.assertFalse(run.is_dispatchable())
+
+    @override_settings(ANNOTATION_ANNOTSV_WORKER_QUEUE="heavy_workers")
+    def test_annotsv_dispatches_on_its_own_queue_and_budget(self):
+        # #2841: AnnotSV runs take heavy_workers slots, never annotation_workers ones
+        for i in range(3):
+            lock = self._make_lock(i, i, count=100, pipeline_types=(STANDARD, STRUCTURAL, ANNOTSV))
+            lock.annotationrun_set.filter(pipeline_type=STRUCTURAL).update(status=AnnotationStatus.FINISHED)
+        slots = {"annotation_workers": 3, "heavy_workers": 1}
+        with ExitStack() as stack:
+            stack.enter_context(mock.patch.object(annotation_scheduler_task, "worker_queue_slots",
+                                                  side_effect=slots.__getitem__))
+            launch = stack.enter_context(mock.patch.object(annotate_variants, "apply_async"))
+            stack.enter_context(mock.patch.object(count_annotation_runs, "apply_async"))
+            stack.enter_context(mock.patch.object(annotation_scheduler_task,
+                                                  "merge_pending_range_locks", return_value=0))
+            dispatch_annotation_runs(self.vav.pk)
+
+        launched = {c.args[0][0]: c.kwargs["queue"] for c in launch.call_args_list}
+        pipeline_types = dict(AnnotationRun.objects.filter(pk__in=launched).values_list("pk", "pipeline_type"))
+        queues_by_type = sorted((pipeline_types[pk], queue) for pk, queue in launched.items())
+        self.assertEqual(queues_by_type, [(ANNOTSV, "heavy_workers")] + [(STANDARD, "annotation_workers")] * 3)
 
     def test_dispatch_reclaims_then_relaunches(self):
         lock = self._make_lock(0, 0, count=100)

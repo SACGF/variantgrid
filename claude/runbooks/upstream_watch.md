@@ -16,7 +16,7 @@ column (the fifth `|`-separated field), so keep the table shape.
 | MaveDB stripped file | every deployment running MaveDB on a VEP_plugins `release/116` checkout from 2026-09-01 (Ensembl/VEP_plugins#853) | 2026-11-03 | 2027-02-03 |
 | gnomAD SV overlap via two `--custom` | Ensembl/ensembl-vep#1989 (`coords=2`, `show_overlaps`) for #1645 | 2026-11-03 | 2027-02-03 |
 | AnnotSV regulatory element sort | lgmgeo/AnnotSV#356 fixed in a released Annotations_Human bundle | 2026-11-10 | 2026-12-10 |
-| AnnotSV fork | lgmgeo/AnnotSV#358 fixed in an AnnotSV release | 2026-11-17 | 2026-12-17 |
+| AnnotSV fork | lgmgeo/AnnotSV#358, #359 and #360 fixed in an AnnotSV release | 2026-11-17 | 2026-12-17 |
 | chrX PAR table | a bioutils release with `bioutils.par` that installs on Python 3.14 (0.6.2 caps `<3.14`, biocommons/bioutils#97) | 2026-11-11 | 2026-12-11 |
 | HPO phenotype synonyms | an HPO release after 2026-10-24 carrying obophenotype/human-phenotype-ontology#11777-#11799 | 2026-11-12 | 2026-12-12 |
 | Transcript span from cdot | SACGF/cdot#246 (per-build `start`/`stop` written into the JSON) | 2026-11-16 | 2027-01-16 |
@@ -198,37 +198,49 @@ bundle that regresses.
 
 ## AnnotSV fork
 
-Deployments run AnnotSV from a `v<upstream>-vg<N>` tag on davmlaw/AnnotSV: upstream plus a rewrite of
-`regulatoryElementsAnnotation` (`share/tcl/AnnotSV/AnnotSV-regulatoryelements.tcl`) that intersects only the SV
-coordinates, reads `bedtools intersect` through a pipe and keeps each reportable (SV, gene, source) once, rather than
-holding every intersect line (#2841). Its output is byte-identical to stock and it keeps upstream's `-version`.
-Branches `358_regulatory_elements_memory` (3.5.10, the one to offer upstream) and
-`358_regulatory_elements_memory_3.5.8` on the fork.
+Deployments run AnnotSV from a `v<upstream>-vg<N>` tag on davmlaw/AnnotSV: upstream plus fixes, each on its own branch
+off the upstream release so it can go upstream as its own PR (#2841). The memory fixes give byte-identical output; the
+ranking fix is a correctness fix that changes the ACMG class, so the fork reports its own `-version`
+(`<upstream>-vg<N>`). The suffix changes only when the output does: a performance-only tag keeps it and needs no
+re-annotation; a tag that changes the output bumps it, which makes it a new pipeline version, and promoting that
+re-annotates every range.
+
+| Fix | Branch (3.5.10) | Upstream issue |
+|---|---|---|
+| regulatory elements: intersect only the SV coordinates, read `bedtools intersect` through a pipe, keep each reportable (SV, gene, source) once | `358_regulatory_elements_memory` | lgmgeo/AnnotSV#358 |
+| `-annotationMode full`: don't keep the split lines until the output is written (VariantGrid passes it, importing only full lines) | `annotation_mode_full_memory` | lgmgeo/AnnotSV#359 |
+| partially overlapping benign SVs read as (coord, source) pairs, so `po_B_*_allG_*` is filled and ranking criteria 4O (loss) and 2C/2F (gain) apply; `allG` only when the benign SV contains every gene of the SV, matched exactly (a substring match, or an SV with no genes, would give false benign calls) | `po_benign_coord_source_pairs` | lgmgeo/AnnotSV#360 |
+
+The deployment branches `vg_3.5.10` and `vg_3.5.8` carry all three plus the `-version` suffix, and are what the `-vg4`
+tags point at (`-vg1` had only the regulatory elements fix, `-vg2` the two memory fixes, both with upstream's
+`-version`; `-vg3`, the pairing fix without exact gene matching, was never deployed).
 
 What carries it in VariantGrid:
-- `annotation/annotsv_annotation.py:is_annotsv_fork_installed` tells the fork apart by its `recordRegulatedGenes` proc;
-  `ANNOTSV_FORK_TAGS` maps upstream version to fork tag
+- `annotation/annotsv_annotation.py:is_annotsv_fork_installed` tells the fork apart by a line each fixed Tcl source
+  has (`ANNOTSV_FORK_FIXES`); `ANNOTSV_FORK_TAGS` maps upstream version to fork tag
 - `variantgrid/deployment_validation/tool_version_checks.py:check_annotsv_fork_installed`, the `deployment_check` warning
-- `annotation/migrations/0020_annotsv_fork.py`, the manual step for existing deployments
+- `annotation/migrations/0020_annotsv_fork.py` (from stock) and `annotation/migrations/0021_annotsv_fork.py`
+  (from an older fork tag), the manual steps for existing deployments
 - the install steps in `claude/guides/operations.md` (data roots) and the wiki's Install-AnnotSV page
 
-Once the fork has run on a deployment for a while, open the 3.5.10 branch as a PR against lgmgeo/AnnotSV, citing
-lgmgeo/AnnotSV#358 (the maintainer is away until the end of 2026, lgmgeo/AnnotSV#356). If upstream releases before
-then without the fix, rebase the branch onto the new tag and add a tag and `ANNOTSV_FORK_TAGS` entry for it.
+Once the fork has run on a deployment for a while, open each fix branch as its own PR against lgmgeo/AnnotSV, citing
+its issue (the maintainer is away until the end of 2026, lgmgeo/AnnotSV#356). If upstream releases before then without
+the fixes, rebase the fix branches onto the new tag, merge them into a new deployment branch, and add a tag and
+`ANNOTSV_FORK_TAGS` entry for it.
 
 Check:
 
 ```bash
-gh issue view 358 --repo lgmgeo/AnnotSV --json state,closedAt -q '"\(.state) \(.closedAt)"'
+for n in 358 359 360; do gh issue view $n --repo lgmgeo/AnnotSV --json number,state -q '"\(.number) \(.state)"'; done
 gh release list --repo lgmgeo/AnnotSV --limit 3
 ```
 
-When resolved (a release whose regulatory elements step no longer grows with the SVs' total length; rerun the
-dense-SV comparison from #2841 against it):
+When resolved (a release with all three fixes: memory no longer grows with the SVs' total length - rerun the
+dense-SV comparison from #2841 against it - and the UGT2B17 deletion from lgmgeo/AnnotSV#360 gets 4O):
 - point the wiki and `claude/guides/operations.md` back at that upstream release
-- remove `check_annotsv_fork_installed`, and turn `is_annotsv_fork_installed` into "the regulatory elements step is
-  fixed" (the fork's marker, or `-version` at least the fixed release) so migration 0020 still imports and stays
-  quiet on deployments that moved to the release
+- remove `check_annotsv_fork_installed`, and turn `is_annotsv_fork_installed` and `get_annotsv_fork_fixes_installed`
+  into "the steps are fixed" (the fork's markers, or `-version` at least the fixed release) so migrations 0020 and
+  0021 still import and stay quiet on deployments that moved to the release
 - deployments install the release and register it as a new pipeline version
   (`manage.py create_new_annotation_pipeline_version --pipeline-type=A`), then delete this row
 

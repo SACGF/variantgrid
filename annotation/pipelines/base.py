@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from annotation.annotation_run_files import write_qs_to_vcf
 from annotation.annotation_version_querysets import get_variants_qs_for_annotation
+from annotation.celery_utils import ANNOTATION_WORKERS_QUEUE
 from annotation.enums import VariantAnnotationPipelineType
 from annotation.models.models_annotation_run import AnnotationPipelineVersion
 from library.utils.file_utils import mk_path_for_file
@@ -178,7 +179,8 @@ class PipelineDef:
     def __init__(self, runner: AnnotationPipelineRunner,
                  depends_on: Optional[VariantAnnotationPipelineType] = None,
                  blocks_vcf_import: bool = True,
-                 enabled_setting: Optional[str] = None):
+                 enabled_setting: Optional[str] = None,
+                 worker_queue_setting: Optional[str] = None):
         self.runner = runner
         # Must be FINISHED on the same AnnotationRangeLock before this may launch. Supplementary
         # pipelines update the VariantAnnotation rows a VEP pipeline wrote, so they queue behind it.
@@ -188,6 +190,9 @@ class PipelineDef:
         self.blocks_vcf_import = blocks_vcf_import
         # Settings flag gating whether the scheduler creates runs of this type at all.
         self.enabled_setting = enabled_setting
+        # Settings name of the celery queue annotate_variants runs this pipeline's tool on, when not
+        # annotation_workers. The dispatcher gives each queue its own budget, sized from its live pool.
+        self.worker_queue_setting = worker_queue_setting
 
     @property
     def pipeline_type(self) -> VariantAnnotationPipelineType:
@@ -196,6 +201,12 @@ class PipelineDef:
     @property
     def enabled(self) -> bool:
         return self.enabled_setting is None or bool(getattr(settings, self.enabled_setting))
+
+    @property
+    def worker_queue(self) -> str:
+        if self.worker_queue_setting:
+            return getattr(settings, self.worker_queue_setting)
+        return ANNOTATION_WORKERS_QUEUE
 
     def __str__(self):
         return f"PipelineDef({VariantAnnotationPipelineType(self.pipeline_type).label})"

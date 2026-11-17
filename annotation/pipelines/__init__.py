@@ -19,7 +19,8 @@ PIPELINES: dict[VariantAnnotationPipelineType, PipelineDef] = {p.pipeline_type: 
     PipelineDef(AnnotSVRunner(),
                 depends_on=VariantAnnotationPipelineType.STRUCTURAL_VARIANT,
                 blocks_vcf_import=False,
-                enabled_setting="ANNOTATION_ANNOTSV_ENABLED"),
+                enabled_setting="ANNOTATION_ANNOTSV_ENABLED",
+                worker_queue_setting="ANNOTATION_ANNOTSV_WORKER_QUEUE"),
 ]}
 
 
@@ -46,6 +47,15 @@ def versioned_pipeline_types() -> list[VariantAnnotationPipelineType]:
     """ Types whose runs are scheduled against an AnnotationPipelineVersion (#720) - the ones a tool
         upgrade re-runs, as opposed to VEP's, which roll with the VariantAnnotationVersion. """
     return [pt for pt, p in PIPELINES.items() if p.runner.versioned]
+
+
+def worker_queue_pipeline_types() -> dict[str, list[VariantAnnotationPipelineType]]:
+    """ The queue annotate_variants runs each pipeline's tool on, with the pipelines that share it - one
+        dispatch budget each. """
+    by_queue: dict[str, list[VariantAnnotationPipelineType]] = {}
+    for pipeline_type, pipeline_def in PIPELINES.items():
+        by_queue.setdefault(pipeline_def.worker_queue, []).append(pipeline_type)
+    return by_queue
 
 
 def vep_pipeline_types() -> list[VariantAnnotationPipelineType]:
