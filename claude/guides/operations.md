@@ -117,6 +117,16 @@ every hash on install. `uv.toml` holds a 7-day cooldown (`exclude-newer`): uv ne
 than a week old, except packages we publish (cdot), listed in `exclude-newer-package`; a security fix let in early
 gets its own dated entry there, removed once the week has passed (`claude/runbooks/upstream_watch.md`).
 
+Admitting a release early is a judgement call, so weigh it rather than bypassing the cooldown by default:
+- Only when we are exposed: our code reaches the vulnerable path with user-controlled input. A transitive package, or
+  a code path nothing calls (soupsieve's selector API, say), waits out the week.
+- Shortens the wait: a very widely downloaded package (more eyes, so bad releases are pulled within hours), a patch
+  release from its usual maintainers, a release already out for 48 hours.
+- Lengthens it: few downloads or a new maintainer, a release that adds install scripts or new dependencies. Dev-only is
+  not safer: dev tools run on developer boxes and in CI, where the credentials are.
+- npm has no rolling window here: resolve with `npm install --before=<date a week ago>`.
+- The commit message says why a release was let in early.
+
 Releases are git tags `vg<major>.<minor>` (`vg3.0`, and `vg4.0` once cut). `VARIANTGRID_VERSION` is `git describe` against the
 latest tag for `VARIANTGRID_MAJOR_VERSION` (`vg4.0-12-gc174556`, or `vg4-gc174556` before that major has a tag), read
 once per process from the checkout and reported by the API docs and `variantgrid/views_rest.py:CapabilitiesView`. Cutting a
