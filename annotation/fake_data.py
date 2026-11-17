@@ -11,6 +11,7 @@ from typing import Optional
 from uuid import uuid4
 
 from django.conf import settings
+from django.db.models import F
 from django.db.models.fields import IntegerField, TextField
 from django.utils import timezone
 
@@ -207,10 +208,30 @@ def get_fake_vep_version(genome_build: GenomeBuild, annotation_consortium, colum
     return fake_version
 
 
+# Dotted version, like the real NCBI/Ensembl releases - it ends up in labels and column names
+FAKE_GENE_ANNOTATION_RELEASE_VERSION = "42.20240101"
+FAKE_CLINVAR_FILENAME = "fake_clinvar.vcf"
+FAKE_HPA_FILENAME = "fake_hpa"
+
+
 def get_fake_annotation_version(genome_build: GenomeBuild) -> AnnotationVersion:
     if not settings.UNIT_TEST:
         raise ValueError("Called get_fake_annotation_version while not in a test!")
-    return create_fake_annotation_version(genome_build)
+    return _seeded_fake_annotation_version(genome_build) or create_fake_annotation_version(genome_build)
+
+
+def _seeded_fake_annotation_version(genome_build: GenomeBuild) -> Optional[AnnotationVersion]:
+    """ The chain create_fake_annotation_version builds, found in one query. VariantGridTestRunner seeds it
+        before cloning the test database, so the full get_or_create walk (with an md5 of each ontology test
+        file) is only needed when a test has replaced part of it, eg retire_seeded_annotation_version """
+    return AnnotationVersion.objects.filter(
+        genome_build=genome_build,
+        variant_annotation_version__status=VariantAnnotationVersion.Status.ACTIVE,
+        gene_annotation_version__gene_annotation_release__version=FAKE_GENE_ANNOTATION_RELEASE_VERSION,
+        gene_annotation_version__ontology_version=F("ontology_version"),
+        clinvar_version__filename=FAKE_CLINVAR_FILENAME,
+        human_protein_atlas_version__filename=FAKE_HPA_FILENAME,
+    ).order_by("pk").last()
 
 
 def create_fake_annotation_version(genome_build: GenomeBuild) -> AnnotationVersion:
@@ -218,8 +239,7 @@ def create_fake_annotation_version(genome_build: GenomeBuild) -> AnnotationVersi
     gene_annotation_import = GeneAnnotationImport.objects.get_or_create(genome_build=genome_build,
                                                                         annotation_consortium=AnnotationConsortium.ENSEMBL,
                                                                         url="fake")[0]
-    # Dotted version, like the real NCBI/Ensembl releases - it ends up in labels and column names
-    gene_annotation_release = GeneAnnotationRelease.objects.get_or_create(version="42.20240101",  # TextField
+    gene_annotation_release = GeneAnnotationRelease.objects.get_or_create(version=FAKE_GENE_ANNOTATION_RELEASE_VERSION,
                                                                           genome_build=genome_build,
                                                                           annotation_consortium=AnnotationConsortium.ENSEMBL,
                                                                           defaults={
@@ -248,10 +268,10 @@ def create_fake_annotation_version(genome_build: GenomeBuild) -> AnnotationVersi
             status=VariantAnnotationVersion.Status.ACTIVE,
             defaults=vav_defaults,
         )
-        clinvar_version = ClinVarVersion.objects.get_or_create(filename="fake_clinvar.vcf",
+        clinvar_version = ClinVarVersion.objects.get_or_create(filename=FAKE_CLINVAR_FILENAME,
                                                                sha256_hash="not_a_real_hash",
                                                                genome_build=genome_build)[0]
-        human_protein_atlas_version = HumanProteinAtlasAnnotationVersion.objects.get_or_create(filename="fake_hpa",
+        human_protein_atlas_version = HumanProteinAtlasAnnotationVersion.objects.get_or_create(filename=FAKE_HPA_FILENAME,
                                                                                                sha256_hash="not_a_real_hash",
                                                                                                hpa_version=0.42)[0]
 

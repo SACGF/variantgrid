@@ -51,8 +51,7 @@ python3 manage.py vg tests --changed                                        # on
   `DJANGO_SETTINGS_MODULE=variantgrid.settings.env_developers.<name>`. The module has to live under
   `variantgrid.settings`: `variantgrid/__init__.py` imports celery, which reads settings while the settings module
   is still importing, so a module anywhere else fails with a missing attribute. Drop the `test_<name>*`
-  databases afterwards. A fresh worktree also needs `manage.py collectstatic_js_reverse` before its first run
-  (the suite fails without the generated reverse.js).
+  databases afterwards. The runner generates the gitignored `reverse.js` the pages load when a fresh checkout has none.
 - A worktree or agent is spawned from `/opt/variantgrid` (or the box's checkout), never from inside
   `variantgrid_sapath/`: that directory is a separate git checkout of the private SA Pathology repo (excluded via
   `.git/info/exclude`), so a worktree created with it as the current directory is a sapath worktree with no

@@ -5,6 +5,7 @@ import shutil
 
 import cdot.hgvs.dataproviders.fasta_seqfetcher as fasta_seqfetcher
 from django.conf import settings
+from django.core.management import call_command
 from django.db import DEFAULT_DB_ALIAS, connections
 from django.db.migrations.loader import MigrationLoader
 from django.test.runner import DiscoverRunner
@@ -19,6 +20,13 @@ class VariantGridTestRunner(DiscoverRunner):
         import processing dir. External service clients are swapped for recorded-data mocks in settings
         (CLINGEN_ALLELE_REGISTRY_API_CLASS etc.), not here - a spawned worker never runs this runner's
         setup_test_environment """
+
+    def setup_test_environment(self, **kwargs):
+        super().setup_test_environment(**kwargs)
+        # Pages render {% static 'django_js_reverse/reverse.js' %}, which a fresh checkout (CI, a new worktree)
+        # doesn't have yet. Generated here it costs a fraction of a second, not another Django boot
+        if not os.path.exists(os.path.join(settings.JS_REVERSE_OUTPUT_PATH, "reverse.js")):
+            call_command("collectstatic_js_reverse")
 
     def teardown_test_environment(self, **kwargs):
         super().teardown_test_environment(**kwargs)

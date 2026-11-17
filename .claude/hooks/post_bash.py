@@ -30,8 +30,8 @@ ISSUE_URL_RE = re.compile(r"(?:github\.com|\brepos)/[\w.-]+/[\w.-]+/issues/\d+")
 WORKTREE_ADD_RE = re.compile(r"\bgit\s+worktree\s+add\b")
 WORKTREE_REMINDED_DIR = Path(tempfile.gettempdir()) / "vg_agent_rule_reminders"
 WORKTREE_REMINDER = ("A new worktree shares the virtualenv but not gitignored files: set it up as "
-                     "claude/guides/github.md#worktrees says (settings module, collectstatic_js_reverse, its own test "
-                     "database, collectstatic) and `git worktree remove` it when the PR is up.")
+                     "claude/guides/github.md#worktrees says (settings module, its own test database, "
+                     "collectstatic) and `git worktree remove` it when the PR is up.")
 
 
 def worktree_reminder(command: str, session_id: str) -> str:
