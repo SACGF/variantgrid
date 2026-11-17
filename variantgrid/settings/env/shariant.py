@@ -19,4 +19,5 @@ SEND_EMAILS = True
 # OIDC
 OIDC_REQUIRED_GROUP = '/variantgrid/shariant_production'
 OIDC_RP_CLIENT_ID = 'shariant'
-LOGOUT_REDIRECT_URL = KEY_CLOAK_PROTOCOL_BASE + '/logout?redirect_uri=https%3A%2F%2Fshariant.org.au'
+LOGOUT_REDIRECT_URL = "https://test.shariant.org.au"
+LOGIN_REDIRECT_URL_FAILURE = "/"

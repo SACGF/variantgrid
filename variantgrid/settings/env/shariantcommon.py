@@ -113,7 +113,7 @@ OIDC_OP_LOGOUT_URL_METHOD = 'oidc_auth.backend.provider_logout'
 
 HELP_URL = "https://shariant.readthedocs.io/en/latest/"
 # Read by mozilla_django_oidc's callback view on a failed login (generally an inactive user)
-LOGIN_REDIRECT_URL_FAILURE = '/accounts/logout/'
+LOGIN_REDIRECT_URL_FAILURE = '/'
 
 EMAIL_BACKEND = 'django_amazon_ses.EmailBackend'
 # Overwrite settings for your system below
