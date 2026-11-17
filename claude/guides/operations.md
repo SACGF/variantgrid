@@ -251,8 +251,9 @@ and many more variants and samples.
 
 ## Testing pipeline
 
-CI (`.github/workflows/django-tests.yml`) runs the suite with `--parallel 4 --keepdb` against Postgres 16, Redis and
-RabbitMQ service containers under `variantgrid/settings/env/github_actions.py`, skipping pushes that only touch `*.md` or `claude/**`. The migrated test database is restored from an Actions cache keyed on the migrations, the `fake_data.py` seed, the test runner and the requirements, so only a run that changes one of those pays the ~3 min of migrations;
+CI (`.github/workflows/django-tests.yml`) runs the suite with `--parallel 4 --keepdb` against Postgres 16 and Redis
+service containers under `variantgrid/settings/env/github_actions.py` (no RabbitMQ: the broker is `memory://` under
+tests), skipping pushes that only touch `*.md` or `claude/**`. The migrated test database is restored from an Actions cache keyed on the migrations, the `fake_data.py` seed, the test runner and the requirements; a run that changes one of those restores the newest older dump and migrates forward from it, so only the new migrations are paid for (a full rebuild is ~3 min, almost all of it Django's migration planning rather than SQL);
 `.github/workflows/agent-maps.yml` generates the maps and runs `vg docs check` on every push without a database, reporting dead citations as a warning rather than failing the build. Browser regression tests live in
 the private [variantgrid_autotests](https://github.com/SACGF/variantgrid_autotests) repo (Selenium, run with
 `run_tests.py <instance.ini> [test | +keyword | -keyword]` against a deployed instance) - the after-deploy net, not the edit

@@ -41,9 +41,9 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U snpdb"
-          --health-interval 10s
+          --health-interval 2s
           --health-timeout 5s
-          --health-retries 10
+          --health-retries 30
 
       redis:
         # Celery result backend - tests that wait on task results talk to it directly
@@ -53,25 +53,9 @@ jobs:
           - 6379:6379
         options: >-
           --health-cmd "redis-cli ping"
-          --health-interval 10s
+          --health-interval 2s
           --health-timeout 5s
-          --health-retries 10
-
-      rabbitmq:
-        # Some tests exercise code that publishes Celery tasks, so a real broker
-        # must be listening. The default guest user only accepts loopback
-        # connections and service containers aren't loopback, hence its own user.
-        image: rabbitmq:4
-        env:
-          RABBITMQ_DEFAULT_USER: variantgrid
-          RABBITMQ_DEFAULT_PASS: variantgrid
-        ports:
-          - 5672:5672
-        options: >-
-          --health-cmd "rabbitmq-diagnostics -q ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
+          --health-retries 30
 
     env:
       DJANGO_SETTINGS_MODULE: variantgrid.settings.env.github_actions
@@ -80,10 +64,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system libraries
-        # libpq-dev for psycopg2, zlib1g-dev for the bgzip python package (both build from sdist),
-        # tabix for the bgzip binary the VCF import split stage runs (variantgrid/tests/test_tool_version_checks.py)
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libpq-dev zlib1g-dev tabix
+      - name: Start installing tabix
+        # The bgzip/tabix binaries the VCF import split stage runs (variantgrid/tests/test_tool_version_checks.py),
+        # only needed by the test step - so apt runs in the background, behind the Python install, js_reverse and
+        # the database restore. Everything else the build needs (zlib headers for the bgzip sdist) is in the image.
+        run: |
+          (sudo NEEDRESTART_SUSPEND=1 DEBIAN_FRONTEND=noninteractive sh -c \
+             'apt-get update -qq && apt-get install -y -qq --no-install-recommends tabix'
+           echo $? > apt.status) < /dev/null > apt.log 2>&1 &
 
       - name: Install uv
         uses: astral-sh/setup-uv@v6
@@ -111,15 +99,24 @@ jobs:
         with:
           path: test_snpdb.dump
           key: test-db-v1-${{ hashFiles('*/migrations/*.py', '*/fake_data.py', 'variantgrid/test_runner.py', 'requirements.txt', 'requirements-dev.txt') }}
+          # On a miss, the newest dump from an older key: --keepdb then applies only the migrations added since, and the
+          # runner rebuilds it from scratch if it holds migrations that aren't on disk (another branch's)
+          restore-keys: test-db-v1-
 
       - name: Load cached test database
-        if: steps.test-db.outputs.cache-hit == 'true'
+        if: steps.test-db.outputs.cache-matched-key != ''
         # pg_restore from the service container, so client and server versions always match
         run: |
           docker exec "$POSTGRES_CONTAINER" createdb -U snpdb test_snpdb
           docker exec -i "$POSTGRES_CONTAINER" pg_restore -U snpdb --no-owner -d test_snpdb < test_snpdb.dump
         env:
           POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+
+      - name: Wait for tabix
+        run: |
+          while [ ! -f apt.status ]; do sleep 1; done
+          cat apt.log
+          exit "$(cat apt.status)"
 
       - name: Run unit tests
         # data/ is PRIVATE_DATA_ROOT (untracked) - some upload tests write output files there
