@@ -16,4 +16,6 @@ celery -b ${BROKER_URL} --app variantgrid worker -l DEBUG --max-tasks-per-child=
 celery -b ${BROKER_URL} --app variantgrid worker -l DEBUG --max-tasks-per-child=100 --concurrency=1 -n variant_id_single_worker --queues variant_id_single_worker &
 celery -b ${BROKER_URL} --app variantgrid worker -l DEBUG --max-tasks-per-child=100 --concurrency=1 -n scheduling_single_worker --queues scheduling_single_worker &
 celery -b ${BROKER_URL} --app variantgrid worker -l DEBUG --max-tasks-per-child=100 --concurrency=2 -n heavy_workers --queues heavy_workers &
+# Schedule state outside the checkout - it would otherwise land, untracked, in the repo root
+celery -b ${BROKER_URL} --app variantgrid beat -l INFO -s /tmp/celerybeat-schedule &
 wait
