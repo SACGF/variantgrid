@@ -615,10 +615,7 @@ class Overlap(TimeStampedModel, ReviewableModelMixin, PreviewModelMixin):
 
     def relevant_values(self) -> list[RelevantValue]:
         from classification.services.overlap_calculator import OverlapCalculatorOncPath, OverlapCalculatorClinSig
-        relevant_value_strs = set()
-        for entry in self.contributions.all():
-            if entry.contribution_status == OverlapContributionStatus.CONTRIBUTING:
-                relevant_value_strs.add(entry.effective_value)
+        relevant_value_strs = {entry.effective_value for entry in self.contributions_list}
 
         if self.value_type == ClassificationResultValue.ONC_PATH:
             return [
