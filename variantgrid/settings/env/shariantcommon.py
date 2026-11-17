@@ -56,6 +56,7 @@ CLASSIFICATION_GENE_CONSENSUS = False  # Records are curated in each lab's own s
 CLASSIFICATION_DIFF_COPIED_ONLY = False  # Likewise, so nothing on Shariant is copied from a previous classification
 CLASSIFICATION_ALLOW_DELETE = False
 CLASSIFICATION_ALLOW_UNKNOWN_KEYS = False
+CLASSIFICATION_MENU_LINK_TO_EVIDENCE_KEYS = False
 CLASSIFICATION_NON_ACMG_ASSERTION_METHOD = [
     re.compile(r'.*VCGS.*', flags=re.IGNORECASE),
     re.compile(r'.*Sherloc.*', flags=re.IGNORECASE)
