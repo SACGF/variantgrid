@@ -5,10 +5,13 @@ GQ but every record is only FC, so its calls were counted as nothing and the Sam
 filters. Candidates come from sample stats alone: a GT field where every sample has no ref/het/hom call and some unknown
 ones means no record had a GT. Only those VCFs (small CNV/SV files) have their genotype rows read, for which bound keys
 the stored CohortGenotype.format JSON holds, so this never scans a large partition. A VCF whose records have GT but not
-a declared depth field keeps it until reloaded; one without sample stats is skipped. Sample stats are recalculated for
-a VCF that changed, so its contents show.
+a declared depth field keeps it until reloaded; one without sample stats is skipped.
+Sample stats are recounted for a VCF that changed, so its contents show - forced, as the stats look fresh: unbinding
+GT changes what counts as a call, not the stats version. A VCF with no GT field whose stats still count none of its
+unknown-zygosity calls (unbound without that recount) is recounted too.
 --dry-run reports without writing.
-Registered as a deploy-time ManualOperation (upload/migrations/0005_one_off_clear_unused_vcf_format_fields.py).
+Registered as a deploy-time ManualOperation (upload/migrations/0005_one_off_clear_unused_vcf_format_fields.py, and
+again by 0006_one_off_clear_unused_vcf_format_fields_recount.py for deployments that ran it without the recount).
 """
 from django.core.management.base import BaseCommand
 from django.db import connection
@@ -25,15 +28,28 @@ from upload.vcf.vcf_import import (
 )
 
 
-def get_no_genotype_call_vcf_ids() -> set[int]:
-    """ VCFs with a GT field whose own cohort's per-sample stats show no ref/het/hom call at all """
+def _vcf_sample_stats_qs(has_genotype_field: bool):
+    """ Per-VCF sums of the per-sample stats on the VCF's own cohort """
     stats_qs = CohortGenotypeStats.objects.filter(
         sample__isnull=False, filter_key__isnull=True, passing_filter=False,
-        sample__vcf__genotype_field__isnull=False,
+        sample__vcf__genotype_field__isnull=not has_genotype_field,
         cohort_genotype_collection__cohort__vcf_id=F("sample__vcf_id"))
-    vcf_calls_qs = stats_qs.values("sample__vcf_id").annotate(
-        calls=Sum("ref_count") + Sum("het_count") + Sum("hom_count"), unknown=Sum("unk_count"))
-    return set(vcf_calls_qs.filter(calls=0, unknown__gt=0).values_list("sample__vcf_id", flat=True))
+    return stats_qs.values("sample__vcf_id").annotate(
+        genotype_calls=Sum("ref_count") + Sum("het_count") + Sum("hom_count"), unknown=Sum("unk_count"),
+        variants=Sum("variant_count"))
+
+
+def get_no_genotype_call_vcf_ids() -> set[int]:
+    """ VCFs with a GT field whose own cohort's per-sample stats show no ref/het/hom call at all """
+    vcf_stats_qs = _vcf_sample_stats_qs(has_genotype_field=True).filter(genotype_calls=0, unknown__gt=0)
+    return set(vcf_stats_qs.values_list("sample__vcf_id", flat=True))
+
+
+def get_uncounted_unknown_call_vcf_ids() -> set[int]:
+    """ VCFs with no GT field, where an unknown zygosity is a call, whose stats were counted while they had one:
+        unknown calls but no variants """
+    vcf_stats_qs = _vcf_sample_stats_qs(has_genotype_field=False).filter(variants=0, unknown__gt=0)
+    return set(vcf_stats_qs.values_list("sample__vcf_id", flat=True))
 
 
 def get_genotype_tables(vcf: VCF) -> list[str]:
@@ -67,13 +83,22 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--dry-run', action='store_true', help="Report what would change, change nothing")
 
+    @staticmethod
+    def _imported_vcfs(vcf_ids: set[int]):
+        vcf_qs = VCF.objects.filter(pk__in=vcf_ids, genotype_samples__gt=0, cohort__isnull=False,
+                                    data_archived_date__isnull=True, import_status=ImportStatus.SUCCESS)
+        return vcf_qs.select_related("genome_build").order_by("pk")
+
+    @staticmethod
+    def _recount_stats(vcf: VCF):
+        annotation_version = AnnotationVersion.latest(vcf.genome_build)
+        calculate_vcf_stats(vcf.pk, annotation_version.pk, force=True)
+
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
         existing_tables = set(connection.introspection.table_names())
-        vcf_qs = VCF.objects.filter(pk__in=get_no_genotype_call_vcf_ids(), genotype_samples__gt=0, cohort__isnull=False,
-                                    data_archived_date__isnull=True, import_status=ImportStatus.SUCCESS)
         num_changed = 0
-        for vcf in vcf_qs.select_related("genome_build").order_by("pk"):
+        for vcf in self._imported_vcfs(get_no_genotype_call_vcf_ids()):
             tables = [t for t in get_genotype_tables(vcf) if t in existing_tables]
             if not (tables and _exists(tables, "jsonb_array_length(format) > 0")):
                 continue  # Imported before FORMAT was stored - nothing to tell used from unused
@@ -91,8 +116,16 @@ class Command(BaseCommand):
             self.stdout.write(f"VCF {vcf.pk} ({vcf.name}): FORMAT {unused} declared but in no record - "
                               f"unbinding {', '.join(sorted(unbound))}")
             if not dry_run:
-                annotation_version = AnnotationVersion.latest(vcf.genome_build)
-                calculate_vcf_stats(vcf.pk, annotation_version.pk)
+                self._recount_stats(vcf)
+
+        # After the loop above, so the VCFs it has just recounted are not found again
+        num_recounted = 0
+        for vcf in self._imported_vcfs(get_uncounted_unknown_call_vcf_ids()):
+            num_recounted += 1
+            self.stdout.write(f"VCF {vcf.pk} ({vcf.name}): no GT field, but its stats count no calls - recounting")
+            if not dry_run:
+                self._recount_stats(vcf)
 
         mode = " (dry run)" if dry_run else ""
         self.stdout.write(f"{num_changed} VCFs{mode} with a GT field but no genotype calls had unused FORMAT fields")
+        self.stdout.write(f"{num_recounted} VCFs{mode} with no GT field had stats counting none of their calls")

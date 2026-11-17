@@ -46,13 +46,13 @@ SAMPLE_STATS_CODE_VERSION = 9
 
 
 @celery.shared_task
-def calculate_vcf_stats(vcf_id, annotation_version_id):
+def calculate_vcf_stats(vcf_id, annotation_version_id, force=False):
     vcf: VCF = VCF.objects.get(pk=vcf_id)
     try:
         annotation_version = AnnotationVersion.objects.get(pk=annotation_version_id)
         msg = f"Build for annotation: {annotation_version.genome_build} and VCF: {vcf.genome_build} match"
         assert annotation_version.genome_build == vcf.genome_build, msg
-        vcf_stats_counts = calculate_cohort_stats(vcf.cohort, annotation_version, with_vcf_stats=True)
+        vcf_stats_counts = calculate_cohort_stats(vcf.cohort, annotation_version, with_vcf_stats=True, force=force)
         _compute_vcf_specific_stats(vcf, annotation_version, vcf_stats_counts)
     except:
         tb = get_traceback()
@@ -225,7 +225,7 @@ def new_counter():
 
 
 def calculate_cohort_stats(cohort: Cohort, annotation_version: AnnotationVersion,
-                           with_vcf_stats: bool = False) -> Optional[VCFStatsCounts]:
+                           with_vcf_stats: bool = False, force: bool = False) -> Optional[VCFStatsCounts]:
     """ Count the cohort's rows once (@see _count_cohort_stats) and populate the four
         CohortGenotype*Stats classes for:
           - per-sample rows (sample IS NOT NULL, filter_key NULL) — every cohort member
@@ -247,7 +247,10 @@ def calculate_cohort_stats(cohort: Cohort, annotation_version: AnnotationVersion
         lock different rows and still run concurrently.
 
         with_vcf_stats also counts the VCF stats on the base cohort's pass and returns them - None when
-        that pass was skipped as fresh. """
+        that pass was skipped as fresh.
+
+        force recounts stats that look fresh, for a change the stats version can't see: what counts as a call
+        depends on the VCF's genotype_field (@see _count_per_sample). """
     code_version = get_sample_stats_code_version()
     vcf_stats_counts = None
     with transaction.atomic():
@@ -260,7 +263,7 @@ def calculate_cohort_stats(cohort: Cohort, annotation_version: AnnotationVersion
             filter_key = stats_cohort.get_stats_filter_key()
             # Per-sample rows only come from the base cohort
             sample_ids = [] if stats_cohort.is_sub_cohort else list(stats_cohort.get_samples().values_list("pk", flat=True))
-            if cohort_stats_are_fresh(cgc, annotation_version, code_version, [filter_key], sample_ids):
+            if not force and cohort_stats_are_fresh(cgc, annotation_version, code_version, [filter_key], sample_ids):
                 logging.info("Cohort stats already fresh for %s on %s; skipping recompute", stats_cohort, cgc)
                 continue
             counts = _compute_and_persist_cohort_stats(stats_cohort, cgc, annotation_version, code_version, filter_key,
