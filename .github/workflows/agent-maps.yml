@@ -40,6 +40,10 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v6
         with:
+          # Pinned, with the version in the cache key: the key otherwise only hashes the requirements, so a new uv
+          # restores a cache it can't use and never saves its own. Bump both together.
+          version: "0.13.9"
+          cache-suffix: uv-0.13.9
           enable-cache: true
           cache-dependency-glob: |
             requirements.txt
