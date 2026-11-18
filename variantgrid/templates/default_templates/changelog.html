@@ -358,7 +358,7 @@
 
     {% else %}
        <div class="card mt-4">
-            <div class="card-header">16 November 2026</div>
+            <div class="card-header">18 November 2026</div>
             <div class="card-body">
                 <h4>Analysis</h4>
                 <ul>
@@ -371,10 +371,19 @@
                     <li>#2787 - T2T: Effect and Conservation nodes only offer filters the annotation has, and warn on unavailable ones</li>
                     <li>#2788 - T2T: gnomAD frequencies added where the T2T reference differs from GRCh38</li>
                     <li>#2773 - Analysis export / import keeps more node settings (cytobands, tags, labs, PanelApp panels)</li>
+                    <li>#2836 - Effect node editor laid out as "Any of" / "All of" groups, showing only the filters in use, with "+ Add filter"</li>
+                    <li>#2836 - Splicing "keep if not scored" only keeps variants with no splicing scores at all (existing nodes keep the old rule, with a switch)</li>
+                    <li>#2846 - Node Genes / Coverage tab splits uncovered genes into below minimum depth and no coverage data</li>
+                    <li>#2770 - Zero node counts are hidden</li>
                 </ul>
                 <h4>Samples / VCFs</h4>
                 <ul>
                     <li>#2759 - VCF and sample pages show their contents (Small, CNV, SV, Fusion, Gene CN, Splice), with a Contents column and filter on the VCF and Samples grids</li>
+                    <li>#2846 - Sample Genes Of Interest tab: apply an existing gene list to a sample, with coverage per list (low coverage genes highlighted)</li>
+                </ul>
+                <h4>Genes</h4>
+                <ul>
+                    <li>#2846 - "Create from PanelApp" makes an editable gene list that shows its source panel and your changes to it</li>
                 </ul>
                 <h4>Variants / Search</h4>
                 <ul>
@@ -389,6 +398,11 @@
                     <li>#2737 - Classify &amp; Report lists the samples the variant was called in first</li>
                     <li>#2743 - Classify &amp; Report - "Build multiple variant report" waits for classifications still populating</li>
                     <li>Condition matching automatically matches on exact MONDO synonyms</li>
+                    <li>Overlaps download (was Discordance Reports), clearer overlap emails, and legacy discordance reports greyed out</li>
+                    <li>Allele page overlaps dull Drug Response values (full values in a tooltip) and show ClinVar Expert Panel status</li>
+                    <li>Grouped classification CSV export has clearer column headings, with criteria grouped by assertion method</li>
+                    <li>New molecular consequence option - disruptive inframe deletion</li>
+                    <li>Pending changes on the classification form are easier to see</li>
                 </ul>
                 <h4>Accounts</h4>
                 <ul>
