@@ -188,23 +188,20 @@ with the test that shows each and the behaviour-level version beside it:
 - **Copying the implementation into the test.** The expected value is computed the same way the code computes it,
   so a wrong formula is wrong in both places: `genes/tests/test_transcript_geometry.py:TestTranscriptGeometry.test_last_junction_is_cdna_end_of_penultimate_exon`
   recomputes `transcript_length - final_exon_length` (its first assertion, the penultimate exon's own cDNA end, is
-  the independent oracle). The same shape as a table: `annotation/tests/test_vep_columns.py:VepColumnsRegistryTest.test_gnomad4_helper_defaults`
-  restates a private helper's dict literal key by key. Test through the public entry point (`filter_for(...)` for a
-  build and columns version) against a fact the code doesn't own.
-- **A literal with no rule behind it.** A count (`len(rows) == 26` in
-  `annotation/tests/test_vep_columns.py:VepColumnsRegistryTest.test_filter_for_gnomad4_grch38_v3_count`), a set of
+  the independent oracle). The same shape as a table: a test that restates a private helper's dict literal key
+  by key. Test through the public entry point (`filter_for(...)` for a build and columns version) against a fact
+  the code doesn't own.
+- **A literal with no rule behind it.** A count (`len(rows) == 26` for one build's VEP columns), a set of
   phase names, or a whole response dict with the volatile keys popped
   (`classification/tests/views/test_classification_view.py:ClassificationTestCaseViews.test_return_data`, ~120 lines
   that nothing in the test explains) - all copied from the first run. Every legitimate addition breaks it and a
   wrong row in place of a right one passes. Assert the properties the input was chosen to exercise: these keys are
   present, that alias was normalised, this field is `immutable`, no gnomAD 3 rows at columns version 3. Where the
   point is "saves nothing" (`...test_test_mode`), assert the row doesn't exist, not sixty keys of JSON.
-- **Pinning a limitation or a declaration.** `genes/tests/test_genes_adversarial.py:TestTranscriptUtils.test_lrg_lowercase_false`
-  asserts that lowercase `lrg_` isn't detected - current behaviour, not a requirement, so a fix fails it. A default
-  (`annotation/tests/test_variant_annotation_version_status.py:VariantAnnotationVersionStatusTests.test_default_status_is_new`),
-  an `on_delete=CASCADE` (`analysis/tests/test_cohort_stats_cache.py:TestCohortStatsCascade.test_cgc_delete_cascades_to_stats`),
-  a `CELERY_TASK_ROUTES` entry: Django applies those, and the test restates the field. A test with no assertion at
-  all ("doesn't crash": `annotation/tests/test_clinvar_xml_parser.py:TestClinVarXmlParser.test_parsing_17662`) is the
+- **Pinning a limitation or a declaration.** A test asserting that lowercase `lrg_` isn't detected as an LRG
+  transcript pins current behaviour, not a requirement, so a fix fails it. A field default (a new
+  `VariantAnnotationVersion`'s status), an `on_delete=CASCADE`, a `CELERY_TASK_ROUTES` entry: Django applies
+  those, and the test restates the field. A test with no assertion at all ("doesn't crash": `annotation/tests/test_clinvar_xml_parser.py:TestClinVarXmlParser.test_parsing_17662`) is the
   same thing with the declaration left out.
 
 An exact expected value is not a snapshot when it is traceable to something the code doesn't own: a checked-in
