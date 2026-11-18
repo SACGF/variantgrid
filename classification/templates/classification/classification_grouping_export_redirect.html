@@ -1,0 +1,68 @@
+{% extends "uicore/page/base.html" %}
+{% load ui_utils %}
+{% block title %}Classification Record Export{% endblock %}
+{% block head %}
+    {% if summary %}
+        <meta http-equiv="refresh" content="1;url={% url 'classification_grouping_export' %}?{{ summary.query_string }}" />
+    {% endif %}
+{% endblock head %}
+{% block content %}
+<div class="container">
+    <h3>Downloading Classification Records</h3>
+    {% if error %}
+        <div class="alert alert-danger">
+            The export settings are invalid: {{ error }}
+        </div>
+        <a class="hover-link" href="{% url 'classification_grouping_export_config' %}">Change settings</a>
+    {% else %}
+        <div class="card">
+            <div class="card-header">Download Settings</div>
+            <div class="card-body">
+                {% labelled label="Format" %}{{ summary.format_label }}{% endlabelled %}
+                {% if summary.genome_build %}
+                    {% labelled label="Genome Build" %}{{ summary.genome_build }}{% endlabelled %}
+                {% endif %}
+                {% if summary.vcf_target_system %}
+                    {% labelled label="Target System" %}{{ summary.vcf_target_system }}{% endlabelled %}
+                {% endif %}
+                {% labelled label="Labs" %}
+                    {{ summary.lab_selection }}
+                    {% if summary.included_labs %}
+                        <div class="text-secondary">Only from:</div>
+                        <ul class="mb-0">
+                            {% for lab in summary.included_labs %}<li>{{ lab }}</li>{% endfor %}
+                        </ul>
+                    {% elif summary.excluded_labs %}
+                        <div class="text-secondary">All sharing labs except:</div>
+                        <ul class="mb-0">
+                            {% for lab in summary.excluded_labs %}<li>{{ lab }}</li>{% endfor %}
+                        </ul>
+                    {% endif %}
+                {% endlabelled %}
+                {% labelled label="Allele Origin" %}{% if summary.allele_origin %}{{ summary.allele_origin.label }}{% else %}All{% endif %}{% endlabelled %}
+                {% labelled label="Since" %}
+                    {% if summary.since %}
+                        {{ summary.since|date:"Y-m-d" }}
+                        {% if summary.since_is_days %}<span class="text-secondary">({{ summary.since_raw }} days ago)</span>{% endif %}
+                    {% else %}
+                        All records
+                    {% endif %}
+                {% endlabelled %}
+                {% labelled label="Rows per File" %}
+                    {% if summary.rows_per_file %}
+                        {{ summary.rows_per_file }} <span class="text-secondary">(downloads as a zip of files)</span>
+                    {% else %}
+                        Unlimited
+                    {% endif %}
+                {% endlabelled %}
+                {% labelled label="File Name" %}{{ summary.filename }}{% endlabelled %}
+            </div>
+            <div class="card-footer">
+                Your download is being generated and will start shortly.
+                Large exports can take a minute or two before your browser shows the file - you can leave this page open.<br/>
+                If your download doesn't start <a class="hover-link" href="{% url 'classification_grouping_export' %}?{{ summary.query_string }}">Click Here</a>.
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

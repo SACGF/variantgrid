@@ -297,6 +297,13 @@ class ClassificationGroupingExportFormat(ABC):
                 genome_build=self.genome_build
             )
 
+    def prepare(self):
+        """
+        Called just before the export is served: load anything the rows need here rather than in __init__, so a
+        format can be constructed (e.g. to describe the export) without querying, and the loads happen before the
+        main queryset's cursor is open
+        """
+
     def header(self) -> list[str]:
         return []
 

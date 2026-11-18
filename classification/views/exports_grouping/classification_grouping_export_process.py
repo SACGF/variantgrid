@@ -79,6 +79,7 @@ class ClassificationGroupingExportProcess:
         """
         Start generating the data and return it in an HTTP Response
         """
+        self.classification_export_format.prepare()
         if self.export_settings.rows_per_file:
             return self._non_streaming_zip()
         else:
@@ -90,6 +91,7 @@ class ClassificationGroupingExportProcess:
             return response
 
     def serve_in_memory(self) -> Iterator[str]:
+        self.classification_export_format.prepare()
         data_peek = self._peekable_data()
 
         while data_peek.peek(default=False):

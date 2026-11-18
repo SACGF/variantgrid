@@ -545,34 +545,6 @@ class ClassificationFilter:
             return 'classification__allele_info__grch38__resolved_hgvs'
 
     @cached_property
-    def _discordant_classification_ids(self) -> dict[int, DiscordanceReportStatus]:
-        """
-        Returns a set of classification IDs where the classification id discordant
-        Ids are not necessarily part of this import
-        :return: A set of classification IDs
-        """
-        discordance_status: dict[int, DiscordanceReportStatus] = {}
-        for cc in ClinicalContext.objects.filter(status=ClinicalContextStatus.DISCORDANT):
-            if dr := DiscordanceReport.latest_report(cc):
-                status: Optional[DiscordanceReportStatus]
-                if dr.is_pending_concordance:
-                    status = DiscordanceReportStatus.PENDING_CONCORDANCE
-                elif dr.resolution == DiscordanceReportResolution.CONTINUED_DISCORDANCE:
-                    status = DiscordanceReportStatus.CONTINUED
-                else:
-                    status = DiscordanceReportStatus.ON_GOING
-
-                for c in dr.actively_discordant_classification_ids():
-                    discordance_status[c] = status
-
-        return discordance_status
-
-    @deprecated("Need to get status from an overlap")
-    def is_discordant(self, cm: ClassificationModification) -> DiscordanceReportStatus:
-        if settings.DISCORDANCE_ENABLED:
-            return self._discordant_classification_ids.get(cm.classification_id)
-
-    @cached_property
     def _since_flagged_classification_ids(self) -> set[int]:
         """
         TODO rename to indicate this is a flag check only

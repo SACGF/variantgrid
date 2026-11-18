@@ -256,12 +256,6 @@ class ClassificationVCF(ExportVCF):
     def somatic_clinical_significance_labels(self):
         return self.unique_values(SpecialEKeys.SOMATIC_CLINICAL_SIGNIFICANCE, raw=False)
 
-    @property
-    def _discordance_value(self) -> Optional[str]:
-        for cms in self.allele_data.cms:
-            if discordance_status := self.allele_data.source.is_discordant(cms):
-                return discordance_status.value
-
     @export_vcf_info_cell(
         header_id="lab_count",
         number=1,
@@ -273,20 +267,10 @@ class ClassificationVCF(ExportVCF):
         return len(set(cms.lab for cms in self.allele_data.cms))
 
     @export_vcf_info_cell(
-        header_id="discordance_status",
-        number=VCFHeaderNumberSpecial.UNBOUND,
-        header_type=VCFHeaderType.String,
-        description="If present, describes the discordance status of allele. Possible values are: ongoing (yet to be resolved), continued (parties could not resolve), pending (parties have agreed to change classifications, waiting on data updates), if absent, the allele is not in discordance",
-        categories={"system": {VCFTargetSystem.GENERIC, VCFTargetSystem.VARSEQ}}
-    )
-    def discordance_status(self):
-        return self._discordance_value
-
-    @export_vcf_info_cell(
         header_id="category",
         number=1,
         header_type=VCFHeaderType.String,
-        description="Free text containing various information such as discordance status, number of labs, full classification",
+        description="Free text containing various information such as number of labs, full classification",
         categories={"system": VCFTargetSystem.EMEDGENE}
     )
     def category(self):

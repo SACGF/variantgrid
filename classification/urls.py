@@ -68,6 +68,7 @@ from classification.views.exports.classification_export_formatter_redcap import 
 from classification.views.exports_grouping.classification_grouping_export_view import (
     serve_export,
     view_classification_grouping_export,
+    view_classification_grouping_export_redirect,
 )
 from classification.views.imported_allele_info_view import (
     ImportedAlleleInfoColumns,
@@ -122,6 +123,8 @@ urlpatterns = [
 
     path('groupings/export_config', view_classification_grouping_export, name='classification_grouping_export_config'),
     path('groupings/export', serve_export, name='classification_grouping_export'),
+    path('groupings/export_redirect', view_classification_grouping_export_redirect,
+         name='classification_grouping_export_redirect'),
     path('groupings/<int:classification_grouping_id>', views.view_classification_grouping_detail, name='classification_grouping_detail'),
     path('groupings/<int:classification_grouping_id>/records', views.view_classification_grouping_records_detail,
          name='classification_grouping_records_detail'),

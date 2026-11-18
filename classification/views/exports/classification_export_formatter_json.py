@@ -126,9 +126,6 @@ class ClassificationExportFormatterJSON(ClassificationExportFormatter):
         if 'fatal_error' in json_values:
             return None
 
-        if discordant_status := self.classification_filter.is_discordant(vcm):
-            json_values['discordant'] = True
-            json_values['discordant_status'] = self.get_discordant_status(discordant_status)
         if withdrawn:
             json_values = {
                 "id": json_values["id"],

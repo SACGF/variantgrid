@@ -2,8 +2,6 @@ from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
 from typing import Any, Optional
-
-from django.conf import settings
 from django.conf import settings
 from django.http import HttpRequest
 
@@ -15,8 +13,7 @@ from classification.views.exports.classification_export_decorator import (
 )
 from classification.views.exports.classification_export_filter import (
     AlleleData,
-    ClassificationFilter,
-    DiscordanceReportStatus,
+    ClassificationFilter
 )
 from classification.views.exports.classification_export_formatter import (
     ClassificationExportExtraData,

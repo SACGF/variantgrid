@@ -133,10 +133,12 @@ class ClassificationGroupingExportFormatterCSV(ClassificationGroupingExportForma
                  csv_format_details: CSVFormatDetails = CSVFormatDetails()):
         self.csv_format_details = csv_format_details
         super().__init__(classification_grouping_filter)
+
+    def prepare(self):
         # prefetch related queries so they don't lazily evaluate
         # after another large cursor has been created
         _ = self.used_keys
-        _ = classification_grouping_filter.check_discordance(0)
+        _ = self.classification_grouping_filter.check_discordance(0)
 
     @cached_property
     def export_tweak(self):

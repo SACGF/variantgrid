@@ -56,20 +56,10 @@
             {% end_ui_register_tab_embedded %}
             {% ui_register_tab_embedded tab_set="lab-selection" label="Custom" %}
                 <span class="text-secondary">The ticked labs will be included.<br/></span>
-                <script>
-                    function deselectAll() {
-                        $('.custom-lab-selection').removeClass("checked").prop('checked', false);
-                        updateLink();
-                    }
-                    function selectAll() {
-                        $('.custom-lab-selection').prop('checked', 'checked');
-                        updateLink();
-                    }
-                </script>
                 <label class="mt-2">Include</label>
                 <div class="ml-1 mb-2">
-                    <a onclick="deselectAll()" class="hover-link"><i class="fa-solid fa-square text-secondary" style="opacity:0.3"></i> De-select All</a><br/>
-                    <a onclick="selectAll()" class="hover-link"><i class="fa-solid fa-square-check text-secondary" style="opacity:0.3"></i> Select All</a><br/>
+                    <a id="custom-lab-deselect-all" class="hover-link"><i class="fa-solid fa-square text-secondary" style="opacity:0.3"></i> De-select All</a><br/>
+                    <a id="custom-lab-select-all" class="hover-link"><i class="fa-solid fa-square-check text-secondary" style="opacity:0.3"></i> Select All</a><br/>
                 </div>
                 <div class="ml-4">
                     {% for lab in sharing_labs %}
@@ -183,14 +173,21 @@
         <hr/>
 
         {% labelled label="Download" %}
-            <a id="download-link" href="">Click here to download</a>
+            <a id="download-link" href="" target="_blank" class="download-link">Download</a>
         {% endlabelled %}
+
+        {% comment %}
+        {% labelled label="Direct Link" %}
+            <a id="direct-link" href="">-</a>
+            <div class="text-muted mt-1">Downloads straight away without the summary page, for bookmarking or scripting.</div>
+        {% endlabelled %}
+        {% endcomment %}
     </div>
 
     <script src="{% static 'js/classification/classification_grouping_export.js' %}"></script>
     <script>
         $(document).ready(() => {
-            initClassificationGroupingExport({{ base_url|jsonify }});
+            initClassificationGroupingExport({{ base_url|jsonify }}, {{ redirect_url|jsonify }});
         });
     </script>
 

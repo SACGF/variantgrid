@@ -286,7 +286,6 @@ class ClassificationExportFormatter(ABC):
 
     def row_generator(self) -> Iterable[list[str]]:
         for allele_data in self.classification_filter.allele_data_filtered_pre_processed(self.batch_pre_cache()):
-
             if row_limit := self.classification_filter.row_limit:
                 if self.row_count >= row_limit:
                     return None
@@ -297,6 +296,7 @@ class ClassificationExportFormatter(ABC):
             else:
                 yield rows  # could be an empty list instead of None, in which case we want to keep on going
                 # whereas None indicates end of the file
+        return None
 
     @abstractmethod
     def row(self, allele_data: AlleleData) -> list[str]:

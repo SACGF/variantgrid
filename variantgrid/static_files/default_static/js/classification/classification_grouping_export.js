@@ -1,6 +1,7 @@
 // @ts-check
 // classification/templates/classification/classification_grouping_export.html
 let groupingExportBaseUrl = null;  // set by initClassificationGroupingExport
+let groupingExportRedirectUrl = null;
 
 function alleleOriginToggle(filterValue) {
     updateLink();
@@ -99,7 +100,7 @@ function updateLink() {
         params.genome_build = $('input[name=franklin_genome_build]:checked').val();
         if (params.allele_origin !== "G") {
             $("#franklin-allele-origin-warning").show();
-            $("#download-link").attr('href', '#').text('-');
+            clearLinks();
             return;
         }
     }
@@ -109,17 +110,32 @@ function updateLink() {
         paramParts.push(`${key}=${encodeURIComponent(value)}`);
     }
     const paramString = '?' + paramParts.join('&');
-    const downloadLink = `${groupingExportBaseUrl}${ paramString }`;
 
     if (error) {
-        $("#download-link").attr('href', '#').text('-');
+        clearLinks();
     } else {
-        $('#download-link').attr('href', downloadLink).text(downloadLink);
+        const directLink = `${groupingExportBaseUrl}${paramString}`;
+        const redirectLink = `${groupingExportRedirectUrl}${paramString}`
+        $('#download-link').attr('href', redirectLink).text(redirectLink);
+        $('#direct-link').attr('href', directLink).text(directLink);
     }
 }
 
-function initClassificationGroupingExport(baseUrl) {
+function clearLinks() {
+    $('#download-link').attr('href', '#').text('-');
+    $('#direct-link').attr('href', '#').text('-');
+}
+
+function setCustomLabSelection(checked) {
+    $('.custom-lab-selection').prop('checked', checked);
+    updateLink();
+}
+
+function initClassificationGroupingExport(baseUrl, redirectUrl) {
     groupingExportBaseUrl = baseUrl;
+    groupingExportRedirectUrl = redirectUrl;
+    $('#custom-lab-select-all').click(() => setCustomLabSelection(true));
+    $('#custom-lab-deselect-all').click(() => setCustomLabSelection(false));
     $('a[data-toggle="tab"]').on('shown.bs.tab', (e) => {
         updateLink();
     });
