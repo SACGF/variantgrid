@@ -169,7 +169,7 @@
 		        url: "{{ request.path }}",
                 success: function() {
 		            nameInput.prop("disabled", false);
-		            msgBox.append(`<li class='alert-info'>Name saved successfully</li>`);
+		            msgBox.append(`<li class='success'>Name saved successfully</li>`);
                     msgBox.fadeIn().delay(2000).fadeOut(1000);
                 },
                 error: function() {
