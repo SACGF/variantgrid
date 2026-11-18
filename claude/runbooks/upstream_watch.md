@@ -15,8 +15,8 @@ column (the fifth `|`-separated field), so keep the table shape.
 | Pre-112 VEP fasta | Shariant and runx1db2 moving to VEP >= 112 (Ensembl/ensembl-vep#1635 fixed in 112) | 2026-11-03 | 2027-02-03 |
 | MaveDB stripped file | every deployment running MaveDB on a VEP_plugins `release/116` checkout from 2026-09-01 (Ensembl/VEP_plugins#853) | 2026-11-03 | 2027-02-03 |
 | gnomAD SV overlap via two `--custom` | Ensembl/ensembl-vep#1989 (`coords=2`, `show_overlaps`) for #1645 | 2026-11-03 | 2027-02-03 |
-| AnnotSV regulatory element sort | lgmgeo/AnnotSV#356 fixed in a released Annotations_Human bundle | 2026-11-10 | 2026-12-10 |
-| AnnotSV fork | lgmgeo/AnnotSV#358, #359 and #360 fixed in an AnnotSV release | 2026-11-17 | 2026-12-17 |
+| AnnotSV regulatory element sort | lgmgeo/AnnotSV#356 fixed in a released Annotations_Human bundle (or lgmgeo/AnnotSV#364 in a release) | 2026-11-18 | 2026-12-18 |
+| AnnotSV fork | an AnnotSV release (3.5.11 or later) carrying lgmgeo/AnnotSV#361-#363, merged in `1a90a121b8` | 2026-11-18 | 2026-12-18 |
 | chrX PAR table | a bioutils release with `bioutils.par` that installs on Python 3.14 (0.6.2 caps `<3.14`, biocommons/bioutils#97) | 2026-11-11 | 2026-12-11 |
 | HPO phenotype synonyms | an HPO release after 2026-10-24 carrying obophenotype/human-phenotype-ontology#11777-#11799 | 2026-11-12 | 2026-12-12 |
 | Transcript span from cdot | SACGF/cdot#246 (per-build `start`/`stop` written into the JSON) | 2026-11-16 | 2027-01-16 |
@@ -180,10 +180,14 @@ over `<ANNOTATION_ANNOTSV_ANNOTATIONS_DIR>/Annotations_Human/FtIncludedInSV/Regu
 and only those: re-sorting the bundle's other bed files changes AnnotSV's output.
 The output TSV is byte-identical either way.
 
+lgmgeo/AnnotSV#364 sorts such a file inside AnnotSV when `bedtools intersect -sorted` fails on it; a release with it
+resolves this as well as a sorted bundle does.
+
 Check:
 
 ```bash
 gh issue view 356 --repo lgmgeo/AnnotSV --json state,closedAt -q '"\(.state) \(.closedAt)"'
+gh pr view 364 --repo lgmgeo/AnnotSV --json state,mergedAt -q '"\(.state) \(.mergedAt)"'
 ```
 
 and, when a newer bundle than 3.5 is out, on a fresh copy of it (prints nothing when sorted):
@@ -223,19 +227,21 @@ What carries it in VariantGrid:
   (from an older fork tag), the manual steps for existing deployments
 - the install steps in `claude/guides/operations.md` (data roots) and the wiki's Install-AnnotSV page
 
-Once the fork has run on a deployment for a while, open each fix branch as its own PR against lgmgeo/AnnotSV, citing
-its issue (the maintainer is away until the end of 2026, lgmgeo/AnnotSV#356). If upstream releases before then without
-the fixes, rebase the fix branches onto the new tag, merge them into a new deployment branch, and add a tag and
-`ANNOTSV_FORK_TAGS` entry for it.
+All three fixes are merged upstream (lgmgeo/AnnotSV#361, #362, #363; `master` at `1a90a121b8`), but no release has
+them yet. Upstream `master` still reports `-version 3.5.10`, the same as stock 3.5.10 without the ranking fix, and that
+string is the pipeline version's `code_version`, so deployments stay on the `-vg4` tags until a release reports its own
+version. Installing from an upstream commit would need the commit recorded at install time (`make install` leaves no
+link to the clone), and the commit adds nothing over `-vg4` but upstream's fix to the 2B (loss) explanation text
+(lgmgeo/AnnotSV#341), not worth a re-annotation.
 
-Check:
+Check (the issues are already closed; it is the release that matters):
 
 ```bash
-for n in 358 359 360; do gh issue view $n --repo lgmgeo/AnnotSV --json number,state -q '"\(.number) \(.state)"'; done
 gh release list --repo lgmgeo/AnnotSV --limit 3
+gh api repos/lgmgeo/AnnotSV/contents/share/tcl/AnnotSV/AnnotSV-config.tcl -q .content | base64 -d | grep -m1 '^# AnnotSV'
 ```
 
-When resolved (a release with all three fixes: memory no longer grows with the SVs' total length - rerun the
+When resolved (a release whose `-version` is 3.5.11 or later with all three fixes: memory no longer grows with the SVs' total length - rerun the
 dense-SV comparison from #2841 against it - and the UGT2B17 deletion from lgmgeo/AnnotSV#360 gets 4O):
 - point the wiki and `claude/guides/operations.md` back at that upstream release
 - remove `check_annotsv_fork_installed`, and turn `is_annotsv_fork_installed` and `get_annotsv_fork_fixes_installed`
