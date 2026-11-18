@@ -8,12 +8,16 @@ from django.test import SimpleTestCase
 from variantgrid.celery import report_dead_worker_fault_dumps
 
 
+def _exited_pid() -> int:
+    process = subprocess.Popen(["true"])
+    process.wait()
+    return process.pid
+
+
 class ReportDeadWorkerFaultDumpsTest(SimpleTestCase):
     def test_reports_dead_process_dumps_and_leaves_live_ones(self):
-        dead_pid = subprocess.Popen(["true"]).pid
-        os.waitpid(dead_pid, 0)
-        empty_dead_pid = subprocess.Popen(["true"]).pid
-        os.waitpid(empty_dead_pid, 0)
+        dead_pid = _exited_pid()
+        empty_dead_pid = _exited_pid()
 
         with tempfile.TemporaryDirectory() as fault_dir:
             def dump_file(pid, text):
