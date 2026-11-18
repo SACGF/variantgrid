@@ -101,7 +101,7 @@ USER_CREATE_ORG_MESSAGE = {
 }
 
 DATA_PRIVACY = {
-    "hosting": "A University of Adelaide server in Adelaide, Australia.",
+    "hosting": "ARDC Nectar Research Cloud, in its Adelaide, Australia data centre.",
     "intended_use": "This is a test server: data may be deleted at any time, so please upload only test or public "
                     "data, never identifiable patient data.",
     "outside_eu": True,
