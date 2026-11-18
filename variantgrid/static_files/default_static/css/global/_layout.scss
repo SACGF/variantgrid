@@ -11,6 +11,16 @@ body {
 	font-family: 'Raleway', serif;
 }
 
+// Login-style pages have no .main-content scroller, so the page itself scrolls (see the desktop rule below)
+body.login-bg-theme {
+	overflow-y: auto;
+}
+
+// clear the fixed-bottom footer
+.login-bg-theme .main-container {
+	margin-bottom: 90px;
+}
+
 nav.navbar {
 	border-bottom: 1px solid #bbb;
 

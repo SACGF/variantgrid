@@ -4,6 +4,13 @@ body {
   font-family: "Raleway", serif;
 }
 
+body.login-bg-theme {
+  overflow-y: auto;
+}
+.login-bg-theme .main-container {
+  margin-bottom: 90px;
+}
+
 nav.navbar {
   border-bottom: 1px solid #bbb;
 }
