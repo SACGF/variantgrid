@@ -176,7 +176,6 @@ class ClassificationGroupingExportFilter:
         for entry in overlap_next_steps_qs.values_list('overlap__overlap_status', 'overlap__value_type', 'contribution__classification_grouping').iterator():
             overlap_status, value_type, classification_grouping = entry
             grouping_to_value_type_to_status[classification_grouping][value_type] = overlap_status
-        print(grouping_to_value_type_to_status)
         return grouping_to_value_type_to_status
 
     def latest_date(self) -> Optional[datetime]:
