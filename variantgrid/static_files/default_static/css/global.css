@@ -971,9 +971,24 @@ table.as_table td {
   white-space: nowrap;
 }
 
+.variant-content-counted {
+  display: inline-flex;
+  white-space: nowrap;
+}
+.variant-content-counted .variant-content-chip {
+  border-radius: 8px 0 0 8px;
+}
+
 .variant-content-count {
-  margin-left: 4px;
-  opacity: 0.85;
+  padding: 0 6px;
+  border: 1px solid #ddd;
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  background-color: #fafafa;
+  color: #555;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 14px;
 }
 
 table.variantgrid-datatable {
