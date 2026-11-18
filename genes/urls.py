@@ -7,6 +7,7 @@ from genes.grids import (
     GeneSymbolVariantsGrid,
     GeneSymbolWikiColumns,
     QCGeneCoverageColumns,
+    SampleGeneListGenesColumns,
     UncoveredGenesColumns,
 )
 from genes.views import views, views_autocomplete, views_coverage, views_rest
@@ -74,6 +75,8 @@ urlpatterns = [
     path('gene_lists/datatable/', DatabaseTableView.as_view(column_class=GeneListColumns),
          name='gene_lists_datatable'),
     path('gene_list_genes/grid/<int:gene_list_id>', DatabaseTableView.as_view(column_class=GeneListGenesColumns), name='gene_list_genes_datatable'),
+    path('sample_gene_list_genes/datatable/<int:sample_gene_list_id>',
+         DatabaseTableView.as_view(column_class=SampleGeneListGenesColumns), name='sample_gene_list_genes_datatable'),
 
     path('canonical_transcript_collections/datatable/',
          DatabaseTableView.as_view(column_class=CanonicalTranscriptCollectionColumns),
