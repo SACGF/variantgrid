@@ -17,6 +17,7 @@ from analysis.enums import (
 )
 from analysis.models.nodes.analysis_node import AnalysisNode
 from analysis.models.nodes.filters.damage_node_filters import (
+    GROUP_NAMES,
     describe_effect_filters,
     get_effect_filter_terms,
 )
@@ -950,13 +951,15 @@ class DamageNode(AnalysisNode):
         return "Variant type, impact, damage predictions, conservation and splicing filter"
 
     def get_node_chips(self) -> list[NodeChip]:
-        """ A chip per filter set, its title the filter in the words of the node's description """
-        chips = super().get_node_chips()
+        """ A chip per filter set, its title the filter in the words of the node's description, inside a chip
+            for the group it is in - "Any of" or "All of", as the editor lays them out """
         terms = get_effect_filter_terms(self)
+        group_chips = {group: [] for group in GROUP_NAMES}
 
         def add_chip(key: str, text: str, **kwargs):
             if key in terms:
-                chips.append(NodeChip(text=text, title=terms[key][1], **kwargs))
+                group, words = terms[key]
+                group_chips[group].append(NodeChip(text=text, title=words, **kwargs))
 
         add_chip("variant_types", ", ".join(get_variant_type_labels(self.variant_types)), icon="fa-solid fa-shapes")
         add_chip("splice_min", "splice", icon="fa-solid fa-scissors")
@@ -984,6 +987,10 @@ class DamageNode(AnalysisNode):
             add_chip("annotsv_acmg_class_min", f"AnnotSV ≥ {Pathogenicity(self.annotsv_acmg_class_min).short_label}")
         add_chip("annotsv_acmg_score_min", "AnnotSV score")
         add_chip("exclude_sv_artefact_regions", "no SV artefact")
+
+        chips = super().get_node_chips()
+        chips.extend(NodeChip(text=GROUP_NAMES[group], children=tuple(children))
+                     for group, children in group_chips.items() if children)
         return chips
 
     def _get_node_extra_grid_columns(self) -> list[str]:

@@ -18,6 +18,8 @@ from snpdb.variant_filters import get_variant_type_labels, restricts_variant_typ
 
 ANY_OF = "any"
 ALL_OF = "all"
+# In the order the editor, the sentence and the node's chips draw them
+GROUP_NAMES = {ANY_OF: "Any of", ALL_OF: "All of"}
 
 # The sentence's frame, around the filters' own words
 SENTENCE = {

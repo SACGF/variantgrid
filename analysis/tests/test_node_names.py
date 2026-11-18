@@ -49,13 +49,15 @@ class TestNodeNames(AnalysisSetupMixin, TestCase):
         self.assertEqual("Escapes NMD", lines[2])
 
     def test_damage_node_score_chips(self):
-        """ A chip's title is the filter in the description's words - "or not scored" only where it has an effect """
+        """ Chips sit in their group's chip, as the editor lays them out. A chip's title is the filter in the
+            description's words - "or not scored" only where it has an effect """
         node = DamageNode(analysis=self.analysis, popeve_score_max=-5.0, popeve_score_required=True,
                           revel_score_min=0.7, gene_loeuf_max=0.6, gene_loeuf_required=True)
-        chips = {chip.text: chip.title for chip in node.get_node_chips()}
-        self.assertEqual("popEVE score ≤ -5 (or not scored)", chips["popEVE score"])
-        self.assertEqual("REVEL ≥ 0.7", chips["REVEL"])
-        self.assertEqual("gnomAD LOEUF ≤ 0.6 (or gene has no score)", chips["LOEUF"])
+        groups = {group.text: {chip.text: chip.title for chip in group.children} for group in node.get_node_chips()}
+        self.assertEqual(["Any of", "All of"], list(groups))
+        self.assertEqual({"REVEL": "REVEL ≥ 0.7"}, groups["Any of"])
+        self.assertEqual({"popEVE score": "popEVE score ≤ -5 (or not scored)",
+                          "LOEUF": "gnomAD LOEUF ≤ 0.6 (or gene has no score)"}, groups["All of"])
 
     def test_gene_list_node_several_lists(self):
         node = GeneListNode.objects.create(analysis=self.analysis)

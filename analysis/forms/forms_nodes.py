@@ -29,8 +29,7 @@ from analysis.models.nodes.filters.clinvar_node import ClinVarNode
 from analysis.models.nodes.filters.conservation_node import ConservationNode
 from analysis.models.nodes.filters.damage_node import DamageNode
 from analysis.models.nodes.filters.damage_node_filters import (
-    ALL_OF,
-    ANY_OF,
+    GROUP_NAMES,
     SENTENCE,
     get_effect_filters,
 )
@@ -696,7 +695,7 @@ class DamageNodeForm(BaseNodeForm):
             'alphamissense_rankscore_min': HiddenInput(attrs={"min": 0, "max": 1, "step": 0.05}),
         }
 
-    GROUPS = ((ANY_OF, "Any of"), (ALL_OF, "All of"))
+    GROUPS = tuple(GROUP_NAMES.items())
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
