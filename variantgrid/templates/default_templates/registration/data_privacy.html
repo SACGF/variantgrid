@@ -1,0 +1,76 @@
+{% extends "registration/abstract_login_vg.html" %}
+{% block inner_content %}
+    <div class="row">
+        <div class="col-12 col-lg-9">
+            <div class="jumbo-box">
+                <h1>Data &amp; privacy</h1>
+                <p>What happens to the data you upload to {{ site_name }}.</p>
+
+                <h4 class="mt-4">Who can see your data</h4>
+                <ul>
+                    {% if private_user_labs %}
+                        <li>New users who register themselves get their own private lab, so nothing they upload is
+                            shared with anyone else by default.</li>
+                    {% endif %}
+                    <li>An upload can be read by the uploader's lab and organisation, and by anyone it is explicitly
+                        shared with. Which groups get access to new uploads can be changed in your user settings.</li>
+                    <li>Some data is deliberately shared with all users.
+                        {% if data_privacy.shared_data %}{{ data_privacy.shared_data }}{% endif %}</li>
+                    <li>System administrators can see everything. They look at user data only to diagnose a problem
+                        (eg a failed import); otherwise it appears only in aggregate statistics (eg import times).</li>
+                </ul>
+
+                {% if private_user_labs %}
+                    <h4 class="mt-4">Getting a lab for your institution</h4>
+                    <ol>
+                        <li>Request a lab using an email address on your institution's website domain.</li>
+                        <li>Confirm the request with the link emailed to that address.</li>
+                        <li>An administrator checks and approves the request.</li>
+                        <li>You become the lab head, and can add colleagues to the lab.</li>
+                    </ol>
+                    {% if user.is_authenticated %}
+                        <p><a href="{% url 'lab_request' %}">Request a lab for your institution</a>.</p>
+                    {% else %}
+                        <p>Log in to request a lab from your user settings.</p>
+                    {% endif %}
+                {% endif %}
+
+                <h4 class="mt-4">Deleting data</h4>
+                <ul>
+                    <li>Deleting an upload removes the uploaded file and its genotypes. Deleting only the VCF removes
+                        its samples and genotypes, but keeps the uploaded file until the upload is deleted too.</li>
+                    <li>Variants are stored once and shared by every sample that has them. A variant left behind
+                        carries nothing about who uploaded it or which samples had it.</li>
+                </ul>
+
+                {% if data_privacy.hosting or data_privacy.backups %}
+                    <h4 class="mt-4">Where data is stored</h4>
+                    <ul>
+                        {% if data_privacy.hosting %}<li>{{ data_privacy.hosting }}</li>{% endif %}
+                        {% if data_privacy.backups %}
+                            <li>{{ data_privacy.backups }} Deleted data leaves the backups as they roll over.</li>
+                        {% endif %}
+                    </ul>
+                {% endif %}
+
+                <h4 class="mt-4">Privacy law and what to upload</h4>
+                <ul>
+                    {% if data_privacy.intended_use %}<li>{{ data_privacy.intended_use }}</li>{% endif %}
+                    {% if data_privacy.outside_eu %}
+                        <li>This server is hosted outside the EU. Uploading data from EU patients is a transfer outside
+                            the EU under the GDPR - pseudonymised research data is still personal data - so check with
+                            your institution's data protection officer first.</li>
+                    {% endif %}
+                    <li>You can run your own private server instead: VariantGrid is
+                        <a href="https://github.com/SACGF/variantgrid">source available</a> on GitHub.</li>
+                </ul>
+
+                <h4 class="mt-4">Reporting problems</h4>
+                <p>Use the <i class="fas fa-bug"></i> "Suggestion / Bug Report" icon in the top menu once logged in,
+                    or raise a <a href="https://github.com/SACGF/variantgrid/issues">GitHub issue</a>.</p>
+
+                <p class="mt-4"><a href="/">Back to main page</a>.</p>
+            </div>
+        </div>
+    </div>
+{% endblock %}

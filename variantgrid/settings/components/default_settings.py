@@ -71,6 +71,13 @@ ADMIN_EMAIL_NOTIFICATION = None
 # Enable to have contact us functionality
 CONTACT_US_ENABLED = False
 
+# Public "Data & privacy" page (#2852), linked from the login page. None hides the link and the page 404s.
+# A dict of plain text for this deployment, every key optional:
+#   "hosting": where the server and its data are, "backups": what is backed up and for how long,
+#   "intended_use": what data the server is for, "shared_data": data shared with every user (eg demo VCFs),
+#   "outside_eu": True adds the GDPR transfer warning for data from EU patients
+DATA_PRIVACY = None
+
 ACCOUNTS_EMAIL = None
 # If you change this value you should run 'recalc' for all ClinicalContexts in admin
 DISCORDANCE_ENABLED = False

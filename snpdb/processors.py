@@ -33,7 +33,8 @@ def settings_context_processor(request):
         'url_name_visible': get_visible_url_names(),
         'use_oidc': settings.USE_OIDC,  # whether user is managed by django or externally by open connect
         'user_feedback_enabled': settings.ROLLBAR.get('enabled', False) and settings.USER_FEEDBACK_ENABLED,
-        "contact_us_enabled": settings.CONTACT_US_ENABLED
+        "contact_us_enabled": settings.CONTACT_US_ENABLED,
+        "data_privacy_enabled": bool(settings.DATA_PRIVACY),
     }
 
     # This can fail on bad urls

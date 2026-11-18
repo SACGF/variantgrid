@@ -56,6 +56,15 @@ SEND_EMAILS = True
 ADMIN_EMAIL_NOTIFICATION = "david.lawrence@sa.gov.au"
 CONTACT_US_ENABLED = True
 
+DATA_PRIVACY = {
+    "hosting": "Amazon Web Services (AWS), in the Sydney, Australia region (ap-southeast-2).",
+    "backups": "The database is backed up by rolling AWS RDS snapshots, each kept for 7 days.",
+    "intended_use": "This server is intended for research samples only - please do not upload identifiable "
+                    "clinical data.",
+    "shared_data": "Public demo data, such as the NA12878 sample, is shared with every user.",
+    "outside_eu": True,
+}
+
 # variantgrid.com static overrides (e.g. vc_settings.js enables the 'public' / "3rd Party
 # Databases" share level - the gate for sharing outward to ClinVar / MatchMaker Exchange).
 _VGAWS_STATIC_FILES_DIR = os.path.join(VARIANTGRID_APP_DIR, "static_files", "vgaws_static")

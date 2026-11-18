@@ -46,6 +46,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('authenticated', views.authenticated, name='authenticated'),
     path('external_help', views.external_help, name='external_help'),
+    path('data_privacy', views.data_privacy, name='data_privacy'),
     path('system/version', views.version, name='version'),
     path('system/changelog', views.changelog, name='changelog'),
     path('system/keycloak_admin', views.keycloak_admin, name='keycloak_admin'),
