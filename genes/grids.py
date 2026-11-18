@@ -1,10 +1,12 @@
 import operator
 import os
+from enum import IntEnum
 from functools import cached_property, reduce
 from typing import Any, Optional
 
 from django.core.exceptions import PermissionDenied
 from django.db.models import (
+    Case,
     Count,
     IntegerField,
     OuterRef,
@@ -13,7 +15,9 @@ from django.db.models import (
     Subquery,
     TextField,
     Value,
+    When,
 )
+from django.db.models.functions import Round
 from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 
@@ -33,8 +37,10 @@ from genes.models import (
     GeneSymbol,
     GeneSymbolWiki,
     ReleaseGeneVersion,
+    SampleGeneList,
     TranscriptVersion,
 )
+from genes.sample_gene_lists import get_sample_gene_coverage
 from library.utils import pretty_label
 from snpdb.enums import ImportStatus
 from snpdb.grids import AbstractVariantGrid, get_standard_overrides
@@ -124,6 +130,83 @@ class GeneListGenesColumns(DatatableConfig[GeneListGeneSymbol]):
         if alias_source := row["gene_symbol_alias__source"]:
             return GeneSymbolAliasSource(alias_source).label
         return ""
+
+
+class GeneAttention(IntEnum):
+    """ Why a gene on a sample's Genes Of Interest tab needs a look - worst last, so the grid sorts those first """
+    OK = 0
+    BELOW_MIN_DEPTH = 1
+    NO_COVERAGE = 2
+    UNMATCHED_SYMBOL = 3
+
+    @property
+    def label(self) -> str:
+        return {
+            GeneAttention.OK: "",
+            GeneAttention.BELOW_MIN_DEPTH: "Below minimum depth",
+            GeneAttention.NO_COVERAGE: "No coverage data",
+            GeneAttention.UNMATCHED_SYMBOL: "Unmatched symbol",
+        }[self]
+
+
+class SampleGeneListGenesColumns(DatatableConfig[GeneListGeneSymbol]):
+    """ A sample gene list's genes with the sample's coverage of each (its best canonical transcript), the
+        ones needing a look highlighted and sorted first; send attention_only=true for just those (#2844) """
+
+    def __init__(self, request: HttpRequest):
+        super().__init__(request)
+        self.sample_gene_list = get_object_or_404(SampleGeneList.filter_for_user(self.user).select_related("sample"),
+                                                  pk=self.get_query_param("sample_gene_list_id"))
+        sample = self.sample_gene_list.sample
+        self.gene_coverage_collection = get_sample_gene_coverage(sample)
+        self.min_depth = sample.get_minimum_coverage_required()
+
+        self.rich_columns = [
+            RichColumn('original_name', label="Gene List Name", orderable=True),
+            RichColumn('gene_symbol', orderable=True, client_renderer="renderGeneSymbol"),
+        ]
+        if self.gene_coverage_collection:
+            self.rich_columns += [
+                RichColumn('coverage_transcript', label="Transcript", orderable=True),
+                RichColumn('coverage_min', label="Min", orderable=True, css_class="num"),
+                RichColumn('coverage_mean', label="Mean", orderable=True, css_class="num", client_renderer="TableFormat.number"),
+                RichColumn('coverage_percent_20x', label="% 20x", orderable=True, css_class="num", client_renderer="TableFormat.number"),
+            ]
+        self.rich_columns.append(RichColumn('attention', label="Needs attention", orderable=True,
+                                            default_sort=SortOrder.DESC, renderer=self.render_attention))
+
+    @staticmethod
+    def render_attention(row: CellData) -> str:
+        return GeneAttention(row["attention"]).label
+
+    def row_css(self, row: CellData) -> Optional[str]:
+        if row["attention"] != GeneAttention.OK:
+            return "table-warning"
+        return None
+
+    def get_initial_queryset(self) -> QuerySet[GeneListGeneSymbol]:
+        qs = GeneListGeneSymbol.objects.filter(gene_list=self.sample_gene_list.gene_list_id)
+        attention_whens = [When(gene_symbol__isnull=True, then=Value(GeneAttention.UNMATCHED_SYMBOL))]
+        if self.gene_coverage_collection:
+            # A gene can have coverage on several canonical transcripts: it is covered if any one reaches min depth
+            best_coverage = GeneCoverageCanonicalTranscript.objects.filter(
+                gene_coverage_collection=self.gene_coverage_collection,  # stays in the collection's partition
+                gene_symbol=OuterRef("gene_symbol")).order_by("-min")
+            qs = qs.annotate(coverage_transcript=Subquery(best_coverage.values("transcript__identifier")[:1]),
+                             coverage_min=Subquery(best_coverage.values("min")[:1]),
+                             coverage_mean=Round(Subquery(best_coverage.values("mean")[:1]), 1),
+                             coverage_percent_20x=Round(Subquery(best_coverage.values("percent_20x")[:1]), 1))
+            attention_whens += [
+                When(coverage_min__isnull=True, then=Value(GeneAttention.NO_COVERAGE)),
+                When(coverage_min__lt=self.min_depth, then=Value(GeneAttention.BELOW_MIN_DEPTH)),
+            ]
+        return qs.annotate(attention=Case(*attention_whens, default=Value(GeneAttention.OK),
+                                          output_field=IntegerField()))
+
+    def filter_queryset(self, qs: QuerySet[GeneListGeneSymbol]) -> QuerySet[GeneListGeneSymbol]:
+        if self.get_query_param("attention_only") == "true":
+            qs = qs.exclude(attention=GeneAttention.OK)
+        return qs
 
 
 class GeneSymbolVariantsGrid(AbstractVariantGrid):
