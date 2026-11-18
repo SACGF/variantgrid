@@ -2,32 +2,49 @@
 // ERRORS, WARNINGS, INFO, MESSAGES
 ////////////////////////
 
+// Each item names its type and gets that icon; an item without one gets none. Only the list's own items, not a
+// list nested in one
 ul.messages {
 	list-style-type: none;
 	width: 80%;
 
-	li {
+	> li {
 		padding: 16px;
 		padding-left: 48px;
 		position: relative;
 
 		&::before {
 			font-family: "Font Awesome 5 Free";
-			content: "\f00c";
 			font-weight: 900;
-			color: #28a745;
 			position: absolute;
 			left: 16px;
 			top: 16px;
 		}
-	}
-}
 
-li.error::before {
-	font-family: "Font Awesome 5 Free";
-	content: "\f00d" !important;
-	font-weight: 900 !important;
-	color: #dc3545 !important;
+		&.success {
+			background-color: #d4edda;
+
+			&::before {
+				content: "\f00c";
+				color: #28a745;
+			}
+		}
+
+		&.info::before {
+			content: "\f05a";
+			color: #0c5460;
+		}
+
+		&.warning::before {
+			content: "\f071";
+			color: #856404;
+		}
+
+		&.error::before {
+			content: "\f00d";
+			color: #dc3545;
+		}
+	}
 }
 
 .info {

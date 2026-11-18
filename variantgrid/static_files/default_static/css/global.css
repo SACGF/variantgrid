@@ -651,26 +651,36 @@ ul.messages {
   list-style-type: none;
   width: 80%;
 }
-ul.messages li {
+ul.messages > li {
   padding: 16px;
   padding-left: 48px;
   position: relative;
 }
-ul.messages li::before {
+ul.messages > li::before {
   font-family: "Font Awesome 5 Free";
-  content: "\f00c";
   font-weight: 900;
-  color: #28a745;
   position: absolute;
   left: 16px;
   top: 16px;
 }
-
-li.error::before {
-  font-family: "Font Awesome 5 Free";
-  content: "\f00d" !important;
-  font-weight: 900 !important;
-  color: #dc3545 !important;
+ul.messages > li.success {
+  background-color: #d4edda;
+}
+ul.messages > li.success::before {
+  content: "\f00c";
+  color: #28a745;
+}
+ul.messages > li.info::before {
+  content: "\f05a";
+  color: #0c5460;
+}
+ul.messages > li.warning::before {
+  content: "\f071";
+  color: #856404;
+}
+ul.messages > li.error::before {
+  content: "\f00d";
+  color: #dc3545;
 }
 
 .info {

@@ -49,7 +49,7 @@
             const messages = $('.messages', analysisForm);
             const warning = $('.' + warningId, messages);
             if (!warning.length) {
-                $(`<li class='info ${warningId}'>Warning: Changing Annotation Version will reload all nodes.</li>`).appendTo(messages);
+                $(`<li class='warning ${warningId}'>Warning: Changing Annotation Version will reload all nodes.</li>`).appendTo(messages);
             }
         });
         initSmartSelectsInForm($("form#analysis-form"));
@@ -70,6 +70,7 @@
     <form id="analysis-form" method="post" action="{{ request.path }}">
         {% crispy form form_helper.horizontal %}
         {% include "uicore/messages/messages.html" %}
+        <ul class="messages"></ul>
         <div>
             {% if has_write_permission %}
                 <button class="btn btn-primary" id='save-analysis-settings' type="submit">Save</button>
