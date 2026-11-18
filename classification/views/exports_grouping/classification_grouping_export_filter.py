@@ -23,6 +23,7 @@ from classification.models import (
     OverlapContributionNextStep, Overlap,
 )
 from genes.hgvs import HGVSComponents
+from library.django_utils.database_utils import iter_ordered
 from library.utils import local_date_string
 from snpdb.enums import AlleleOriginBucket
 from snpdb.models import GenomeBuild, Lab, Organization, Variant, VariantAllele
@@ -291,7 +292,7 @@ class ClassificationGroupingExportFormat(ABC):
         return self.classification_grouping_filter.queryset(genome_build=genome_build)
 
     def allele_group_iterator(self) -> Iterator[ClassificationGroupingByAllele]:
-        for allele_id, cgs in itertools.groupby(self.queryset(self.genome_build).iterator(chunk_size=4000), lambda cg: cg.allele_origin_grouping.allele.pk):
+        for allele_id, cgs in itertools.groupby(iter_ordered(self.queryset(self.genome_build)), lambda cg: cg.allele_origin_grouping.allele.pk):
             yield ClassificationGroupingByAllele(
                 allele_id,
                 list(cgs),

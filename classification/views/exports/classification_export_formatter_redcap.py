@@ -27,6 +27,7 @@ from classification.views.exports.classification_export_formatter import (
     ClassificationExportFormatter,
 )
 from classification.views.exports.classification_export_utils import CitationCounter
+from library.django_utils.database_utils import iter_ordered
 from library.utils.text_utils import delimited_row
 
 # WARNING: REDCap export ignores the since parameter
@@ -115,7 +116,7 @@ class ClassificationExportFormatterRedCap(ClassificationExportFormatter):
         qs = qs.order_by(OrderBy(RawSQL('cast(published_evidence->>%s as jsonb)->>%s', (self.group_on, 'value'))))
 
         group = None
-        for vcm in qs.iterator():
+        for vcm in iter_ordered(qs):
             value = vcm.get(self.group_on, None)
             if group is None or group.group_on_value != value:
                 if group:

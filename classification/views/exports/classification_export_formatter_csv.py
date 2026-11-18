@@ -15,7 +15,6 @@ from classification.views.exports.classification_export_decorator import (
 from classification.views.exports.classification_export_filter import (
     AlleleData,
     ClassificationFilter,
-    DiscordanceReportStatus,
 )
 from classification.views.exports.classification_export_formatter import (
     ClassificationExportExtraData,
@@ -23,6 +22,7 @@ from classification.views.exports.classification_export_formatter import (
 )
 from classification.views.exports.classification_export_utils import CitationCounter
 from library.django_utils import get_url_from_view_path
+from library.django_utils.database_utils import iter_ordered_batches
 from library.utils import (
     ExportDataType,
     ExportRow,
@@ -240,8 +240,10 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
         )
         if self.format_details.full_detail:
             # apparently this is significantly quicker than the attempt to use an aggregate
-            for evidence in self.classification_filter.cms_qs.values_list('published_evidence', flat=True).iterator(chunk_size=1000):
-                used_keys.check_evidence(evidence)
+            # Which keys are used doesn't depend on order, so batch in pk order rather than sorting genomically
+            for batch_qs in iter_ordered_batches(self.classification_filter.cms_qs.order_by("pk")):
+                for evidence in batch_qs.values_list('published_evidence', flat=True):
+                    used_keys.check_evidence(evidence)
         else:
             used_keys.check_evidence_enable_all_considered()
 

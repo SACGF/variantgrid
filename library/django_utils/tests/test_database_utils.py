@@ -1,3 +1,4 @@
+from django.contrib.auth.models import Group, User
 from django.core.exceptions import EmptyResultSet
 from django.db import connection
 from django.test import TestCase
@@ -6,6 +7,8 @@ from library.django_utils.database_utils import (
     get_pg_setting,
     get_queryset_row_estimate,
     get_table_row_estimates,
+    iter_ordered,
+    iter_ordered_batches,
     pg_settings,
     queryset_to_sql,
     render_empty_result_set_sql,
@@ -61,3 +64,28 @@ class RowEstimatesTest(TestCase):
 
     def test_queryset_row_estimate(self):
         self.assertIsInstance(get_queryset_row_estimate(GenomeBuild.objects.all()), int)
+
+
+class IterOrderedTest(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        # last names tie, so the order across batches depends on the pk tiebreaker
+        cls.users = [User.objects.create_user(username=f"iter_ordered_{i}", last_name=f"name_{i % 3}")
+                     for i in range(7)]
+        group_a, group_b = Group.objects.create(name="iter_ordered_a"), Group.objects.create(name="iter_ordered_b")
+        for user in cls.users:
+            user.groups.add(group_a, group_b)
+
+    def _qs(self):
+        return User.objects.filter(pk__in=[u.pk for u in self.users])
+
+    def test_keeps_order_across_batches(self):
+        qs = self._qs().order_by("-last_name")
+        self.assertEqual(list(qs.order_by("-last_name", "pk")), list(iter_ordered(qs, batch_size=2)))
+        self.assertEqual([2, 2, 2, 1], [len(batch_qs) for batch_qs in iter_ordered_batches(qs, batch_size=2)])
+
+    def test_multi_valued_join_rows_as_the_queryset_gives_them(self):
+        """ A repeated pk is fetched in one batch, so its rows aren't doubled across a batch boundary """
+        qs = self._qs().filter(groups__name__startswith="iter_ordered").order_by("last_name")
+        self.assertEqual(7 * 2, qs.count())
+        self.assertEqual(list(qs.order_by("last_name", "pk")), list(iter_ordered(qs, batch_size=2)))
