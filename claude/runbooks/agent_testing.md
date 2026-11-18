@@ -52,7 +52,8 @@ Another agent or a human tester may be on the box at the same time.
 4. Comment on the issue, starting with `🤖 Written by Claude`: what changed (PR number), how it was tested and the
    result, and what still needs doing. For Shariant testing, numbered UI steps a tester can follow.
 5. Outcome:
-   - **Close** only if it passed, nothing further is needed, and the run has the closing grant.
+   - **Close** only if it passed, nothing further is needed, and the run has the closing grant. Without the grant,
+     the comment says it is ready to close, and no label is added.
    - **Leave open** (and move it per the triage runbook) when it needs Shariant testing (the comments say whether it
      is required), a cherry-pick to a release or production branch, a manual deploy step (`manage.py
      manual_outstanding`) or install steps, or when testing failed or was inconclusive. Say which in the comment.

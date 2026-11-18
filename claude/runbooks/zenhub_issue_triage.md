@@ -122,8 +122,8 @@ branch (e.g. `origin/shariant_prod_2025_04`), and if so can it be closed.
    cause. If the failure is outside what the issue's commits touch, or the tester notes it also happens on prod, it
    belongs in a new issue (draft it for the user) and doesn't block this one.
 6. For close-ready issues: comment (prefixed `🤖 Written by Claude`) saying it went into the named prod branch and has
-   been released, with the commits or the test pass as evidence, then `gh issue edit N -R SACGF/<repo> --add-label
-   "can we close this?"`. Humans close issues; an agent closes one only under the explicit per-run grant in
+   been released, with the commits or the test pass as evidence, and that it is ready to close. Add no label: the
+   comment is the signal. Humans close issues; an agent closes one only under the explicit per-run grant in
    `claude/runbooks/agent_testing.md`.
 
 ## 6. Triage Coding Complete into test pipelines
