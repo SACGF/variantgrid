@@ -8,6 +8,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.test.client import Client
 from django.urls.base import reverse
+from guardian.shortcuts import assign_perm
 
 from analysis.enums import GroupOperation, NodeMatchInput
 from analysis.forms.forms_nodes import ClinVarNodeForm, DamageNodeForm, PopulationNodeForm
@@ -25,7 +26,7 @@ from annotation.pathogenicity_predictions import (
     TOOLS_BY_RAW_FIELD,
 )
 from genes.models import GeneSymbol, GnomADGeneConstraint
-from library.guardian_utils import assign_permission_to_user_and_groups
+from library.guardian_utils import DjangoPermission, assign_permission_to_user_and_groups
 from snpdb.enums import AlleleOriginFilterDefault
 from snpdb.models import CachedWebResource
 from snpdb.models.models_genome import GenomeBuild
@@ -194,6 +195,16 @@ class NodePresetsTest(TestCase):
             self.assertEqual(1, html.count('name="preset"'), node_class)  # inside the form the editor posts
             labels = [p["label"] for p in client.get(self._presets_url(node)).json()]
             self.assertTrue(any(lbl.startswith(label) for lbl in labels), f"{label} not in {labels}")
+
+    def test_read_only_editor_has_no_dropdown(self):
+        reader = User.objects.create_user(username="test_node_presets_reader")
+        assign_perm(DjangoPermission.perm(self.analysis, DjangoPermission.READ), reader, self.analysis)
+        client = Client()
+        client.force_login(reader)
+        node = PopulationNode.objects.create(analysis=self.analysis)
+        response = client.get(self._node_url(node))
+        self.assertEqual(200, response.status_code)
+        self.assertNotIn(f'id="node-preset-{node.pk}"', response.content.decode())
 
     def test_admin_edit_reaches_a_cached_editor(self):
         """ The editor HTML is cached for a week, so the presets it lists must come from the uncached endpoint """
