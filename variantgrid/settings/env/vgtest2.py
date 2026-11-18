@@ -100,6 +100,13 @@ USER_CREATE_ORG_MESSAGE = {
                "lab from your user settings page (using your institutional email).",
 }
 
+DATA_PRIVACY = {
+    "hosting": "A University of Adelaide server in Adelaide, Australia.",
+    "intended_use": "This is a test server: data may be deleted at any time, so please upload only test or public "
+                    "data, never identifiable patient data.",
+    "outside_eu": True,
+}
+
 # Latest annotation (VEP 115, columns_version 4, dbNSFP 5.x, gnomAD 4.1, ...) is the package default now (#1625)
 
 ANNOTATION_ANNOTSV_ENABLED = True

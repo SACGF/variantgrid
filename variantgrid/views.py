@@ -8,6 +8,7 @@ from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_not_required
 from django.contrib.auth.models import User
 from django.contrib.sites.models import Site
+from django.http import Http404
 from django.http.response import (
     HttpResponseForbidden,
     HttpResponseNotFound,
@@ -35,6 +36,7 @@ from manual.models import Deployment
 from snpdb.forms import KeycloakUserForm
 from snpdb.keycloak import Keycloak, KeycloakError, KeycloakNewUser
 from snpdb.models import UserSettings
+from snpdb.models.models_lab_request import is_per_user_lab_pattern
 
 
 class OneStepRegistrationView(SimpleRegistrationView):
@@ -189,6 +191,20 @@ def external_help(request):
 
     context = {}
     return render(request, 'external_help.html', context)
+
+
+@login_not_required
+def data_privacy(request):
+    """ Public page on who can see uploaded data and how it is stored, for settings.DATA_PRIVACY deployments """
+    if not settings.DATA_PRIVACY:
+        raise Http404("No data and privacy page on this deployment")
+
+    context = {
+        "data_privacy": settings.DATA_PRIVACY,
+        "private_user_labs": any(is_per_user_lab_pattern(lab_pattern)
+                                 for lab_pattern in settings.USER_CREATE_ORG_LABS.values()),
+    }
+    return render(request, 'registration/data_privacy.html', context)
 
 
 @require_superuser

@@ -23,6 +23,11 @@
                         <label>Contact Us</label>
                         <p><a href='{% url "contact_us" %}'>You can contact us here</a> to discuss if VariantGrid technology would be useful to you.</p>
                     {% endif %}
+
+                    {% if data_privacy_enabled %}
+                        <label>Data &amp; Privacy</label>
+                        <p><a href='{% url "data_privacy" %}'>Who can see your data, where it is stored and how to delete it</a>.</p>
+                    {% endif %}
                     <hr class="my-4"/>
 
                     <label>GitHub</label>
