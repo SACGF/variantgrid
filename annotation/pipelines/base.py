@@ -50,6 +50,11 @@ class AnnotationPipelineRunner(abc.ABC):
             operator-triggered rather than per-run. """
         raise NotImplementedError(f"{self.pipeline_type} is not a versioned pipeline")
 
+    def get_example_command(self, genome_build) -> Optional[list[str]]:
+        """ The tool's command line as current settings build it, with placeholder paths - what the annotation
+            versions page shows. None for a pipeline with no external command. """
+        return None
+
     def get_or_create_current_version(self, genome_build) -> tuple[AnnotationPipelineVersion, bool]:
         """ Register the installed tool as an AnnotationPipelineVersion, as
             get_or_create_variant_annotation_version_from_current_vep does for VEP.

@@ -38,6 +38,9 @@ class AnnotSVRunner(AnnotationPipelineRunner):
             "data_version": settings.ANNOTATION_ANNOTSV_BUNDLE_VERSION,
         }
 
+    def get_example_command(self, genome_build) -> list[str]:
+        return get_annotsv_command("in.vcf", "out_dir", genome_build, genome_build.annotation_consortium)
+
     # Deliberately no ANNOTATION_VEP_SV_MAX_SIZE filter in get_variants_qs. That cap exists because VEP
     # fills the logs with 'too long to annotate' above it; AnnotSV handles large SVs, and ranking them is
     # what it is for. Being fed the VEP dump is the reason it has never seen them.

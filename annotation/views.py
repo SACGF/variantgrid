@@ -2,6 +2,7 @@ from typing import Optional
 
 import cdot
 from django.conf import settings
+from django.db.models import Count
 from django.http.response import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -14,13 +15,14 @@ from annotation.models import (
     AnnotationVersion,
     VariantAnnotationVersion,
 )
+from annotation.models.models_annotation_run import AnnotationPipelineVersion
 from annotation.models.models_gene_annotation import (
     DBNSFPGeneAnnotationVersion,
     HumanProteinAtlasAnnotation,
     HumanProteinAtlasAnnotationVersion,
 )
 from annotation.pathogenicity_predictions import COLOUR_BANDS, EFFECT_NODE_FILTERS, TOOLS
-from annotation.pipelines import vep_pipeline_types
+from annotation.pipelines import get_pipeline, get_runner, versioned_pipeline_types, vep_pipeline_types
 from annotation.vep_annotation import (
     get_cached_vep_variant_annotation_version_kwargs,
     get_vep_command,
@@ -323,7 +325,30 @@ def annotation_versions(request):
             vep_command = " ".join(vep_command).replace(" -", "\n")
             vep_commands[pt.value] = vep_command
 
-        anno_versions[genome_build.name] = (vep_commands, qs, latest, has_annotation, has_active)
+        # #2849: the versioned pipelines (AnnotSV) have no VAV, so show their registered versions and command here
+        pipeline_versions = []
+        for pipeline_type in versioned_pipeline_types():
+            runner = get_runner(pipeline_type)
+            if not runner.supports_genome_build(genome_build):
+                continue
+            versions_qs = AnnotationPipelineVersion.objects.filter(
+                pipeline_type=pipeline_type, genome_build=genome_build,
+            ).annotate(num_runs=Count("annotationrun")).order_by("-created")
+            enabled = get_pipeline(pipeline_type).enabled
+            if not (enabled or versions_qs.exists()):
+                continue
+            command = None
+            if enabled and (command_args := runner.get_example_command(genome_build)):
+                command = " ".join(command_args).replace(" -", "\n-")
+            pipeline_versions.append({
+                "label": VariantAnnotationPipelineType(pipeline_type).label,
+                "slug": f"{genome_build.name}-{pipeline_type}",
+                "enabled": enabled,
+                "command": command,
+                "versions": versions_qs,
+            })
+
+        anno_versions[genome_build.name] = (vep_commands, qs, latest, has_annotation, has_active, pipeline_versions)
 
     context = {
         "annotation_versions": anno_versions,
