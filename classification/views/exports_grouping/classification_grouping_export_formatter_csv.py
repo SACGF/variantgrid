@@ -133,6 +133,11 @@ class ClassificationGroupingExportFormatterCSV(ClassificationGroupingExportForma
                  csv_format_details: CSVFormatDetails = CSVFormatDetails()):
         self.csv_format_details = csv_format_details
         super().__init__(classification_grouping_filter)
+        # prefetch related queries so they don't lazily evaluate
+        # after another large cursor has been created
+        _ = self.used_keys
+        _ = classification_grouping_filter.check_discordance(0)
+
     @cached_property
     def export_tweak(self):
         return ExportTweak(
@@ -175,7 +180,7 @@ class ClassificationGroupingExportFormatterCSV(ClassificationGroupingExportForma
 
     def single_row_generator(self) -> Iterator[str]:
         queryset = self.queryset().prefetch_related("overlapcontribution_set")
-        for row in queryset.iterator(chunk_size=4000):
+        for row in queryset.iterator(chunk_size=500):
             cm = row.latest_classification_modification
             row_data = []
             row_data.extend(CSVNonEvidence(

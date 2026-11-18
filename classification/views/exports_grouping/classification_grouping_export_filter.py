@@ -176,7 +176,6 @@ class ClassificationGroupingExportFilter:
         for entry in overlap_next_steps_qs.values_list('overlap__overlap_status', 'overlap__value_type', 'contribution__classification_grouping').iterator():
             overlap_status, value_type, classification_grouping = entry
             grouping_to_value_type_to_status[classification_grouping][value_type] = overlap_status
-        print(grouping_to_value_type_to_status)
         return grouping_to_value_type_to_status
 
     def latest_date(self) -> Optional[datetime]:
@@ -291,7 +290,7 @@ class ClassificationGroupingExportFormat(ABC):
         return self.classification_grouping_filter.queryset(genome_build=genome_build)
 
     def allele_group_iterator(self) -> Iterator[ClassificationGroupingByAllele]:
-        for allele_id, cgs in itertools.groupby(self.queryset(self.genome_build).iterator(chunk_size=4000), lambda cg: cg.allele_origin_grouping.allele.pk):
+        for allele_id, cgs in itertools.groupby(self.queryset(self.genome_build).iterator(chunk_size=500), lambda cg: cg.allele_origin_grouping.allele.pk):
             yield ClassificationGroupingByAllele(
                 allele_id,
                 list(cgs),
