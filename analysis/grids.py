@@ -554,11 +554,16 @@ class AnalysesListColumns(DatatableConfig[Analysis]):
 
     def _render_analysis(self, cell: CellData) -> JsonDataType:
         analysis_id = cell.value
-        return {
+        locked = bool(cell["analysislock__locked"])
+        link = {
             "text": analysis_id,
             "url": reverse("analysis", kwargs={"analysis_id": analysis_id}),
-            "locked": bool(cell["analysislock__locked"]),
+            "locked": locked,
         }
+        # A locked analysis is read only for everyone, which its lock icon already says
+        if not locked:
+            self.mark_read_only(link, analysis_id)
+        return link
 
     def _render_actions(self, cell: CellData) -> JsonDataType:
         analysis_id = cell.value
@@ -626,12 +631,12 @@ class AnalysisTemplatesColumns(DatatableConfig[AnalysisTemplate]):
                        renderer=self.render_delete, client_renderer='TableFormat.deleteRow'),
         ]
 
-    @staticmethod
-    def _render_analysis(cell: CellData) -> JsonDataType:
-        return {
+    def _render_analysis(self, cell: CellData) -> JsonDataType:
+        link = {
             "text": cell.value,
             "url": reverse("analysis", kwargs={"analysis_id": cell["analysis__id"]}),
         }
+        return self.mark_read_only(link, cell["id"])
 
     @staticmethod
     def _render_clone(cell: CellData) -> JsonDataType:

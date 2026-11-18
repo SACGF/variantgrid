@@ -898,9 +898,14 @@ TableFormat.linkUrl = (data, type, row) => {
         textDom = $('<span>', {text: text});
     }
     const aDom = $('<a>', {href:data.url, html: textDom, class: 'hover-link'});
-
+    if (data.read_only) {
+        return $('<span>').append(aDom, TableFormat.readOnlyIcon()).prop('outerHTML');
+    }
     return aDom.prop('outerHTML');
 };
+
+// A link cell the server flagged read_only - the user can view the row but not write it
+TableFormat.readOnlyIcon = () => $('<i>', {class: 'fa-regular fa-eye text-muted ml-1', title: 'Read only'});
 
 // kwargs: {columns: the members of data (or of row) to show}
 TableFormat.preview = (data, type, row, ctx) => {

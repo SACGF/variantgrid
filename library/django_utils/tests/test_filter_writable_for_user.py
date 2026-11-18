@@ -1,6 +1,6 @@
 """
-filter_writable_for_user() is the batch form of can_write() - the grids' delete columns resolve a
-whole page through it, passing the page's pks. These check the two agree, with and without pks,
+filter_writable_for_user() is the batch form of can_write() - the grids' delete columns and read only
+flags resolve a whole page through it, passing the page's pks. These check the two agree, with and without pks,
 wherever a model overrides one of them.
 """
 from django.contrib.auth.models import Group, User
@@ -11,6 +11,7 @@ from guardian.shortcuts import assign_perm
 
 from analysis.models import Analysis, AnalysisLock, VariantTag
 from annotation.fake_data import create_fake_variants
+from genes.models.models_gene_list import GeneList
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.models import ExternalModelManager, ExternalPK, Patient
 from snpdb.enums import ImportStatus
@@ -87,6 +88,12 @@ class FilterWritableForUserTest(TestCase):
                                     date=timezone.now())
         self.assert_agrees_with_can_write(Analysis, self.analysis, self.owner, True)
 
+    def test_locked_gene_list(self):
+        """ GeneList.can_write refuses a locked list even to its owner """
+        gene_list = GeneList.objects.create(name="writable locked gene list", user=self.owner, locked=True)
+        assign_permission_to_user_and_groups(self.owner, gene_list)
+        self.assert_agrees_with_can_write(GeneList, gene_list, self.owner, False)
+
     def test_patient(self):
         patient = Patient.objects.create(patient_code="writable patient")
         assign_permission_to_user_and_groups(self.owner, patient)
@@ -138,8 +145,8 @@ class FilterWritableForUserTest(TestCase):
             self.assertEqual(set(page_writable.values_list("pk", flat=True)), {page_analysis.pk}, user)
 
 
-class DeleteColumnPermissionTest(TestCase):
-    """ The delete column offers a link only where the user can write the row """
+class WritePermissionColumnsTest(TestCase):
+    """ The delete column offers a link, and the name cell no read only flag, only where the user can write the row """
 
     @classmethod
     def setUpTestData(cls):
@@ -152,11 +159,17 @@ class DeleteColumnPermissionTest(TestCase):
         cls.vcf = VCF.objects.get()
         assign_perm(VCF.get_read_perm(), cls.reader, cls.vcf)
 
-    def _delete_links(self, user) -> list:
+    def _rows(self, user) -> list:
         self.client.force_login(user)
         response = self.client.get(reverse("vcfs_datatable"), {"draw": 1, "start": 0, "length": 100})
         self.assertEqual(response.status_code, 200)
-        return [row["delete"] for row in response.json()["data"]]
+        return response.json()["data"]
+
+    def _delete_links(self, user) -> list:
+        return [row["delete"] for row in self._rows(user)]
+
+    def _read_only_flags(self, user) -> list:
+        return [row["name"].get("read_only", False) for row in self._rows(user)]
 
     def test_owner_gets_delete_link(self):
         self.assertEqual(self._delete_links(self.owner),
@@ -166,3 +179,9 @@ class DeleteColumnPermissionTest(TestCase):
 
     def test_read_only_user_gets_none(self):
         self.assertEqual(self._delete_links(self.reader), [None])
+
+    def test_owner_name_not_read_only(self):
+        self.assertEqual(self._read_only_flags(self.owner), [False])
+
+    def test_read_only_user_name_flagged(self):
+        self.assertEqual(self._read_only_flags(self.reader), [True])
