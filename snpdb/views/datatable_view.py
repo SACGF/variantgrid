@@ -37,6 +37,7 @@ from library.django_utils.grid_export import (
     csv_streaming_response,
     grid_export_csv,
 )
+from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.django_utils.major_operation import MajorOperationViewMixin
 from library.log_utils import report_exc_info
 from library.utils import JsonDataType, JsonObjType, full_class_name, nice_class_name, pretty_label
@@ -848,10 +849,19 @@ class DatatableConfig(Generic[DC]):
             # Legacy data can have blank text primary keys (eg Experiment) - no URL to link to
             return {"text": text}
         obj = self._model(pk=pk)
-        return {
+        link = {
             "text": text,
             "url": obj.get_absolute_url(),
         }
+        if issubclass(self._model, GuardianPermissionsMixin):
+            self.mark_read_only(link, pk)
+        return link
+
+    def mark_read_only(self, link: dict, pk) -> dict:
+        """ Flags a link cell for a row the user can't write, which the link renderers draw as an eye """
+        if pk not in self._writable_pks_for_page(self._model._meta.pk.name):
+            link["read_only"] = True
+        return link
 
     def render_delete(self, cell: CellData) -> Optional[str]:
         """ The delete link, or None where the user can't write the row """

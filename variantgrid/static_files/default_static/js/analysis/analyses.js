@@ -12,6 +12,9 @@ function renderAnalysisLink(data, type, row) {
         $('<i>', {class: 'fa fa-lock fa-lg mr-1', title: 'Locked'}).appendTo(dom);
     }
     $('<a>', {href: data.url, class: 'hover-link', text: data.text}).appendTo(dom);
+    if (data.read_only) {
+        TableFormat.readOnlyIcon().appendTo(dom);
+    }
     return dom.prop('outerHTML');
 }
 

@@ -131,6 +131,9 @@ working-tree `runserver` as `claude_agent`; read the PNGs it writes rather than 
   snpdb/views/datatable_view.py:DatatableConfig.pre_render (it gets the page's rows; the page's objects under
   `server_calculate_mode = DatatableConfigQuerySetMode.OBJECTS`), never a `.get()` per row - per-row write
   permission is `_writable_pks_for_page`, and snpdb/grids.py:AbstractAlleleLiftoverColumns.pre_render is an example.
+- A row the user can view but not write shows an eye after its name: `view_primary_key` flags `read_only` on any
+  Guardian model's link, and a grid with its own link renderer passes the link through
+  snpdb/views/datatable_view.py:DatatableConfig.mark_read_only (`TableFormat.readOnlyIcon` draws it, #968).
 - A User FK column is `self.user_column(fk, label=...)` (snpdb/views/datatable_view.py:DatatableConfig.user_column):
   it sorts/exports on the username, renders through `render_user` and its search matches the "First Last" the cell
   shows via `RichColumn.search_annotations` - expressions power_search annotates only while a search is in flight.

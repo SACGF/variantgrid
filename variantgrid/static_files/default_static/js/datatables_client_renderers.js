@@ -47,7 +47,7 @@ function renderExpandAnalysisAuditLogEntry(x) {
 }
 
 
-// Server sends {text, url} - url is null where there's nothing to link to
+// Server sends {text, url, read_only} - url is null where there's nothing to link to
 function renderOptionalLink(data, type, row) {
     if (!data || !data.text) {
         return '<span class="no-value">-</span>';
@@ -55,7 +55,11 @@ function renderOptionalLink(data, type, row) {
     if (!data.url) {
         return $('<span>', {text: data.text}).prop('outerHTML');
     }
-    return $('<a>', {href: data.url, class: 'hover-link', text: data.text}).prop('outerHTML');
+    const aDom = $('<a>', {href: data.url, class: 'hover-link', text: data.text});
+    if (data.read_only) {
+        return $('<span>').append(aDom, TableFormat.readOnlyIcon()).prop('outerHTML');
+    }
+    return aDom.prop('outerHTML');
 }
 
 

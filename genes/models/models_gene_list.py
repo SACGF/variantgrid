@@ -213,6 +213,11 @@ class GeneList(GuardianPermissionsMixin, TimeStampedModel):
         return user_or_group.has_perm(write_perm, self) and not self.locked
 
     @classmethod
+    def filter_writable_for_user(cls, user, pks=None):
+        """ Batch can_write - a locked GeneList is read only """
+        return super().filter_writable_for_user(user, pks=pks).filter(locked=False)
+
+    @classmethod
     def allow_group_permission_delete(cls) -> bool:
         return True  # User-created list; deletable via the group_permissions delete view
 

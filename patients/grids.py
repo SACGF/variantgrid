@@ -63,8 +63,7 @@ class PatientListColumns(DatatableConfig[Patient]):
         self.rich_columns = [
             RichColumn('id', search=False, visible=False),
             RichColumn('patient_code', label='Patient', orderable=True, extra_columns=['id'],
-                       renderer=partial(_render_patient_link, patient_id_column='id'),
-                       client_renderer='TableFormat.linkUrl'),
+                       renderer=self._render_patient, client_renderer='TableFormat.linkUrl'),
             RichColumn('external_pk__code', label='External ID', orderable=True),
             RichColumn('family_code', label='Family Code', orderable=True),
             RichColumn('phenotype', orderable=True, client_renderer='TableFormat.limit',
@@ -87,6 +86,9 @@ class PatientListColumns(DatatableConfig[Patient]):
             RichColumn('id', name='delete', label='', orderable=False, search=False,
                        renderer=self.render_delete, client_renderer='TableFormat.deleteRow'),
         ]
+
+    def _render_patient(self, cell: CellData) -> JsonDataType:
+        return self.mark_read_only(_render_patient_link(cell, patient_id_column='id'), cell['id'])
 
     def get_initial_queryset(self) -> QuerySet[Patient]:
         """ Samples carry their VCF's permissions rather than their patient's, so the count/names are of the
