@@ -126,7 +126,6 @@
                                     <th>Data Version</th>
                                     <th>Status</th>
                                     <th>Created</th>
-                                    <th>Runs</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -137,10 +136,9 @@
                                         <td>{{ version.data_version|default_if_none:'' }}</td>
                                         <td>{{ version.get_status_display }}</td>
                                         <td>{% timestamp version.created %}</td>
-                                        <td>{{ version.num_runs }}</td>
                                     </tr>
                                 {% empty %}
-                                    <tr><td colspan="6" class="text-muted">No version registered - see <a href="{% url 'variant_annotation_runs' %}">annotation runs</a></td></tr>
+                                    <tr><td colspan="5" class="text-muted">No version registered - see <a href="{% url 'variant_annotation_runs' %}">annotation runs</a></td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>

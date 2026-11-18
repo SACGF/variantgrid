@@ -2,7 +2,6 @@ from typing import Optional
 
 import cdot
 from django.conf import settings
-from django.db.models import Count
 from django.http.response import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -333,7 +332,7 @@ def annotation_versions(request):
                 continue
             versions_qs = AnnotationPipelineVersion.objects.filter(
                 pipeline_type=pipeline_type, genome_build=genome_build,
-            ).annotate(num_runs=Count("annotationrun")).order_by("-created")
+            ).order_by("-created")
             enabled = get_pipeline(pipeline_type).enabled
             if not (enabled or versions_qs.exists()):
                 continue
