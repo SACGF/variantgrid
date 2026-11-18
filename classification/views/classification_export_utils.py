@@ -186,15 +186,12 @@ class UsedKeyTracker:
 
     @cached_property
     def ordered_keys(self) -> list[UsedKey]:
-        return self._ordered_keys_extra(self.group_criteria)
-
-    def _ordered_keys_extra(self, group_criteria: bool = False) -> list[UsedKey]:
         criterias_by_namespace: dict[str, list[UsedKey]] = defaultdict(list)
         ordered_keys: list[UsedKey] = []
         for e_key in self.considered_keys:
             if used_key := self.calc_dict.get(e_key.key):
                 used_key.ekey = e_key
-                if (namespace := e_key.namespace) and group_criteria and namespace in _GROUPED_NAMESPACES:
+                if (namespace := e_key.namespace) and self.group_criteria and namespace in _GROUPED_NAMESPACES:
                     criterias_by_namespace[namespace].append(used_key)
                 else:
                     ordered_keys.append(used_key)

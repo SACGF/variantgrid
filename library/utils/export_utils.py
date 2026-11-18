@@ -310,7 +310,7 @@ class ExportRow:
                 row.add_cell(label)
         return row.get_row()
 
-    def to_csv(self,export_tweak: ExportTweak = ExportTweak.DEFAULT, export_settings: Optional[ExportSettings] = None) -> list[str]:
+    def to_csv(self, export_tweak: ExportTweak = ExportTweak.DEFAULT, export_settings: Optional[ExportSettings] = None) -> list[str]:
         if not export_settings:
             export_settings = ExportSettings.get_for_request()
 
