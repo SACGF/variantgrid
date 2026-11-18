@@ -97,8 +97,9 @@ Patterns here:
   on, plus variant type and the repeat / SV artefact regions, which always narrow). Each row is one
   `analysis/models/nodes/filters/damage_node_filters.py:EffectFilter` - its fields, group and words. The editor draws
   only the rows with a value and moves one by writing its `_required`, so the form posts what it always has; the
-  sentence under the groups, the node's summary, hover card and chip titles all read those words. A new filter is an
-  `EffectFilter` there, not template markup.
+  sentence under the groups, the node's summary, hover card and chip titles all read those words, and the node's
+  chips sit inside an "Any of" / "All of" group chip (`NodeChip.children`). A new filter is an `EffectFilter` there,
+  not template markup.
 - A required splicing filter with allow null keeps a variant with none of the splicing scores it reads. Nodes saved
   before that (#2836) kept any variant missing one score - nearly all, as dbscSNV only scores splice-consensus SNVs -
   and keep that rule while `DamageNode.splice_allow_null_any_missing` is set (migration 0021, exports without the key

@@ -74,7 +74,7 @@ class DamageNodeVariantTypesTest(AnalysisSetupMixin, TestCase):
 class DamageNodeTypeChipsTest(SimpleTestCase):
     @staticmethod
     def _chip_texts(**kwargs) -> list[str]:
-        return [chip.text for chip in DamageNode(**kwargs).get_node_chips()]
+        return [chip.text for group in DamageNode(**kwargs).get_node_chips() for chip in group.children]
 
     def test_no_restriction_no_chips(self):
         self.assertEqual([], self._chip_texts(variant_types=[]))

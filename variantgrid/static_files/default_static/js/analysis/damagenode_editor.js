@@ -354,10 +354,8 @@ function initDamageNodeEditor(options) {
                 $(".effect-group-empty", groupDiv).text(empty).toggle(!rows.length);
                 let hint = "a variant must pass every one, so adding one can only narrow the results";
                 if (group === "any") {
-                    hint = "a variant needs at least one of these";
-                    if (rows.length > 1) {
-                        hint += ", so adding one can only widen the results";
-                    }
+                    hint = "a variant needs at least one of these: the first filter narrows the results, "
+                         + "each one after that widens them";
                 }
                 $(".effect-group-hint", groupDiv).text(hint);
                 if (options.canEdit) {
