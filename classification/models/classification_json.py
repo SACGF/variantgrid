@@ -1,6 +1,13 @@
+""" Classification.as_json: populate_classification_json builds one record's JSON from ClassificationJsonParams;
+    ClassificationJsonBulk shares the per-user and per-lab work across an export's records and loads what they read a
+    batch at a time (#2870) """
 from collections import defaultdict
+from collections.abc import Iterable
+from typing import Optional
 
 from django.conf import settings
+from django.contrib.auth.models import User
+from django.db.models import prefetch_related_objects
 
 from classification.enums import EvidenceKeyValueType, ShareLevel, SpecialEKeys
 from classification.models import (
@@ -11,17 +18,76 @@ from classification.models import (
     EvidenceKeyMap,
     ImportedAlleleInfo,
 )
+from classification.models.classification import EvidenceVisibility
 from classification.models.classification_evidence_normalise import evidence_validation_messages
+from classification.models.classification_grouping import ClassificationGrouping
 from classification.models.classification_json_definitions import (
     ClassificationJsonAlleleDict,
     ClassificationJsonAlleleRevolvedDict,
 )
 from classification.models.classification_ref import ClassificationRef
+from classification.models.classification_variant_info_models import ResolvedVariantInfo
 from genes.hgvs import HGVSDisplay
 from library.django_utils import get_url_from_view_path
 
 
-def get_allele_info_dict(classification: Classification) -> ClassificationJsonAlleleDict:
+class ClassificationJsonBulk:
+    """ Pass as ClassificationJsonParams.bulk when converting many classifications, and call prepare_batch with each
+        batch before converting it: evidence visibility is resolved once per lab, can_write once per batch, and
+        the relations populate_classification_json reads are prefetched rather than fetched per record """
+
+    PREFETCH = [
+        "flag_collection",
+        "conditiontextmatch__condition_text",
+        "allele_info__latest_validation",
+        "allele_info__grch37",
+        "allele_info__grch38",
+        "classificationgroupingentry_set__grouping__overlapcontribution_set",
+    ]
+
+    def __init__(self, user: User):
+        self.evidence_visibility = EvidenceVisibility(user)
+        self._user = user
+        self._batch_ids: set[int] = set()
+        self._writable_ids: set[int] = set()
+        self._resolved_builds: dict[int, list[ResolvedVariantInfo]] = {}
+
+    def prepare_batch(self, classifications: Iterable[Classification]):
+        classifications = list(classifications)
+        prefetch_related_objects(classifications, *self.PREFETCH)
+        self._batch_ids = {c.pk for c in classifications}
+        self._writable_ids = set(Classification.filter_writable_for_user(self._user, pks=self._batch_ids)
+                                 .values_list("pk", flat=True))
+        allele_info_ids = {c.allele_info_id for c in classifications if c.allele_info_id}
+        self._resolved_builds = defaultdict(list)
+        for resolved in ImportedAlleleInfo.resolved_builds_qs(allele_info_ids):
+            self._resolved_builds[resolved.allele_info_id].append(resolved)
+
+    def in_batch(self, classification: Classification) -> bool:
+        """ Loaded with the current batch, so up to date and with its relations prefetched """
+        return classification.pk in self._batch_ids
+
+    def can_write(self, classification: Classification) -> bool:
+        if self.in_batch(classification):
+            return classification.pk in self._writable_ids
+        return classification.can_write(user_or_group=self._user)
+
+    def grouping_for(self, classification: Classification) -> Optional[ClassificationGrouping]:
+        if self.in_batch(classification):
+            # there's only ever one entry per classification
+            if entry := next(iter(classification.classificationgroupingentry_set.all()), None):
+                return entry.grouping
+            return None
+        return ClassificationGroupingEntry.grouping_for(classification)
+
+    def resolved_builds(self, classification: Classification) -> list[ResolvedVariantInfo]:
+        if self.in_batch(classification):
+            return self._resolved_builds.get(classification.allele_info_id, [])
+        return classification.allele_info.resolved_builds
+
+
+def get_allele_info_dict(classification: Classification,
+                          bulk: Optional[ClassificationJsonBulk] = None) -> ClassificationJsonAlleleDict:
     allele_info_dict: ClassificationJsonAlleleDict = {}
     if allele_info := classification.allele_info:
         resolved_dict: ClassificationJsonAlleleRevolvedDict = {
@@ -54,7 +120,8 @@ def get_allele_info_dict(classification: Classification) -> ClassificationJsonAl
         allele_info_dict["resolved"] = resolved_dict
 
         genome_builds = {}
-        for variant_info in allele_info.resolved_builds:
+        resolved_builds = bulk.resolved_builds(classification) if bulk else allele_info.resolved_builds
+        for variant_info in resolved_builds:
             genome_builds[variant_info.genome_build.name] = {
                 'variant_id': variant_info.variant_id,
                 SpecialEKeys.C_HGVS: variant_info.resolved_hgvs,
@@ -104,13 +171,15 @@ def populate_classification_json(classification: Classification, params: Classif
     if not last_published_version:
         last_published_version = classification.last_published_version
 
-    can_write = classification.can_write(user_or_group=current_user)
+    bulk = params.bulk
+    in_batch = bool(bulk) and bulk.in_batch(classification)
+    evidence_visibility = bulk.evidence_visibility if bulk else EvidenceVisibility(current_user)
+    can_write = bulk.can_write(classification) if bulk else classification.can_write(user_or_group=current_user)
 
     if classification.share_level == ShareLevel.CURRENT_USER.key:
         last_published_version = None
 
     last_published_timestamp = None
-    lowest_share_level = classification.lowest_share_level(current_user)
     if last_published_version:
         last_published_timestamp = last_published_version.created.timestamp()
 
@@ -119,7 +188,8 @@ def populate_classification_json(classification: Classification, params: Classif
         clinical_context = classification.clinical_context.name
 
     triages_json = {}
-    if grouping := ClassificationGroupingEntry.grouping_for(classification):
+    grouping = bulk.grouping_for(classification) if bulk else ClassificationGroupingEntry.grouping_for(classification)
+    if grouping:
         for contribution in grouping.overlapcontribution_set.all():
             triages_json[contribution.value_type] = contribution.triage_state_obj.to_dict()
     # attach this directly to the record for now, might make it part of the default generation
@@ -141,7 +211,7 @@ def populate_classification_json(classification: Classification, params: Classif
         'can_write': can_write,
         'can_write_latest': can_write,
         'clinical_context': clinical_context,
-        'data': classification.get_visible_evidence(classification.evidence, lowest_share_level),
+        'data': evidence_visibility.visible_evidence(classification, classification.evidence),
         'resolved_condition': classification.condition_resolution_dict,
         'withdrawn': classification.withdrawn,
         'allele_origin_bucket': classification.allele_origin_bucket,
@@ -172,7 +242,7 @@ def populate_classification_json(classification: Classification, params: Classif
         versioned_data = version.evidence
         content['title'] = content['title'] + '.' + str(version_timestamp)
         content['version'] = version_timestamp
-        content['data'] = classification.get_visible_evidence(versioned_data, lowest_share_level)
+        content['data'] = evidence_visibility.visible_evidence(classification, versioned_data)
         if include_messages:
             content['messages'] = evidence_validation_messages(versioned_data)
         content['can_write'] = False
@@ -182,12 +252,12 @@ def populate_classification_json(classification: Classification, params: Classif
 
     if include_messages:
         content['messages'] = (content['messages'] or []) + classification.current_state_validation(
-            user=current_user).flat_messages
+            user=current_user, refresh=not in_batch).flat_messages
 
     # Summary
     data = content['data']
 
-    content["allele"] = get_allele_info_dict(classification)
+    content["allele"] = get_allele_info_dict(classification, bulk)
 
     if classification.sample:
         content["sample_id"] = classification.sample.pk

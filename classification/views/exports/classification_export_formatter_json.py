@@ -12,6 +12,7 @@ from classification.models import (
     ClassificationModification,
     EvidenceKeyMap,
 )
+from classification.models.classification_json import ClassificationJsonBulk
 from classification.models.evidence_mixin import EvidenceMixin
 from classification.views.exports.classification_export_decorator import (
     register_classification_exporter,
@@ -82,7 +83,8 @@ class ClassificationExportFormatterJSON(ClassificationExportFormatter):
                                         # FIXME don't want this to be the default
                                         remove_acmg_namespace=True,
                                         inject_source_url=self.format_details.inject_source_url,
-                                        populate_literature_with_citations=populate_literature_with_citations)
+                                        populate_literature_with_citations=populate_literature_with_citations,
+                                        bulk=ClassificationJsonBulk(self.classification_filter.user))
 
     @property
     def delimiter_for_row(self):
@@ -92,12 +94,12 @@ class ClassificationExportFormatterJSON(ClassificationExportFormatter):
         return ['{"records":[']
 
     def batch_pre_cache(self) -> Optional[Callable[[list[AlleleData]], None]]:
-        if not self.json_params.populate_literature_with_citations:
-            return None
-
-        def prefetch_citations(batch: list[AlleleData]):
-            EvidenceMixin.prefetch_citations(ci.classification.classification for ad in batch for ci in ad.all_cms)
-        return prefetch_citations
+        def prepare_batch(batch: list[AlleleData]):
+            classifications = [ci.classification.classification for ad in batch for ci in ad.all_cms]
+            self.json_params.bulk.prepare_batch(classifications)
+            if self.json_params.populate_literature_with_citations:
+                EvidenceMixin.prefetch_citations(classifications)
+        return prepare_batch
 
     def row(self, allele_data: AlleleData) -> list[str]:
         rows = []

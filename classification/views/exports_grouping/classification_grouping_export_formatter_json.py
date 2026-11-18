@@ -6,6 +6,7 @@ from functools import cached_property
 from django.conf import settings
 
 from classification.models import ClassificationJsonParams
+from classification.models.classification_json import ClassificationJsonBulk
 from classification.models.evidence_mixin import EvidenceMixin
 from classification.views.exports_grouping.classification_grouping_export_filter import (
     ClassificationGroupingExportFilter,
@@ -55,7 +56,8 @@ class ClassificationGroupingExportFormatterJSON(ClassificationGroupingExportForm
             current_user=self.classification_grouping_filter.user,
             api_version=2,
             include_data=include_data,
-            populate_literature_with_citations=populate_literature_with_citations
+            populate_literature_with_citations=populate_literature_with_citations,
+            bulk=ClassificationJsonBulk(self.classification_grouping_filter.user)
         )
 
     def single_row_generator(self) -> Iterator[str]:
@@ -74,8 +76,10 @@ class ClassificationGroupingExportFormatterJSON(ClassificationGroupingExportForm
         ).prefetch_related("overlapcontribution_set")
 
         for batch in batch_iterator(queryset.iterator(chunk_size=4000), batch_size=CITATION_PREFETCH_BATCH_SIZE):
+            classifications = [cg.latest_classification_modification.classification for cg in batch]
+            self.json_params.bulk.prepare_batch(classifications)
             if self.json_params.populate_literature_with_citations:
-                EvidenceMixin.prefetch_citations(cg.latest_classification_modification.classification for cg in batch)
+                EvidenceMixin.prefetch_citations(classifications)
             for cg in batch:
                 json_data = cg.latest_classification_modification.as_json(
                     self.json_params

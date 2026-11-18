@@ -3,7 +3,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from django.contrib.auth.models import User
 from django.db.models import Q
@@ -18,6 +18,9 @@ from eventlog.notifications import NotificationBuilder
 from genes.models import GeneSymbol, Transcript
 from library.utils import VarsDict, local_date_string
 from snpdb.models import Allele
+
+if TYPE_CHECKING:
+    from classification.models.classification_json import ClassificationJsonBulk
 
 
 @dataclass
@@ -197,7 +200,8 @@ class ClassificationJsonParams:
                  fix_data_types=False,
                  remove_acmg_namespace: Optional[bool] = None,
                  inject_source_url: bool = False,
-                 populate_literature_with_citations: bool = False
+                 populate_literature_with_citations: bool = False,
+                 bulk: Optional['ClassificationJsonBulk'] = None
                  ):
         """
         :param current_user: The user who will be consuming this data
@@ -213,6 +217,7 @@ class ClassificationJsonParams:
         :param remove_acmg_namespace: if True, change "acmg:bp2" to "bp2" etc for backwards compatibility
         :param inject_source_url: if True, sets evidence key source_url to be the URL that the classification can be accessed at
         :param populate_literature_with_citations: if True, sets evidence key literature to be a list of citations found in the classification (assumes you're not exporting literature as a raw evidence)
+        :param bulk: for converting many classifications (an export), work shared between them and done a batch at a time
         """
         self.current_user = current_user
         self.include_data = include_data
@@ -228,6 +233,7 @@ class ClassificationJsonParams:
         self.remove_acmg_namespace = remove_acmg_namespace
         self.inject_source_url = inject_source_url
         self.populate_literature_with_citations = populate_literature_with_citations
+        self.bulk = bulk
 
     @cached_property
     def date_str(self) -> str:

@@ -102,6 +102,9 @@ Gotchas:
 - Classification.variant and .allele are nullable: a record whose ImportedAlleleInfo failed validation keeps variant=None and
   is excluded from exports (models/classification.py:Classification.include_based_on_allele_info). Filter on it rather than
   assuming every classification has a variant.
+- Converting many records with as_json (an export): pass `ClassificationJsonParams(bulk=ClassificationJsonBulk(user))` and call
+  `prepare_batch` per batch (models/classification_json.py:ClassificationJsonBulk). Without it every record rebuilds its lab's
+  evidence key map, asks Guardian for can_write and, with include_messages, refresh_from_db()s itself (#2870).
 - settings DISCORDANCE_ENABLED defaults to False: ClinicalContext.recalc_and_save still stores the status, but DiscordanceReports
   and notifications are only created when it is on. models/discordance_models.py:DiscordanceReport.is_pending_concordance is
   a live calculation, never stored.
