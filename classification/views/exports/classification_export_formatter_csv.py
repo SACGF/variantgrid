@@ -4,6 +4,7 @@ from functools import cached_property
 from typing import Any, Optional
 
 from django.conf import settings
+from django.conf import settings
 from django.http import HttpRequest
 
 from classification.models import Classification, ClassificationModification, EvidenceKeyMap

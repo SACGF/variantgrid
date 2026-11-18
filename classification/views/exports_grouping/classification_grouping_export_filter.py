@@ -142,7 +142,7 @@ class ClassificationGroupingExportFilter:
             "latest_allele_info__grch38",
             "latest_classification_modification__classification",
             "lab__organization",
-        )
+        ).defer('latest_classification_modification__delta', 'latest_classification_modification__classification__evidence')
 
         return groupings
 

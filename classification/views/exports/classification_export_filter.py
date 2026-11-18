@@ -713,7 +713,7 @@ class ClassificationFilter:
             f'classification__allele_info__grch{genome_build_str}__variant__alt',
             'classification__lab__organization',
             'classification__clinical_context'
-        )
+        ).defer('delta', 'classification__evidence')
 
         if allele_id := self.allele:
             cms = cms.filter(classification__allele_info__allele_id=allele_id)
@@ -746,7 +746,7 @@ class ClassificationFilter:
         """
         allele_data: Optional[AlleleData] = None
         cm: ClassificationModification
-        for cm in self.cms_qs.iterator(chunk_size=1000):
+        for cm in self.cms_qs.iterator(chunk_size=500):
             if allele_info := cm.classification.allele_info:
                 allele_id = cm.classification.allele_id
                 # note only care about allele origin bucket if self.allele_origin_split is True
@@ -779,9 +779,12 @@ class ClassificationFilter:
                 yield allele_data
 
     def allele_data_filtered_pre_processed(self, batch_processor: Optional[Callable[[list[AlleleData]], None]] = None) -> Iterator[AlleleData]:
-        for batch in batch_iterator(self._allele_data_filtered(), batch_size=100):
-            # AlleleData.pre_process(batch)
-            if batch_processor:
+        if batch_processor:
+            for batch in batch_iterator(self._allele_data_filtered(), batch_size=100):
+                # AlleleData.pre_process(batch)
                 batch_processor(batch)
-            for data in batch:
+                for data in batch:
+                    yield data
+        else:
+            for data in self._allele_data_filtered():
                 yield data
