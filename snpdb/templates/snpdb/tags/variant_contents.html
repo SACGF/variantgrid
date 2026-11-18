@@ -2,7 +2,11 @@
 {% if chips %}
     <span class="variant-contents">
     {% for chip in chips %}
-        <span class="variant-content-chip variant-content-{{ chip.content }}" title="{{ chip.title }}">{{ chip.label }}{% if show_counts %}<span class="variant-content-count">{{ chip.count|intcomma }}</span>{% endif %}</span>
+        {% if show_counts %}
+            <span class="variant-content-counted" title="{{ chip.title }}"><span class="variant-content-chip variant-content-{{ chip.content }}">{{ chip.label }}</span><span class="variant-content-count">{{ chip.count|intcomma }}</span></span>
+        {% else %}
+            <span class="variant-content-chip variant-content-{{ chip.content }}" title="{{ chip.title }}">{{ chip.label }}</span>
+        {% endif %}
     {% endfor %}
     </span>
 {% elif placeholder and counted %}
