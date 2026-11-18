@@ -19,7 +19,7 @@ They deliberately exercise the parts the substitution touches or risks:
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
-from analysis.enums import ZygosityNodeZygosity
+from analysis.enums import GroupOperation, ZygosityNodeZygosity
 from analysis.models import Analysis
 from analysis.models.nodes.filters.allele_frequency_node import AlleleFrequencyNode
 from analysis.models.nodes.filters.merge_node import MergeNode
@@ -333,18 +333,18 @@ class TestRarePopulationNodePruningEquivalence(TestCase):
         node.count = count
         return node
 
-    def _rare_population_child(self):
+    def _rare_population_child(self, **kwargs):
         # percent <= 5 with gnomad_af -> _has_common_variants() is False -> pushes common_variants=False up.
-        pop = PopulationNode.objects.create(
-            analysis=self.analysis, percent=1.0,
-            gnomad_af=True, gnomad_popmax_af=False, af_1kg=True, af_uk10k=True, topmed_af=False)
+        pop_kwargs = {"gnomad_af": True, "gnomad_popmax_af": False, "af_1kg": True, "af_uk10k": True,
+                      "topmed_af": False} | kwargs
+        pop = PopulationNode.objects.create(analysis=self.analysis, percent=1.0, **pop_kwargs)
         pop.add_parent(self._ready_source())
         pop._cached_parents = None
         pop.save()
         return pop
 
-    def _result_pks(self):
-        return set(self._rare_population_child().get_queryset().values_list("pk", flat=True))
+    def _result_pks(self, **kwargs):
+        return set(self._rare_population_child(**kwargs).get_queryset().values_list("pk", flat=True))
 
     def test_rare_population_node_result_equivalent_with_gate_on_vs_off(self):
         with override_settings(ANALYSIS_NODE_STORE_ID_SIZE_MAX=0):
@@ -355,3 +355,11 @@ class TestRarePopulationNodePruningEquivalence(TestCase):
         # The rare variant survives both paths; the common variant is excluded by both.
         self.assertEqual(pks_gate_off, {self.v_rare.pk})
         self.assertEqual(pks_gate_on, pks_gate_off)
+
+    def test_all_group_operation_keeps_common_partition_variant_missing_from_another_database(self):
+        """ #2856 - under ALL a variant common in gnomAD but with no TopMed value is kept, so the node can't
+            skip the common partition it lives in """
+        kwargs = {"group_operation": GroupOperation.ALL, "af_1kg": False, "af_uk10k": False, "topmed_af": True}
+        for store_id_size_max in [0, 1000]:
+            with override_settings(ANALYSIS_NODE_STORE_ID_SIZE_MAX=store_id_size_max):
+                self.assertEqual(self._result_pks(**kwargs), {self.v_rare.pk, self.v_common.pk})

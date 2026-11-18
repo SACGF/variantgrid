@@ -105,8 +105,20 @@ class PopulationNode(AnalysisNode):
             )
         return warnings
 
+    def _population_database_columns(self) -> list[str]:
+        """ VariantAnnotation columns the frequency cutoff is applied to """
+        columns = [field for field in self.population_database_fields if getattr(self, field)]
+        if self.pk:
+            for gnomad_pop in self.populationnodegnomadpopulation_set.all():
+                columns.append(VariantAnnotation.get_gnomad_population_field(gnomad_pop.population))
+        return columns
+
     def _has_common_variants(self) -> bool:
+        """ The common partition only holds variants above 5% in gnomAD, which ANY removes. ALL keeps one that is
+            missing or below the cutoff in another database, so it can only skip the partition with one database """
         rare_only = (self.gnomad_af or self.gnomad_popmax_af) and self.percent <= 5
+        if rare_only and self.group_operation != GroupOperation.ANY:
+            rare_only = len(self._population_database_columns()) == 1
         return not rare_only
 
     def _get_kwargs_for_parent_annotation_kwargs(self, common_variants=None, **kwargs):
@@ -139,16 +151,7 @@ class PopulationNode(AnalysisNode):
     def _get_node_q(self) -> Optional[Q]:
         and_q = []
         if self.filtering_by_population:
-            population_databases = []
-            for field in self.population_database_fields:
-                if getattr(self, field):
-                    population_databases.append(field)
-
-            for gnomad_pop in self.populationnodegnomadpopulation_set.all():
-                field = VariantAnnotation.get_gnomad_population_field(gnomad_pop.population)
-                population_databases.append(field)
-
-            if population_databases:
+            if population_databases := self._population_database_columns():
                 # The group operation is backwards from what you may expect, as the widget takes MAX
                 # but we are filtering for NULL or less than
                 # ANY - remove if frequency is above cutoff in any database (much more strict).
