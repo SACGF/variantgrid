@@ -30,6 +30,7 @@ from django.urls import reverse
 from django.utils.html import conditional_escape, escape
 from kombu.utils import json
 
+from library.django_utils.database_utils import iter_ordered_batches
 from library.django_utils.datatable_mixins import JSONResponseView
 from library.django_utils.filter_rules import filter_operations_json, parse_filters, rules_to_q
 from library.django_utils.grid_export import (
@@ -41,7 +42,6 @@ from library.django_utils.guardian_permissions_mixin import GuardianPermissionsM
 from library.django_utils.major_operation import MajorOperationViewMixin
 from library.log_utils import report_exc_info
 from library.utils import JsonDataType, JsonObjType, full_class_name, nice_class_name, pretty_label
-from library.utils.collection_utils import batch_iterator
 from snpdb.models import AvatarDetails, UserGridConfig
 
 logger = logging.getLogger(__name__)
@@ -684,18 +684,16 @@ class DatatableConfig(Generic[DC]):
             yield {rc.name: self.export_cell(row, rc) for rc in columns}
 
     def iter_export_rows(self, qs: QuerySet[DC]) -> Iterator[dict]:
+        """ Batches by pk rather than one cursor over the whole export (#2867). Server renderers look up per
+            page what they show (pre_render) - a batch is the export's page """
         columns = self.export_columns()
-        rows = qs.values(*self.value_columns()).iterator()
-        if not any(rc.csv_rendered for rc in columns):
-            return self.render_export_rows(rows, columns)
-        return self._iter_pre_rendered_export_rows(qs, rows, columns)
-
-    def _iter_pre_rendered_export_rows(self, qs: QuerySet[DC], rows: Iterator[dict],
-                                       columns: list[RichColumn]) -> Iterator[dict]:
-        """ Server renderers look up per page what they show (pre_render) - a batch is the export's page """
-        for batch in batch_iterator(rows, EXPORT_ROWS_PER_CHUNK):
-            self.pre_render(qs, batch)
-            yield from self.render_export_rows(batch, columns)
+        pre_render = any(rc.csv_rendered for rc in columns)
+        value_columns = self.value_columns()
+        for batch_qs in iter_ordered_batches(qs, EXPORT_ROWS_PER_CHUNK):
+            rows = list(batch_qs.values(*value_columns))
+            if pre_render:
+                self.pre_render(qs, rows)
+            yield from self.render_export_rows(rows, columns)
 
     def apply_filters(self, qs: QuerySet[DC]) -> QuerySet[DC]:
         """ Everything that narrows the rows: the config's own params, the search box, then the

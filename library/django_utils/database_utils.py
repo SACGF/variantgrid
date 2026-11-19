@@ -5,32 +5,36 @@ cursors, sql_delete_qs deletes by a queryset's WHERE without loading rows (dange
 postgres_arrays / postgres_array_quote format array literals, long_running_sql / get_active_backend_pids / signal_backends /
 wait_for_backends_to_stop find and cancel other connections' running queries, query_was_cancelled tells a
 cancel or statement_timeout apart from other OperationalErrors, pg_settings / get_pg_setting set
-and read this connection's run-time settings, advisory_lock serialises work across connections, and get_table_row_estimates / get_queryset_row_estimate give planner
-row counts without scanning.
+and read this connection's run-time settings, advisory_lock serialises work across connections, get_table_row_estimates / get_queryset_row_estimate give planner
+row counts without scanning, and iter_ordered / iter_ordered_batches read a large ordered queryset (an export) a batch at a time
+without a server-side cursor.
 """
 import contextlib
 import json
 import logging
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Optional, TypeVar, Generic, Type
+from itertools import batched, chain
+from typing import Any, Generic, Optional, TypeVar
 
 import psycopg
 import sqlparse
-from django.db import connection, transaction, models
+from django.db import connection, models, transaction
 from django.db.backends.postgresql.psycopg_any import mogrify
-from django.db.utils import OperationalError
 
 # 970: Added transaction wrapper due to Postgres hanging query
 from django.db.models import QuerySet
+from django.db.models.enums import IntegerChoices, TextChoices
 from django.db.models.lookups import In
 from django.db.models.sql.where import NothingNode
-from django.db.models.enums import TextChoices, IntegerChoices
+from django.db.utils import OperationalError
 
 from library.cache import timed_cache
 from library.constants import DAY_SECS
+
+M = TypeVar('M', bound=models.Model)
 
 
 @transaction.atomic
@@ -185,6 +189,32 @@ def get_queryset_row_estimate(qs: QuerySet) -> int:
     return int(plan[0]["Plan"]["Plan Rows"])
 
 
+def iter_ordered_batches(qs: QuerySet[M], batch_size: int = 1000) -> Iterator[QuerySet[M]]:
+    """ qs's rows in its order, as querysets of at most batch_size rows: the ordered pks are read first, then
+        each batch by pk (#2867).
+
+        Use this rather than QuerySet.iterator() for anything that reads a whole large queryset while doing
+        slow work per row, such as an export. In autocommit iterator() declares a WITH HOLD cursor, which
+        Postgres materialises (the whole sorted result, every column) to a temp file before the first row,
+        then holds a connection until the caller finishes. Here only the pks are sorted and nothing stays
+        open between batches. Rows deleted after the pks are read are skipped, and edited rows show their
+        new values. """
+    ordering = list(qs.query.order_by or qs.model._meta.ordering)
+    pk_names = {"pk", qs.model._meta.pk.attname}
+    if not any(isinstance(o, str) and o.lstrip("-") in pk_names for o in ordering):
+        ordering.append("pk")  # batches are re-sorted, so ties have to break the same way each time
+    qs = qs.order_by(*ordering)
+    # A multi-valued join repeats a pk: fetch it in one batch, which returns its rows as qs would
+    pks = dict.fromkeys(qs.values_list("pk", flat=True))
+    for batch in batched(pks, batch_size):
+        yield qs.filter(pk__in=batch)
+
+
+def iter_ordered(qs: QuerySet[M], batch_size: int = 1000) -> Iterator[M]:
+    """ qs's objects in its order, read in batches by pk (@see iter_ordered_batches) """
+    return chain.from_iterable(iter_ordered_batches(qs, batch_size))
+
+
 def get_postgresql_version() -> str:
     # Few ways to get this, but we'll go with the simpler one:
     # SHOW server_version - '14.12 (Ubuntu 14.12-0ubuntu0.22.04.1)'
@@ -336,7 +366,7 @@ class ChoicesMixin(Generic[TX]):
     PyCharm isn't smart enough to work out the expected type, so just add the type hint after declaring using this in a model
     """
 
-    def __init__(self, choices_type: Type[TX], *args, **kwargs):
+    def __init__(self, choices_type: type[TX], *args, **kwargs):
         if "choices" not in kwargs:
             kwargs["choices"] = choices_type.choices
         self.choices_type = choices_type

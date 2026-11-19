@@ -39,6 +39,7 @@ from classification.models import (
 )
 from flags.models import Flag, FlagComment, FlagsMixin
 from genes.models import GeneSymbol
+from library.django_utils.database_utils import iter_ordered
 from library.utils import (
     batch_iterator,
     http_header_date_now,
@@ -737,7 +738,7 @@ class ClassificationFilter:
         """
         allele_data: Optional[AlleleData] = None
         cm: ClassificationModification
-        for cm in self.cms_qs.iterator(chunk_size=1000):
+        for cm in iter_ordered(self.cms_qs):
             if allele_info := cm.classification.allele_info:
                 allele_id = cm.classification.allele_id
                 # note only care about allele origin bucket if self.allele_origin_split is True

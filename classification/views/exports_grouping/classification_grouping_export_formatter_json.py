@@ -13,9 +13,9 @@ from classification.views.exports_grouping.classification_grouping_export_filter
     ClassificationGroupingExportFormat,
     ClassificationGroupingExportFormatProperties,
 )
-from library.utils import batch_iterator
+from library.django_utils.database_utils import iter_ordered_batches
 
-CITATION_PREFETCH_BATCH_SIZE = 100
+BATCH_SIZE = 1000  # rows read, prepared (ClassificationJsonBulk) and citation-prefetched together
 
 
 @dataclass(frozen=True)
@@ -75,7 +75,8 @@ class ClassificationGroupingExportFormatterJSON(ClassificationGroupingExportForm
             "latest_classification_modification__classification__clinical_context"
         ).prefetch_related("overlapcontribution_set")
 
-        for batch in batch_iterator(queryset.iterator(chunk_size=4000), batch_size=CITATION_PREFETCH_BATCH_SIZE):
+        for batch in iter_ordered_batches(queryset, BATCH_SIZE):
+            batch = list(batch)
             classifications = [cg.latest_classification_modification.classification for cg in batch]
             self.json_params.bulk.prepare_batch(classifications)
             if self.json_params.populate_literature_with_citations:

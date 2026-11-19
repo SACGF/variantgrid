@@ -170,6 +170,38 @@ class GenesOfInterestTest(TestCase):
         self.assertAlmostEqual((100 * 100 + 40 * 300) / 400, summary.mean_depth)
         self.assertEqual((["GOIC"], ["NOTAGENE"]), (summary.no_coverage_symbols, summary.unmatched_names))
 
+    @patch("genes.grids.get_sample_gene_coverage")
+    def test_sample_gene_list_genes_grid_flags_genes_needing_attention(self, mock_get_sample_gene_coverage):
+        gcc = GeneCoverageCollection.objects.create(path="/tmp/goi_grid.cov.tsv", data_state=DataState.COMPLETE,
+                                                    genome_build=self.genome_build)
+        mock_get_sample_gene_coverage.return_value = gcc
+        min_depth = self.sample.get_minimum_coverage_required()
+        # GOIB is covered on one of its 2 transcripts, GOIC only below min depth, GOID has no coverage data
+        for symbol, depth in [("GOIA", min_depth), ("GOIB", 0), ("GOIB", min_depth), ("GOIC", min_depth - 1)]:
+            GeneCoverageCanonicalTranscript.objects.create(gene_coverage_collection=gcc, gene_symbol_id=symbol,
+                                                           original_gene_symbol=symbol, original_transcript="",
+                                                           min=depth, mean=50.0, std_dev=1.0)
+        gene_list = _create_gene_list(self.user, ["GOIA", "GOIB", "GOIC", "GOID"])
+        GeneListGeneSymbol.objects.create(gene_list=gene_list, original_name="NOTAGENE")
+        sample_gene_list = SampleGeneList.objects.create(sample=self.sample, gene_list=gene_list)
+
+        self.client.force_login(self.user)
+        url = reverse("sample_gene_list_genes_datatable", kwargs={"sample_gene_list_id": sample_gene_list.pk})
+
+        def attention(**params):
+            rows = self.client.get(url, params).json()["data"]
+            return [(row["original_name"], row["attention"]) for row in rows]
+
+        needing_attention = [("NOTAGENE", "Unmatched symbol"), ("GOID", "No coverage data"),
+                             ("GOIC", "Below minimum depth")]
+        self.assertEqual(needing_attention, attention()[:3])
+        self.assertEqual({("GOIA", ""), ("GOIB", "")}, set(attention()[3:]))
+        self.assertEqual(needing_attention, attention(attention_only="true"))
+
+        other_user = User.objects.create_user(username="goi_other_user")
+        self.client.force_login(other_user)
+        self.assertEqual(404, self.client.get(url).status_code)
+
     def test_apply_existing_gene_list_to_sample(self):
         source = _create_gene_list(self.user, ["GOIA", "GOIB"])
         self.client.force_login(self.user)

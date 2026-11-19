@@ -107,26 +107,28 @@
                     {% analysis_templates_tag sample_gene_list.sample.genome_build autocomplete_field=False has_sample_gene_list=True requires_sample_gene_list=True has_somatic_sample=sample_gene_list.sample.is_somatic sample_gene_list=sample_gene_list sample=sample_gene_list.sample %}
                 </div>
 
-                {% if sample_gene_list.gene_list.unmatched_gene_symbols.exists %}
-                    <ul class='messages'><b>Warning: could not match the following symbols:</b>
-                        {% for glgs in sample_gene_list.gene_list.unmatched_gene_symbols %}
-                            <li class="warning">
-                                {{ glgs.original_name }}
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% endif %}
-
                 {% if card.coverage %}
                     <div class="sample-gene-list-coverage mb-2">
                         <b>Coverage</b>
                         {% include "genes/gene_list_coverage_summary.html" with summary=card.coverage %}
                         {% if has_sample_qc_tab %}<a class="hover-link sample-qc-tab-link" href="#sample-qc">Full coverage (QC tab)</a>{% endif %}
                     </div>
-                    <table id="sample-gene-list-coverage-datatable-{{ sample_gene_list.pk }}" class="sticky-header" data-datatable-url="{% url 'gene_coverage_collection_gene_list_datatable' gene_coverage_collection_id=card.gene_coverage_collection.pk min_depth=card.coverage.min_coverage gene_list_id_list=sample_gene_list.gene_list.pk %}"></table>
                 {% endif %}
 
-                <table id="sample-gene-lists-genes-datatable-{{ sample_gene_list.gene_list.pk }}" class="sticky-header" data-datatable-responsive="true" data-datatable-url="{% url 'gene_list_genes_datatable' gene_list_id=sample_gene_list.gene_list.pk %}"></table>
+                <a class="hover-link" data-toggle="collapse" href="#sample-gene-list-genes-{{ sample_gene_list.pk }}">
+                    Genes ({{ card.num_genes }}{% if card.num_needing_attention %}, <span class="text-warning font-weight-bold">{{ card.num_needing_attention }} need{{ card.num_needing_attention|pluralize:"s," }} attention</span>{% endif %})
+                </a>
+                <a class="hover-link ml-2" href="{% url 'view_gene_list' sample_gene_list.gene_list.pk %}" target="_blank">gene list page</a>
+                {# The table is only created when this is first shown (sample_gene_lists_tab.js) #}
+                <div id="sample-gene-list-genes-{{ sample_gene_list.pk }}" class="sample-gene-list-genes collapse mt-2"
+                     data-genes-datatable-url="{% url 'sample_gene_list_genes_datatable' sample_gene_list.pk %}">
+                    {% if card.num_needing_attention %}
+                    <div class="form-check">
+                        <input class="form-check-input attention-only" type="checkbox" id="attention-only-{{ sample_gene_list.pk }}">
+                        <label class="form-check-label" for="attention-only-{{ sample_gene_list.pk }}">Only genes needing attention</label>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>

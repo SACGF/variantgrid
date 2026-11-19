@@ -34,9 +34,37 @@ function populateSampleGeneListFromJSON(data) {
     }
 }
 
+// The DataTables ajax `data` hook of a genes table
+function sampleGeneListGenesFilter(data, settings) {
+    const genes = $("#" + settings.sTableId).closest(".sample-gene-list-genes");
+    data["attention_only"] = $("input.attention-only", genes).is(":checked");
+}
+
+// A table is only created when its genes are first shown, so the tab doesn't wait on every list's
+function initSampleGeneListGenes() {
+    $(".sample-gene-list-genes").one("show.bs.collapse", function() {
+        const genes = $(this);
+        const sampleGeneListId = genes.closest(".sample-gene-list-container").attr("sample-gene-list-id");
+        genes.append($("<table>", {
+            id: "sample-gene-list-genes-datatable-" + sampleGeneListId,
+            class: "sticky-header",
+            "data-datatable-url": genes.attr("data-genes-datatable-url"),
+            "data-datatable-data": "sampleGeneListGenesFilter",
+        }));
+    });
+
+    $(".sample-gene-list-genes input.attention-only").change(function() {
+        $(this).closest(".sample-gene-list-genes").find("table").DataTable().ajax.reload();
+    });
+}
+
 function drawInitialSampleGeneLists(sampleGeneListData) {
     for (let i=0 ; i<sampleGeneListData.length ; i++) {
-        populateSampleGeneListFromJSON(sampleGeneListData[i]);
+        const data = sampleGeneListData[i];
+        populateSampleGeneListFromJSON(data);
+        if (data.active && data.visible) {
+            $(".sample-gene-list-container[sample-gene-list-id=" + data.pk + "] .sample-gene-list-genes").collapse("show");
+        }
     }
     $("#sample-gene-list-items").show();
 }
@@ -54,6 +82,7 @@ function modifySampleGeneList(that, data) {
 }
 
 function initSampleGeneListsTab(sampleGeneListData) {
+    initSampleGeneListGenes();
     drawInitialSampleGeneLists(sampleGeneListData);
 
     $("button.make-active").click(function() {
