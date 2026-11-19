@@ -87,8 +87,8 @@ class GuardianPermissionsMixin:
             where otherwise the query reads every permission row the user's groups hold for the model
             (~400ms a page at 200k VariantTags, #1432).
             A class that overrides can_write() overrides this too, or the two drift apart. """
-        if not (user and user.is_authenticated):
-            return cls.objects.none()
+        if not (user and user.is_authenticated and user.is_active):
+            return cls.objects.none()  # has_perm() is False for an inactive user, superuser or not
         perm_class = cls.get_permission_class()
         if perm_class != cls:
             writable_qs = cls._filter_from_permission_object_qs(perm_class.filter_writable_for_user(user))

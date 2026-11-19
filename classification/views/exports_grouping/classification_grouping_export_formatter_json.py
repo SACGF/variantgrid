@@ -6,6 +6,7 @@ from functools import cached_property
 from django.conf import settings
 
 from classification.models import ClassificationJsonParams
+from classification.models.classification_json import ClassificationJsonBulk
 from classification.models.evidence_mixin import EvidenceMixin
 from classification.views.exports_grouping.classification_grouping_export_filter import (
     ClassificationGroupingExportFilter,
@@ -14,7 +15,7 @@ from classification.views.exports_grouping.classification_grouping_export_filter
 )
 from library.django_utils.database_utils import iter_ordered_batches
 
-CITATION_PREFETCH_BATCH_SIZE = 100
+BATCH_SIZE = 1000  # rows read, prepared (ClassificationJsonBulk) and citation-prefetched together
 
 
 @dataclass(frozen=True)
@@ -55,7 +56,8 @@ class ClassificationGroupingExportFormatterJSON(ClassificationGroupingExportForm
             current_user=self.classification_grouping_filter.user,
             api_version=2,
             include_data=include_data,
-            populate_literature_with_citations=populate_literature_with_citations
+            populate_literature_with_citations=populate_literature_with_citations,
+            bulk=ClassificationJsonBulk(self.classification_grouping_filter.user)
         )
 
     def single_row_generator(self) -> Iterator[str]:
@@ -73,10 +75,12 @@ class ClassificationGroupingExportFormatterJSON(ClassificationGroupingExportForm
             "latest_classification_modification__classification__clinical_context"
         ).prefetch_related("overlapcontribution_set")
 
-        for batch in iter_ordered_batches(queryset, CITATION_PREFETCH_BATCH_SIZE):
+        for batch in iter_ordered_batches(queryset, BATCH_SIZE):
             batch = list(batch)
+            classifications = [cg.latest_classification_modification.classification for cg in batch]
+            self.json_params.bulk.prepare_batch(classifications)
             if self.json_params.populate_literature_with_citations:
-                EvidenceMixin.prefetch_citations(cg.latest_classification_modification.classification for cg in batch)
+                EvidenceMixin.prefetch_citations(classifications)
             for cg in batch:
                 json_data = cg.latest_classification_modification.as_json(
                     self.json_params

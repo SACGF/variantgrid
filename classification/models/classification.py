@@ -1297,8 +1297,9 @@ class Classification(GuardianPermissionsMixin, FlagsMixin, EvidenceMixin, TimeSt
             records = lpv.classificationmodificationsyncrecord_set.filter(success=True)
         return records
 
-    def current_state_validation(self, user: User) -> ValidationMerger:
-        if self.id:
+    def current_state_validation(self, user: User, refresh: bool = True) -> ValidationMerger:
+        """ refresh=False when the record was just loaded (an export) - reloading drops its prefetched relations """
+        if refresh and self.id:
             self.refresh_from_db()
         validations_received = classification_current_state_signal.send(sender=Classification, record=self, user=user)
         multi_errors = ValidationMerger.union_send_responses(validations_received)

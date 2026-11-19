@@ -55,6 +55,12 @@ class FilterWritableForUserTest(TestCase):
         self.assert_agrees_with_can_write(VCF, self.vcf, self.owner, True)
         self.assert_agrees_with_can_write(VCF, self.vcf, self.other, False)
 
+    def test_inactive_user_with_permission(self):
+        """ has_perm() is False for an inactive user, so can_write() is too """
+        inactive = User.objects.create_user(username="writable_inactive", is_active=False)
+        assign_permission_to_user_and_groups(inactive, self.vcf)
+        self.assert_agrees_with_can_write(VCF, self.vcf, inactive, False)
+
     def test_sample_through_vcf(self):
         """ Sample.can_write falls back to the VCF's permission """
         self.assert_agrees_with_can_write(Sample, self.sample, self.owner, True)

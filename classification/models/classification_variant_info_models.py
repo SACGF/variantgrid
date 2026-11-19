@@ -8,6 +8,7 @@ converter produced it.
 """
 import logging
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from dataclasses import replace as dataclass_replace
 from datetime import timedelta
@@ -28,6 +29,7 @@ from django.db.models import (
     ForeignKey,
     JSONField,
     OneToOneField,
+    QuerySet,
     TextField,
 )
 from django.urls import reverse
@@ -1125,8 +1127,13 @@ class ImportedAlleleInfo(TimeStampedModel):
 
     @property
     def resolved_builds(self) -> list[ResolvedVariantInfo]:
-        return list(ResolvedVariantInfo.objects.filter(allele_info=self).select_related(
-            'genome_build', 'variant__locus__contig', 'variant__locus__ref', 'variant__alt'))
+        return list(ImportedAlleleInfo.resolved_builds_qs([self.pk]))
+
+    @staticmethod
+    def resolved_builds_qs(allele_info_ids: Iterable[int]) -> QuerySet[ResolvedVariantInfo]:
+        """ resolved_builds of many allele infos in one query """
+        return ResolvedVariantInfo.objects.filter(allele_info__in=allele_info_ids).select_related(
+            'genome_build', 'variant__locus__contig', 'variant__locus__ref', 'variant__alt')
 
     def calculate_variant_coordinate(self) -> CalculatedVariantCoordinate:
         vc: Optional[VariantCoordinate] = None
