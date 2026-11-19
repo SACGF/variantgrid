@@ -22,7 +22,7 @@ from classification.views.exports.classification_export_formatter import (
 )
 from classification.views.exports.classification_export_utils import CitationCounter
 from library.django_utils import get_url_from_view_path
-from library.django_utils.database_utils import iter_ordered_batches
+from library.django_utils.database_utils import iter_ordered
 from library.utils import (
     ExportDataType,
     ExportRow,
@@ -241,9 +241,9 @@ class ClassificationExportFormatterCSV(ClassificationExportFormatter):
         if self.format_details.full_detail:
             # apparently this is significantly quicker than the attempt to use an aggregate
             # Which keys are used doesn't depend on order, so batch in pk order rather than sorting genomically
-            for batch_qs in iter_ordered_batches(self.classification_filter.cms_qs.order_by("pk")):
-                for evidence in batch_qs.values_list('published_evidence', flat=True):
-                    used_keys.check_evidence(evidence)
+            evidence_qs = self.classification_filter.cms_qs.select_related(None).only("published_evidence")
+            for cm in iter_ordered(evidence_qs.order_by("pk")):
+                used_keys.check_evidence(cm.published_evidence)
         else:
             used_keys.check_evidence_enable_all_considered()
 

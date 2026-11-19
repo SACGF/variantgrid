@@ -689,8 +689,8 @@ class DatatableConfig(Generic[DC]):
         columns = self.export_columns()
         pre_render = any(rc.csv_rendered for rc in columns)
         value_columns = self.value_columns()
-        for batch_qs in iter_ordered_batches(qs, EXPORT_ROWS_PER_CHUNK):
-            rows = list(batch_qs.values(*value_columns))
+        for batch_qs in iter_ordered_batches(qs.values(*value_columns), EXPORT_ROWS_PER_CHUNK):
+            rows = list(batch_qs)
             if pre_render:
                 self.pre_render(qs, rows)
             yield from self.render_export_rows(rows, columns)
