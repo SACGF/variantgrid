@@ -36,6 +36,11 @@ checkout stays on the branch it was on (on a deployment, the deployed commit).
   issue; say what changed and why that design, and lead with the simplest true framing ("mostly a documentation
   change"). Write it for someone who hasn't seen the diff: expand a term from the code the first time it appears, and
   avoid jargon (`close through package __init__`) without a plain sentence first.
+- **The PR body is implementation notes for the reviewer; results go on the issue.** The body covers the cause in
+  code terms, the design, each call site changed, why a change keeps the old behaviour, known limits, overlap with
+  other open PRs, and which tests cover it. Its first line links the issue comment holding the results. Benchmarks,
+  before/after tables, what users will notice and caveats a deployment cares about go in that issue comment, with the
+  testing notes (Comments, below), because the issue is what a tester or the user reads.
 - **Before reporting a PR done:** `gh pr checks <N>` is green and `gh pr view <N> --json mergeable` says MERGEABLE. A
   failing CI job or a conflict is yours to fix before the report-back, not the user's to discover. After the PR merges,
   its branch is deleted once `git branch -r --merged origin/master` (or `git merge-base --is-ancestor`) confirms every
@@ -110,6 +115,21 @@ as numbered UI steps a system tester who is not a programmer can follow: which p
 A variant created for the test on a test system may be named with its coordinates so the tester can find it; that is
 test data, not a patient's. What a test should check (an evidence key that must populate, a count that must change)
 is written down there too.
+
+When a PR is up, post one **results comment** on the issue, headed `## Results (PR #N)`, written for a reader who
+won't open the diff:
+- **Headline:** the outcome in one sentence ("a full JSON export takes 3.5 minutes instead of 20.7").
+- **Measurements:** a before/after table with the data size and the conditions. Name the menu path for what was
+  timed, not the function.
+- **The cause, in plain terms:** what was slow or wrong, without code names.
+- **Same output?** How it was checked, and any difference that remains, with why it doesn't matter.
+- **Anything else fixed along the way.**
+- **Caveats:** where a deployment may see less benefit or a cost, and what would address it.
+- **What changes for users**, when that isn't obvious.
+- **Testing notes:** the VariantGrid and Shariant sections.
+
+Check every menu name and URL in it against `variantgrid/menus.py` and `reverse()` before posting. Edit this comment
+when the numbers change rather than adding another.
 
 Keep issue and PR text current: when the scope changes mid-way (a PR split, an approach dropped), rewrite the issue
 and PR bodies and titles to the final state rather than appending "update:" notes, and remove mentions of the
