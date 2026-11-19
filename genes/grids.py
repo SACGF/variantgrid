@@ -189,8 +189,7 @@ class SampleGeneListGenesColumns(DatatableConfig[GeneListGeneSymbol]):
         attention_whens = [When(gene_symbol__isnull=True, then=Value(GeneAttention.UNMATCHED_SYMBOL))]
         if self.gene_coverage_collection:
             # A gene can have coverage on several canonical transcripts: it is covered if any one reaches min depth
-            best_coverage = GeneCoverageCanonicalTranscript.objects.filter(
-                gene_coverage_collection=self.gene_coverage_collection,  # stays in the collection's partition
+            best_coverage = self.gene_coverage_collection.get_canonical_transcript_coverage().filter(
                 gene_symbol=OuterRef("gene_symbol")).order_by("-min")
             qs = qs.annotate(coverage_transcript=Subquery(best_coverage.values("transcript__identifier")[:1]),
                              coverage_min=Subquery(best_coverage.values("min")[:1]),
@@ -463,11 +462,10 @@ class QCGeneCoverageColumns(DatatableConfig[GeneCoverageCanonicalTranscript]):
             return "table-warning"
         return None
 
-    def get_coverage_q(self, gene_coverage_collection, gene_symbols) -> Q:
-        filters = [Q(gene_coverage_collection=gene_coverage_collection)]
+    def get_coverage_q(self, gene_symbols) -> Q:
         if gene_symbols:
-            filters.append(Q(gene_symbol__in=gene_symbols))
-        return reduce(operator.and_, filters)
+            return Q(gene_symbol__in=gene_symbols)
+        return Q()
 
     def get_initial_queryset(self) -> QuerySet[GeneCoverageCanonicalTranscript]:
         gene_coverage_collection = get_object_or_404(GeneCoverageCollection,
@@ -478,16 +476,18 @@ class QCGeneCoverageColumns(DatatableConfig[GeneCoverageCanonicalTranscript]):
                 gene_list = GeneList.get_for_user(self.user, gene_list_id, success_only=False)
                 gene_symbols.update(gene_list.get_gene_names())
 
-        q = self.get_coverage_q(gene_coverage_collection, gene_symbols)
-        return GeneCoverageCanonicalTranscript.objects.filter(q)
+        if gene_coverage_collection.data_archived:
+            return GeneCoverageCanonicalTranscript.objects.none()
+        q = self.get_coverage_q(gene_symbols)
+        return gene_coverage_collection.get_canonical_transcript_coverage().filter(q)
 
 
 class UncoveredGenesColumns(QCGeneCoverageColumns):
     def row_css(self, row: CellData) -> Optional[str]:
         return None  # Every row is below the minimum depth
 
-    def get_coverage_q(self, gene_coverage_collection, gene_symbols) -> Q:
-        q = super().get_coverage_q(gene_coverage_collection, gene_symbols)
+    def get_coverage_q(self, gene_symbols) -> Q:
+        q = super().get_coverage_q(gene_symbols)
         return q & Q(min__lt=self.min_depth)
 
 

@@ -7,7 +7,7 @@ from typing import Optional
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
-from django.db.models import Count, F, FloatField, Min, Sum
+from django.db.models import Count, F, FloatField, Min, QuerySet, Sum
 from django.db.models.deletion import CASCADE, DO_NOTHING, SET_NULL
 from django.db.models.signals import pre_delete
 from django.dispatch import receiver
@@ -24,6 +24,7 @@ from library.django_utils.django_file_utils import (
     remove_import_processing_dir,
 )
 from library.django_utils.django_partition import RelatedModelsPartitionModel
+from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
 from library.log_utils import log_traceback
 from snpdb.enums import DataState
 from snpdb.models.models_genome import GenomeBuild
@@ -204,15 +205,19 @@ class GeneCoverageCollection(DataArchiveMixin, RelatedModelsPartitionModel):
         logging.info("%d missing genes, %d missing transcripts", missing_genes, missing_transcripts)
         return warnings
 
-    def _canonical_transcript_coverage(self):
+    def get_canonical_transcript_coverage(self) -> QuerySet['GeneCoverageCanonicalTranscript']:
+        """ This collection's canonical transcript coverage, read from its own partition table - a query on the
+            inheritance parent locks every collection's partition and its indexes, and runs the lock table out of
+            shared memory (#2874). Usable as a subquery: the partition rewrite happens when it is compiled """
         if self.data_archived:
             raise DataArchivedError(self)
-        # Filter on the collection so the query stays in its partition
-        return GeneCoverageCanonicalTranscript.objects.filter(gene_coverage_collection=self)
+        qs = get_queryset_with_transformer_hook(klass=GeneCoverageCanonicalTranscript)
+        qs.add_sql_transformer(self.sql_partition_transformer)
+        return qs.filter(gene_coverage_collection=self)
 
     def get_below_threshold_gene_symbols(self, gene_symbols, min_coverage):
         """ Genes with coverage data, where none of it reaches min_coverage """
-        coverage_qs = self._canonical_transcript_coverage()
+        coverage_qs = self.get_canonical_transcript_coverage()
         with_data = coverage_qs.values_list("gene_symbol", flat=True)
         covered = coverage_qs.filter(min__gte=min_coverage).values_list("gene_symbol", flat=True)
         return gene_symbols.filter(pk__in=with_data).exclude(pk__in=covered)
@@ -220,13 +225,13 @@ class GeneCoverageCollection(DataArchiveMixin, RelatedModelsPartitionModel):
     def get_no_coverage_gene_symbols(self, gene_symbols):
         """ Genes with no coverage data at all - a naming mismatch (symbol, or a transcript not in the kit's
             canonical transcript collection) rather than low depth """
-        with_data = self._canonical_transcript_coverage().values_list("gene_symbol", flat=True)
+        with_data = self.get_canonical_transcript_coverage().values_list("gene_symbol", flat=True)
         return gene_symbols.exclude(pk__in=with_data)
 
     def get_gene_lists_coverage_summary(self, gene_lists: list[GeneList],
                                         min_coverage: int) -> 'GeneListCoverageSummary':
         gene_symbols = GeneSymbol.objects.filter(genelistgenesymbol__gene_list__in=gene_lists).distinct()
-        coverage_qs = self._canonical_transcript_coverage().filter(gene_symbol__in=gene_symbols)
+        coverage_qs = self.get_canonical_transcript_coverage().filter(gene_symbol__in=gene_symbols)
         data = coverage_qs.aggregate(num_genes_with_coverage=Count("gene_symbol", distinct=True),
                                      weighted_mean=Sum(F("mean") * F("size"), output_field=FloatField()),
                                      total_size=Sum("size"),

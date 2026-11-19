@@ -80,6 +80,10 @@ Gotchas:
   swapping `_meta.db_table` by hand leaves `Field.cached_col` pointing at the partition for the life of the process.
   Writes count: a `DELETE`/`UPDATE` of rows known to live in one partition still locks every partition in the tree
   if it is issued against the base table (`snpdb/tasks/cohort_genotype_tasks.py:common_variant_classified_task`).
+  Reads count too: a `SELECT` on the base table filtered to one collection locks every partition and its indexes at
+  plan time, and on a page view that runs the lock table out of shared memory - read one collection through
+  `get_queryset_with_transformer_hook` + `sql_partition_transformer`
+  (`genes/models/models_gene_coverage.py:GeneCoverageCollection.get_canonical_transcript_coverage`, #2874).
 - A model whose rows live in a partition points at its collection with `on_delete=DO_NOTHING` - dropping the partition
   in `library/django_utils/django_partition.py:RelatedModelsPartitionModel.delete_related_objects` is the delete. A
   `CASCADE` there makes Django's collector issue `DELETE FROM <base table>`, and inheritance expansion takes

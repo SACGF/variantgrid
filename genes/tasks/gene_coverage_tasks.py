@@ -8,6 +8,7 @@ from django.db.models.query_utils import Q
 from genes.canonical_transcripts.canonical_transcript_manager import CanonicalTranscriptManager
 from genes.gene_matching import GeneSymbolMatcher
 from genes.models import GeneCoverageCanonicalTranscript, GeneCoverageCollection, TranscriptVersion
+from library.django_utils.django_partition import bulk_create_in_partition
 from seqauto.models import EnrichmentKit
 from snpdb.enums import DataState
 
@@ -87,4 +88,5 @@ def create_canonical_gene_coverage_for_enrichment_kit(enrichment_kit_id):
 
             if canonical_transcripts_list:
                 #logging.info("Bulk inserting %d GeneCoverageCanonicalTranscript records", len(canonical_transcripts_list))
-                GeneCoverageCanonicalTranscript.objects.bulk_create(canonical_transcripts_list)
+                bulk_create_in_partition(cc, GeneCoverageCanonicalTranscript, "genes_genecoveragecanonicaltranscript",
+                                         canonical_transcripts_list)
