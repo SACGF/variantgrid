@@ -67,7 +67,19 @@
                             {% else %}
                                 {% if panel.active %}
                                     {% labelled label="Active" %}{{ panel.active }}{% endlabelled %}
+                                    {% labelled label="Installed" %}{{ panel.installed.installed_str }}{% endlabelled %}
+                                    {% if panel.installed.warning %}
+                                        <div class="alert alert-warning" role="alert">
+                                            <i class="fas fa-exclamation-triangle"></i> {{ panel.installed.warning }}
+                                        </div>
+                                        {% if panel.installed.needs_registering %}
+                                            <button name="{{ panel.register_name }}" class="btn btn-primary">
+                                                Register installed tool
+                                            </button>
+                                        {% endif %}
+                                    {% endif %}
                                 {% else %}
+                                    {% labelled label="Installed" %}{{ panel.installed.installed_str }}{% endlabelled %}
                                     <div class="alert alert-warning" role="alert">
                                         <i class="fas fa-exclamation-triangle"></i>
                                         Enabled, but no version registered - no runs are being created.

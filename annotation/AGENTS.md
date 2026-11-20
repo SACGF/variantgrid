@@ -71,7 +71,9 @@ Patterns here:
 - New VEP install: `manage.py create_new_variant_annotation_version`
   (annotation/annotation_versions.py:get_or_create_variant_annotation_version_from_current_vep, status NEW) → link a
   GeneAnnotationRelease (annotation/models/models_version.py:VariantAnnotationVersion.link_gene_annotation_release) →
-  `gene_annotation --new-releases` → promote. Non-VEP tools: `create_new_annotation_pipeline_version`.
+  `gene_annotation --new-releases` → promote. Non-VEP tools: `create_new_annotation_pipeline_version` (or Register on
+  the runs page) → promote; deployment_check warns while the installed tool isn't ACTIVE
+  (annotation/pipelines/base.py:AnnotationPipelineRunner.get_installed_tool_version).
 Gotchas:
 - T2T's gnomAD `4.1.t2t_liftover` is built from gnomAD's T2T liftover files, which have no record where CHM13's reference
   allele differs from GRCh38's: a T2T variant at such a site (often common - it's GRCh38's reference allele) gets no

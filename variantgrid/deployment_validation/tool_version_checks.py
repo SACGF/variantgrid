@@ -1,7 +1,8 @@
 """
 deployment_check "Tool versions": every external binary the server shells out to, checked the way it is
 used. check_tool_versions is the entry point (it also warns about AnnotSV bundle files that cost memory,
-about stock AnnotSV in place of our fork, and about no worker on AnnotSV's queue);
+about stock AnnotSV in place of our fork, about no worker on AnnotSV's queue, and about an installed versioned
+pipeline tool that isn't the ACTIVE AnnotationPipelineVersion);
 check_vcf_split_pipe runs the real VCF import split stage
 (GNU split --filter | bash | bgzip) on a tiny VCF, since a tool missing inside that filter only fails
 at import time rather than on the command line.
@@ -25,8 +26,10 @@ from annotation.annotsv_annotation import (
     is_annotsv_fork_installed,
 )
 from annotation.celery_utils import live_worker_queue_slots
+from annotation.pipelines import get_pipeline, get_runner, versioned_pipeline_types
 from pedigree.graphs.pedigree_chart import get_ped_parser_command
 from snpdb.models import SomalierConfig
+from snpdb.models.models_genome import GenomeBuild
 from upload.vcf.vcf_preprocess import get_bcftools_tool_version, get_split_vcf_command
 
 # Bump to the release that fixes https://github.com/samtools/bcftools/issues/2601 - norm doesn't left-align
@@ -131,6 +134,23 @@ def check_annotsv_worker_queue() -> dict:
     return check
 
 
+def check_pipeline_versions_installed() -> dict:
+    """ A warning, not invalid: registering and promoting the installed tool is done after the upgrade, on the
+        annotation runs page. Until then its runs are refused (#2886) """
+    checks = {}
+    for pipeline_type in versioned_pipeline_types():
+        if not get_pipeline(pipeline_type).enabled:
+            continue
+        runner = get_runner(pipeline_type)
+        for genome_build in GenomeBuild.builds_with_annotation():
+            if runner.supports_genome_build(genome_build):
+                check = {"valid": True}
+                if warning := runner.get_installed_tool_version(genome_build).warning:
+                    check["warning"] = warning
+                checks[f"{pipeline_type.label} version ({genome_build})"] = check
+    return checks
+
+
 def check_tool_versions() -> dict:
     # If it returns True then everything is good, exception or anything else, bad
     tools = {
@@ -184,5 +204,6 @@ def check_tool_versions() -> dict:
         tool_versions["AnnotSV regulatory elements sorted"] = check_annotsv_regulatory_elements_sorted()
         tool_versions["AnnotSV fork (#2841)"] = check_annotsv_fork_installed()
         tool_versions["AnnotSV worker queue (#2841)"] = check_annotsv_worker_queue()
+    tool_versions.update(check_pipeline_versions_installed())
 
     return tool_versions

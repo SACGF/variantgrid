@@ -43,6 +43,7 @@ from snpdb.tests.utils.vcf_testing_utils import (
     slowly_create_test_variant,
     slowly_create_test_variant_from_coordinate,
 )
+from variantgrid.deployment_validation.tool_version_checks import check_pipeline_versions_installed
 
 ANNOTSV = VariantAnnotationPipelineType.ANNOTSV
 STANDARD = VariantAnnotationPipelineType.STANDARD
@@ -389,6 +390,58 @@ class RegisterPipelineVersionViewTest(TestCase):
             self.client.post(reverse("variant_annotation_runs"), {post_name: "1"})
         self.assertFalse(AnnotationPipelineVersion.objects.filter(pipeline_type=ANNOTSV,
                                                                  genome_build=t2t).exists())
+
+
+@override_settings(ANNOTATION_ANNOTSV_ENABLED=True,
+                   ANNOTATION_ANNOTSV_GENOME_BUILD={"GRCh37": "GRCh37"},
+                   ANNOTATION_ANNOTSV_BUNDLE_VERSION="3.5")
+class InstalledPipelineVersionTest(TestCase):
+    """ #2886: installing a new AnnotSV has to be noticed by deployment_check and the runs page, rather than
+        first showing up as its runs refused by check_tool_version. """
+
+    def setUp(self):
+        super().setUp()
+        self.genome_build = GenomeBuild.get_name_or_alias("GRCh37")
+        self.check_name = f"{ANNOTSV.label} version ({self.genome_build})"
+        AnnotationPipelineVersion.objects.create(
+            pipeline_type=ANNOTSV, genome_build=self.genome_build, code_version="3.5.10",
+            data_version="3.5", status=AnnotationPipelineVersion.Status.ACTIVE)
+
+    def _deployment_check_warning(self, installed_version: str):
+        with mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
+                        return_value=installed_version):
+            check = check_pipeline_versions_installed()[self.check_name]
+        self.assertTrue(check["valid"])  # a warning: the upgrader runs deployment_check --die-if-invalid
+        return check.get("warning")
+
+    def test_installed_active_version_has_no_warning(self):
+        self.assertIsNone(self._deployment_check_warning("3.5.10"))
+
+    def test_unregistered_install_warns_to_register(self):
+        warning = self._deployment_check_warning("3.5.10-vg4")
+        self.assertIn("3.5.10-vg4/3.5 is not registered", warning)
+        self.assertIn("create_new_annotation_pipeline_version --pipeline-type=A --genome-build=GRCh37", warning)
+
+    def test_registered_new_install_warns_to_promote(self):
+        AnnotationPipelineVersion.objects.create(
+            pipeline_type=ANNOTSV, genome_build=self.genome_build, code_version="3.5.10-vg4",
+            data_version="3.5", status=AnnotationPipelineVersion.Status.NEW)
+        self.assertIn("registered as NEW", self._deployment_check_warning("3.5.10-vg4"))
+
+    def test_unreadable_install_warns_rather_than_failing(self):
+        with mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
+                        side_effect=FileNotFoundError("/fake/AnnotSV")):
+            check = check_pipeline_versions_installed()[self.check_name]
+        self.assertIn("couldn't read the installed version", check["warning"])
+
+    def test_runs_page_offers_register_for_an_unregistered_install(self):
+        user = User.objects.create_superuser("installed_test_admin", "installed@test.com", "password")
+        self.client.force_login(user)
+        with mock.patch("annotation.pipelines.annotsv.get_annotsv_command_line_version",
+                        return_value="3.5.10-vg4"):
+            response = self.client.get(reverse("variant_annotation_runs"))
+        self.assertContains(response, "3.5.10-vg4/3.5 is not registered")
+        self.assertContains(response, f"register-pipeline-version-{ANNOTSV}-{self.genome_build.name}")
 
 
 class ExecuteCmdTimeoutTest(TestCase):
