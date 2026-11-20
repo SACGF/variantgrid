@@ -11,7 +11,7 @@ from classification.views.exports_grouping.classification_grouping_export_filter
     ClassificationGroupingExportFormat, ClassificationGroupingExportFormatProperties, \
     ClassificationGroupingExportFilter, OverlapStatusSummary
 from library.django_utils import get_url_from_view_path
-from library.django_utils.database_utils import iter_ordered, iter_ordered_batches
+from library.django_utils.database_utils import iter_ordered
 from library.utils import delimited_row, ExportRow, export_column, ExportTweak
 from snpdb.models import GenomeBuild
 
@@ -165,9 +165,10 @@ class ClassificationGroupingExportFormatterCSV(ClassificationGroupingExportForma
         if self.csv_format_details.full_detail:
             # This is significantly quicker than the attempt to use an aggregate
             # Which keys are used doesn't depend on order, so batch in pk order rather than the export's order
-            for batch_qs in iter_ordered_batches(self.queryset().order_by("pk")):
-                for evidence in batch_qs.values_list('latest_classification_modification__published_evidence', flat=True):
-                    used_keys.check_evidence(evidence)
+            evidence_qs = self.queryset().select_related(None).select_related("latest_classification_modification").only(
+                "latest_classification_modification__published_evidence")
+            for cg in iter_ordered(evidence_qs.order_by("pk")):
+                used_keys.check_evidence(cg.latest_classification_modification.published_evidence)
         else:
             used_keys.check_evidence_enable_all_considered()
 

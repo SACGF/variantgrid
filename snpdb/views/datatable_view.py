@@ -33,11 +33,7 @@ from kombu.utils import json
 from library.django_utils.database_utils import iter_ordered_batches
 from library.django_utils.datatable_mixins import JSONResponseView
 from library.django_utils.filter_rules import filter_operations_json, parse_filters, rules_to_q
-from library.django_utils.grid_export import (
-    EXPORT_ROWS_PER_CHUNK,
-    csv_streaming_response,
-    grid_export_csv,
-)
+from library.django_utils.grid_export import csv_streaming_response, grid_export_csv
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsMixin
 from library.django_utils.major_operation import MajorOperationViewMixin
 from library.log_utils import report_exc_info
@@ -48,6 +44,10 @@ logger = logging.getLogger(__name__)
 
 # Client asks for the server side CSV by adding this to the table's own ajax params
 DATATABLE_CSV_PARAM = "dataTableCsv"
+# Rows the server CSV reads per query. Each batch repeats the grid's filters (@see iter_ordered_batches), and a
+# permission filter costs about the same per query whatever the batch size - the 200k row variant tags CSV
+# took 42 s in batches of 1000, 26 s in 5000 (#2867)
+EXPORT_BATCH_SIZE = 5000
 
 
 def page_bounds(start: Optional[str], length: Optional[str], max_length: int) -> tuple[int, int]:
@@ -689,8 +689,8 @@ class DatatableConfig(Generic[DC]):
         columns = self.export_columns()
         pre_render = any(rc.csv_rendered for rc in columns)
         value_columns = self.value_columns()
-        for batch_qs in iter_ordered_batches(qs, EXPORT_ROWS_PER_CHUNK):
-            rows = list(batch_qs.values(*value_columns))
+        for batch_qs in iter_ordered_batches(qs.values(*value_columns), EXPORT_BATCH_SIZE):
+            rows = list(batch_qs)
             if pre_render:
                 self.pre_render(qs, rows)
             yield from self.render_export_rows(rows, columns)

@@ -27,7 +27,9 @@ from django.db.backends.postgresql.psycopg_any import mogrify
 # 970: Added transaction wrapper due to Postgres hanging query
 from django.db.models import QuerySet
 from django.db.models.enums import IntegerChoices, TextChoices
+from django.db.models.expressions import Col, Func, Value
 from django.db.models.lookups import In
+from django.db.models.query import ModelIterable
 from django.db.models.sql.where import NothingNode
 from django.db.utils import OperationalError
 
@@ -198,7 +200,14 @@ def iter_ordered_batches(qs: QuerySet[M], batch_size: int = 1000) -> Iterator[Qu
         Postgres materialises (the whole sorted result, every column) to a temp file before the first row,
         then holds a connection until the caller finishes. Here only the pks are sorted and nothing stays
         open between batches. Rows deleted after the pks are read are skipped, and edited rows show their
-        new values. """
+        new values.
+
+        A queryset of model objects has its filters applied once, by the pk query: each batch is fetched by pk
+        alone, with qs's select_related, prefetches, only/defer and annotations on the model's own columns, and
+        each object comes back once, even if it no longer matches the filters. Anything else (values(), an
+        annotation through a join) is fetched with qs's filters, which can decide what a column holds - a
+        values() column through a reverse FK has a row per related row the filters keep. Apply values() to qs
+        rather than to the batches, so the filters stay. """
     ordering = list(qs.query.order_by or qs.model._meta.ordering)
     pk_names = {"pk", qs.model._meta.pk.attname}
     if not any(isinstance(o, str) and o.lstrip("-") in pk_names for o in ordering):
@@ -206,8 +215,38 @@ def iter_ordered_batches(qs: QuerySet[M], batch_size: int = 1000) -> Iterator[Qu
     qs = qs.order_by(*ordering)
     # A multi-valued join repeats a pk: fetch it in one batch, which returns its rows as qs would
     pks = dict.fromkeys(qs.values_list("pk", flat=True))
+    if (batch_qs := _unfiltered_objects(qs)) is None:
+        batch_qs = qs
     for batch in batched(pks, batch_size):
-        yield qs.filter(pk__in=batch)
+        yield batch_qs.filter(pk__in=batch)
+
+
+def _unfiltered_objects(qs: QuerySet[M]) -> Optional[QuerySet[M]]:
+    """ qs without its filters, for fetching objects qs already matched by pk, or None if qs is more than
+        filtered model objects. An annotation on the model's own columns is kept (Guardian's
+        get_objects_for_user annotates str_pk, the pk as text, to filter on) """
+    query = qs.query
+    if qs._iterable_class is not ModelIterable or query.extra or query.combinator:
+        return None
+    if not all(_on_own_columns(expression, query.base_table) for expression in query.annotation_select.values()):
+        return None
+    if any(isinstance(o, str) and o.lstrip("-") in query.annotations for o in query.order_by):
+        return None
+    unfiltered_qs = qs.model._base_manager.order_by(*query.order_by)
+    for name, expression in query.annotation_select.items():
+        unfiltered_qs.query.add_annotation(expression, name)
+    unfiltered_qs.query.select_related = query.select_related
+    unfiltered_qs.query.deferred_loading = query.deferred_loading
+    unfiltered_qs._prefetch_related_lookups = qs._prefetch_related_lookups
+    return unfiltered_qs
+
+
+def _on_own_columns(expression, table_alias: str) -> bool:
+    """ An expression of the table's columns and constants, e.g. Cast("pk") - no join, subquery or aggregate """
+    return all(isinstance(e, Col) and e.alias == table_alias
+               or isinstance(e, Value)
+               or (isinstance(e, Func) and not e.contains_aggregate)
+               for e in expression.flatten())
 
 
 def iter_ordered(qs: QuerySet[M], batch_size: int = 1000) -> Iterator[M]:
