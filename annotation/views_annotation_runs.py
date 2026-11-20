@@ -14,6 +14,7 @@ from annotation.models import (
 )
 from annotation.models.models_annotation_run import AnnotationPipelineVersion
 from annotation.pipelines import get_pipeline, get_runner, versioned_pipeline_types
+from annotation.pipelines.base import get_register_pipeline_version_command
 from annotation.tasks.annotate_variants import annotation_run_retry, recheck_vep_version
 from annotation.tasks.annotation_scheduler_task import (
     annotation_scheduler,
@@ -232,19 +233,22 @@ def variant_annotation_runs(request):
     pipeline_version_panels = []
     for genome_build in GenomeBuild.builds_with_annotation():
         for pipeline_type in versioned_pipeline_types():
+            runner = get_runner(pipeline_type)
+            enabled = get_pipeline(pipeline_type).enabled
+            supported = runner.supports_genome_build(genome_build)
             pipeline_version_panels.append({
                 "genome_build": genome_build,
                 "label": VariantAnnotationPipelineType(pipeline_type).label,
-                "enabled": get_pipeline(pipeline_type).enabled,
-                "supported": get_runner(pipeline_type).supports_genome_build(genome_build),
+                "enabled": enabled,
+                "supported": supported,
+                "installed": runner.get_installed_tool_version(genome_build) if enabled and supported else None,
                 "active": AnnotationPipelineVersion.get_active(pipeline_type, genome_build),
                 "new": AnnotationPipelineVersion.get_new(pipeline_type, genome_build),
                 "historical_count": AnnotationPipelineVersion.objects.filter(
                     pipeline_type=pipeline_type, genome_build=genome_build,
                     status=AnnotationPipelineVersion.Status.HISTORICAL).count(),
                 "register_name": _register_pipeline_version_post_name(pipeline_type, genome_build),
-                "register_command": f"python3 manage.py create_new_annotation_pipeline_version "
-                                    f"--pipeline-type={pipeline_type} --genome-build={genome_build}",
+                "register_command": get_register_pipeline_version_command(pipeline_type, genome_build),
             })
 
     any_new_vav = VariantAnnotationVersion.objects.filter(

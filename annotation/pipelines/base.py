@@ -1,6 +1,7 @@
 import abc
 import logging
 import os
+from dataclasses import dataclass
 from typing import Optional
 
 from django.conf import settings
@@ -14,6 +15,65 @@ from annotation.enums import VariantAnnotationPipelineType
 from annotation.models.models_annotation_run import AnnotationPipelineVersion
 from library.utils.file_utils import mk_path_for_file
 from snpdb.models import Variant
+from snpdb.models.models_genome import GenomeBuild
+
+
+def get_register_pipeline_version_command(pipeline_type, genome_build) -> str:
+    return (f"python3 manage.py create_new_annotation_pipeline_version "
+            f"--pipeline-type={VariantAnnotationPipelineType(pipeline_type).value} --genome-build={genome_build}")
+
+
+@dataclass
+class InstalledToolVersion:
+    """ The installed tool set against the versions registered for one pipeline and build: what
+        deployment_check and the annotation runs page report, so an upgraded binary or bundle is noticed
+        before the runs scheduled against the old version are refused by check_tool_version. """
+    pipeline_type: VariantAnnotationPipelineType
+    genome_build: GenomeBuild
+    installed: Optional[dict]  # get_current_tool_version, None when it couldn't be read
+    read_error: Optional[str]
+    active: Optional[AnnotationPipelineVersion]
+    registered: Optional[AnnotationPipelineVersion]  # the version matching the installed tool
+
+    @property
+    def installed_str(self) -> str:
+        if self.installed is None:
+            return f"couldn't read the installed version: {self.read_error}"
+        return "/".join(v for v in self.installed.values() if v)
+
+    @property
+    def needs_registering(self) -> bool:
+        return self.installed is not None and self.registered is None
+
+    @property
+    def needs_promoting(self) -> bool:
+        return self.registered is not None and self.registered.status == AnnotationPipelineVersion.Status.NEW
+
+    @property
+    def register_command(self) -> str:
+        return get_register_pipeline_version_command(self.pipeline_type, self.genome_build)
+
+    @property
+    def warning(self) -> Optional[str]:
+        label = f"{self.pipeline_type.label} ({self.genome_build})"
+        if self.installed is None:
+            return f"{label}: {self.installed_str}"
+        if self.active is None:
+            return (f"{label}: enabled, but no version is registered, so no runs are created. Register the "
+                    f"installed {self.installed_str} on the annotation runs page, or: {self.register_command}")
+        if self.needs_registering:
+            return (f"{label}: installed {self.installed_str} is not registered (ACTIVE is {self.active}), so its "
+                    f"runs are refused. Register it on the annotation runs page, or: {self.register_command}, "
+                    f"then promote it there")
+        if self.needs_promoting:
+            return (f"{label}: installed {self.installed_str} is registered as NEW (ACTIVE is {self.active}), so "
+                    f"its runs are refused. Promote it on the annotation runs page")
+        if not self.registered.is_active:
+            # Not offered for promotion: its runs are already FINISHED, so the scheduler would re-run nothing and
+            # leave the later version's values in place
+            return (f"{label}: installed {self.installed_str} is a historical version (ACTIVE is {self.active}), "
+                    f"so its runs are refused. Install the ACTIVE version, or a newer one and register it")
+        return None
 
 
 class AnnotationPipelineRunner(abc.ABC):
@@ -70,6 +130,23 @@ class AnnotationPipelineRunner(abc.ABC):
         return AnnotationPipelineVersion.objects.get_or_create(
             pipeline_type=self.pipeline_type, genome_build=genome_build,
             defaults={"status": status}, **kwargs)
+
+    def get_installed_tool_version(self, genome_build) -> InstalledToolVersion:
+        """ The installed tool and the versions registered for genome_build. Shells out to the tool. """
+        installed = None
+        read_error = None
+        registered = None
+        try:
+            installed = self.get_current_tool_version(genome_build)
+        except OSError as e:
+            read_error = str(e)
+        if installed is not None:
+            registered = AnnotationPipelineVersion.objects.filter(
+                pipeline_type=self.pipeline_type, genome_build=genome_build, **installed).first()
+        return InstalledToolVersion(
+            pipeline_type=self.pipeline_type, genome_build=genome_build, installed=installed,
+            read_error=read_error, active=AnnotationPipelineVersion.get_active(self.pipeline_type, genome_build),
+            registered=registered)
 
     def check_tool_version(self, annotation_run):
         """ Refuse to run when the installed tool isn't the version this run was scheduled against, as
