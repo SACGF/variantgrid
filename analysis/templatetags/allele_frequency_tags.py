@@ -12,6 +12,7 @@ def allele_frequency_controls(node):
     allele_frequency = get_allele_frequency_filter_data_for_node(node)
 
     return {
+        "node_id": node.pk,
         "VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT": settings.VARIANT_ALLELE_FREQUENCY_CLIENT_SIDE_PERCENT,
         'allele_frequency': allele_frequency
     }

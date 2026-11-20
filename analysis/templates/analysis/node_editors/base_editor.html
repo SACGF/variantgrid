@@ -185,7 +185,16 @@
 		showNodeDataPane();
 	}
 
+	// Ready callbacks run a task after the editor is inserted. A node clicked in between has already replaced
+	// this editor, so its setup would run against DOM that's gone (#2880)
+	function isNodeEditorShown(nodeId) {
+		return $("#node-editor-wrapper").attr("node_id") === String(nodeId);
+	}
+
 	$(document).ready(function() {
+		if (!isNodeEditorShown({{ node.pk }})) {
+			return;
+		}
 		$("#node-editor-tabs > ul.nav-tabs > li > a").on('shown.bs.tab', function () {
 			switch_node_data($(this).attr("id"));
 		});
