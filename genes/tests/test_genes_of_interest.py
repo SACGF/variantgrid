@@ -23,6 +23,7 @@ from genes.models import (
     SampleGeneList,
 )
 from genes.panel_app import create_gene_list_from_panel_app
+from library.django_utils.django_partition import bulk_create_in_partition
 from library.guardian_utils import assign_permission_to_user_and_groups
 from snpdb.enums import DataState, ImportStatus
 from snpdb.models import VCF, Sample
@@ -34,6 +35,10 @@ def _create_gene_list(user, symbols, name="goi") -> GeneList:
     GeneListGeneSymbol.objects.bulk_create([GeneListGeneSymbol(gene_list=gene_list, original_name=symbol,
                                                                gene_symbol_id=symbol) for symbol in symbols])
     return gene_list
+
+
+def _create_coverage(gcc: GeneCoverageCollection, records: list[GeneCoverageCanonicalTranscript]):
+    bulk_create_in_partition(gcc, GeneCoverageCanonicalTranscript, "genes_genecoveragecanonicaltranscript", records)
 
 
 class GenesOfInterestTest(TestCase):
@@ -151,14 +156,17 @@ class GenesOfInterestTest(TestCase):
     def test_coverage_splits_below_threshold_from_no_data(self):
         gcc = GeneCoverageCollection.objects.create(path="/tmp/goi.cov.tsv", data_state=DataState.COMPLETE,
                                                     genome_build=self.genome_build)
-        for symbol, min_depth, mean, size in [("GOIA", 30, 100.0, 100), ("GOIB", 5, 40.0, 300)]:
-            GeneCoverageCanonicalTranscript.objects.create(gene_coverage_collection=gcc, gene_symbol_id=symbol,
-                                                           original_gene_symbol=symbol, original_transcript="",
-                                                           size=size, min=min_depth, mean=mean, std_dev=1.0)
+        _create_coverage(gcc, [GeneCoverageCanonicalTranscript(gene_coverage_collection=gcc, gene_symbol_id=symbol,
+                                                               original_gene_symbol=symbol, original_transcript="",
+                                                               size=size, min=min_depth, mean=mean, std_dev=1.0)
+                               for symbol, min_depth, mean, size in [("GOIA", 30, 100.0, 100), ("GOIB", 5, 40.0, 300)]])
         gene_list = _create_gene_list(self.user, self.SYMBOLS)
         GeneListGeneSymbol.objects.create(gene_list=gene_list, original_name="NOTAGENE")
 
         gene_symbols = GeneSymbol.objects.filter(pk__in=self.SYMBOLS)
+        # Read from the collection's partition: the inheritance parent locks every collection's partition (#2874)
+        below_threshold_sql = str(gcc.get_below_threshold_gene_symbols(gene_symbols, 20).query)
+        self.assertNotIn('"genes_genecoveragecanonicaltranscript"', below_threshold_sql)
         self.assertEqual(["GOIB"], list(gcc.get_below_threshold_gene_symbols(gene_symbols, 20)
                                         .values_list("symbol", flat=True)))
         self.assertEqual(["GOIC"], list(gcc.get_no_coverage_gene_symbols(gene_symbols)
@@ -177,10 +185,11 @@ class GenesOfInterestTest(TestCase):
         mock_get_sample_gene_coverage.return_value = gcc
         min_depth = self.sample.get_minimum_coverage_required()
         # GOIB is covered on one of its 2 transcripts, GOIC only below min depth, GOID has no coverage data
-        for symbol, depth in [("GOIA", min_depth), ("GOIB", 0), ("GOIB", min_depth), ("GOIC", min_depth - 1)]:
-            GeneCoverageCanonicalTranscript.objects.create(gene_coverage_collection=gcc, gene_symbol_id=symbol,
-                                                           original_gene_symbol=symbol, original_transcript="",
-                                                           min=depth, mean=50.0, std_dev=1.0)
+        coverage = [("GOIA", min_depth), ("GOIB", 0), ("GOIB", min_depth), ("GOIC", min_depth - 1)]
+        _create_coverage(gcc, [GeneCoverageCanonicalTranscript(gene_coverage_collection=gcc, gene_symbol_id=symbol,
+                                                               original_gene_symbol=symbol, original_transcript="",
+                                                               min=depth, mean=50.0, std_dev=1.0)
+                               for symbol, depth in coverage])
         gene_list = _create_gene_list(self.user, ["GOIA", "GOIB", "GOIC", "GOID"])
         GeneListGeneSymbol.objects.create(gene_list=gene_list, original_name="NOTAGENE")
         sample_gene_list = SampleGeneList.objects.create(sample=self.sample, gene_list=gene_list)
