@@ -88,6 +88,9 @@
     };
 
     $(document).ready(function() {
+        if (!isNodeEditorShown({{ node_id }})) {
+            return;
+        }
         $("#add-slider").click(function(event) {
             addSlider();
         });
