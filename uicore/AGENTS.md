@@ -156,6 +156,9 @@ working-tree `runserver` as `claude_agent`; read the PNGs it writes rather than 
   rather than a short page (snpdb/views/datatable_view.py:page_bounds) - every row is `server_csv_download`.
 - COUNTs cost: `count_unfiltered = False` skips the unfiltered one; `known_count()` / `approximate_count_enabled`
   supply a stored or estimated total (snpdb/views/datatable_view.py:datatable_response).
+- A page sorted or filtered across expensive joins sets `page_pks_first`: the OFFSET/LIMIT runs on a pk query and the
+  columns are fetched for the page's pks only (`snpdb/views/datatable_view.py:DatatableConfig.paging`). The queryset
+  must be one row per pk.
 - The Variant cell's kind badge (`VariantGridFormat.variantKindBadge` in
   variantgrid/static_files/default_static/js/variantgrid_formats.js) is drawn from members already riding along
   hidden - `alt__seq` and `svlen` - so a new "what kind of row is this?" signal needs no extra column. Small

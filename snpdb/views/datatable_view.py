@@ -436,6 +436,9 @@ class DatatableConfig(Generic[DC]):
     # Hovering a row for 500ms fetches its expanded content early
     expand_prefetch = True
     max_page_length = UserGridConfig.MAX_ROWS
+    # Choose the page's pks with the filters and sort alone, then fetch the columns for those pks (@see paging).
+    # For a queryset of one row per pk whose column joins are expensive across every row
+    page_pks_first = False
     # CSV header labels that differ from the column's own (@see csv_columns)
     csv_label_overrides: Optional[dict[str, str]] = None
 
@@ -709,7 +712,13 @@ class DatatableConfig(Generic[DC]):
         return page_bounds(self.get_query_param('start'), self.get_query_param('length'), self.max_page_length)
 
     def paging(self, qs: QuerySet[DC]) -> QuerySet[DC]:
+        """ With page_pks_first, the OFFSET/LIMIT runs on a pk query, so Postgres doesn't compute the column
+            joins for every row it sorts or steps over, and the columns are fetched for the page's rows only
+            (#1887, #2878). Both come off the same ordered queryset, so the page keeps its order """
         start, length = self.page_bounds()
+        if self.page_pks_first:
+            page_pks = list(qs.values_list("pk", flat=True)[start:start + length])
+            return qs.filter(pk__in=page_pks)
         return qs[start:start + length]
 
     def get_csv_name(self) -> str:
