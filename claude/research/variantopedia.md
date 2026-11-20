@@ -56,7 +56,7 @@ direct grid hit (CSV export, bookmark) falls back to the user's last saved filte
 (`snpdb/variant_filters.py:get_all_variants_filters`). With no selective filter
 (`snpdb/variant_filters.py:is_selective`) the grid matches nothing rather than scanning the table. Nothing is sortable:
 every page is in `(contig, position, pk)` order, which streams off the `snpdb_locus` unique index (#1663).
-`AllVariantsGrid.paging` takes the page's pks first and only then joins the annotation columns for those rows (#1887);
+`AllVariantsGrid` sets `page_pks_first`, so a page's pks are chosen first and only then joined to the annotation columns (#1887);
 a gene filter is bounded by the gene's locus span (`snpdb/variant_filters.py:get_gene_bounds_q`) so it seeks.
 `AllVariantsGrid.known_count` reports the planner's row estimate (`~1.2M`) instead of a COUNT(*) once it passes
 `APPROXIMATE_COUNT_MIN`.

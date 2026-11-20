@@ -142,6 +142,9 @@ class AllVariantsGrid(AbstractVariantGrid):
     # tiebreaker makes pagination stable. @see issue #1663
     DEFAULT_ORDER_BY = ("locus__contig_id", "locus__position", "pk")
     APPROXIMATE_COUNT_MIN = 1_000_000
+    # An OFFSET deep into a filtered scan otherwise drags every row it steps over through the annotation,
+    # ClinVar, gene and classification joins (#1887)
+    page_pks_first = True
 
     def __init__(self, request: HttpRequest, genome_build_name: Optional[str] = None,
                  extra_filters: Optional[dict] = None, **kwargs):
@@ -196,17 +199,6 @@ class AllVariantsGrid(AbstractVariantGrid):
 
     def initial_order(self) -> Optional[list]:
         return None  # every page is served in genomic order, whatever the client asks for
-
-    def paging(self, qs: QuerySet) -> QuerySet:
-        """ Take the page's pks first, then the columns for those pks.
-
-            An OFFSET deep into a filtered scan drags every row it steps over through the annotation,
-            ClinVar, gene and classification joins. Paging on pks walks variant + locus + the filter
-            joins only, and the columns are then fetched for the 10 rows on the page (#1887).
-            Both phases are built off the same ordered queryset, so genomic order is preserved. """
-        start, length = self.page_bounds()
-        page_pks = list(qs.values_list("pk", flat=True)[start:start + length])
-        return qs.filter(pk__in=page_pks)
 
     def ordering(self, qs: QuerySet) -> QuerySet:
         """ Serve every page in genomic order regardless of any order the request supplies. Emitted as
@@ -334,9 +326,12 @@ class VariantTagCaseColumnsMixin:
 class VariantTagsColumns(VariantTagCaseColumnsMixin, DatatableConfig[VariantTag]):
     """ List VariantTags (Tag-centric) - @see variant_tags.html and base_related_analyses.html """
     GRID_NAME = 'Variant Tags'
-    # The initial queryset is every tag in the build - a DISTINCT over a dozen joins - and recordsTotal
-    # only feeds the "(filtered from N total)" text, so it isn't worth a second count of it
+    # The initial queryset is every tag in the build over a dozen joins, and recordsTotal only feeds the
+    # "(filtered from N total)" text, so it isn't worth a second count of it
     count_unfiltered = False
+    # Sorted on unindexed columns, so without this every tag is joined to its variant, annotation, gene,
+    # patient... before the page is chosen (#2878)
+    page_pks_first = True
     # The DataTable pages at 100 rows, so the CSV streams from the server
     server_csv_download = True
     csv_label_overrides = {"user": "Username"}
@@ -440,8 +435,8 @@ class VariantTagsColumns(VariantTagCaseColumnsMixin, DatatableConfig[VariantTag]
         return self.annotate_patient_identity(qs)
 
     def _annotation_version_queryset(self) -> QuerySet[VariantTag]:
-        """ Join VariantAnnotation through the build's partition rather than the parent table - every
-            historical version otherwise multiplies the rows the DISTINCT has to sort through """
+        """ Join VariantAnnotation through the build's partition rather than the parent table, which
+            holds a row per variant for every historical version """
         qs = get_queryset_with_transformer_hook(klass=VariantTag)
         if self.annotation_version:
             qs.add_sql_transformer(self.annotation_version.sql_partition_transformer)

@@ -159,8 +159,8 @@ class VariantTag(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel):
         if variant_qs is not None:
             q_native_build &= Q(variant__in=variant_qs)
 
-        # Do distinct as we used to get 2x results with MT (which share contigs across builds)
-        return tags_qs.filter(q_allele | q_native_build).distinct()
+        # Both test the tag's own row, so each tag comes back once without a DISTINCT (#2878)
+        return tags_qs.filter(q_allele | q_native_build)
 
     @staticmethod
     def variants_for_build_q(genome_build, tags_qs, tag_ids: list[str]) -> Q:

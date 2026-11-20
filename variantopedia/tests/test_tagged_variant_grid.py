@@ -313,10 +313,10 @@ class VariantTagsGridQueryTest(TestCase):
         return VariantTag.objects.create(variant=variant, allele=allele.allele, tag=cls.tag, analysis=analysis,
                                          genome_build=cls.genome_build, user=user or cls.user)
 
-    def _response(self, user: User = None):
+    def _response(self, user: User = None, start: int = 0, length: int = 100):
         url = reverse('variant_tags_datatable', kwargs={"genome_build_name": self.genome_build.name})
         self.client.force_login(user or self.user)
-        response = self.client.post(url, {"length": 100, "tag": self.tag.pk})
+        response = self.client.post(url, {"start": start, "length": length, "tag": self.tag.pk})
         self.assertEqual(response.status_code, 200)
         return response.json()
 
@@ -353,7 +353,7 @@ class VariantTagsGridQueryTest(TestCase):
         return variant_annotation_version
 
     def test_gene_symbol_comes_from_the_build_annotation_version_only(self):
-        """ Joining every version of the annotation multiplied the rows the DISTINCT had to sort """
+        """ The parent annotation table holds a row per version, so joining it gave a tag a row per version """
         self._tag(self.variant)
         self._annotate(self.old_annotation_version.variant_annotation_version,
                        create_fake_transcript_version(self.genome_build))  # RUNX1
@@ -363,6 +363,25 @@ class VariantTagsGridQueryTest(TestCase):
         rows = self._rows()
         self.assertEqual(len(rows), 1, "One row per tag, however many versions the variant is annotated in")
         self.assertEqual(rows[0]["gene_symbol"], "GATA2")
+
+    def test_a_tag_on_a_variant_in_both_builds_is_one_row(self):
+        """ A mitochondrial variant has a VariantAllele in each build, as the builds share the contig (#417) """
+        variant_tag = self._tag(self.variant)
+        VariantAllele.objects.create(variant=self.variant, allele=variant_tag.allele,
+                                     genome_build=GenomeBuild.get_name_or_alias("GRCh38"),
+                                     origin=AlleleOrigin.IMPORTED_TO_DATABASE)
+        data = self._response()
+        self.assertEqual([variant_tag.pk], [row["id"] for row in data["data"]])
+        self.assertEqual(1, data["recordsFiltered"])
+
+    def test_pages_follow_the_sort(self):
+        """ The page's pks are chosen first and its columns fetched after, so both have to keep the order """
+        tag_pks = [self._tag(self.variant).pk, self._tag(self.other_variant).pk,
+                   self._tag(self.variant).pk]
+        newest_first = [row["id"] for row in self._rows()]
+        self.assertEqual(sorted(tag_pks, reverse=True), newest_first)
+        pages = [row["id"] for start in range(3) for row in self._response(start=start, length=1)["data"]]
+        self.assertEqual(newest_first, pages)
 
     def test_delete_permissions_cost_the_same_however_many_rows(self):
         """ can_write delegates to the analysis, so checking it per row was 2 Guardian queries a row """
