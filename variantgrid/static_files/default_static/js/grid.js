@@ -277,6 +277,7 @@ function appendVariantTaggingPill(cell, variantId, tag, response) {
     const newTag = $(getVariantTagHtml(variantId, tag, false, options));
     newTag.click(tagClickHandler);
     cell.append(newTag);
+    markHiddenGridTags(cell);
 }
 
 
@@ -347,7 +348,8 @@ function getVariantTagHtml(variantId, tag, readOnly, options) {
     // A tagging's own pk - the analysis grid's X removes that one tagging, not every tagging of the tag
     const pkAttr = options.variantTagId ? ` variant_tag_id='${escapeHtml(options.variantTagId)}'` : "";
     const marker = options.marker ? `<i class='grid-tag-sample-marker ${options.marker}'></i>` : "";
-    return `<span class='${outerClasses.join(' ')}' title='${escapeHtml(title)}' variant_id='${escapeHtml(variantId)}' tag_id='${escapeHtml(tag)}'${pkAttr}><span class='user-tag-colored'>${tagLabel}${marker}</span></span>`;
+    // A delay so moving the mouse across a row of tags doesn't pop up a tooltip over the rows below for each
+    return `<span class='${outerClasses.join(' ')}' title='${escapeHtml(title)}' data-delay='{"show": 500, "hide": 0}' variant_id='${escapeHtml(variantId)}' tag_id='${escapeHtml(tag)}'${pkAttr}><span class='user-tag-colored'>${tagLabel}${marker}</span></span>`;
 }
 
 
@@ -425,6 +427,24 @@ function disarmVariantTags(except) {
         armed = armed.not(except);
     }
     armed.removeClass("grid-tag-armed").children(".grid-tag-delete").remove();
+    setTagTooltipEnabled(armed, true);
+}
+
+
+// The X sits inside the tag, so moving onto it never leaves the tag - an armed tag's own tooltip is off,
+// or it shows over the X's along with it
+function setTagTooltipEnabled(gridTags, enabled) {
+    gridTags.each(function() {
+        const tooltip = $(this).data("bs.tooltip");
+        if (tooltip) {
+            if (enabled) {
+                tooltip.enable();
+            } else {
+                tooltip.hide();
+                tooltip.disable();
+            }
+        }
+    });
 }
 
 
@@ -439,13 +459,16 @@ function tagClickHandler() {
     }
     disarmVariantTags(gridTag);
     gridTag.addClass("grid-tag-armed");
+    setTagTooltipEnabled(gridTag, false);
 
     const deleteButton = $("<i/>", {"class": "grid-tag-delete fa-solid fa-circle-xmark",
                                     "title": "Remove tag"});
     deleteButton.click(function(event) {
         event.stopPropagation();
         const removeTagCallback = function () {
+            const gridTags = gridTag.parent();
             gridTag.remove();
+            markHiddenGridTags(gridTags);
         };
         removeVariantTag(gridTag.attr('variant_id'), gridTag.attr('tag_id'),
                          gridTag.attr('variant_tag_id'), removeTagCallback);
@@ -454,9 +477,55 @@ function tagClickHandler() {
 }
 
 
+/* A cell shows only the tags that fit whole, and a +N for the rest, rather than one cut off at the column
+   edge. Measured from the tags' own widths against the cell's - the columns are fixed width - so it's
+   right whether or not the cell is hovered (and lifted), and is redone whenever a cell's tags change.
+   The first tag always shows, shrunk if it has to be. @see .grid-tags */
+function markHiddenGridTags(containers) {
+    const MORE_WIDTH = 22;  // .grid-tags-overflow's padding, which the +N sits in
+    // Measure every cell, then change every cell, so the grid lays out twice rather than once a cell
+    containers.removeClass("grid-tags-overflow").addClass("grid-tags-measuring");
+    containers.children(".grid-tags-more").remove();
+    containers.children(".grid-tag-hidden").removeClass("grid-tag-hidden");
+    const hiddenTagsByContainer = containers.get().map(function(container) {
+        const cell = container.parentElement;
+        const cellStyle = getComputedStyle(cell);
+        const available = cell.clientWidth - parseFloat(cellStyle.paddingLeft) - parseFloat(cellStyle.paddingRight);
+        const items = Array.from(container.children);
+        const total = items.reduce((width, item) => width + item.offsetWidth, 0);
+        if (total <= available) {
+            return [];
+        }
+        const hidden = [];
+        let right = 0;
+        let firstTag = true;
+        for (const item of items) {
+            right += item.offsetWidth;
+            if (item.classList.contains("grid-tag")) {
+                if (!firstTag && right > available - MORE_WIDTH) {
+                    hidden.push(item);
+                }
+                firstTag = false;
+            }
+        }
+        return hidden;
+    });
+    containers.removeClass("grid-tags-measuring");
+    containers.each(function(i) {
+        const hidden = hiddenTagsByContainer[i];
+        if (hidden.length) {
+            $(hidden).addClass("grid-tag-hidden");
+            $(this).addClass("grid-tags-overflow");
+            $("<span/>", {"class": "grid-tags-more", text: "+" + hidden.length}).appendTo(this);
+        }
+    });
+}
+
+
 // Kicked off after every grid draw, alongside the page's own gridComplete
 function gridCompleteExtra() {
     FloatingPanel.hide();  // A tag entry or sort menu raised off the last draw's cells is stale now
+    markHiddenGridTags($(".grid-tags"));
     const aWin = getAnalysisWindow();
     if (!aWin.variantTagsReadOnly) {
         $(".grid-tag-deletable").click(tagClickHandler);

@@ -150,6 +150,29 @@ function processInitialDom() {
     }
 }
 
+/**
+ * A tooltip or popover only hides on its element's mouseleave, which never comes once the element has left the page
+ * (a grid redraw, a deleted tag), so the tip would stay on screen until a reload. Bootstrap marks an element with
+ * aria-describedby while its tip is up. jQuery's remove() has already dropped the Bootstrap instance by now, so then
+ * the tip is removed directly; a detached element (DataTables keeps its rows) is hidden, so it can show again
+ * @param {Node} removedNode
+ */
+function hideTipsOfRemovedNode(removedNode) {
+    if (removedNode.nodeType !== Node.ELEMENT_NODE) {
+        return;
+    }
+    const node = $(removedNode);
+    node.find('[aria-describedby]').addBack('[aria-describedby]').each((index, element) => {
+        const describedBy = $(element);
+        const instance = describedBy.data('bs.tooltip') || describedBy.data('bs.popover');
+        if (instance) {
+            instance.hide();
+        } else {
+            $(document.getElementById(describedBy.attr('aria-describedby'))).filter('.tooltip, .popover').remove();
+        }
+    });
+}
+
 function enhanceAndMonitor() {
     processInitialDom();
 
@@ -173,6 +196,9 @@ function enhanceAndMonitor() {
                     // run the risk of adding a child of something that's already been added
                     node.attr('data-p', '1');
                 }
+            }
+            for (const removedNode of mutation.removedNodes) {
+                hideTipsOfRemovedNode(removedNode);
             }
         });
     });
