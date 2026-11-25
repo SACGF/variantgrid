@@ -374,8 +374,9 @@ def view_analysis_status(request):
             analysis_ids = list(nodes_qs.order_by().values_list("analysis_id", flat=True).distinct())
             for analysis_id in analysis_ids:
                 node_utils.reload_analysis_nodes(analysis_id, only_errors=True)
+            of_matching = "" if filter_form.num_matching is None else f" of {filter_form.num_matching} matching"
             messages.add_message(request, messages.INFO,
-                                 f"Reloading {num_nodes} failed nodes in {len(analysis_ids)} analyses")
+                                 f"Reloading {num_nodes}{of_matching} failed nodes in {len(analysis_ids)} analyses")
             query_string = urlencode({k: v for k, v in filter_form.cleaned_data.items() if v})
             return redirect(f"{reverse('analysis_status')}?{query_string}")
 

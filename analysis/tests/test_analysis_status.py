@@ -9,6 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from analysis.enums import NodeStatus
+from analysis.forms.forms import AnalysisNodeIssuesFilterForm
 from analysis.models import AllVariantsNode, Analysis, AnalysisNode, NodeTask
 from analysis.models.nodes.node_version import NodeVersion
 from analysis.scheduler_status import get_analyses_with_work, get_scheduler_status
@@ -91,3 +92,33 @@ class TestAnalysisStatus(AnalysisSetupMixin, TestCase):
 
         response = self.client.get("/analysis/analysis_issues?error_contains=x")
         self.assertRedirects(response, f"{url}?error_contains=x", status_code=301)
+
+
+class TestReloadMatchingLimit(AnalysisSetupMixin, TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        user = User.objects.get_or_create(username="test_reload_matching_limit")[0]
+        cls.analysis_ids = []
+        for num_failed in [2, 3, 1]:
+            analysis = Analysis(genome_build=cls.grch37, name=f"{num_failed} failed")
+            analysis.set_defaults_and_save(user)
+            for _ in range(num_failed):
+                node = AllVariantsNode.objects.create(analysis=analysis)
+                AnalysisNode.objects.filter(pk=node.pk).update(status=NodeStatus.ERROR)
+            cls.analysis_ids.append(analysis.pk)
+
+    def _capped(self, max_nodes=None) -> tuple[list[int], int]:
+        form = AnalysisNodeIssuesFilterForm({"max_nodes": max_nodes})
+        qs = form.get_queryset()
+        self.assertEqual(form.num_matching, 6 if max_nodes else None)
+        return sorted(set(qs.values_list("analysis_id", flat=True))), qs.count()
+
+    def test_whole_analyses_up_to_limit(self):
+        first, second, _third = self.analysis_ids
+        self.assertEqual(self._capped(), (self.analysis_ids, 6))
+        self.assertEqual(self._capped(max_nodes=5), ([first, second], 5))
+        self.assertEqual(self._capped(max_nodes=4), ([first], 2))
+        # An analysis bigger than the limit is still taken on its own
+        self.assertEqual(self._capped(max_nodes=1), ([first], 2))

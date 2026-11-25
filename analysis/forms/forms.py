@@ -11,6 +11,7 @@ from dal import forward
 from django import forms
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
+from django.db.models import Count
 from django.forms import inlineformset_factory
 from django.forms.widgets import TextInput
 
@@ -560,13 +561,20 @@ class AnalysisNodeIssuesFilterForm(forms.Form):
     modified_from = forms.DateField(required=False, widget=NativeDateInput())
     modified_to = forms.DateField(required=False, widget=NativeDateInput())
     error_contains = forms.CharField(required=False)
+    max_nodes = forms.IntegerField(required=False, min_value=1, label="Reload at most",
+                                   widget=forms.NumberInput(attrs={"style": "width: 7em"}))
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['node_class'].choices = [('', 'All'), *get_node_class_choices()]
+        self.num_matching: Optional[int] = None
 
     def get_queryset(self):
-        """ Invalid fields are left out of cleaned_data, so they don't filter """
+        """ What the grid shows and 'Reload matching' reloads. Invalid fields are left out of
+            cleaned_data, so they don't filter.
+            A reload is per analysis, so max_nodes takes whole analyses (oldest first) while they fit -
+            always at least one, so an analysis with more failed nodes than the limit is still reachable.
+            Sets num_matching (failed nodes before the cap) when capping, else leaves it None """
         self.is_valid()
         data = self.cleaned_data
         qs = AnalysisNode.objects.filter(status=NodeStatus.ERROR)
@@ -578,6 +586,18 @@ class AnalysisNodeIssuesFilterForm(forms.Form):
             qs = qs.filter(modified__date__lte=modified_to)
         if error_contains := data.get('error_contains'):
             qs = qs.filter(errors__icontains=error_contains)
+
+        if max_nodes := data.get('max_nodes'):
+            analysis_counts = list(qs.order_by().values_list("analysis_id").annotate(Count("pk")).order_by("analysis_id"))
+            self.num_matching = sum(analysis_nodes for _, analysis_nodes in analysis_counts)
+            analysis_ids = []
+            num_nodes = 0
+            for analysis_id, analysis_nodes in analysis_counts:
+                if analysis_ids and num_nodes + analysis_nodes > max_nodes:
+                    break
+                analysis_ids.append(analysis_id)
+                num_nodes += analysis_nodes
+            qs = qs.filter(analysis_id__in=analysis_ids)
         return qs
 
 
