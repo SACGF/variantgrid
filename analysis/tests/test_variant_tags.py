@@ -124,28 +124,39 @@ class TestVariantTagLiftoverClinGenError(TestCase):
 
 @override_settings(CLINGEN_ALLELE_REGISTRY_LOGIN=None)
 @patch("analysis.tasks.variant_tag_tasks.create_liftover_pipelines")
-class TestVariantTagLiftoverStaleNodeVersion(TestCase):
-    """ The reload a tagging triggers deletes the tagged node's old NodeVersion while the task runs (#2892) """
+class TestVariantTagLiftoverConcurrentChanges(TestCase):
+    """ The tag and the analysis it was made in can change while variant_tag_created_task runs """
 
-    def test_deleted_node_version_still_assigns_allele(self, mock_create_liftover_pipelines):
+    def setUp(self):
+        super().setUp()
         user = User.objects.get_or_create(username='testuser')[0]
         grch37 = GenomeBuild.get_name_or_alias("GRCh37")
         create_fake_variants(grch37)
         variant = Variant.objects.filter(Variant.get_no_reference_q()).order_by("pk").first()
-        allele = create_mock_allele(variant, grch37)
+        self.allele = create_mock_allele(variant, grch37)
         analysis = Analysis.objects.create(genome_build=grch37, user=user)
         node = TagNode.objects.create(analysis=analysis)
         tag = Tag.objects.get_or_create(pk="artefact")[0]
-        variant_tag = VariantTag.objects.create(genome_build=grch37, variant=variant, tag=tag, user=user,
-                                                analysis=analysis, node=node, node_version=node.node_version)
+        self.variant_tag = VariantTag.objects.create(genome_build=grch37, variant=variant, tag=tag, user=user,
+                                                     analysis=analysis, node=node, node_version=node.node_version)
 
-        NodeVersion.objects.filter(pk=variant_tag.node_version_id).delete()
-        _liftover_variant_tag(variant_tag)
+    def test_deleted_node_version_still_assigns_allele(self, mock_create_liftover_pipelines):
+        """ The reload a tagging triggers deletes the tagged node's old NodeVersion (#2892) """
+        NodeVersion.objects.filter(pk=self.variant_tag.node_version_id).delete()
+        _liftover_variant_tag(self.variant_tag)
 
-        variant_tag.refresh_from_db()
-        self.assertEqual(variant_tag.allele, allele)
-        self.assertIsNone(variant_tag.node_version)
+        self.variant_tag.refresh_from_db()
+        self.assertEqual(self.variant_tag.allele, self.allele)
+        self.assertIsNone(self.variant_tag.node_version)
         mock_create_liftover_pipelines.assert_called_once()
+
+    def test_deleted_tag_is_not_recreated(self, mock_create_liftover_pipelines):
+        """ The user untags before the task stores the allele (#2902) """
+        VariantTag.objects.filter(pk=self.variant_tag.pk).delete()
+        _liftover_variant_tag(self.variant_tag)
+
+        self.assertFalse(VariantTag.objects.filter(pk=self.variant_tag.pk).exists())
+        mock_create_liftover_pipelines.assert_not_called()
 
 
 class TestTagNodeSnapshotWarning(TestCase):
