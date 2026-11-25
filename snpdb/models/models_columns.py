@@ -4,6 +4,7 @@ from typing import Iterable, Optional
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
+from django.db.models import Q
 from django.db.models.deletion import CASCADE
 from django.urls import reverse
 from guardian.shortcuts import get_objects_for_group
@@ -169,6 +170,15 @@ class CustomColumnsCollection(GuardianPermissionsAutoInitialSaveMixin, TimeStamp
                                                   defaults={"sort_order": cc.sort_order})
 
         return clone_cc
+
+    def get_variant_columns(self) -> set[str]:
+        """ variant_column of every column this collection's grid can filter on: its own columns and the
+            members its composites bring along hidden """
+        in_collection = Q(customcolumn__custom_columns_collection=self)
+        member_of_composite_in_collection = Q(
+            composite_membership__composite__customcolumn__custom_columns_collection=self)
+        qs = VariantGridColumn.objects.filter(in_collection | member_of_composite_in_collection)
+        return set(qs.values_list("variant_column", flat=True))
 
     @classmethod
     def filter_public(cls):

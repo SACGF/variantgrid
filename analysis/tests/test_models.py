@@ -17,6 +17,7 @@ from analysis.models import (
     SampleNode,
     ZygosityNode,
 )
+from analysis.models.nodes.filters.filter_node import FilterNode, FilterNodeItem
 from analysis.tests.test_node_editors_render import form_submit_data
 from annotation.fake_data import get_fake_annotation_version
 from genes.models import GeneList, SampleGeneList
@@ -32,6 +33,7 @@ from snpdb.models import (
     TagConfigCollection,
     UserSettingsOverride,
 )
+from snpdb.models.models_columns import VariantGridColumn
 
 
 @override_settings(ANALYSIS_NODE_CACHE_Q=False)
@@ -137,6 +139,28 @@ class AnalysisModelTestCase(TestCase):
         child.refresh_from_db()
         self.assertEqual((parent.x, parent.y), (10, 10))
         self.assertEqual((child.x, child.y), (210, 10))  # downstream is now to the right
+
+    def test_custom_columns_check_counts_composite_members(self):
+        """ chrom is drawn inside the 'variant' composite, so a filter on it works with any collection #2900 """
+        analysis = Analysis(genome_build=self.grch37, name="composite member filter test")
+        analysis.set_defaults_and_save(self.owner_user)
+        assign_permission_to_user_and_groups(self.owner_user, analysis.custom_columns_collection)
+        filter_node = FilterNode.objects.create(analysis=analysis)
+        FilterNodeItem.objects.create(filter_node=filter_node, sort_order=0, operation="eq",
+                                      field="locus__contig__name", data="17")
+
+        data = {k: v for k, v in AnalysisForm(instance=analysis, user=self.owner_user).initial.items()
+                if v is not None}
+        data["name"] = "renamed"
+        form = AnalysisForm(data, instance=analysis, user=self.owner_user)
+        self.assertTrue(form.is_valid(), form.errors)
+
+        valid_columns = analysis.custom_columns_collection.get_variant_columns()
+        missing_column = VariantGridColumn.objects.exclude(variant_column__in=valid_columns).first()
+        FilterNodeItem.objects.create(filter_node=filter_node, sort_order=1, operation="eq",
+                                      field=missing_column.variant_column, data="x")
+        form = AnalysisForm(data, instance=analysis, user=self.owner_user)
+        self.assertIn("custom_columns_collection", form.errors)
 
     def test_invisible_analysis_hides_template_from_lists(self):
         """ Internal auto-analysis templates (eg cohort VCF export) are hidden from template lists

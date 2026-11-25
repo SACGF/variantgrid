@@ -311,10 +311,8 @@ class AnalysisForm(forms.ModelForm, ROFormMixin):
 
     def clean_custom_columns_collection(self):
         ccc = self.cleaned_data["custom_columns_collection"]
-        valid_columns = ccc.customcolumn_set.values_list("column__variant_column", flat=True)
-
         fni_qs = FilterNodeItem.objects.filter(filter_node__analysis=self.instance)
-        invalid_items = fni_qs.exclude(field__in=valid_columns)
+        invalid_items = fni_qs.exclude(field__in=ccc.get_variant_columns())
         if invalid_items.exists():
             node_items: dict[AnalysisNode, set] = defaultdict(set)
             for fni in invalid_items.order_by("filter_node"):
