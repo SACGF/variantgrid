@@ -8,7 +8,7 @@ Start with:
 - models/nodes/node_version.py — NodeVersion and what cascades from it (NodeTask, NodeCache, column summaries);
   node_vcf_filter.py / node_allele_frequency.py — the VCF and allele frequency filters several nodes share
 - models/nodes/sources/*.py, models/nodes/filters/*.py — one module per concrete node
-- models/models_analysis.py — Analysis (locking, can_write), AnalysisTemplate/Version/Run
+- models/models_analysis.py — Analysis (locking, can_write), AnalysisTemplate/Version/Run; auto_launch.py — auto-launched template runs
 - tasks/analysis_update_tasks.py + tasks/node_update_tasks.py — dispatcher and the per-node celery tasks
 - models/nodes/node_utils.py — update_analysis (entry point after any edit), reload_analysis_nodes, tag recounts
 - views/nodes/node_view.py + forms/forms_nodes.py — node editors; grids.py + grid_export.py — node grid/export
@@ -313,6 +313,8 @@ Gotchas:
 - Templates run by cloning the snapshot then setting AnalysisVariable-bound fields in toposort order
   (`analysis/models/models_analysis.py:AnalysisTemplateRun.populate_arguments`); a source node's editor gets the variable
   widget only when `analysis.template_type == TEMPLATE` (`analysis/views/nodes/node_view.py:NodeView.get_form`).
+- Auto-launch is `analysis/auto_launch.py`. A group-level rule's analysis is keyed per sequencing run, but its SampleNode
+  reads every sample the group has, so a specimen re-sequenced on a second run shows both runs' calls in both analyses.
 - Cache keys are pks (`analysis/models/nodes/node_query_mixin.py` keys node Q dicts on `node_version.pk`), so cached
   entries survive a deploy. One whose pickled class was since renamed, moved or removed is a miss
   (`library/django_utils/redis_cache.py:UnpickleTolerantRedisCache`); a change that leaves old entries unpickling but

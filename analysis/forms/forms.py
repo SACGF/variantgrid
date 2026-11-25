@@ -2,6 +2,8 @@ import itertools
 import operator
 import re
 from collections import defaultdict
+from functools import cached_property
+from typing import Optional
 
 from crispy_forms.bootstrap import FieldWithButtons, StrictButton
 from crispy_forms.layout import Field, Layout
@@ -31,10 +33,12 @@ from analysis.models import (
     FilterNodeItem,
     NodeGraphType,
 )
+from analysis.models.models_analysis import AnalysisVariable
 from analysis.models.nodes.node_types import (
     get_node_class_choices,
     get_nodes_by_classification,
 )
+from analysis.models.nodes.sources.sample_node import SampleNode
 from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.models.models_version import VariantAnnotationVersion
 from genes.models.models_gene import GeneSymbol
@@ -44,6 +48,7 @@ from library.forms import NumberInput, ROFormMixin
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.enums import SampleSourceLevel, Sex
 from seqauto.models import EnrichmentKit
+from seqauto.models.models_software import VariantCaller
 from snpdb.forms import UserSettingsGenomeBuildMixin
 from snpdb.models import (
     CustomColumnsCollection,
@@ -149,25 +154,49 @@ class AnalysisTemplateForm(forms.ModelForm):
 
 
 class AutoLaunchAnalysisTemplateForm(forms.ModelForm):
+    REGEX_FIELDS = ("sample_regex", "variant_caller_regex", "vcf_source_regex")
+
     class Meta:
         model = AutoLaunchAnalysisTemplate
-        fields = ("enrichment_kit", "sample_regex")
+        fields = ("enrichment_kit", "sample_regex", "variant_caller_regex", "vcf_source_regex", "launch_level")
         widgets = {
             "enrichment_kit": ModelSelect2(url='enrichment_kit_autocomplete',
                                            attrs={'data-placeholder': 'Enrichment Kit...'}),
-            "sample_regex": forms.TextInput(attrs={
-                "size": 20,
-                "class": "form-control form-control-sm",
-            })
+            "sample_regex": forms.TextInput(attrs={"size": 20, "class": "form-control form-control-sm"}),
+            "variant_caller_regex": forms.TextInput(attrs={"size": 20, "class": "form-control form-control-sm"}),
+            "vcf_source_regex": forms.TextInput(attrs={"size": 20, "class": "form-control form-control-sm"}),
+            "launch_level": forms.Select(attrs={"class": "form-control form-control-sm"}),
         }
 
-    def clean_sample_regex(self):
-        if value := self.cleaned_data.get("sample_regex"):
-            try:
-                re.compile(value)
-            except re.error as e:
-                raise forms.ValidationError(f"RegEx error: {e}") from e
-        return value
+    def clean(self):
+        cleaned_data = super().clean()
+        for field in self.REGEX_FIELDS:
+            if value := cleaned_data.get(field):
+                try:
+                    re.compile(value)
+                except re.error as e:
+                    self.add_error(field, f"RegEx error: {e}")
+
+        # The run hands the template the sample, or the group at the launch level, through its variable
+        if (launch_level := cleaned_data.get("launch_level")) and self.instance.template_id:
+            variable_field = SampleNode.SOURCE_LEVEL_FIELDS[launch_level]
+            template_analysis = self.instance.template.analysis
+            if not AnalysisVariable.objects.filter(node__analysis=template_analysis, field=variable_field).exists():
+                self.add_error("launch_level", f"The template has no '{variable_field}' variable to launch with")
+        return cleaned_data
+
+    @cached_property
+    def variant_caller_matches(self) -> Optional[list[str]]:
+        """ The variant caller names registered so far that the regex matches, so a typo shows as matching
+            nothing. None when the regex is blank (matches anything) or doesn't compile """
+        if not (regex := self["variant_caller_regex"].value()):
+            return None
+        try:
+            pattern = re.compile(regex)
+        except re.error:
+            return None
+        names = VariantCaller.objects.order_by("name").values_list("name", flat=True).distinct()
+        return [name for name in names if pattern.match(name)]
 
 
 AutoLaunchFormSet = inlineformset_factory(
@@ -602,3 +631,5 @@ class AnalysisTemplateAutoLaunchForm(forms.Form):
                                             widget=ModelSelect2(url='enrichment_kit_autocomplete',
                                                                 attrs={'data-placeholder': 'Enrichment Kit...'}))
     example_sample_name = forms.CharField(required=False)
+    example_variant_caller = forms.CharField(required=False)
+    example_vcf_source = forms.CharField(required=False)

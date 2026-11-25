@@ -2,8 +2,8 @@
 Analysis (a DAG of nodes over one build and AnnotationVersion, Guardian-permissioned, with a
 version that invalidates every node cache) and its template machinery: AnalysisTemplate /
 AnalysisTemplateVersion snapshot an analysis, AnalysisVariable exposes node fields as parameters,
-AnalysisTemplateRun records a run and its arguments, and Sample/CohortAnalysisTemplateRun plus
-AutoLaunchAnalysisTemplate drive the auto-analyses on import. AnalysisClassification links the
+AnalysisTemplateRun records a run and its arguments, and Sample/Cohort/GroupAnalysisTemplateRun plus
+AutoLaunchAnalysisTemplate drive the auto-analyses on import (@see analysis.auto_launch). AnalysisClassification links the
 classifications made from an analysis. Nodes are in nodes/analysis_node.py.
 """
 from collections import defaultdict
@@ -34,7 +34,9 @@ from genes.models import CanonicalTranscriptCollection
 from library.django_utils.guardian_permissions_mixin import GuardianPermissionsAutoInitialSaveMixin
 from library.guardian_utils import DjangoPermission, admin_bot, assign_permission_to_user_and_groups
 from library.preview_request import PreviewModelMixin
-from seqauto.models import EnrichmentKit
+from patients.enums import SampleSourceLevel
+from patients.models import Extraction, Patient, Specimen
+from seqauto.models import EnrichmentKit, SequencingRun
 from snpdb.enums import BuiltInFilters
 from snpdb.models import (
     AbstractNodeCountSettings,
@@ -639,12 +641,22 @@ class AnalysisTemplate(GuardianPermissionsAutoInitialSaveMixin, TimeStampedModel
 
 
 class AutoLaunchAnalysisTemplate(TimeStampedModel):
+    """ Launches a template when a VCF imports. Every criterion is matched against each of its samples, a
+        blank regex matching anything; launch_level says what the run is for - the sample, or the extraction /
+        specimen / patient it belongs to (@see analysis.auto_launch) """
     template = models.ForeignKey(AnalysisTemplate, on_delete=CASCADE)
     enrichment_kit = models.ForeignKey(EnrichmentKit, null=True, blank=True, on_delete=CASCADE)
     sample_regex = models.TextField(null=True, blank=True)
+    # The caller seqauto registered the VCF under (VCFFromSequencingRun), for uploads through the API
+    variant_caller_regex = models.TextField(null=True, blank=True)
+    # The VCF's ##source header, for uploads that have no sequencing records
+    vcf_source_regex = models.TextField(null=True, blank=True)
+    launch_level = models.CharField(max_length=1, choices=SampleSourceLevel.choices,
+                                    default=SampleSourceLevel.SAMPLE)
 
     class Meta:
-        unique_together = ('template', 'enrichment_kit', 'sample_regex')
+        unique_together = ('template', 'enrichment_kit', 'sample_regex', 'variant_caller_regex',
+                           'vcf_source_regex', 'launch_level')
 
 
 class AnalysisTemplateVersion(TimeStampedModel):
@@ -818,14 +830,14 @@ class AnalysisTemplateRun(TimeStampedModel):
     def populate_analysis_name(self):
         """ Populate analysis_name_template with params based on AnalysisVariable fields, and the magic values:
                 * template - TemplateVersion string representation
-                * input - 1st we find of "pedigree", "trio", "quad", "duo", "cohort", "sample" """
+                * input - 1st we find of ANALYSIS_TEMPLATE_SOURCE_FIELDS """
 
         params = {"template": str(self.template_version)}
         for arg in self.analysistemplaterunargument_set.all():
             params[arg.variable.field] = arg.value
 
         # Do the family sources before sample so they're used first (they set proband as sample)
-        for field in ["pedigree", "trio", "quad", "duo", "cohort", "sample"]:
+        for field in ANALYSIS_TEMPLATE_SOURCE_FIELDS:
             if field in params:
                 params["input"] = params[field]
                 break
@@ -883,6 +895,17 @@ class SampleAnalysisTemplateRun(models.Model):
     class Meta:
         unique_together = ('sample', 'analysis_template_run')
 
+
+class GroupAnalysisTemplateRun(models.Model):
+    """ An auto-launched run against the extraction, specimen or patient a sample belongs to - one per template,
+        group and sequencing run (null for VCFs with no sequencing records) @see analysis.auto_launch """
+    analysis_template_run = models.OneToOneField(AnalysisTemplateRun, on_delete=CASCADE)
+    template = models.ForeignKey(AnalysisTemplate, on_delete=CASCADE)
+    source_level = models.CharField(max_length=1, choices=SampleSourceLevel.choices)
+    extraction = models.ForeignKey(Extraction, null=True, on_delete=CASCADE)
+    specimen = models.ForeignKey(Specimen, null=True, on_delete=CASCADE)
+    patient = models.ForeignKey(Patient, null=True, on_delete=CASCADE)
+    sequencing_run = models.ForeignKey(SequencingRun, null=True, on_delete=CASCADE)
 
 
 class AnalysisClassification(models.Model):

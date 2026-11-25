@@ -35,8 +35,10 @@ $(document).ready(function() {
 
         <div class="match">
             <b>Showing matches for:</b>
-            {% labelled label="Kit Name" %}{{ sample_enrichment_kit_name }}{% endlabelled %}
-            {% labelled label="Sample Name" %}{{ sample_name }}{% endlabelled %}
+            {% labelled label="Kit Name" %}{{ subject.enrichment_kit_name }}{% endlabelled %}
+            {% labelled label="Sample Name" %}{{ subject.sample_name }}{% endlabelled %}
+            {% labelled label="Variant Caller" %}{{ subject.variant_caller_name }}{% endlabelled %}
+            {% labelled label="VCF Source" %}{{ subject.vcf_source }}{% endlabelled %}
         </div>
 
 
@@ -45,9 +47,13 @@ $(document).ready(function() {
                 <tr>
                     <th>Enrichment Kit</th>
                     <th class="match">Match</th>
-                    <th>Regex</th>
+                    <th>Sample Regex</th>
                     <th class="match">Match</th>
-                    <th>Template Name</th>
+                    <th>Variant Caller Regex</th>
+                    <th class="match">Match</th>
+                    <th>VCF Source Regex</th>
+                    <th class="match">Match</th>
+                    <th>Launch per</th>
                     <th>Template</th>
                     <th class="match">Launch</th>
                 </tr>
@@ -55,15 +61,17 @@ $(document).ready(function() {
                     <tr>
                         <td>{{ match.enrichment_kit_name }}</td>
                         <td class="match">{{ match.enrichment_kit_match | bool_emojify }}</td>
-                        <td>{{ match.sample_regex }}</td>
+                        <td>{{ match.auto_launch.sample_regex }}</td>
                         <td class="match">{{ match.sample_regex_match | bool_emojify }}</td>
-                        <td>{{ match.analysis_template_name }}</td>
+                        <td>{{ match.auto_launch.variant_caller_regex }}</td>
+                        <td class="match">{{ match.variant_caller_match | bool_emojify }}</td>
+                        <td>{{ match.auto_launch.vcf_source_regex }}</td>
+                        <td class="match">{{ match.vcf_source_match | bool_emojify }}</td>
+                        <td>{{ match.auto_launch.get_launch_level_display }}</td>
                         <td>
-                            {% if match.analysis_template %}
-                                <a href="{{ match.analysis_template.analysis.get_absolute_url }}">
-                                    {{ match.analysis_template }}
-                                </a>
-                            {% endif %}
+                            <a href="{{ match.analysis_template.analysis.get_absolute_url }}">
+                                {{ match.analysis_template }}
+                            </a>
                         </td>
                         <td class="match">{{ match.match | bool_emojify }}</td>
                     </tr>
