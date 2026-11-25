@@ -26,10 +26,8 @@ from django.views.decorators.http import require_POST
 
 from analysis import forms
 from analysis.analysis_import_export import analysis_export_to_dict
-from analysis.analysis_templates import (
-    get_auto_launch_analysis_template_matches,
-    populate_analysis_from_template_run,
-)
+from analysis.analysis_templates import populate_analysis_from_template_run
+from analysis.auto_launch import AutoLaunchSubject, get_auto_launch_analysis_template_matches
 from analysis.enums import (
     AnalysisTemplateRunTrigger,
     AnalysisType,
@@ -140,20 +138,20 @@ def analysis_templates_auto_launch(request):
 
     template_auto_launch_form = AnalysisTemplateAutoLaunchForm(request.POST or None)
 
-    sample_enrichment_kit_name = None
-    sample_name = ""
+    subject = AutoLaunchSubject()
     if request.method == "POST":
         if sample_enrichment_kit_id := request.POST.get("enrichment_kit"):
             if enrichment_kit := EnrichmentKit.objects.filter(pk=sample_enrichment_kit_id).first():
-                sample_enrichment_kit_name = enrichment_kit.name
-        sample_name = request.POST["example_sample_name"]
+                subject.enrichment_kit_name = enrichment_kit.name
+        subject.sample_name = request.POST.get("example_sample_name", "")
+        subject.variant_caller_name = request.POST.get("example_variant_caller") or None
+        subject.vcf_source = request.POST.get("example_vcf_source") or None
 
-    auto_launch_analysis_template_matches = get_auto_launch_analysis_template_matches(request.user, sample_enrichment_kit_name, sample_name)
+    auto_launch_analysis_template_matches = get_auto_launch_analysis_template_matches(request.user, subject)
     context = {
         "auto_launch_analysis_template_matches": auto_launch_analysis_template_matches,
         "template_auto_launch_form": template_auto_launch_form,
-        "sample_enrichment_kit_name": sample_enrichment_kit_name,
-        "sample_name": sample_name,
+        "subject": subject,
     }
     return render(request, 'analysis/analysis_templates_auto_launch.html', context)
 

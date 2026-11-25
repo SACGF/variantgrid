@@ -49,21 +49,42 @@
 
                 {{ f.id }}
 
-                <div class="col-md-4">
+                <div class="col-md-3">
                     {{ f.enrichment_kit.errors }}
                     {% labelled label="EnrichmentKit" %}
                         {{ f.enrichment_kit }}
                     {% endlabelled %}
                 </div>
 
-                <div class="col-md-6 {%if f.sample_regex.errors %}has-error{% endif %}">
+                <div class="col-md-2">
                     {{ f.sample_regex.errors }}
                     {% labelled label="Sample RegEx" %}
                         {{ f.sample_regex }}
                     {% endlabelled %}
                 </div>
 
-                <div class="col-md-2 text-center">
+                <div class="col-md-2">
+                    {{ f.variant_caller_regex.errors }}
+                    {% labelled label="Variant Caller RegEx" help="Matched against the variant caller the sequencing pipeline registered the VCF under" %}
+                        {{ f.variant_caller_regex }}
+                    {% endlabelled %}
+                </div>
+
+                <div class="col-md-2">
+                    {{ f.vcf_source_regex.errors }}
+                    {% labelled label="VCF Source RegEx" help="Matched against the VCF's ##source header" %}
+                        {{ f.vcf_source_regex }}
+                    {% endlabelled %}
+                </div>
+
+                <div class="col-md-2">
+                    {{ f.launch_level.errors }}
+                    {% labelled label="Launch per" help="Sample launches once per matching sample. Extraction / Specimen / Patient launch once per sequencing run of the group the sample belongs to, when every file registered for it has imported" %}
+                        {{ f.launch_level }}
+                    {% endlabelled %}
+                </div>
+
+                <div class="col-md-1 text-center">
                     {% labelled label="Delete" %}
                         {{ f.DELETE }}
                     {% endlabelled %}

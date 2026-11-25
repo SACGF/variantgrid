@@ -20,6 +20,7 @@ class AnalysisConfig(AppConfig):
         from analysis.signals.signal_handlers import (
             analysis_pre_delete,
             handle_active_sample_gene_list_created,
+            handle_sample_saved,
             handle_vcf_import_success,
             variant_tag_create,
             variant_tag_delete,
@@ -45,6 +46,7 @@ class AnalysisConfig(AppConfig):
         post_delete.connect(variant_tag_delete, sender=VariantTag)
         vcf_import_success_signal.connect(handle_vcf_import_success)
         post_save.connect(handle_active_sample_gene_list_created, sender=ActiveSampleGeneList)
+        post_save.connect(handle_sample_saved, sender=Sample)
 
         # Stop any node still loading before the delete cascades into its caches - see
         # analysis_pre_delete. SACGF/variantgrid_com#2

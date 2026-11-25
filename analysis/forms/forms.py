@@ -31,10 +31,12 @@ from analysis.models import (
     FilterNodeItem,
     NodeGraphType,
 )
+from analysis.models.models_analysis import AnalysisVariable
 from analysis.models.nodes.node_types import (
     get_node_class_choices,
     get_nodes_by_classification,
 )
+from analysis.models.nodes.sources.sample_node import SampleNode
 from annotation.models.models_annotation_version import AnnotationVersion
 from annotation.models.models_version import VariantAnnotationVersion
 from genes.models.models_gene import GeneSymbol
@@ -149,25 +151,36 @@ class AnalysisTemplateForm(forms.ModelForm):
 
 
 class AutoLaunchAnalysisTemplateForm(forms.ModelForm):
+    REGEX_FIELDS = ("sample_regex", "variant_caller_regex", "vcf_source_regex")
+
     class Meta:
         model = AutoLaunchAnalysisTemplate
-        fields = ("enrichment_kit", "sample_regex")
+        fields = ("enrichment_kit", "sample_regex", "variant_caller_regex", "vcf_source_regex", "launch_level")
         widgets = {
             "enrichment_kit": ModelSelect2(url='enrichment_kit_autocomplete',
                                            attrs={'data-placeholder': 'Enrichment Kit...'}),
-            "sample_regex": forms.TextInput(attrs={
-                "size": 20,
-                "class": "form-control form-control-sm",
-            })
+            "sample_regex": forms.TextInput(attrs={"size": 20, "class": "form-control form-control-sm"}),
+            "variant_caller_regex": forms.TextInput(attrs={"size": 20, "class": "form-control form-control-sm"}),
+            "vcf_source_regex": forms.TextInput(attrs={"size": 20, "class": "form-control form-control-sm"}),
+            "launch_level": forms.Select(attrs={"class": "form-control form-control-sm"}),
         }
 
-    def clean_sample_regex(self):
-        if value := self.cleaned_data.get("sample_regex"):
-            try:
-                re.compile(value)
-            except re.error as e:
-                raise forms.ValidationError(f"RegEx error: {e}") from e
-        return value
+    def clean(self):
+        cleaned_data = super().clean()
+        for field in self.REGEX_FIELDS:
+            if value := cleaned_data.get(field):
+                try:
+                    re.compile(value)
+                except re.error as e:
+                    self.add_error(field, f"RegEx error: {e}")
+
+        # The run hands the template the sample, or the group at the launch level, through its variable
+        if (launch_level := cleaned_data.get("launch_level")) and self.instance.template_id:
+            variable_field = SampleNode.SOURCE_LEVEL_FIELDS[launch_level]
+            template_analysis = self.instance.template.analysis
+            if not AnalysisVariable.objects.filter(node__analysis=template_analysis, field=variable_field).exists():
+                self.add_error("launch_level", f"The template has no '{variable_field}' variable to launch with")
+        return cleaned_data
 
 
 AutoLaunchFormSet = inlineformset_factory(
@@ -602,3 +615,5 @@ class AnalysisTemplateAutoLaunchForm(forms.Form):
                                             widget=ModelSelect2(url='enrichment_kit_autocomplete',
                                                                 attrs={'data-placeholder': 'Enrichment Kit...'}))
     example_sample_name = forms.CharField(required=False)
+    example_variant_caller = forms.CharField(required=False)
+    example_vcf_source = forms.CharField(required=False)

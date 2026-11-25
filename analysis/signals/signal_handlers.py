@@ -4,11 +4,13 @@ import celery
 from django.db import transaction
 
 from analysis.enums import AnalysisTemplateRunTrigger
+from analysis.models.models_analysis import AutoLaunchAnalysisTemplate
 from analysis.models.nodes.node_utils import cancel_node_tasks
 from analysis.models.nodes.node_version import NodeTask
 from analysis.tasks.auto_analysis_tasks import (
     auto_run_analyses_for_sample,
     auto_run_analyses_for_vcf,
+    auto_run_group_analyses_for_sample,
     reload_auto_analyses_for_vcf,
 )
 from analysis.tasks.variant_tag_tasks import (
@@ -17,6 +19,7 @@ from analysis.tasks.variant_tag_tasks import (
     variant_tag_created_task,
     variant_tag_deleted_in_analysis_task,
 )
+from patients.enums import SampleSourceLevel
 from snpdb.enums import ImportStatus
 
 
@@ -78,3 +81,14 @@ def handle_active_sample_gene_list_created(sender, instance, created, **kwargs):
         else:
             logging.warning("Skipping auto analysis for sample: %s, import_status=%s",
                             sample, sample.get_import_status_display())
+
+
+def handle_sample_saved(sender, instance, created, **kwargs):  # pylint: disable=unused-argument
+    """ Linking a sample to its extraction / patient (seqauto, a patient import, extraction matching) can come
+        after its VCF imported, and the link may be what a group auto-launch was waiting on """
+    if created or instance.import_status != ImportStatus.SUCCESS:
+        return
+    if not (instance.extraction_id or instance.patient_id):
+        return
+    if AutoLaunchAnalysisTemplate.objects.exclude(launch_level=SampleSourceLevel.SAMPLE).exists():
+        transaction.on_commit(auto_run_group_analyses_for_sample.si(instance.pk).apply_async)

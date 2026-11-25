@@ -73,6 +73,7 @@ CELERY_TASK_ROUTES = {
     # Analysis
     'analysis.tasks.auto_analysis_tasks.auto_run_analyses_for_sample': ANALYSIS_WORKERS,
     'analysis.tasks.auto_analysis_tasks.auto_run_analyses_for_vcf': ANALYSIS_WORKERS,
+    'analysis.tasks.auto_analysis_tasks.auto_run_group_analyses_for_sample': ANALYSIS_WORKERS,
     'analysis.tasks.karyomapping_tasks.create_genome_karyomapping_for_trio': ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.update_node_task": ANALYSIS_WORKERS,
     "analysis.tasks.node_update_tasks.node_cache_task": ANALYSIS_WORKERS,

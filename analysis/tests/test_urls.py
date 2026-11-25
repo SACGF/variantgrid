@@ -12,6 +12,7 @@ from analysis.enums import AnalysisTemplateType, SNPMatrix
 from analysis.models import (
     Analysis,
     AnalysisTemplate,
+    AutoLaunchAnalysisTemplate,
     GeneListNode,
     GeneListNodeGeneList,
     SampleNode,
@@ -24,6 +25,7 @@ from annotation.fake_data import get_fake_annotation_version
 from genes.models import GeneList
 from library.django_utils.unittest_utils import URLTestCase, prevent_request_warnings
 from library.guardian_utils import assign_permission_to_user_and_groups
+from patients.enums import SampleSourceLevel
 from snpdb.enums import ImportStatus
 from snpdb.models import CachedGeneratedFile, Variant
 from snpdb.models.models_cohort import (
@@ -128,6 +130,8 @@ class Test(URLTestCase):
         cls.analysis_template = AnalysisTemplate.objects.create(name="test_urls template",
                                                                 user=cls.user_owner,
                                                                 analysis=template_analysis)
+        AutoLaunchAnalysisTemplate.objects.create(template=cls.analysis_template, variant_caller_regex="dragen",
+                                                  launch_level=SampleSourceLevel.SPECIMEN)
 
         grid_column_name = "variantannotation__transcript_version__gene_version__gene_symbol__symbol"
         analysis_params = {"analysis_id": cls.analysis.pk}
@@ -209,6 +213,8 @@ class Test(URLTestCase):
         ]
 
         self._test_urls(URL_NAMES_AND_KWARGS, self.user_non_owner)
+        # The owner can see the template, so the page draws its auto launch row
+        self._test_urls([("analysis_templates_auto_launch", {}, 200)], self.user_owner)
 
     def testDatatableUrls(self):
         DATATABLE_URLS = [

@@ -1,6 +1,9 @@
 import celery
 
-from analysis.analysis_templates import auto_launch_analysis_templates_for_sample
+from analysis.auto_launch import (
+    auto_launch_analysis_templates_for_sample,
+    auto_launch_group_analyses_for_sample,
+)
 from analysis.enums import AnalysisTemplateRunTrigger
 from analysis.models.models_analysis import CohortAnalysisTemplateRun, SampleAnalysisTemplateRun
 from analysis.models.nodes.node_utils import reload_analysis_nodes
@@ -27,6 +30,15 @@ def auto_run_analyses_for_vcf(vcf_id: int, trigger: AnalysisTemplateRunTrigger, 
     for sample in vcf.sample_set.all():
         auto_launch_analysis_templates_for_sample(vcf.user, sample, trigger,
                                                   skip_already_analysed=skip_already_analysed)
+        auto_launch_group_analyses_for_sample(vcf.user, sample, trigger)
+
+
+@celery.shared_task
+def auto_run_group_analyses_for_sample(sample_id: int):
+    """ A sample saved with its extraction / patient - the link may be what a group was waiting on """
+    sample = Sample.objects.get(pk=sample_id)
+    auto_launch_group_analyses_for_sample(sample.vcf.user, sample, AnalysisTemplateRunTrigger.SAMPLE_LINKED,
+                                          reload_existing=False)
 
 
 @celery.shared_task

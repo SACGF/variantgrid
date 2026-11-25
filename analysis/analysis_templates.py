@@ -1,6 +1,3 @@
-import logging
-import re
-from dataclasses import dataclass
 from typing import Optional
 
 from auditlog.context import disable_auditlog
@@ -14,15 +11,12 @@ from analysis.models import (
     AnalysisTemplateRun,
     AnalysisTemplateRunArgument,
     AnalysisTemplateVersion,
-    AutoLaunchAnalysisTemplate,
     CohortAnalysisTemplateRun,
     SampleAnalysisTemplateRun,
 )
 from analysis.models.nodes.analysis_node import AnalysisDag
 from analysis.models.nodes.node_utils import get_toposorted_nodes, reload_analysis_nodes
-from analysis.related_analyses import get_related_analysis_details_for_samples
 from annotation.models import AnnotationVersion
-from genes.models import ActiveSampleGeneList
 from library.django_utils.database_utils import advisory_lock
 from library.guardian_utils import add_public_group_read_permission
 from snpdb.models import Cohort, GenomeBuild, Sample
@@ -129,70 +123,3 @@ def get_cohort_analysis(cohort: Cohort, analysis_template: AnalysisTemplate,
     return _get_single_template_run_analysis(CohortAnalysisTemplateRun, analysis_template,
                                              cohort, "cohort", AnalysisTemplateRunTrigger.COHORT,
                                              annotation_version=annotation_version)
-
-
-def _get_auto_launch_analysis_templates_for_sample(user, sample, skip_already_analysed=False):
-    if skip_already_analysed:
-        if get_related_analysis_details_for_samples(user, [sample]):
-            return []
-
-    sample_enrichment_kit_name = None
-    if sample.enrichment_kit:
-        sample_enrichment_kit_name = sample.enrichment_kit.name
-
-    matches = get_auto_launch_analysis_template_matches(user, sample_enrichment_kit_name, sample.name)
-    return [m.analysis_template for m in matches if m.match]
-
-@dataclass
-class AutoLaunchAnalysisTemplateMatch:
-    enrichment_kit_name: Optional[str]
-    enrichment_kit_match: bool
-    sample_regex: Optional[str]
-    sample_regex_match: bool
-    analysis_template: AnalysisTemplate
-
-    @property
-    def match(self) -> bool:
-        return self.enrichment_kit_match and self.sample_regex_match
-
-
-def get_auto_launch_analysis_template_matches(user, sample_enrichment_kit_name, sample_name) -> list[AutoLaunchAnalysisTemplateMatch]:
-    matches = []
-    templates_qs = AnalysisTemplate.filter_for_user(user)
-    for auto_launch in AutoLaunchAnalysisTemplate.objects.filter(template__in=templates_qs):
-        enrichment_kit_name = None
-        if enrichment_kit := auto_launch.enrichment_kit:
-            enrichment_kit_name = enrichment_kit.name
-
-        sample_regex_match = True  # blank means anything
-        if auto_launch.sample_regex:
-            sample_regex_match = bool(re.match(auto_launch.sample_regex, sample_name))
-        match = AutoLaunchAnalysisTemplateMatch(enrichment_kit_name=enrichment_kit_name,
-                                                enrichment_kit_match=sample_enrichment_kit_name == enrichment_kit_name,
-                                                sample_regex=auto_launch.sample_regex,
-                                                sample_regex_match=sample_regex_match,
-                                                analysis_template=auto_launch.template)
-        matches.append(match)
-    return matches
-
-def auto_launch_analysis_templates_for_sample(user, sample, trigger: AnalysisTemplateRunTrigger,
-                                              skip_already_analysed=False):
-    for analysis_template in _get_auto_launch_analysis_templates_for_sample(user, sample,
-                                                                            skip_already_analysed=skip_already_analysed):
-        template_version = analysis_template.active
-        if template_version is None:
-            logging.warning("Skipping auto analysis '%s' for sample: %s. Template has no active version",
-                            analysis_template, sample)
-            continue
-
-        template_arguments = {"sample": sample}
-        if template_version.requires_sample_gene_list:
-            try:
-                template_arguments["sample_gene_list"] = sample.activesamplegenelist.sample_gene_list
-            except ActiveSampleGeneList.DoesNotExist:
-                logging.warning("Skipping auto analysis '%s' for sample: %s. Will try again if QC Gene Lists created", analysis_template, sample)
-                continue
-        template_run = AnalysisTemplateRun.create(analysis_template, sample.genome_build, trigger, user=user,
-                                                  template_version=template_version)
-        template_run.populate_arguments(template_arguments)
-        populate_analysis_from_template_run(template_run)
