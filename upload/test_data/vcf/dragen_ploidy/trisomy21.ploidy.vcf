@@ -1,0 +1,63 @@
+##fileformat=VCFv4.2
+##DRAGENVersion=<ID=dragen,Version="SW: 4.2.7, HW: Unknown">
+##source=DRAGEN_PLOIDY
+##reference=file:///staging/reference/v4.2/hg38-alt_masked.cnv.graph.hla.rna-9-r3.0-1
+##contig=<ID=chr1,length=248956422>
+##contig=<ID=chr2,length=242193529>
+##contig=<ID=chr3,length=198295559>
+##contig=<ID=chr4,length=190214555>
+##contig=<ID=chr5,length=181538259>
+##contig=<ID=chr6,length=170805979>
+##contig=<ID=chr7,length=159345973>
+##contig=<ID=chr8,length=145138636>
+##contig=<ID=chr9,length=138394717>
+##contig=<ID=chr10,length=133797422>
+##contig=<ID=chr11,length=135086622>
+##contig=<ID=chr12,length=133275309>
+##contig=<ID=chr13,length=114364328>
+##contig=<ID=chr14,length=107043718>
+##contig=<ID=chr15,length=101991189>
+##contig=<ID=chr16,length=90338345>
+##contig=<ID=chr17,length=83257441>
+##contig=<ID=chr18,length=80373285>
+##contig=<ID=chr19,length=58617616>
+##contig=<ID=chr20,length=64444167>
+##contig=<ID=chr21,length=46709983>
+##contig=<ID=chr22,length=50818468>
+##contig=<ID=chrX,length=156040895>
+##contig=<ID=chrY,length=57227415>
+##autosomeDepthOfCoverage=35.1771
+##estimatedSexKaryotype=XY
+##referenceSexKaryotype=XY
+##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">
+##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">
+##ALT=<ID=DEL,Description="Deletion relative to the reference">
+##ALT=<ID=DUP,Description="Region of elevated copy number relative to the reference">
+##FILTER=<ID=LowQual,Description="QUAL below 20">
+##FORMAT=<ID=DC,Number=1,Type=Float,Description="Depth of coverage">
+##FORMAT=<ID=NDC,Number=1,Type=Float,Description="Normalized depth of coverage">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
+chr1	1	.	N	.	30.2962	PASS	END=248956422	DC:NDC	35.1789:1.00005
+chr2	1	.	N	.	31.1871	PASS	END=242193529	DC:NDC	35.2482:1.00202
+chr3	1	.	N	.	30.0121	PASS	END=198295559	DC:NDC	35.0699:0.996953
+chr4	1	.	N	.	31.4612	PASS	END=190214555	DC:NDC	35.117:0.998292
+chr5	1	.	N	.	28.4064	PASS	END=181538259	DC:NDC	35.2607:1.00238
+chr6	1	.	N	.	29.3689	PASS	END=170805979	DC:NDC	35.1646:0.999646
+chr7	1	.	N	.	29.8149	PASS	END=159345973	DC:NDC	35.1127:0.998168
+chr8	1	.	N	.	29.0379	PASS	END=145138636	DC:NDC	35.3056:1.00365
+chr9	1	.	N	.	29.5325	PASS	END=138394717	DC:NDC	35.0355:0.995975
+chr10	1	.	N	.	29.5145	PASS	END=133797422	DC:NDC	35.3196:1.00405
+chr11	1	.	N	.	28.6578	PASS	END=135086622	DC:NDC	35.0753:0.997107
+chr12	1	.	N	.	28.0208	PASS	END=133275309	DC:NDC	35.0292:0.995796
+chr13	1	.	N	.	29.0188	PASS	END=114364328	DC:NDC	35.2636:1.00246
+chr14	1	.	N	.	29.4922	PASS	END=107043718	DC:NDC	35.3305:1.00436
+chr15	1	.	N	.	29.0977	PASS	END=101991189	DC:NDC	35.2194:1.0012
+chr16	1	.	N	.	29.6845	PASS	END=90338345	DC:NDC	35.0786:0.997201
+chr17	1	.	N	.	28.5986	PASS	END=83257441	DC:NDC	35.2469:1.00198
+chr18	1	.	N	.	31.3271	PASS	END=80373285	DC:NDC	35.0867:0.997431
+chr19	1	.	N	.	31.0488	PASS	END=58617616	DC:NDC	35.1673:0.999721
+chr20	1	.	N	.	29.6978	PASS	END=64444167	DC:NDC	35.1442:0.999066
+chr21	1	.	N	<DUP>	150	PASS	END=46709983;SVTYPE=DUP	DC:NDC	52.7611:1.49987
+chr22	1	.	N	.	28.7547	PASS	END=50818468	DC:NDC	34.9211:0.992723
+chrX	1	.	N	.	31.2814	PASS	END=156040895	DC:NDC	17.4495:0.992095
+chrY	1	.	N	.	30.7534	PASS	END=57227415	DC:NDC	17.686:1.00554
