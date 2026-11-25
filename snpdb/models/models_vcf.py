@@ -27,6 +27,7 @@ from django.dispatch.dispatcher import receiver
 from django.shortcuts import get_object_or_404
 from django.urls.base import reverse
 from guardian.shortcuts import get_objects_for_user
+from model_utils import FieldTracker
 from model_utils.models import TimeStampedModel
 
 from library.django_utils import SortByPKMixin
@@ -392,6 +393,8 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
     patient = models.ForeignKey(Patient, null=True, blank=True, on_delete=SET_NULL)
     import_status = models.CharField(max_length=1, choices=ImportStatus.choices, default=ImportStatus.CREATED)
     variants_type = models.CharField(max_length=1, choices=VariantOrigin.choices, default=VariantOrigin.UNKNOWN)
+    # A link made after import can complete a group auto-launch (analysis.signals.signal_handlers.handle_sample_saved)
+    group_link_tracker = FieldTracker(fields=["extraction", "patient"])
 
     preview_icon_symbol = "node-icon-sample"  # SampleNode wears this too - see get_node_class_icon
 

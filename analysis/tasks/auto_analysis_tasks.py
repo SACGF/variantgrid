@@ -30,15 +30,14 @@ def auto_run_analyses_for_vcf(vcf_id: int, trigger: AnalysisTemplateRunTrigger, 
     for sample in vcf.sample_set.all():
         auto_launch_analysis_templates_for_sample(vcf.user, sample, trigger,
                                                   skip_already_analysed=skip_already_analysed)
-        auto_launch_group_analyses_for_sample(vcf.user, sample, trigger)
+        auto_launch_group_analyses_for_sample(vcf.user, sample)
 
 
 @celery.shared_task
 def auto_run_group_analyses_for_sample(sample_id: int):
-    """ A sample saved with its extraction / patient - the link may be what a group was waiting on """
+    """ A sample linked to its extraction / patient after import - the link may be what a group was waiting on """
     sample = Sample.objects.get(pk=sample_id)
-    auto_launch_group_analyses_for_sample(sample.vcf.user, sample, AnalysisTemplateRunTrigger.SAMPLE_LINKED,
-                                          reload_existing=False)
+    auto_launch_group_analyses_for_sample(sample.vcf.user, sample, reload_existing=False)
 
 
 @celery.shared_task

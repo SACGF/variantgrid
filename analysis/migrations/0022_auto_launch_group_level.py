@@ -35,7 +35,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='analysistemplaterun',
             name='trigger',
-            field=models.CharField(choices=[('U', 'User'), ('V', 'VCF import'), ('G', 'Sample gene list created'), ('L', 'Sample linked'), ('S', 'Sample analysis'), ('C', 'Cohort analysis')], max_length=1, null=True),
+            field=models.CharField(choices=[('U', 'User'), ('V', 'VCF import'), ('G', 'Sample gene list created'), ('L', 'All linked sequencing samples imported'), ('S', 'Sample analysis'), ('C', 'Cohort analysis')], max_length=1, null=True),
         ),
         migrations.AlterUniqueTogether(
             name='autolaunchanalysistemplate',

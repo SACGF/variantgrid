@@ -90,5 +90,7 @@ def handle_sample_saved(sender, instance, created, **kwargs):  # pylint: disable
         return
     if not (instance.extraction_id or instance.patient_id):
         return
+    if not instance.group_link_tracker.changed():
+        return
     if AutoLaunchAnalysisTemplate.objects.exclude(launch_level=SampleSourceLevel.SAMPLE).exists():
         transaction.on_commit(auto_run_group_analyses_for_sample.si(instance.pk).apply_async)

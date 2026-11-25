@@ -34,7 +34,8 @@ class AnalysisTemplateRunTrigger(models.TextChoices):
     USER = 'U', 'User'
     VCF_IMPORT = 'V', 'VCF import'
     SAMPLE_GENE_LIST = 'G', 'Sample gene list created'  # auto-launch retried once the sample's gene list arrived
-    SAMPLE_LINKED = 'L', 'Sample linked'  # a group auto-launch retried once a sample joined its extraction / patient
+    # a group auto-launch (on a sequencing run): every SequencingSample the group has on the run has imported
+    ALL_LINKED_SEQUENCING_SAMPLES_IMPORTED = 'L', 'All linked sequencing samples imported'
     SAMPLE = 'S', 'Sample analysis'  # the hidden per-sample analysis (sample variants tab, auto exports)
     COHORT = 'C', 'Cohort analysis'  # the hidden per-cohort analysis (auto exports)
 

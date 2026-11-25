@@ -12,9 +12,10 @@ what the run is for:
 
 A group launches once every file the pipeline registered for it on that run (the SingleSampleVCFs of its
 SequencingSamples) has imported. Any of those in error stops the launch, with an event saying why - an
-incomplete case analysis is worse than none. Group membership can arrive after the VCFs, so a sample being
-saved with a group retries (analysis.signals.signal_handlers.handle_sample_saved). A VCF with no sequencing
-records has no expected set: its group launches on the first matching VCF, and later imports reload it.
+incomplete case analysis is worse than none. Group membership can arrive after the VCFs, so a sample linked
+to its extraction / patient after import retries (analysis.signals.signal_handlers.handle_sample_saved). Either
+way the run's trigger is ALL_LINKED_SEQUENCING_SAMPLES_IMPORTED. A VCF with no sequencing records has no
+expected set: its group launches (trigger VCF_IMPORT) on the first matching VCF, and later imports reload it.
 
 Entry points: auto_launch_analysis_templates_for_sample (sample level), auto_launch_group_analyses_for_sample
 (group level), get_auto_launch_analysis_template_matches (the matching, for the auto launch page).
@@ -218,8 +219,7 @@ class GroupFiles:
         return group_files
 
 
-def auto_launch_group_analyses_for_sample(user: User, sample: Sample, trigger: AnalysisTemplateRunTrigger,
-                                          reload_existing: bool = True):
+def auto_launch_group_analyses_for_sample(user: User, sample: Sample, reload_existing: bool = True):
     """ reload_existing - a VCF joining a group that has already launched reloads its analysis, so node counts
         include it. Off for a retry that only exists to catch a late link, which a sample save also fires """
     if sample.import_status != ImportStatus.SUCCESS or sample.vcf.data_archived:
@@ -233,12 +233,12 @@ def auto_launch_group_analyses_for_sample(user: User, sample: Sample, trigger: A
     for analysis_template, level in launches:
         if group := get_sample_group_object(sample, level):
             _launch_or_reload_group_analysis(user, sample, analysis_template, level, group, sequencing_run,
-                                             trigger, reload_existing)
+                                             reload_existing)
 
 
 def _launch_or_reload_group_analysis(user, sample: Sample, analysis_template: AnalysisTemplate,
                                      level: SampleSourceLevel, group, sequencing_run: Optional[SequencingRun],
-                                     trigger: AnalysisTemplateRunTrigger, reload_existing: bool):
+                                     reload_existing: bool):
     group_field = GROUP_LEVEL_FIELDS[level]
     lock_name = f"{GroupAnalysisTemplateRun._meta.db_table}_{analysis_template.pk}_{level}_{sequencing_run and sequencing_run.pk}"
     with advisory_lock(lock_name, group.pk):
@@ -274,6 +274,11 @@ def _launch_or_reload_group_analysis(user, sample: Sample, analysis_template: An
                          f"{group_field} level launch can't supply", severity=LogLevel.WARNING)
             return
 
+        # Whichever import or late link completed the set, the launch is the set being complete
+        if sequencing_run:
+            trigger = AnalysisTemplateRunTrigger.ALL_LINKED_SEQUENCING_SAMPLES_IMPORTED
+        else:
+            trigger = AnalysisTemplateRunTrigger.VCF_IMPORT
         template_run = AnalysisTemplateRun.create(analysis_template, sample.genome_build, trigger, user=user,
                                                   template_version=template_version)
         template_run.populate_arguments({group_field: group})

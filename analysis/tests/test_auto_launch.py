@@ -23,7 +23,6 @@ from analysis.models.models_analysis import (
     GroupAnalysisTemplateRun,
 )
 from analysis.models.nodes.sources.sample_node import SampleNode
-from analysis.signals.signal_handlers import handle_sample_saved
 from annotation.fake_data import get_fake_annotation_version
 from eventlog.models import Event
 from library.guardian_utils import assign_permission_to_user_and_groups
@@ -120,7 +119,7 @@ class AutoLaunchTestBase(TestCase):
             BackendVCF.objects.create(uploaded_vcf=uploaded_vcf, single_sample_vcf=single_sample_vcf)
             VCFFromSequencingRun.objects.create(vcf=vcf, sequencing_run=single_sample_vcf.sequencing_run,
                                                 variant_caller=single_sample_vcf.variant_caller)
-        auto_launch_group_analyses_for_sample(self.user, sample, AnalysisTemplateRunTrigger.VCF_IMPORT)
+        auto_launch_group_analyses_for_sample(self.user, sample)
         return sample
 
     def _runs(self):
@@ -137,6 +136,8 @@ class AutoLaunchGroupTestCase(AutoLaunchTestBase):
 
         self._import(self.rna, arms[self.rna][0])
         run = self._runs().get()
+        self.assertEqual(run.analysis_template_run.trigger,
+                         AnalysisTemplateRunTrigger.ALL_LINKED_SEQUENCING_SAMPLES_IMPORTED)
         self.assertEqual(run.analysis_template_run.analysis.name, f"{self.template.active} for {self.specimen}")
         node = SampleNode.objects.get(analysis=run.analysis_template_run.analysis)
         self.assertEqual(node.specimen, self.specimen)
@@ -162,16 +163,22 @@ class AutoLaunchGroupTestCase(AutoLaunchTestBase):
     def test_without_sequencing_records_launches_on_first_vcf(self):
         self._import(self.dna)
         self._import(self.rna)
-        self.assertEqual(self._runs().count(), 1)
+        run = self._runs().get()
+        self.assertEqual(run.analysis_template_run.trigger, AnalysisTemplateRunTrigger.VCF_IMPORT)
 
     def test_sample_linked_after_import_queues_a_retry(self):
         sample = self._import(None)
         self.assertFalse(self._runs().exists())
-        sample.extraction = self.dna
         with patch("analysis.signals.signal_handlers.auto_run_group_analyses_for_sample") as task:
             with self.captureOnCommitCallbacks(execute=True):
-                handle_sample_saved(Sample, sample, created=False)
-        task.si.assert_called_once_with(sample.pk)
+                sample.name = "renamed"
+                sample.save()
+            task.si.assert_not_called()
+
+            with self.captureOnCommitCallbacks(execute=True):
+                sample.extraction = self.dna
+                sample.save()
+            task.si.assert_called_once_with(sample.pk)
 
 
 class AutoLaunchMatchingTestCase(AutoLaunchTestBase):
