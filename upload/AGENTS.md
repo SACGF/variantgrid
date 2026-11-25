@@ -114,6 +114,11 @@ Gotchas:
   (genes/gene_splice.py:SpliceEventResolver.resolve_junction, which also takes a stored coordinate Variant). A junction in
   no gene, or ambiguously in two, is skipped and counted on the import page. The header keeps `##source`, so the
   `^SpliceGirl` VCFSourceSettings row still binds AD/DP as alt/ref depth.
+- A DRAGEN ploidy VCF (`##source=DRAGEN_PLOIDY`, test_data/vcf/dragen_ploidy/) is an ordinary genotype VCF with no
+  `GT`: each euploid chromosome is a reference span (ALT `.` with END), skipped by vcf_clean_and_filter, and an aneuploid
+  one a `<DUP>`/`<DEL>` over the whole contig, which the canonicaliser stores as a whole-chromosome Variant
+  (@see snpdb.whole_chromosome_variants). A euploid sample's file imports with no variants. The header's sex
+  karyotype and the per-chromosome depths are not stored.
 - DRAGEN TSO 500's run-level files (CombinedVariantOutput, MetricsOutput) write sequencing records, so their importers
   are seqauto's (seqauto/import_task_factories.py, registered through settings.IMPORT_TASK_FACTORY_IMPORTS);
   its AllFusions, SpliceGirl and CNV VCFs write variants and are imported here.
