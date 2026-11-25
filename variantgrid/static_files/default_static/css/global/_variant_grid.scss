@@ -207,7 +207,7 @@ table.variantgrid-datatable {
 		align-items: center;
 		gap: 4px;
 		min-width: 0;
-		max-width: calc(100% - 16px);  // the arrow's width + margin
+		width: calc(100% - 16px);  // the arrow's width + margin; full width so the IGV icon lines up on the right
 
 		a.rv-label {
 			overflow: hidden;
@@ -216,9 +216,10 @@ table.variantgrid-datatable {
 			text-decoration: none;
 		}
 
-		// Kept whole beside the clipped label, like the kind badge. @see VariantGridFormat.representativeVariant
+		// Kept whole at the cell's right edge, so the icons line up down the column. @see VariantGridFormat.representativeVariant
 		a.rv-igv {
 			flex: none;
+			margin-left: auto;
 		}
 	}
 

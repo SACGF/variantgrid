@@ -1067,7 +1067,7 @@ table.variantgrid-datatable .variant_id-container {
   align-items: center;
   gap: 4px;
   min-width: 0;
-  max-width: calc(100% - 16px);
+  width: calc(100% - 16px);
 }
 table.variantgrid-datatable .variant_id-container a.rv-label {
   overflow: hidden;
@@ -1077,6 +1077,7 @@ table.variantgrid-datatable .variant_id-container a.rv-label {
 }
 table.variantgrid-datatable .variant_id-container a.rv-igv {
   flex: none;
+  margin-left: auto;
 }
 table.variantgrid-datatable .fusion-calls {
   padding: 0 4px;
