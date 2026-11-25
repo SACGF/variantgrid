@@ -1402,8 +1402,35 @@ table.variantgrid-datatable .sample-zygosity .zyg-filtered {
   flex: none;
 }
 table.variantgrid-datatable .grid-tags {
-  display: inline-block;
-  vertical-align: top;
+  position: relative;
+  display: flex;
+  overflow: hidden;
+}
+table.variantgrid-datatable .grid-tags > * {
+  flex: none;
+}
+table.variantgrid-datatable .grid-tags > .grid-tag {
+  display: flex;
+  flex-shrink: 1;
+  min-width: 0;
+}
+table.variantgrid-datatable .grid-tags-measuring > .grid-tag {
+  flex-shrink: 0;
+}
+table.variantgrid-datatable .grid-tags > .grid-tag-hidden {
+  display: none;
+}
+table.variantgrid-datatable .grid-tags-overflow {
+  padding-right: 22px;
+}
+table.variantgrid-datatable .grid-tags-more {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 22px;
+  text-align: center;
+  font-size: 10px;
+  color: #6c757d;
 }
 table.variantgrid-datatable td.dt-tags:hover,
 table.variantgrid-datatable td.dt-tags_global:hover {
@@ -1411,9 +1438,19 @@ table.variantgrid-datatable td.dt-tags_global:hover {
 }
 table.variantgrid-datatable td.dt-tags:hover > .grid-tags,
 table.variantgrid-datatable td.dt-tags_global:hover > .grid-tags {
-  position: relative;
   z-index: 3;
+  width: max-content;
+  padding-right: 0;
+  overflow: visible;
   background: #f8f8f8;
+}
+table.variantgrid-datatable td.dt-tags:hover > .grid-tags > .grid-tag-hidden,
+table.variantgrid-datatable td.dt-tags_global:hover > .grid-tags > .grid-tag-hidden {
+  display: flex;
+}
+table.variantgrid-datatable td.dt-tags:hover .grid-tags-more,
+table.variantgrid-datatable td.dt-tags_global:hover .grid-tags-more {
+  display: none;
 }
 table.variantgrid-datatable .grid-tag-deletable .user-tag-colored {
   cursor: pointer;

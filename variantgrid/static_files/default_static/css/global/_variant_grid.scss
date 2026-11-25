@@ -589,12 +589,48 @@ table.variantgrid-datatable {
 		}
 	}
 
-	// A row can carry more tags than the column is wide, and the cell clips. Hovering lifts the
-	// whole set out of the clip - over the cells to its right, on the row's hover colour - so the
-	// tags past the edge (and their delete X) can still be read and clicked
+	// A row can carry more tags than the column is wide. The cell shows the tags that fit whole and a
+	// +N for the rest (@see markHiddenGridTags) rather than one cut off at the column edge; the first
+	// tag always shows, shrinking to fit. Hovering lifts the whole set out of the clip, over the cells
+	// to its right on the row's hover colour, so the hidden tags (and their delete X) can be read and
+	// clicked
 	.grid-tags {
-		display: inline-block;
-		vertical-align: top;
+		position: relative;
+		display: flex;
+		overflow: hidden;
+
+		> * {
+			flex: none;
+		}
+
+		> .grid-tag {
+			display: flex;
+			flex-shrink: 1;
+			min-width: 0;
+		}
+	}
+
+	// Each tag at its full width, to see which fit
+	.grid-tags-measuring > .grid-tag {
+		flex-shrink: 0;
+	}
+
+	.grid-tags > .grid-tag-hidden {
+		display: none;
+	}
+
+	.grid-tags-overflow {
+		padding-right: 22px;
+	}
+
+	.grid-tags-more {
+		position: absolute;
+		top: 0;
+		right: 0;
+		width: 22px;
+		text-align: center;
+		font-size: 10px;
+		color: #6c757d;
 	}
 
 	td.dt-tags,
@@ -603,9 +639,19 @@ table.variantgrid-datatable {
 			overflow: visible;
 
 			> .grid-tags {
-				position: relative;
 				z-index: 3;
+				width: max-content;
+				padding-right: 0;
+				overflow: visible;
 				background: #f8f8f8;
+
+				> .grid-tag-hidden {
+					display: flex;
+				}
+			}
+
+			.grid-tags-more {
+				display: none;
 			}
 		}
 	}
