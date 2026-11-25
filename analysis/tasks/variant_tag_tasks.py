@@ -60,9 +60,10 @@ def _liftover_variant_tag(variant_tag: VariantTag):
     # Single variant path stores a ClinGen server error (retried later) rather than raising, so the tag still gets an allele
     variant_allele = get_variant_allele_for_variant(variant_tag.genome_build, variant_tag.variant)
 
-    # Assign allele to VariantTag
+    # Only write the allele: the reload this tagging triggered may have deleted the node version (SET_NULL) the
+    # in-memory tag still points at, and a full save would write it back (#2892)
     if variant_tag.allele is None:
         variant_tag.allele = variant_allele.allele
-        variant_tag.save()
+        variant_tag.save(update_fields=["allele"])
 
     create_liftover_pipelines(admin_bot(), [variant_allele.allele], ImportSource.WEB, variant_tag.genome_build)

@@ -122,6 +122,32 @@ class TestVariantTagLiftoverClinGenError(TestCase):
         mock_create_liftover_pipelines.assert_called_once()
 
 
+@override_settings(CLINGEN_ALLELE_REGISTRY_LOGIN=None)
+@patch("analysis.tasks.variant_tag_tasks.create_liftover_pipelines")
+class TestVariantTagLiftoverStaleNodeVersion(TestCase):
+    """ The reload a tagging triggers deletes the tagged node's old NodeVersion while the task runs (#2892) """
+
+    def test_deleted_node_version_still_assigns_allele(self, mock_create_liftover_pipelines):
+        user = User.objects.get_or_create(username='testuser')[0]
+        grch37 = GenomeBuild.get_name_or_alias("GRCh37")
+        create_fake_variants(grch37)
+        variant = Variant.objects.filter(Variant.get_no_reference_q()).order_by("pk").first()
+        allele = create_mock_allele(variant, grch37)
+        analysis = Analysis.objects.create(genome_build=grch37, user=user)
+        node = TagNode.objects.create(analysis=analysis)
+        tag = Tag.objects.get_or_create(pk="artefact")[0]
+        variant_tag = VariantTag.objects.create(genome_build=grch37, variant=variant, tag=tag, user=user,
+                                                analysis=analysis, node=node, node_version=node.node_version)
+
+        NodeVersion.objects.filter(pk=variant_tag.node_version_id).delete()
+        _liftover_variant_tag(variant_tag)
+
+        variant_tag.refresh_from_db()
+        self.assertEqual(variant_tag.allele, allele)
+        self.assertIsNone(variant_tag.node_version)
+        mock_create_liftover_pipelines.assert_called_once()
+
+
 class TestTagNodeSnapshotWarning(TestCase):
     """ Global tag nodes serve a cached queryset that isn't invalidated by tags made in other analyses,
         so warn the user it's a snapshot - @see SACGF/variantgrid_sapath#144 """
