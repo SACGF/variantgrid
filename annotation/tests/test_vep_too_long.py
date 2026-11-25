@@ -3,11 +3,13 @@
 count - they must still get vep_skipped_reason=TOO_LONG rows, including when nothing else in range was dumped.
 """
 from datetime import timedelta
+from unittest.mock import Mock
 
 from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import timezone
 
+from annotation.annotation_version_querysets import filter_vep_sv_max_size, is_vep_too_long
 from annotation.enums import AnnotationStatus, VariantAnnotationPipelineType, VEPSkippedReason
 from annotation.fake_data import get_fake_vep_version, retire_seeded_annotation_version
 from annotation.models import (
@@ -23,8 +25,8 @@ from annotation.vcf_files.bulk_vep_vcf_annotation_inserter import BulkVEPVCFAnno
 from annotation.vcf_files.import_vcf_annotations import handle_vep_skipped
 from genes.enums import AnnotationConsortium
 from genes.fake_data import create_fake_gene_version
-from library.genomics.vcf_enums import VCFSymbolicAllele
-from snpdb.models import GenomeBuild, VariantCoordinate
+from library.genomics.vcf_enums import VariantClass, VCFSymbolicAllele
+from snpdb.models import GenomeBuild, Variant, VariantCoordinate
 from snpdb.tests.utils.vcf_testing_utils import (
     slowly_create_test_variant,
     slowly_create_test_variant_from_coordinate,
@@ -57,6 +59,9 @@ class VEPTooLongTestBase(TestCase):
         cls.snv = slowly_create_test_variant("1", 100000, 'A', 'T', cls.grch37)
         cls.long_sv = create_deletion(200000, -5 * SV_MAX_SIZE)
         cls.short_sv = create_deletion(300000, -SV_MAX_SIZE // 2)
+        chr21_gain = VariantCoordinate(chrom="21", position=1, ref="N", alt=VCFSymbolicAllele.CHROM_GAIN,
+                                       svlen=48129894)
+        cls.whole_chromosome = slowly_create_test_variant_from_coordinate(chr21_gain, cls.grch37)
 
     def _sv_run(self, max_variant) -> AnnotationRun:
         lock = AnnotationRangeLock.objects.create(version=self.vav, min_variant=self.snv,
@@ -94,6 +99,40 @@ class VEPTooLongTestCase(VEPTooLongTestBase):
         self.assertEqual(self._skipped_reasons(sv_run), {self.long_sv.pk: VEPSkippedReason.TOO_LONG})
 
 
+class WholeChromosomeTooLongTestCase(VEPTooLongTestBase):
+    """ #2908 - VEP can't parse a whole-chromosome alt, so it is too long whatever the cap """
+
+    def test_too_long_whatever_the_cap(self):
+        qs = Variant.objects.filter(pk__in=[self.long_sv.pk, self.short_sv.pk, self.whole_chromosome.pk])
+        for sv_max_size, too_long in [(SV_MAX_SIZE, {self.long_sv, self.whole_chromosome}),
+                                      (None, {self.whole_chromosome})]:
+            with self.subTest(sv_max_size=sv_max_size):
+                self.assertEqual(too_long, set(filter_vep_sv_max_size(qs, sv_max_size, too_long=True)))
+                self.assertEqual(set(qs) - too_long, set(filter_vep_sv_max_size(qs, sv_max_size, too_long=False)))
+                self.assertEqual(too_long, {v for v in qs if is_vep_too_long(v.alt.seq, v.svlen, sv_max_size)})
+
+    def test_too_long_row_classed_as_copy_number(self):
+        sv_run = self._sv_run(self.whole_chromosome)
+        sv_run.dump_count = 1  # short_sv, which VEP annotated
+        sv_run.annotated_count = 1
+        bulk_inserter = BulkVEPVCFAnnotationInserter(sv_run, validate_columns=False, vep_skipped_only=True)
+        handle_vep_skipped(sv_run, bulk_inserter)
+
+        va = VariantAnnotation.objects.get(annotation_run=sv_run, variant=self.whole_chromosome)
+        self.assertEqual(VEPSkippedReason.TOO_LONG, va.vep_skipped_reason)
+        self.assertEqual(VariantClass.COPY_NUMBER_GAIN, va.variant_class)
+
+    def test_gene_overlaps_without_symbols(self):
+        """ The genes are what gene lists join on, the thousands of symbols only noise in a grid cell """
+        sv_run = self._sv_run(self.whole_chromosome)
+        bulk_inserter = BulkVEPVCFAnnotationInserter(sv_run, validate_columns=False, vep_skipped_only=True)
+        bulk_inserter.sv_gene_overlap_resolver = Mock(get_overlaps=Mock(return_value=({"APP", "SOD1"}, [1, 2])))
+        for variant, expected_symbols in [(self.whole_chromosome, None), (self.long_sv, "APP,SOD1")]:
+            variant_data = {}
+            bulk_inserter.add_sv_gene_overlaps(variant.pk, variant.coordinate, variant_data)
+            self.assertEqual(expected_symbols, variant_data.get("overlapping_symbols"))
+        self.assertEqual(4, len(bulk_inserter.variant_gene_overlap_list))
+
 
 class VariantPageNoTranscriptMessageTestCase(VEPTooLongTestBase):
     """ #2511: the variant page says why there is no transcript, and only calls VEP's no-gene result intergenic """
@@ -122,6 +161,11 @@ class VariantPageNoTranscriptMessageTestCase(VEPTooLongTestBase):
         self.assertEqual(["AAA1", "ZZZ1"], [gv.gene_symbol_id for gv in vts.gene_overlaps])
         self.assertIn("(2 genes)", vts.no_transcript_message)
         self.assertNotIn("intergenic", vts.no_transcript_message)
+
+    def test_whole_chromosome(self):
+        vts = self._vts(self.whole_chromosome, vep_skipped_reason=VEPSkippedReason.TOO_LONG)
+        self.assertIn("Whole chromosome - not annotated by VEP. Genes assigned by overlap (0 genes)",
+                      " ".join(vts.warning_messages))
 
     def test_too_long_without_gene_overlaps(self):
         vts = self._vts(self.long_sv, vep_skipped_reason=VEPSkippedReason.TOO_LONG)

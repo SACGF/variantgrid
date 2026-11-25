@@ -938,11 +938,13 @@ class BulkVEPVCFAnnotationInserter:
         """ For long SVs that VEP skipped (TOO_LONG): resolve gene overlaps locally
             from the gene_annotation_release transcripts and populate
             overlapping_symbols + queue VariantGeneOverlap rows.
-            Leaves gene_id/transcript_id on the variant row null (a long SV may overlap many genes). """
+            Leaves gene_id/transcript_id on the variant row null (a long SV may overlap many genes), and a whole
+            chromosome's overlapping_symbols empty - its thousands of symbols are noise in a grid cell, and the
+            kind badge says what the row is. """
         if self.sv_gene_overlap_resolver is None:
             return
         symbols, gene_ids = self.sv_gene_overlap_resolver.get_overlaps(variant_coordinate)
-        if symbols:
+        if symbols and not variant_coordinate.is_whole_chromosome:
             variant_data["overlapping_symbols"] = ",".join(sorted(symbols))
         for gene_id in gene_ids:
             overlap = {"variant_id": variant_id, "gene_id": gene_id}

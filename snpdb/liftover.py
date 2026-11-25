@@ -322,6 +322,25 @@ def _liftover_using_existing_contig(allele, dest_genome_build: GenomeBuild) -> t
     return conversion_tool, variant
 
 
+def _whole_chromosome_variant(allele) -> Optional[Variant]:
+    """ Uses the prefetch (@see _liftover_allele_qs) """
+    for variant_allele in allele.variantallele_set.all():
+        if variant_allele.variant.is_whole_chromosome:
+            return variant_allele.variant
+    return None
+
+
+def _liftover_whole_chromosome(variant: Variant, dest_genome_build: GenomeBuild) -> LIFTOVER_TUPLE:
+    """ The same chromosome's whole-chromosome coordinate in the destination build """
+    conversion_tool = AlleleConversionTool.WHOLE_CHROMOSOME
+    contig = variant.locus.contig
+    dest_contig = dest_genome_build.chrom_contig_mappings.get(contig.name)
+    if dest_contig is None:
+        return conversion_tool, None, f"{dest_genome_build} has no chromosome '{contig.name}'"
+    variant_coordinate = VariantCoordinate.whole_chromosome(dest_genome_build, dest_contig.name, variant.alt.seq)
+    return conversion_tool, variant_coordinate, None
+
+
 def _liftover_using_dest_variant_coordinate(allele, dest_genome_build: GenomeBuild,
                                             hgvs_matcher=None,
                                             failed_tools: set[str] = None) -> Iterable[LIFTOVER_TUPLE]:
@@ -336,6 +355,12 @@ def _liftover_using_dest_variant_coordinate(allele, dest_genome_build: GenomeBui
 
     if failed_tools is None:
         failed_tools = AlleleLiftover.get_failed_conversion_tools([allele.pk], dest_genome_build).get(allele.pk, set())
+
+    if whole_chromosome_variant := _whole_chromosome_variant(allele):
+        # No tool can read the alt, and none is needed - @see snpdb.whole_chromosome_variants
+        if AlleleConversionTool.WHOLE_CHROMOSOME not in failed_tools:
+            yield _liftover_whole_chromosome(whole_chromosome_variant, dest_genome_build)
+        return
 
     conversion_tool = None
     g_hgvs = None
@@ -392,8 +417,8 @@ def _liftover_using_source_variant_coordinate(allele, source_genome_build: Genom
 
     # If we have >=3 builds, sometimes this will be called for us when we don't have the variant in this build
     variant_allele = _variant_allele_for_build(allele, source_genome_build)
-    if not variant_allele:
-        return
+    if not variant_allele or variant_allele.variant.is_whole_chromosome:
+        return  # A whole chromosome is lifted over by _liftover_using_dest_variant_coordinate alone
     variant_coordinate = variant_allele.variant.coordinate
 
     if failed_tools is None:

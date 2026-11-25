@@ -1,7 +1,7 @@
 """
 VCF-level constants that both the importer and the writers share: column positions (VCFColumns),
-the symbolic alts (VCFSymbolicAllele, and GeneLevelSymbolicAlt for gene-level events on the fake
-contig), header constants, and VariantClass (Ensembl's VARIANT_CLASS terms).
+the symbolic alts (VCFSymbolicAllele with the whole-chromosome WHOLE_CHROMOSOME_ALTS, and
+GeneLevelSymbolicAlt for gene-level events on the fake contig), header constants, and VariantClass (Ensembl's VARIANT_CLASS terms).
 """
 import re
 from typing import Optional
@@ -29,6 +29,13 @@ class VCFSymbolicAllele:
     DUP = "<DUP>"
     INS = "<INS>"
     INV = "<INV>"
+    # A whole chromosome gained or lost (aneuploidy). Ours rather than VCF spec alts, like the gene-level
+    # ones - @see snpdb.whole_chromosome_variants
+    CHROM_GAIN = "<CHROM_GAIN>"
+    CHROM_LOSS = "<CHROM_LOSS>"
+
+
+WHOLE_CHROMOSOME_ALTS = (VCFSymbolicAllele.CHROM_GAIN, VCFSymbolicAllele.CHROM_LOSS)
 
 
 class GeneIdNamespace(models.TextChoices):

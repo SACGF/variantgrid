@@ -11,6 +11,7 @@ from django.utils import timezone
 from annotation.annotation_version_querysets import (
     filter_vep_sv_max_size,
     get_variants_qs_for_annotation,
+    is_vep_too_long,
 )
 from annotation.enums import VariantAnnotationPipelineType
 from annotation.models import AnnotationRun, VEPSkippedReason
@@ -21,8 +22,15 @@ from annotation.vep_warnings import (
     parse_skipped_variants_file,
     parse_vep_warnings,
 )
+from library.genomics.vcf_enums import VariantClass, VCFSymbolicAllele
 from snpdb.models import Variant, VariantCoordinate
 from snpdb.vcf_utils import cyvcf2_header_types
+
+# VEP never sees one, so it is classed here, as gene-level copy number is (annotation.gene_level_annotation)
+WHOLE_CHROMOSOME_VARIANT_CLASS = {
+    VCFSymbolicAllele.CHROM_GAIN: VariantClass.COPY_NUMBER_GAIN,
+    VCFSymbolicAllele.CHROM_LOSS: VariantClass.COPY_NUMBER_LOSS,
+}
 
 
 def import_vcf_annotations(
@@ -213,12 +221,12 @@ def _get_unannotated_variants_qs(annotation_run: AnnotationRun) -> QuerySet[Vari
 
 def _is_vep_too_long(annotation_run: AnnotationRun, variant: Variant, sv_max_size: Optional[int]) -> bool:
     return (annotation_run.pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT
-            and bool(sv_max_size) and variant.svlen is not None and abs(variant.svlen) > sv_max_size)
+            and is_vep_too_long(variant.alt.seq, variant.svlen, sv_max_size))
 
 
 def _get_vep_too_long_variants(annotation_run: AnnotationRun, sv_max_size: Optional[int]) -> list[Variant]:
     """ Unannotated SVs in range that VEPRunner.get_variants_qs left out of the dump """
-    if annotation_run.pipeline_type != VariantAnnotationPipelineType.STRUCTURAL_VARIANT or not sv_max_size:
+    if annotation_run.pipeline_type != VariantAnnotationPipelineType.STRUCTURAL_VARIANT:
         return []
     return list(filter_vep_sv_max_size(_get_unannotated_variants_qs(annotation_run), sv_max_size, too_long=True))
 
@@ -235,11 +243,13 @@ def _add_vep_skipped_variant(annotation_run: AnnotationRun, bulk_inserter, v: Va
                                                alt=v.alt.seq,
                                                svlen=v.svlen)
         bulk_inserter.add_sv_gene_overlaps(v.pk, variant_coordinate, va)
+        if variant_class := WHOLE_CHROMOSOME_VARIANT_CLASS.get(variant_coordinate.alt):
+            va["variant_class"] = variant_class
     bulk_inserter.variant_annotation_list.append(va)
 
 
 def _insert_vep_skipped_variants(bulk_inserter):
     if bulk_inserter.variant_annotation_list:
         # Only insert the columns we care about
-        bulk_inserter.all_variant_columns = ["vep_skipped_reason"]
+        bulk_inserter.all_variant_columns = ["vep_skipped_reason", "variant_class"]
         bulk_inserter.finish()

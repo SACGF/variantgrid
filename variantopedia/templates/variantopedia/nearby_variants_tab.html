@@ -1,7 +1,9 @@
 {% load settings_tags %}
 {% load ui_utils %}
 {% load tag_config_tags %}
-{% if timed_out %}
+{% if max_variant_length %}
+    <div class="alert alert-info">Nearby variants are not shown for a variant longer than {{ max_variant_length }}.</div>
+{% elif timed_out %}
     <div class="alert alert-warning">Nearby variant counts took too long to calculate and were stopped.</div>
 {% else %}
 {% labelled label="Codon"  id="nearby_codon" %}{{ codon_summary }}{% tag_counts codon_tag_counts %}{% endlabelled %}

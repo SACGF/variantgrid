@@ -553,6 +553,11 @@ def nearby_variants_tab(request, variant_id, annotation_version_id):
         "distance": distance,
         "distance_str": str(distance)
     }
+    max_variant_length = settings.VARIANT_DETAILS_NEARBY_MAX_VARIANT_LENGTH
+    if max_variant_length and variant.length > max_variant_length:
+        # It would only wait out the statement timeout (a whole chromosome, a large SV)
+        context["max_variant_length"] = format_bp(max_variant_length)
+        return render(request, "variantopedia/nearby_variants_tab.html", context)
     try:
         with pg_settings(statement_timeout=settings.VARIANT_DETAILS_NEARBY_STATEMENT_TIMEOUT_SECONDS * 1000):
             context.update(get_nearby_summaries(request.user, variant, annotation_version,

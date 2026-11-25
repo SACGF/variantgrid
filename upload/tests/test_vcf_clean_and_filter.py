@@ -57,6 +57,22 @@ def _fake_annotation_settings() -> dict:
     return annotation
 
 
+_TEST_FASTA_GRCH38 = os.path.join(_TEST_DIR, "placeholder_grch38.fna")
+
+
+def _write_placeholder_fasta_grch38(genome_build):
+    _write_atomically(_TEST_FASTA_GRCH38, ">placeholder\nN\n")
+    fai_lines = [f"{accession}\t{length}\t0\t60\t61\n"
+                 for accession, length in genome_build.standard_contigs.values_list("refseq_accession", "length")]
+    _write_atomically(_TEST_FASTA_GRCH38 + ".fai", "".join(fai_lines))
+
+
+def _fake_annotation_settings_grch38() -> dict:
+    annotation = copy.deepcopy(settings.ANNOTATION)
+    annotation[settings.BUILD_GRCH38]["reference_fasta"] = _TEST_FASTA_GRCH38
+    return annotation
+
+
 @override_settings(ANNOTATION=_fake_annotation_settings())
 class TestVCFCleanAndFilterSortedCheck(TestCase):
     @classmethod
@@ -281,3 +297,23 @@ class TestVCFCleanAndFilterRecordFormatFields(TestCase):
                          allow_unsorted=True, record_format_fields_file=record_format_fields_file)
         with open(record_format_fields_file, encoding="utf-8") as f:
             self.assertEqual(f.read().splitlines(), ["FC", "SM"])
+
+
+@override_settings(ANNOTATION=_fake_annotation_settings_grch38())
+class TestVCFCleanAndFilterDragenPloidy(TestCase):
+    """ A DRAGEN ploidy VCF (#2908): the euploid chromosomes are reference spans, the aneuploid one a <DUP> """
+
+    def test_only_the_aneuploid_record_kept(self):
+        genome_build = GenomeBuild.grch38()
+        _write_placeholder_fasta_grch38(genome_build)
+        vcf_filename = os.path.join(settings.BASE_DIR, "upload", "test_data", "vcf", "dragen_ploidy",
+                                    "trisomy21.ploidy.vcf")
+        stats_filename = os.path.join(_TEST_DIR, f"{self.id()}.skipped.txt")
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            call_command("vcf_clean_and_filter", vcf=vcf_filename, genome_build=genome_build.name,
+                         skipped_records_stats_file=stats_filename)
+        records = [line.split("\t") for line in stdout.getvalue().splitlines() if not line.startswith("#")]
+        self.assertEqual([("NC_000021.9", "1", "N", "<DUP>")], [tuple(r[:2] + r[3:5]) for r in records])
+        with open(stats_filename, encoding="utf-8") as f:
+            self.assertEqual(f"{REFERENCE_SPAN_SKIP_REASON}\t23", f.read().strip())

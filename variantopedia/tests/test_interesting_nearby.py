@@ -1,5 +1,8 @@
+from unittest.mock import patch
+
 from django.contrib.auth.models import User
 from django.test import TestCase
+from django.urls import reverse
 
 from analysis.models import VariantTag
 from annotation.annotation_version_querysets import get_variant_queryset_for_annotation_version
@@ -13,9 +16,19 @@ from classification.enums.classification_enums import ShareLevel
 from classification.models import Classification
 from classification.tests.models.test_utils import ClassificationTestUtils
 from genes.fake_data import create_fake_transcript_version
+from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.enums import AlleleOriginBucket
-from snpdb.models import GenomeBuild, Tag, Variant, VariantZygosityCountCollection
-from snpdb.tests.utils.vcf_testing_utils import create_mock_allele
+from snpdb.models import (
+    GenomeBuild,
+    Tag,
+    Variant,
+    VariantCoordinate,
+    VariantZygosityCountCollection,
+)
+from snpdb.tests.utils.vcf_testing_utils import (
+    create_mock_allele,
+    slowly_create_test_variant_from_coordinate,
+)
 from variantopedia.interesting_nearby import (
     get_transcript_and_domains,
     get_transcript_and_exons,
@@ -85,3 +98,19 @@ class InterestingNearbyTest(TestCase):
         self.assertEqual({transcript.pk: "5/10"}, get_transcript_and_exons(self.variant, self.vav))
         self.assertEqual({transcript.pk: {"Domain1", "Domain2"}},
                          get_transcript_and_domains(self.variant, self.vav))
+
+
+class NearbyVariantsTabTest(TestCase):
+    def test_long_variant_runs_no_query(self):
+        """ A whole chromosome or a large SV would only wait out the statement timeout (#2908) """
+        genome_build = GenomeBuild.grch37()
+        annotation_version = get_fake_annotation_version(genome_build)
+        vc = VariantCoordinate(chrom="2", position=1000, ref="A", alt=VCFSymbolicAllele.DUP, svlen=20_000_000)
+        variant = slowly_create_test_variant_from_coordinate(vc, genome_build)
+        self.client.force_login(User.objects.get_or_create(username="nearby_variants_tab_user")[0])
+        url = reverse("nearby_variants_tab", kwargs={"variant_id": variant.pk,
+                                                     "annotation_version_id": annotation_version.pk})
+        with patch("variantopedia.views.get_nearby_summaries") as get_nearby_summaries:
+            response = self.client.get(url)
+        get_nearby_summaries.assert_not_called()
+        self.assertContains(response, "Nearby variants are not shown for a variant longer than 10 Mb")

@@ -45,9 +45,10 @@ class VEPRunner(AnnotationPipelineRunner):
 
     def get_variants_qs(self, annotation_run):
         qs = super().get_variants_qs(annotation_run)
-        if self.is_structural_variant and settings.ANNOTATION_VEP_SV_MAX_SIZE:
-            # VEP will skip variants above a certain size and fill up the logs with 'too long to annotate'
-            # So just skip these - handle_vep_skipped / handle_empty_dump write their TOO_LONG rows
+        if self.is_structural_variant:
+            # VEP will skip variants above a certain size and fill up the logs with 'too long to annotate', and
+            # can't parse a whole-chromosome alt. So just skip these - handle_vep_skipped / handle_empty_dump
+            # write their TOO_LONG rows
             qs = filter_vep_sv_max_size(qs, settings.ANNOTATION_VEP_SV_MAX_SIZE, too_long=False)
         return qs
 

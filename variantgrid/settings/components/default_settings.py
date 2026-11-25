@@ -1336,6 +1336,9 @@ VARIANT_DETAILS_NEARBY_RANGE = 50
 VARIANT_DETAILS_NEARBY_SHOW_GENE = False
 # The nearby tab gives up after this rather than hold a web worker until DATABASE_STATEMENT_TIMEOUT_SECONDS
 VARIANT_DETAILS_NEARBY_STATEMENT_TIMEOUT_SECONDS = 30
+# ...and isn't calculated at all for a variant longer than this (a whole chromosome, a large SV), which would
+# only wait out that timeout. 0 for no limit
+VARIANT_DETAILS_NEARBY_MAX_VARIANT_LENGTH = 10_000_000
 
 # Can only use block or allow list. Use "text" value of link (see vc_links.js)
 VARIANT_DETAILS_QUICK_LINKS_ALLOW_LIST = []
@@ -1351,9 +1354,11 @@ VARIANT_MANUAL_CREATE_BY_NON_ADMIN = True
 VARIANT_SYMBOLIC_ALT_ENABLED = True
 VARIANT_SYMBOLIC_ALT_SIZE = 50
 # Any other symbolic ALT is dropped at import (vcf_clean_alts). <INS> is left out on purpose: Manta's often has no
-# SVLEN and END=POS, so it would store with svlen 0 and unrelated insertions would collapse into one Variant
+# SVLEN and END=POS, so it would store with svlen 0 and unrelated insertions would collapse into one Variant.
+# <CHROM_GAIN>/<CHROM_LOSS> are ours (@see snpdb.whole_chromosome_variants) - here so our own VCFs re-import
 VARIANT_SYMBOLIC_ALT_VALID_TYPES = {VCFSymbolicAllele.CNV, VCFSymbolicAllele.DEL,
-                                    VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV}
+                                    VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV,
+                                    VCFSymbolicAllele.CHROM_GAIN, VCFSymbolicAllele.CHROM_LOSS}
 
 # VCF 4.3 defines SVLEN as negative for DELs, but 4.4+ it's always positive
 # This is for our internal storage in Variant records

@@ -13,7 +13,7 @@ import operator
 import os
 import re
 from collections.abc import Iterable
-from functools import cached_property, reduce
+from functools import cached_property, lru_cache, reduce
 from typing import Optional
 
 from django.conf import settings
@@ -482,6 +482,17 @@ class GenomeBuildContig(models.Model):
         return f"{self.contig} ({self.genome_build})"
 
 
+@lru_cache
+def _get_euchromatic_bounds(contig_id: int) -> Optional[tuple[int, int]]:
+    """ Cytobands are seed data, so cached per contig """
+    bands = Cytoband.objects.filter(contig_id=contig_id).filter(Q(stain="gneg") | Q(stain__startswith="gpos"))
+    bands = bands.order_by("start")
+    first_band_end = bands.values_list("end", flat=True).first()
+    if first_band_end is None:
+        return None
+    return first_band_end, bands.values_list("start", flat=True).last()
+
+
 class Cytoband(models.Model, PreviewModelMixin):
     """ A cytogenetic band at any level (name is the arm and band, eg "p", "p1", "p13" or "p15.5") - start/end are
         1-based inclusive. The cytoband files only hold the finest level; the levels above are generated from them,
@@ -510,6 +521,12 @@ class Cytoband(models.Model, PreviewModelMixin):
     def get_file_bands(contig: Contig) -> QuerySet['Cytoband']:
         """ The finest level - the bands in the cytoband file, ordered by position. The generated levels have no stain """
         return Cytoband.objects.filter(contig=contig).exclude(stain="").select_related("contig").order_by("start")
+
+    @staticmethod
+    def get_euchromatic_bounds(contig_id: int) -> Optional[tuple[int, int]]:
+        """ (end of the first euchromatic band - gneg/gpos* - start of the last), None for a contig with no
+            bands. What a whole chromosome spans - @see snpdb.whole_chromosome_variants """
+        return _get_euchromatic_bounds(contig_id)
 
     @staticmethod
     def get_band_range_name(cytobands: list['Cytoband']) -> Optional[str]:

@@ -345,11 +345,13 @@ class AlleleConversionTool(models.TextChoices):
     PICARD = "PC", "Picard LiftoverVCF"
     CROSSMAP = "CM", "CrossMap"
     BCFTOOLS_LIFTOVER = "BL", "BCFtools/liftover"
+    WHOLE_CHROMOSOME = "WC", "Same chromosome"  # @see snpdb.whole_chromosome_variants
 
     @classmethod
     def vcf_tuples_in_destination_build(cls, conversion_tool):
         IN_DEST_BUILD = {
             cls.SAME_CONTIG: True,
+            cls.WHOLE_CHROMOSOME: True,
             cls.CLINGEN_ALLELE_REGISTRY: True,
             cls.DBSNP: True,
             cls.NCBI_REMAP: False,

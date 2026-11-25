@@ -940,6 +940,16 @@ table.as_table td {
   color: #00695c;
 }
 
+.rv-kind-chrom-loss {
+  background: #b3261e;
+  color: #fdecea;
+}
+
+.rv-kind-chrom-gain {
+  background: #1a56b8;
+  color: #e8f0fe;
+}
+
 .variant-content-small {
   --variant-content-color: #78909c;
 }
