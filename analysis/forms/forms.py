@@ -2,6 +2,8 @@ import itertools
 import operator
 import re
 from collections import defaultdict
+from functools import cached_property
+from typing import Optional
 
 from crispy_forms.bootstrap import FieldWithButtons, StrictButton
 from crispy_forms.layout import Field, Layout
@@ -46,6 +48,7 @@ from library.forms import NumberInput, ROFormMixin
 from library.guardian_utils import assign_permission_to_user_and_groups
 from patients.enums import SampleSourceLevel, Sex
 from seqauto.models import EnrichmentKit
+from seqauto.models.models_software import VariantCaller
 from snpdb.forms import UserSettingsGenomeBuildMixin
 from snpdb.models import (
     CustomColumnsCollection,
@@ -181,6 +184,19 @@ class AutoLaunchAnalysisTemplateForm(forms.ModelForm):
             if not AnalysisVariable.objects.filter(node__analysis=template_analysis, field=variable_field).exists():
                 self.add_error("launch_level", f"The template has no '{variable_field}' variable to launch with")
         return cleaned_data
+
+    @cached_property
+    def variant_caller_matches(self) -> Optional[list[str]]:
+        """ The variant caller names registered so far that the regex matches, so a typo shows as matching
+            nothing. None when the regex is blank (matches anything) or doesn't compile """
+        if not (regex := self["variant_caller_regex"].value()):
+            return None
+        try:
+            pattern = re.compile(regex)
+        except re.error:
+            return None
+        names = VariantCaller.objects.order_by("name").values_list("name", flat=True).distinct()
+        return [name for name in names if pattern.match(name)]
 
 
 AutoLaunchFormSet = inlineformset_factory(

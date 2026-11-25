@@ -201,3 +201,14 @@ class AutoLaunchMatchingTestCase(AutoLaunchTestBase):
         self.assertIn("launch_level", form.errors)
         form = AutoLaunchAnalysisTemplateForm({"launch_level": SampleSourceLevel.SPECIMEN}, instance=auto_launch)
         self.assertTrue(form.is_valid(), form.errors)
+
+    def test_variant_caller_regex_shows_registered_matches(self):
+        auto_launch = AutoLaunchAnalysisTemplate(template=self.template)
+        cases = {
+            "": None,
+            "TSO_dragen": ["TSO_dragen_caller", "TSO_dragen_cnv_caller"],
+            "TSO_dargen": [],
+        }
+        for regex, matches in cases.items():
+            form = AutoLaunchAnalysisTemplateForm({"variant_caller_regex": regex}, instance=auto_launch)
+            self.assertEqual(form.variant_caller_matches, matches, regex)

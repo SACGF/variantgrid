@@ -65,8 +65,15 @@
 
                 <div class="col-md-2">
                     {{ f.variant_caller_regex.errors }}
-                    {% labelled label="Variant Caller RegEx" help="Matched against the variant caller the sequencing pipeline registered the VCF under" %}
+                    {% labelled label="Variant Caller RegEx" help="Matched against the variant caller a sequencing pipeline registered the VCF under, through the backend API. Only VCFs uploaded that way have one, so a rule with this set never matches a VCF uploaded by hand" %}
                         {{ f.variant_caller_regex }}
+                        {% with matches=f.variant_caller_matches %}
+                            {% if matches is not None %}
+                                <small class="form-text text-muted">
+                                    {% if matches %}Matches: {{ matches|join:", " }}{% else %}Matches no variant caller registered so far{% endif %}
+                                </small>
+                            {% endif %}
+                        {% endwith %}
                     {% endlabelled %}
                 </div>
 
