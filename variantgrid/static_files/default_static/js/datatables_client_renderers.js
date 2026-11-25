@@ -93,7 +93,7 @@ $(document).on('click', '.dt-clone-row', function() {
     $.ajax({
         type: 'POST',
         url: btn.data('url'),
-        headers: {'X-CSRFToken': Cookies.get('csrftoken')},
+        headers: {'X-CSRFToken': getCsrfToken()},
         success: function() {
             btn.closest('table').DataTable().ajax.reload(null, false);
         },

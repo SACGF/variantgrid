@@ -402,7 +402,7 @@ const DataTableDefinition = (function() {
                         type: 'POST',
                         url: Urls.set_user_row_config(),
                         data: {grid_name: gridName, grid_rows: gridRows},
-                        headers: {'X-CSRFToken': Cookies.get('csrftoken')}
+                        headers: {'X-CSRFToken': getCsrfToken()}
                     });
                 }
             });
@@ -1083,7 +1083,7 @@ $(document).on('click', '.dt-delete-confirm-yes', function(event) {
     $.ajax({
         type: 'POST',
         url: confirmBox.data('trigger').data('url'),
-        headers: {'X-CSRFToken': Cookies.get('csrftoken')},
+        headers: {'X-CSRFToken': getCsrfToken()},
         success: function() {
             confirmBox.closest('table').DataTable().ajax.reload(null, false);
         },

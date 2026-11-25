@@ -13,6 +13,11 @@ if (!String.prototype.replaceAll) {
 	};
 }
 
+/** CSRF_COOKIE_NAME is per deployment, as instances sharing a hostname (on other ports) share cookies */
+function getCsrfToken() {
+    return Cookies.get(window.CSRF_COOKIE_NAME || 'csrftoken');
+}
+
 function tweakAjax() {
     // automatically send X-CSRFToken on ajax calls
     $.ajaxSetup({
@@ -20,7 +25,7 @@ function tweakAjax() {
             //if (settings.type == 'POST' || settings.type == 'PUT' || settings.type == 'DELETE' || settings.type == 'PATCH') {
                 if (!(/^http:.*/.test(settings.url) || /^https:.*/.test(settings.url))) {
                     // Only send the token to relative URLs i.e. locally.
-                    xhr.setRequestHeader("X-CSRFToken", Cookies.get('csrftoken'));
+                    xhr.setRequestHeader("X-CSRFToken", getCsrfToken());
                 } else {
                     // console.log("Didn't add CSRF! to external url '" + settings.url + "'");
                 }
@@ -400,7 +405,7 @@ registerDomProcessor('input[name=csrfmiddlewaretoken]', (node) => {
     const form = node.closest('form');
     form.submit(function (e) {
         // if a page load has changed the cookie, change it in the form
-        const cookie = Cookies.get('csrftoken');
+        const cookie = getCsrfToken();
         node.val(cookie);
         return true;
     });
@@ -684,7 +689,7 @@ function postUrl(url) {
     const input = document.createElement('input');
     input.type = 'hidden';
     input.name = 'csrfmiddlewaretoken';
-    input.value = Cookies.get('csrftoken');
+    input.value = getCsrfToken();
     form.appendChild(input);
     document.body.appendChild(form);
     form.submit();

@@ -15,7 +15,7 @@ function turnOffTips() {
     $.ajax({
         type: 'POST',
         url: Urls.set_show_tips(),
-        headers: {'X-CSRFToken': Cookies.get('csrftoken')}
+        headers: {'X-CSRFToken': getCsrfToken()}
     });
     const message = $("<div>", {class: "tip-box tips-off", text: "Tips off - switch them back on in User Settings."});
     const $boxes = $(".tip-box");

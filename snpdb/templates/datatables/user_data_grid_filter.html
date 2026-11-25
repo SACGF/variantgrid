@@ -26,7 +26,7 @@
                 data: {grid_name: "{{ grid_name }}", filter_level: $(this).data("filter-level"),
                        checked: $(this).is(":checked")},
                 url: "{% url 'set_user_data_grid_config' %}",
-                headers: {"X-CSRFToken": Cookies.get("csrftoken")},
+                headers: {"X-CSRFToken": getCsrfToken()},
                 success: function() {
                     $("#{{ table_id }}").DataTable().ajax.reload(null, false);
                 }
