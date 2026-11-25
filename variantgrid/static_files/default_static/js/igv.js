@@ -74,13 +74,28 @@ function igvVariantLocus(chrom, position, alt, svlen) {
     return `${chrom}:${position}`;
 }
 
-// getAlignmentFilesFuncString names a page function returning the BAMs/CRAMs, called on click so it sees the page as it is then
+// getAlignmentFilesFuncString names a page function returning the BAMs/CRAMs, called on click so it sees the page as it is
+// then. Pages without alignments (all variants, a contig) share the grid renderers, so it may not be defined
 function createIgvUrl(locus, getAlignmentFilesFuncString) {
     if (getIgvSettings().show_igv_links && IGV_LOCUS_REGEX.test(locus)) {
-        const alignmentFiles = getAlignmentFilesFuncString ? `${getAlignmentFilesFuncString}()` : '[]';
+        const funcName = getAlignmentFilesFuncString;
+        const alignmentFiles = funcName ? `(typeof ${funcName} === "function" ? ${funcName}() : [])` : '[]';
         return `javascript:openIgvLink("${locus}", ${alignmentFiles})`;
     }
     return null;
+}
+
+// A variant grid row's IGV URL (rowData keyed as the grid's Variant column), null when the page doesn't show IGV links.
+// A gene-level row's locus is a gene ID on a fake contig, not a coordinate, so it has none - a splice junction's
+// own IGV link comes off its breakpoints instead (@see VariantGridFormat.spliceCalls, snpdb/gene_level_variants.py)
+function variantRowIgvUrl(rowData) {
+    const chrom = rowData["locus__contig__name"];
+    const position = rowData["locus__position"];
+    if (chrom == null || position == null || chrom === GENE_LEVEL_CONTIG_NAME) {
+        return null;
+    }
+    const locus = igvVariantLocus(chrom, position, rowData["alt__seq"], rowData["svlen"]);
+    return createIgvUrl(locus, 'getAlignmentFiles');
 }
 
 function createIgvLink(locus, getAlignmentFilesFuncString) {

@@ -215,6 +215,11 @@ table.variantgrid-datatable {
 			white-space: nowrap;
 			text-decoration: none;
 		}
+
+		// Kept whole beside the clipped label, like the kind badge. @see VariantGridFormat.representativeVariant
+		a.rv-igv {
+			flex: none;
+		}
 	}
 
 	// How many caller rows a fusion was merged from - the calls are in the title. @see fusionCalls

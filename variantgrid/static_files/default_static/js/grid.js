@@ -124,17 +124,9 @@ function variantGridRowDetail(rowData, ctx) {
     const actions = $('<div>', {class: 'variant-row-detail-actions'});
     actions.append($('<a>', {href: `javascript:load_variant_details(${variantId});`, text: 'Details'}));
     actions.append($('<a>', {href: Urls.view_variant(variantId), target: '_blank', text: 'Open in new tab'}));
-    const chrom = rowData["locus__contig__name"];
-    const position = rowData["locus__position"];
-    // A gene-level row's locus is a gene ID on a fake contig, not a coordinate, so there is nothing
-    // to open - a splice junction's own IGV link comes off its breakpoints instead
-    // (@see VariantGridFormat.spliceCalls, snpdb/gene_level_variants.py)
-    if (chrom != null && position != null && chrom !== GENE_LEVEL_CONTIG_NAME) {
-        const locus = igvVariantLocus(chrom, position, rowData["alt__seq"], rowData["svlen"]);
-        const igvUrl = createIgvUrl(locus, 'getAlignmentFiles');  // null unless the analysis shows IGV links
-        if (igvUrl) {
-            actions.append($('<a>', {href: igvUrl, text: 'IGV'}));
-        }
+    const igvUrl = variantRowIgvUrl(rowData);
+    if (igvUrl) {
+        actions.append($('<a>', {href: igvUrl, text: 'IGV'}));
     }
     detail.append(fragment, actions);
     return detail;

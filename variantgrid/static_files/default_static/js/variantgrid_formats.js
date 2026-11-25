@@ -1123,6 +1123,11 @@ VariantGridFormat.representativeVariant = (variantId, type, rowData, ctx) => {
     if (badge) {
         parts.push(badge);
     }
+    // Follows the page's show_igv_links (an analysis' setting), as the row expand's IGV link does (#2893)
+    const igvUrl = variantRowIgvUrl(rowData);
+    if (igvUrl) {
+        parts.push(`<a class='rv-igv grid-link-icon igv-link' title='Open in IGV' href='${escapeHtml(igvUrl)}'></a>`);
+    }
     return `<span class='variant_id-container' variant_id='${variantId}'>${parts.join('')}</span>`;
 };
 
