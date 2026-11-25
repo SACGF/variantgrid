@@ -11,6 +11,7 @@ from variantopedia.forms import SearchForm
 
 def settings_context_processor(request):
     context = {
+        'csrf_cookie_name': settings.CSRF_COOKIE_NAME,  # deployments sharing a hostname on other ports need their own (#2895)
         'form_helper': FORM_HELPER_HELPER,
         'discordance_enabled': settings.DISCORDANCE_ENABLED,
         'classification_distinguish_research': settings.CLASSIFICATION_DISTINGUISH_RESEARCH,

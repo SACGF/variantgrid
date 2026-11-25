@@ -7,7 +7,7 @@
     if (!inputElement) {
         return;
     }
-    const csrftoken = Cookies.get('csrftoken');
+    const csrftoken = getCsrfToken();
 
     const pond = FilePond.create(inputElement, {
         allowMultiple: true,

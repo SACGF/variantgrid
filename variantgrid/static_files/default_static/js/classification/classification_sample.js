@@ -70,7 +70,7 @@ function initClassificationSample(options) {
         /** @type {Object<string, any>} */
         const data = {
             sample_id: sampleSelect.val(),
-            csrfmiddlewaretoken: Cookies.get('csrftoken'),
+            csrfmiddlewaretoken: getCsrfToken(),
         };
         if (repopulate.prop('checked')) {
             data.repopulate = 'on';

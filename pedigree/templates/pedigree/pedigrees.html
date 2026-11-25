@@ -52,7 +52,7 @@
                     type: "POST",
                     data: {grid_name: "Pedigrees", filter_level: "groups", checked: $(this).is(":checked")},
                     url: "{% url 'set_user_data_grid_config' %}",
-                    headers: {"X-CSRFToken": Cookies.get("csrftoken")},
+                    headers: {"X-CSRFToken": getCsrfToken()},
                     success: function() {
                         $("#pedigree-grid").DataTable().ajax.reload(null, false);
                     }

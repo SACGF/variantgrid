@@ -25,6 +25,7 @@
     {% endcompress %}
     {% compress js %}
         <script>window.SITE_NAME = "{{ site_name }}";</script>
+        <script>window.CSRF_COOKIE_NAME = "{{ csrf_cookie_name }}";</script>
         <script src="{% static 'js/global.js' %}"></script>
     {% endcompress %}
 
