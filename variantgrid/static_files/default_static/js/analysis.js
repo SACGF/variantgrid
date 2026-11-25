@@ -34,41 +34,101 @@ function isHorizontalMode() {
     return typeof ANALYSIS_HORIZONTAL_MODE !== "undefined" && ANALYSIS_HORIZONTAL_MODE;
 }
 
-// The height available to the grid inside the bottom panel - what's left under whatever sits above it
+// The height available to the grid inside its panel - what's left under whatever sits above it (in
+// vertical mode, the node editor). Null when there's no panel to fit (the dual screen window)
 function gridPaneAvailableHeight() {
     const panel = $("#right-panel");
     const gridContainer = $("#node-grid-container");
     if (!panel.length || !gridContainer.length) {
-        return 0;
+        return null;
     }
     const offsetInPanel = gridContainer.offset().top - panel.offset().top + panel.scrollTop();
     return panel.innerHeight() - offsetInPanel;
 }
 
+// Horizontal mode's panel is sized by the user's splitter, so the grid follows it nearly all the way down
 const MIN_GRID_HEIGHT = 100;
+// Vertical mode's grid sits under a node editor of any height - below about 8 rows the panel scrolls instead
+const MIN_GRID_HEIGHT_UNDER_EDITOR = 200;
 const GRID_BOTTOM_MARGIN = 10;
+const GRID_FIT_STORAGE_KEY = "analysisGridFitToWindow";
 
+function gridFitsToWindow() {
+    return localStorage.getItem(GRID_FIT_STORAGE_KEY) !== "false";
+}
+
+// The toggle beside "Showing 1 to X" that swaps fitting the rows to the window for showing them all -
+// only there when the page of rows is taller than the room for it. An icon, as the bar has no width to spare
+function updateGridFitLink(wrapper, rowsOverflow) {
+    let link = $(".grid-fit-toggle", wrapper);
+    if (!link.length) {
+        link = $("<a>", {class: "grid-fit-toggle", href: "javascript:void(0)"}).append($("<i>"));
+        link.appendTo($(".bottom .showing", wrapper));
+        link.click(function() {
+            localStorage.setItem(GRID_FIT_STORAGE_KEY, String(!gridFitsToWindow()));
+            resizeGrid();
+        });
+    }
+    const fitted = gridFitsToWindow();
+    const title = fitted ? "Show all rows - make the grid as tall as its rows"
+                         : "Fit to window - scroll the rows inside the grid, keeping the column headers and horizontal scroll bar on screen";
+    // Once the page has made the title a Bootstrap tooltip, it is read from data-original-title
+    link.attr("title", title).attr("data-original-title", title);
+    $("i", link).attr("class", fitted ? "fa-solid fa-up-right-and-down-left-from-center"
+                                      : "fa-solid fa-down-left-and-up-right-to-center");
+    link.toggle(rowsOverflow);
+}
+
+/* Fit the grid's rows to the room its panel has for them, so the column headers and the horizontal
+   scroll bar stay on screen and only the rows scroll (unless the user chose "show all rows") */
 function resizeGrid() {
     const wrapper = $("#node-grid-container .dataTables_wrapper:visible");
     if (!wrapper.length) {
         return;
     }
-    // The grid pane is the full window width in horizontal mode, so give the rows the pane height too -
-    // otherwise the scroll body keeps them in a short box with the panel empty underneath
-    const available = isHorizontalMode() ? gridPaneAvailableHeight() : null;
+    const available = gridPaneAvailableHeight();
+    const minHeight = isHorizontalMode() ? MIN_GRID_HEIGHT : MIN_GRID_HEIGHT_UNDER_EDITOR;
 
     wrapper.each(function() {
         const scrollBody = $(".dataTables_scrollBody", this);
-        if (available && scrollBody.length) {
+        if (available !== null && scrollBody.length) {
             // Everything but the rows - toolbar, column headers, pager
-            const chrome = $(this).outerHeight(true) - scrollBody.height();
-            scrollBody.css("max-height", Math.max(available - chrome - GRID_BOTTOM_MARGIN, MIN_GRID_HEIGHT) + "px");
+            const chrome = $(this).outerHeight(true) - scrollBody.outerHeight();
+            const fitHeight = Math.max(available - chrome - GRID_BOTTOM_MARGIN, minHeight);
+            const horizontalScrollBar = scrollBody[0].offsetHeight - scrollBody[0].clientHeight;
+            const rowsOverflow = scrollBody[0].scrollHeight + horizontalScrollBar > fitHeight;
+            const fitted = gridFitsToWindow();
+            scrollBody.css("max-height", fitted ? fitHeight + "px" : "");
+            $("#node-grid-container").toggleClass("grid-fitted", fitted);
+            updateGridFitLink($(this), rowsOverflow);
         }
         const table = $("table.dataTable", this).first();
         if (table.length && $.fn.DataTable.isDataTable(table)) {
             // The pane changed width - re-sync the cloned scroll header with the body
             table.DataTable().columns.adjust();
         }
+    });
+}
+
+let gridPaneResizeObserver = null;
+
+/* The room for the grid changes with the window, the splitter and - in vertical mode - the height of
+   the node editor above it, which moves as the editor loads and as its sections open */
+function watchGridPaneSize() {
+    if (gridPaneResizeObserver) {
+        gridPaneResizeObserver.disconnect();
+    }
+    let pending = null;
+    gridPaneResizeObserver = new ResizeObserver(function() {
+        if (pending === null) {
+            pending = requestAnimationFrame(function() {
+                pending = null;
+                resizeGrid();
+            });
+        }
+    });
+    $("#right-panel, #node-editor-container").each(function() {
+        gridPaneResizeObserver.observe(this);
     });
 }
 
@@ -955,6 +1015,7 @@ function layout_analysis_editor_and_grid() {
 
     setupBottomPaneTabs();
     applyEditorHome();
+    watchGridPaneSize();
 }
 
 

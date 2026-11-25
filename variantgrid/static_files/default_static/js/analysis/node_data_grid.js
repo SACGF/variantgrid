@@ -2,7 +2,7 @@
 // analysis/templates/analysis/node_data/node_data_grid.html
 /* global nodeId:writable, nodeAlignmentsDict:writable */
 /* global registerNodeGridDownloadButton, nodeGridHasData, export_grid, setupNodeGrid, gridLoadError, loadNodeGridData, cacheVersionedUrl */ // grid.js
-/* global isHorizontalMode, resizeGrid, bottomPaneGridHidden, showGridLoadingOverlay, registerDeferredGridLoad */ // analysis.js
+/* global resizeGrid, bottomPaneGridHidden, showGridLoadingOverlay, registerDeferredGridLoad */ // analysis.js
 /* global GRID */ // analysis/analysis_editor_and_grid.js
 /* global revealSelectedTab */ // analysis/templates/analysis/node_editors/grid_editor.html
 /* global load_node_editor, on_error_function */ // analysis/templates/analysis/node_data/base_node_data.html
@@ -69,8 +69,8 @@ function gridComplete(gridData) {
         // Clear the grid-only overlay we put up when the user clicked "Show grid" (no-op otherwise).
         hideGridLoadingOverlay();
 
-        if (typeof isHorizontalMode === "function" && isHorizontalMode()) {
-            resizeGrid();  // fill the full width bottom panel the grid landed in
+        if (typeof resizeGrid === "function") {  // analysis.js isn't loaded in the dual screen window
+            resizeGrid();  // fit this page of rows to the panel the grid landed in
         }
     }
 }
