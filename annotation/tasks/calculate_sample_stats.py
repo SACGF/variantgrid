@@ -47,7 +47,7 @@ from snpdb.models.models_genome import CHRX_PSEUDOAUTOSOMAL_REGIONS
 
 # Bump when a change alters what the stats count - readers treat rows from older versions as stale
 # and enqueue a recompute (@see snpdb/views/views_data.py:_sample_stats)
-SAMPLE_STATS_CODE_VERSION = 10
+SAMPLE_STATS_CODE_VERSION = 9
 
 
 @celery.shared_task
@@ -78,7 +78,6 @@ def get_sample_stats_code_version() -> SampleStatsCodeVersion:
         7 - chrX hom/het (the sex guess) leaves out structural variants
         8 - structural_count, gene_copy_number_count and gene_splice_count (#2759)
         9 - chrX hom/het leaves out the pseudoautosomal regions (#2745)
-        10 - whole_chromosome_count, and whole-chromosome variants left out of structural_count (#2908)
     """
     code_version, _ = SampleStatsCodeVersion.objects.get_or_create(name="SampleStats",
                                                                    version=SAMPLE_STATS_CODE_VERSION,
