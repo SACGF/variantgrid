@@ -122,6 +122,7 @@ VARIANT_TYPE_LABELS = {
     VariantType.SPLICE: "Gene splice",
     VCFSymbolicAllele.DUP_CHROM: "Chrom gain",
     VCFSymbolicAllele.DEL_CHROM: "Chrom loss",
+    VCFSymbolicAllele.CNV_CHROM: "Chrom normal",
 }
 
 # The types offered on the All Variants page - reference variants are always excluded there, and the

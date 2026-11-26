@@ -35,6 +35,8 @@ class NodeChip:
     # Drawn as coloured dots inside the chip, and as the chips themselves on the hover card, which is
     # where the colours are learnt - what kinds of call a VCF chip's files hold (#2759)
     dots: tuple["NodeChip", ...] = ()
+    # Zygosity.CHOICES labels, drawn as the grid's zygosity glyphs (variantgrid_formats.js:ZYGOSITY_GLYPHS)
+    zygosities: tuple[str, ...] = ()
 
 
 def truncate_name_line(text: str, max_length: int = NAME_LINE_MAX_LENGTH) -> str:

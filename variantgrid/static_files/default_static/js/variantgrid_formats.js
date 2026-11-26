@@ -386,6 +386,12 @@ const ZYGOSITY_GLYPH_CSS = {
     '?': 'zyg-unknown',
 };
 
+// One zygosity (a Zygosity.CHOICES label) as its glyph - the grid's sample cell and the analysis
+// SampleNode's zygosity chip
+function zygosityGlyph(zygosity) {
+    return `<svg class='zyg-glyph ${ZYGOSITY_GLYPH_CSS[zygosity]}' viewBox='0 0 16 16'>${ZYGOSITY_GLYPHS[zygosity]}</svg>`;
+}
+
 function _hasSampleValue(value) {
     return value != null && value !== '' && value !== '.';
 }
@@ -413,8 +419,7 @@ function _genotypeQualityCss(value, thresholds, higherIsBetter) {
 }
 
 VariantGridFormat.sampleZygosity = (zygosity, type, rowData, ctx) => {
-    const glyph = ZYGOSITY_GLYPHS[zygosity];
-    if (!glyph) {
+    if (!ZYGOSITY_GLYPHS[zygosity]) {
         // '.' - the sample has no call for this variant at all
         return '';
     }
@@ -480,7 +485,7 @@ VariantGridFormat.sampleZygosity = (zygosity, type, rowData, ctx) => {
     }
 
     return `<span class='sample-zygosity' title='${escapeHtml(detail.join(' · '))}'>`
-         + `<svg class='zyg-glyph ${ZYGOSITY_GLYPH_CSS[zygosity]}' viewBox='0 0 16 16'>${glyph}</svg>`
+         + zygosityGlyph(zygosity)
          + (values ? `<span class='zyg-values'>${values}</span>` : '')
          + copyNumberHtml + quality + filtersHtml + '</span>';
 };
@@ -964,6 +969,8 @@ const SV_KIND_CSS = {'DEL': 'del', 'DUP': 'dup', 'INV': 'inv', 'CNV': 'cnv', 'IN
 const WHOLE_CHROMOSOME_KINDS = {
     'DUP:CHROM': {code: 'GAIN', css: 'chrom-gain', iscnSign: '+', title: 'Whole chromosome gain'},
     'DEL:CHROM': {code: 'LOSS', css: 'chrom-loss', iscnSign: '-', title: 'Whole chromosome loss'},
+    // Euploid - a reference call, so named by its contig rather than an ISCN abnormality
+    'CNV:CHROM': {code: 'NORMAL', css: 'chrom-normal', iscnSign: null, title: 'Whole chromosome at the expected copy number'},
 };
 
 // Returns {code, cssClass, title}, or null for a variant with an explicit ref/alt
@@ -1047,9 +1054,9 @@ VariantGridFormat.representativeVariantLabel = (variantId, rowData) => {
     const wholeChromosome = (alt != null) ? WHOLE_CHROMOSOME_KINDS[String(alt).slice(1, -1)] : null;
     if (wholeChromosome && chrom != null) {
         const contig = _contigLabel(chrom);
-        const iscn = wholeChromosome.iscnSign + contig.replace(/^chr/i, '');
+        const name = wholeChromosome.iscnSign ? wholeChromosome.iscnSign + contig.replace(/^chr/i, '') : contig;
         const end = position + Math.abs(svlen || 0);
-        return {html: `<span class='rv-gene rv-${wholeChromosome.css}'>${escapeHtml(iscn)}</span>`,
+        return {html: `<span class='rv-gene rv-${wholeChromosome.css}'>${escapeHtml(name)}</span>`,
                 title: `${wholeChromosome.title} - ${contig}:${position}-${end}`};
     }
 

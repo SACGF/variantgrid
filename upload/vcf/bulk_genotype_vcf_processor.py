@@ -474,6 +474,12 @@ class BulkGenotypeVCFProcessor(AbstractBulkVCFProcessor):
                 str(variant.num_unknown),
                 ''.join(alt_zygosity),
             ]
+        elif not variant.ALT:
+            # ALT '.' has no alt allele for any sample to carry, so without a GT every sample is reference
+            cohort_gt = [
+                str(self.num_samples), "0", "0", "0",
+                Zygosity.HOM_REF * self.num_samples
+            ]
         else:
             num_unknown = str(self.num_samples)  # All are unknown
             cohort_gt = [

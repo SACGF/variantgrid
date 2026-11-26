@@ -13,10 +13,13 @@ from annotation.models.models_version import VariantAnnotationVersion
 from annotation.pipelines import blocking_pipeline_types
 from library.django_utils.django_file_utils import get_import_processing_filename
 from library.log_utils import report_message
-from snpdb.models import Variant, VariantCoordinate
+from snpdb.models import Cytoband, Variant, VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.vcf_utils import vcf_get_ref_alt_svlen_and_modification
-from snpdb.whole_chromosome_variants import WHOLE_CHROMOSOME_ALT_FOR_SV_ALT
+from snpdb.whole_chromosome_variants import (
+    WHOLE_CHROMOSOME_ALT_FOR_SV_ALT,
+    whole_chromosome_reference_alt,
+)
 from upload.enums import ModifiedImportedVariantOperation, UploadStepTaskType, VCFPipelineStage
 from upload.models import ModifiedImportedVariant, SimpleVCFImportInfo, UploadStep
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
@@ -92,12 +95,25 @@ class AbstractBulkVCFProcessor(abc.ABC):
                                                                                old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
         if modification:
             self.svlen_modifications[modification] += 1
+        if alt == Variant.REFERENCE_ALT and (reference_span := self._whole_chromosome_reference_span(variant)):
+            return ref, *reference_span
         if alt in WHOLE_CHROMOSOME_ALT_FOR_SV_ALT and svlen is not None:
             contig = self.genome_build.chrom_contig_mappings[variant.CHROM]
             variant_coordinate = VariantCoordinate(chrom=contig.name, position=variant.POS, ref=ref, alt=alt, svlen=svlen)
             if variant_coordinate.is_whole_chromosome_near_miss(self.genome_build):
                 self.whole_chromosome_near_misses.append(variant_coordinate)
         return ref, alt, svlen
+
+    def _whole_chromosome_reference_span(self, variant: cyvcf2.Variant) -> Optional[tuple[str, int]]:
+        """ (<CNV:CHROM>, svlen) for a euploid chromosome - a reference span vcf_clean_and_filter kept, as it
+            skips every other - @see snpdb.whole_chromosome_variants """
+        if (end := variant.INFO.get("END")) is None or variant.INFO.get("SVTYPE") is not None:
+            return None
+        contig = self.genome_build.chrom_contig_mappings[variant.CHROM]
+        span = Cytoband.get_whole_chromosome_span(self.genome_build, contig)
+        if alt := whole_chromosome_reference_alt(variant.POS, int(end), span):
+            return alt, int(end) - variant.POS
+        return None
 
     def set_max_variant(self, variant_hashes, variant_ids):
         # Keep track of max annotated variant per pipeline type (only non-reference are annotated).

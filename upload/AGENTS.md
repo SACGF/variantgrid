@@ -115,13 +115,13 @@ Gotchas:
   no gene, or ambiguously in two, is skipped and counted on the import page. The header keeps `##source`, so the
   `^SpliceGirl` VCFSourceSettings row still binds AD/DP as alt/ref depth.
 - A DRAGEN ploidy VCF (`##source=DRAGEN_PLOIDY`, test_data/vcf/dragen_ploidy/) is an ordinary genotype VCF with no
-  `GT`: each euploid chromosome is a reference span (ALT `.` with END), skipped by vcf_clean_and_filter, and an aneuploid
-  one a `<DUP>`/`<DEL>` over the whole contig, which the canonicaliser stores as a whole-chromosome Variant
+  `GT`: each euploid chromosome is a reference span (ALT `.` with END) and an aneuploid one a `<DUP>`/`<DEL>` over the
+  whole contig. vcf_clean_and_filter keeps a reference span only when it covers a whole chromosome, and the importer
+  stores it as `<CNV:CHROM>` with HOM_REF genotype (an ALT `.` record without GT is HOM_REF,
+  vcf/bulk_genotype_vcf_processor.py); the canonicaliser stores the `<DUP>`/`<DEL>` as `<DUP:CHROM>`/`<DEL:CHROM>`
   (@see snpdb.whole_chromosome_variants). Its NDC (depth against the expected ploidy, 1.5 for a trisomy) is the VCF's
-  copy ratio field, so SampleNode's gain/loss thresholds pick mosaics. A euploid sample's file imports with no
-  variants. The header's estimated sex karyotype, reference karyotype and autosome depth are kept as the sample's
-  SamplePloidy (vcf/vcf_import.py:set_sample_ploidy_from_header, single-sample VCFs only, replaced on reload); the
-  euploid chromosomes' depths are not stored.
+  copy ratio field, so SampleNode's gain/loss thresholds pick mosaics. The header's estimated sex karyotype, reference karyotype and autosome depth are kept as the sample's
+  SamplePloidy (vcf/vcf_import.py:set_sample_ploidy_from_header, single-sample VCFs only, replaced on reload).
 - A `<DUP>`/`<DEL>` from any caller that covers most of a chromosome without being whole-chromosome
   (snpdb/whole_chromosome_variants.py:is_whole_chromosome_near_miss) is stored as written, with an import message and a
   Rollbar report (vcf/abstract_bulk_vcf_processor.py:AbstractBulkVCFProcessor.get_ref_alt_svlen).

@@ -408,13 +408,20 @@ def search_variant_symbolic(search_input: SearchInputInstance):
     return yield_search_variant_match(search_input, VariantCoordinate.from_symbolic_match)
 
 
+_WHOLE_CHROMOSOME_SEARCH_MESSAGES = {
+    VCFSymbolicAllele.DUP_CHROM: "Whole chromosome gain of chr{chrom}",
+    VCFSymbolicAllele.DEL_CHROM: "Whole chromosome loss of chr{chrom}",
+    VCFSymbolicAllele.CNV_CHROM: "chr{chrom} at the expected copy number",
+}
+
+
 @search_receiver(
     search_type=Variant,
     pattern=WHOLE_CHROMOSOME_SEARCH_PATTERN,
     sub_name="Whole chromosome",
     example=SearchExample(
         note="A whole chromosome gained or lost - its samples are everyone with it",
-        examples=["trisomy 21", "monosomy X", "chr21 gain", "loss of chrX"]
+        examples=["trisomy 21", "monosomy X", "chr21 gain", "loss of chrX", "chr21 normal"]
     )
 )
 def search_variant_whole_chromosome(search_input: SearchInputInstance):
@@ -427,7 +434,7 @@ def search_variant_whole_chromosome(search_input: SearchInputInstance):
         variants_qs = get_visible_variants(search_input, genome_build)
         for variant in variants_qs.filter(locus__contig=contig, locus__position=WHOLE_CHROMOSOME_POSITION,
                                           alt__seq=alt):
-            message = f"Whole chromosome {'gain' if alt == VCFSymbolicAllele.DUP_CHROM else 'loss'} of chr{chrom}"
+            message = _WHOLE_CHROMOSOME_SEARCH_MESSAGES[alt].format(chrom=chrom)
             yield SearchResult(variant.preview, messages=[SearchMessage(message, severity=LogLevel.INFO)])
 
 

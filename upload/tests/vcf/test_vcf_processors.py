@@ -10,6 +10,7 @@ from django.test import TestCase, override_settings
 from annotation.fake_data import get_fake_annotation_version
 from library.genomics.vcf_enums import UNDECLARED_FILTERS_INFO, VCFSymbolicAllele
 from library.utils import sha256sum_str
+from patients.enums import Zygosity
 from snpdb.enums import ImportSource
 from snpdb.models import Sequence, VCFFilter
 from snpdb.models.models_vcf import SamplePloidy
@@ -112,19 +113,26 @@ class TestVCFProcessors(TestCase):
         vcf_filename = os.path.join(self.TEST_DATA_DIR, "sample1_hg19.vcf")
         self._test_genotype_processor(vcf_filename, BulkGenotypeVCFProcessor)
 
-    def test_dragen_ploidy_record_is_whole_chromosome(self):
-        """ #2908 - the trisomy's <DUP> over all of chr21 resolves to the <DUP:CHROM> Variant """
-        chrom_gain = Sequence.objects.get_or_create(seq=VCFSymbolicAllele.DUP_CHROM,
-                                                    seq_sha256_hash=sha256sum_str(VCFSymbolicAllele.DUP_CHROM))[0]
-        Sequence.objects.get_or_create(seq="N", seq_sha256_hash=sha256sum_str("N"))
+    def test_dragen_ploidy_records_are_whole_chromosome(self):
+        """ #2908 - the trisomy's <DUP> over all of chr21 resolves to the <DUP:CHROM> Variant.
+            #2915 - each euploid chromosome's reference span to <CNV:CHROM>, HOM_REF as it has no GT """
+        sequence_ids = {seq: Sequence.objects.get_or_create(seq=seq, seq_sha256_hash=sha256sum_str(seq))[0].pk
+                        for seq in (VCFSymbolicAllele.DUP_CHROM, VCFSymbolicAllele.CNV_CHROM, "N")}
         vcf_filename = os.path.join(self.TEST_DATA_DIR, "dragen_ploidy", "trisomy21.ploidy.vcf")
         vcf_reader = cyvcf2.VCF(vcf_filename)
         upload_step, uploaded_vcf = self._create_fake_upload_step_and_vcf(vcf_filename, vcf_reader)
         processor = BulkGenotypeVCFProcessor(upload_step, uploaded_vcf.vcf.cohort.cohort_genotype_collection,
                                              uploaded_vcf, None)
-        dup = next(v for v in vcf_reader if v.ALT)  # The pipeline drops the reference spans before this
-        _variant_coordinate, variant_hash = processor.process_entry(dup)
-        self.assertEqual((1, chrom_gain.pk, 46709982), (variant_hash.position, variant_hash.alt, variant_hash.svlen))
+        calls = {}
+        for record in vcf_reader:
+            _variant_coordinate, variant_hash = processor.process_entry(record)
+            zygosity = processor.locus_cohort_genotypes[-1][4]
+            calls[record.CHROM] = (variant_hash.position, variant_hash.alt, variant_hash.svlen, zygosity)
+        self.assertEqual((1, sequence_ids[VCFSymbolicAllele.DUP_CHROM], 46709982, Zygosity.UNKNOWN_ZYGOSITY),
+                         calls.pop("chr21"))
+        self.assertEqual(23, len(calls))
+        self.assertEqual({(1, sequence_ids[VCFSymbolicAllele.CNV_CHROM], Zygosity.HOM_REF)},
+                         {(position, alt, zygosity) for position, alt, _svlen, zygosity in calls.values()})
         self.assertEqual("NDC", uploaded_vcf.vcf.copy_number_field)
         self.assertEqual([], processor.whole_chromosome_near_misses)
 

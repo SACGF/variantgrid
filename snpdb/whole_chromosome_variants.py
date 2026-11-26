@@ -11,9 +11,9 @@ gives a whole-chromosome gain or loss a single representation:
   * the chromosome's real contig, position 1, ref the fasta base there (N on every standard human contig)
   * alt <DUP:CHROM> or <DEL:CHROM> (library/genomics/vcf_enums.py:WHOLE_CHROMOSOME_ALTS) - gain/loss rather
     than trisomy/monosomy because the copy number is the sample's, not the variant's (as GeneLevelSymbolicAlt)
-  * svlen = contig length - 1, positive for both, so end = the contig length
+  * svlen = contig length - 1, positive for all three alts, so end = the contig length
 
-So there are exactly two whole-chromosome Variants per chromosome per build. A real contig rather than the
+So there are exactly three whole-chromosome Variants per chromosome per build, the third the euploid one below. A real contig rather than the
 gene-level one because the event has a chromosome: nodes narrow by contig, region filters and IGV read
 position and end, and the gene overlaps come from the interval like any other SV too long for VEP.
 
@@ -31,6 +31,21 @@ first usable bin: past the telomere's N on most chromosomes, anywhere from the f
 the q arm on an acrocentric (chr21 has sequence from 5 Mb, euchromatin from 13 Mb), and outside the PARs on chrY,
 which analysis-set references mask. The slack is smaller than the terminal bands, so a call missing one
 (eg a chr21 dup ending before q22.3) is a partial gain or loss, as is any arm.
+
+## Euploid chromosomes (#2915)
+
+A ploidy caller writes each euploid chromosome as a reference span (ALT '.', END the contig's end, no GT).
+That is a measurement - the chromosome is at the expected copy number for the sample's karyotype, so a male's
+single chrX is euploid - and "tested and normal for chr21" is worth keeping. A reference span reaching the same
+slack (is_whole_chromosome_span) is stored as <CNV:CHROM>, the spec's CNV being a "region of uniform copy
+number (may be deletion, duplication or copy number neutral)": vcf_clean_and_filter keeps it where it skips
+any other reference span, and the importer's whole_chromosome_reference_alt reads it as <CNV:CHROM>. Its
+genotype is HOM_REF, as for any ALT '.' record in a VCF without GT
+(upload/vcf/bulk_genotype_vcf_processor.py), so SampleNode shows it only with ref ticked
+(analysis/models/nodes/sources/sample_node.py:SampleNode._get_zygosities) and it is not a call in the sample's stats.
+
+A caller's whole-chromosome <CNV> has no direction and is stored as written, so <CNV:CHROM> is only ever a
+reference call.
 
 A <DUP>/<DEL> that misses the slack but covers VARIANT_WHOLE_CHROMOSOME_NEAR_MISS_FRACTION (90%) of the span
 (is_whole_chromosome_near_miss) is stored as written, and the VCF import says it may have been a whole
@@ -74,7 +89,8 @@ WHOLE_CHROMOSOME_ALT_FOR_SV_ALT = {
 
 WHOLE_CHROMOSOME_POSITION = 1
 
-# ISCN's sign for a whole chromosome gained or lost, and the word the label and badge say
+# ISCN's sign for a whole chromosome gained or lost, and the word the label and badge say. A euploid
+# chromosome has no ISCN abnormality, so is labelled by its contig
 _ISCN_SIGNS = {
     VCFSymbolicAllele.DUP_CHROM: "+",
     VCFSymbolicAllele.DEL_CHROM: "-",
@@ -82,13 +98,14 @@ _ISCN_SIGNS = {
 _LABEL_WORDS = {
     VCFSymbolicAllele.DUP_CHROM: "GAIN",
     VCFSymbolicAllele.DEL_CHROM: "LOSS",
+    VCFSymbolicAllele.CNV_CHROM: "NORMAL",
 }
 
 _SEARCH_CHROM = r"(?:chr(?:omosome)?\s*)?([0-9]{1,2}|X|Y)"
-# "trisomy 21", "monosomy X", "chr21 gain", "gain of chr21", and the ISCN "+21" / "-X" alone or as labelled
-# ("+21 GAIN")
+# "trisomy 21", "monosomy X", "chr21 gain", "gain of chr21", the ISCN "+21" / "-X" alone or as labelled
+# ("+21 GAIN"), and a euploid one as labelled ("chr21 NORMAL")
 WHOLE_CHROMOSOME_SEARCH_PATTERN = re.compile(
-    rf"^(?:(trisomy|monosomy)\s*{_SEARCH_CHROM}|{_SEARCH_CHROM}\s+(gain|loss)|(gain|loss)\s+of\s+{_SEARCH_CHROM}"
+    rf"^(?:(trisomy|monosomy)\s*{_SEARCH_CHROM}|{_SEARCH_CHROM}\s+(gain|loss|normal)|(gain|loss)\s+of\s+{_SEARCH_CHROM}"
     rf"|([+-])\s*([0-9]{{1,2}}|X|Y)(?:\s+(?:gain|loss))?)$",
     re.IGNORECASE)
 _SEARCH_WORD_ALTS = {
@@ -98,6 +115,7 @@ _SEARCH_WORD_ALTS = {
     "monosomy": VCFSymbolicAllele.DEL_CHROM,
     "loss": VCFSymbolicAllele.DEL_CHROM,
     "-": VCFSymbolicAllele.DEL_CHROM,
+    "normal": VCFSymbolicAllele.CNV_CHROM,
 }
 
 
@@ -107,15 +125,27 @@ def _uncalled_ends(position: int, end: int, span: tuple[int, int]) -> tuple[int,
     return max(0, position - span_start), max(0, span_end - end)
 
 
-def whole_chromosome_alt(alt: str, position: int, end: int, span: Optional[tuple[int, int]]) -> Optional[str]:
-    """ <DUP:CHROM>/<DEL:CHROM> for a <DUP>/<DEL> reaching within VARIANT_WHOLE_CHROMOSOME_END_SLACK of each end
-        of span, else None. span is Cytoband.get_whole_chromosome_span - None for a contig with no bands """
-    whole_alt = WHOLE_CHROMOSOME_ALT_FOR_SV_ALT.get(alt)
-    if whole_alt is None or span is None:
-        return None
+def is_whole_chromosome_span(position: int, end: int, span: Optional[tuple[int, int]]) -> bool:
+    """ position..end reaches within VARIANT_WHOLE_CHROMOSOME_END_SLACK of each end of span.
+        span is Cytoband.get_whole_chromosome_span - None for a contig with no bands """
+    if span is None:
+        return False
     slack = settings.VARIANT_WHOLE_CHROMOSOME_END_SLACK
-    if all(uncalled <= slack for uncalled in _uncalled_ends(position, end, span)):
+    return all(uncalled <= slack for uncalled in _uncalled_ends(position, end, span))
+
+
+def whole_chromosome_alt(alt: str, position: int, end: int, span: Optional[tuple[int, int]]) -> Optional[str]:
+    """ <DUP:CHROM>/<DEL:CHROM> for a <DUP>/<DEL> spanning the whole chromosome, else None """
+    whole_alt = WHOLE_CHROMOSOME_ALT_FOR_SV_ALT.get(alt)
+    if whole_alt and is_whole_chromosome_span(position, end, span):
         return whole_alt
+    return None
+
+
+def whole_chromosome_reference_alt(position: int, end: int, span: Optional[tuple[int, int]]) -> Optional[str]:
+    """ <CNV:CHROM> for a reference span (ALT '.' with END) over the whole chromosome - a euploid one - else None """
+    if is_whole_chromosome_span(position, end, span):
+        return VCFSymbolicAllele.CNV_CHROM
     return None
 
 
@@ -144,10 +174,11 @@ def whole_chromosome_iscn(chrom: str, alt: str) -> Optional[str]:
 
 
 def whole_chromosome_label(chrom: str, alt: str) -> Optional[str]:
-    """ "+21 GAIN" - as the grid's label and badge (variantgrid_formats.js:WHOLE_CHROMOSOME_KINDS) """
-    if iscn := whole_chromosome_iscn(chrom, alt):
-        return f"{iscn} {_LABEL_WORDS[alt]}"
-    return None
+    """ "+21 GAIN", "chr21 NORMAL" - as the grid's label and badge (variantgrid_formats.js:WHOLE_CHROMOSOME_KINDS) """
+    if not (word := _LABEL_WORDS.get(alt)):
+        return None
+    name = whole_chromosome_iscn(chrom, alt) or ("chr" + re.sub(r"^chr", "", chrom, flags=re.IGNORECASE))
+    return f"{name} {word}"
 
 
 def parse_whole_chromosome_search(text: str) -> Optional[tuple[str, str]]:

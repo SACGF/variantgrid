@@ -305,13 +305,41 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
     # ── Query ─────────────────────────────────────────────────────────────────
 
     def _get_zygosities(self, sample: Optional[Sample] = None) -> list[str]:
-        """ Empty means no zygosity filter - a VCF without GT has nothing to filter on """
-        if sample and not sample.has_genotype:
-            return []
+        """ The zygosity codes kept - empty means no zygosity filter.
 
+            A VCF without GT has no het or hom (@see _get_possible_zygosities), so ref is the one choice that
+            applies to it: everything but its reference genotypes is kept, and those when ref is ticked """
         if sample and (override := self.get_sample_filter(sample)) and override.zygosity is not None:
-            return list(override.zygosity)
-        return list(self.get_node_zygosity())
+            zygosities = list(override.zygosity)
+        else:
+            zygosities = list(self.get_node_zygosity())
+        if sample and not sample.has_genotype:
+            return [code for _, code in self.ZYGOSITY_FIELD_CODES
+                    if code != Zygosity.HOM_REF or code in zygosities]
+        return zygosities
+
+    @classmethod
+    def _get_possible_zygosities(cls, sample: Optional[Sample] = None) -> list[str]:
+        """ What a sample's calls can be stored as. Without GT the importer writes unknown zygosity, or
+            HOM_REF for a reference genotype (ALT '.') """
+        if sample and not sample.has_genotype:
+            return [Zygosity.HOM_REF, Zygosity.UNKNOWN_ZYGOSITY]
+        return [code for _, code in cls.ZYGOSITY_FIELD_CODES]
+
+    def _get_kept_zygosities(self, sample: Optional[Sample] = None) -> list[str]:
+        """ The codes the query keeps, in checkbox order - no filter keeps them all """
+        zygosities = self._get_zygosities(sample)
+        return [code for _, code in self.ZYGOSITY_FIELD_CODES if not zygosities or code in zygosities]
+
+    def _get_shown_zygosities(self, sample: Optional[Sample] = None) -> list[str]:
+        """ The codes kept that the sample's calls can be - what the zygosity chip draws """
+        possible = self._get_possible_zygosities(sample)
+        return [code for code in self._get_kept_zygosities(sample) if code in possible]
+
+    def _get_filtered_zygosities(self, sample: Optional[Sample] = None) -> list[str]:
+        """ The codes shown, or empty when that is everything the sample's calls can be """
+        shown = self._get_shown_zygosities(sample)
+        return [] if len(shown) == len(self._get_possible_zygosities(sample)) else shown
 
     def get_zygosity_description(self, sample: Optional[Sample] = None):
         zygosities = self._get_zygosities(sample or self.sample)
@@ -337,7 +365,7 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         arg_q_dict = {}
         # The zygosity IN is also what restricts the outer join to this sample's rows, so with nothing
         # to filter on it becomes "any zygosity" rather than being left out
-        zygosity = self._get_zygosities(sample) or [code for _, code in self.ZYGOSITY_FIELD_CODES]
+        zygosity = self._get_kept_zygosities(sample)
         alias, field = sample.get_cohort_genotype_alias_and_field("zygosity")
         q = Q(**{f"{field}__in": zygosity})
         arg_q_dict[alias] = {str(q): q}
@@ -513,11 +541,8 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         if filter_code not in (0, 1):
             return None  # Custom filters defeat the cache
 
-        # The query treats an empty selection as no filter, so the cache has to count everything too
-        if selected := self._get_zygosities(self.sample):
-            zygosities = [code in selected for _, code in self.ZYGOSITY_FIELD_CODES]
-        else:
-            zygosities = [True] * len(self.ZYGOSITY_FIELD_CODES)
+        kept = self._get_kept_zygosities(self.sample)
+        zygosities = [code in kept for _, code in self.ZYGOSITY_FIELD_CODES]
 
         return get_cached_label_count_for_cohort(
             cohort=self.sample.vcf.cohort,
@@ -561,11 +586,12 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         return f"node-icon-sample-{sex}{deceased}"
 
     # The prefix names the shape stored, so a deploy that changes it doesn't read a day old one
-    @cache_memoize(DAY_SECS, prefix="SampleNode._get_card_data.vcf_ids",
+    @cache_memoize(DAY_SECS, prefix="SampleNode._get_card_data.zygosities",
                    args_rewrite=lambda s: (s.pk, s.version))
     def _get_card_data(self) -> dict:
-        """ Everything the canvas card draws that needs the database - the pedigree badge, and the
-            specimen -> extraction -> VCF tree of what the node actually reads, each VCF as (pk, name).
+        """ Everything the canvas card draws that needs the database - the pedigree badge, the
+            specimen -> extraction -> VCF tree of what the node actually reads, each VCF as (pk, name),
+            and the zygosities kept: the node's, and each sample's that differs (an override, a VCF without GT).
 
             Memoized together because get_rendering_dict runs for every node on every analysis
             render, and walking to the patient is up to three FK hops """
@@ -585,12 +611,26 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             else:
                 unlinked_vcfs.append(vcf)
 
+        if self.source_level == SampleSourceLevel.SAMPLE:
+            zygosities = self._get_filtered_zygosities(self.sample)
+            sample_zygosities = []
+        else:
+            zygosities = self._get_filtered_zygosities()
+            node_kept = self._get_kept_zygosities()
+            sample_zygosities = []
+            for sample in group.samples:
+                possible = self._get_possible_zygosities(sample)
+                if (shown := self._get_shown_zygosities(sample)) != [z for z in node_kept if z in possible]:
+                    sample_zygosities.append((sample.name, shown))
+
         return {
             "patient_badge": self._get_patient_badge(),
             "sample_vcf": (self.sample.vcf_id, str(self.sample.vcf)) if self.sample else None,
             "specimens": [dict(sp, extractions=list(sp["extractions"].values())) for sp in specimens.values()],
             "unlinked_vcfs": remove_duplicates_from_list(unlinked_vcfs),
             "warnings": group.warnings,
+            "zygosities": zygosities,
+            "sample_zygosities": sample_zygosities,
         }
 
     @cached_property
@@ -627,9 +667,9 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
                         title=f"Restricted to sample gene list: {self.sample_gene_list.gene_list.name}")
 
     def get_node_chips(self) -> list[NodeChip]:
-        """ The hierarchy from the picked object down, nested the way the relations are. Why a group
-            node returns fewer rows than it used to - a VCF was archived - is a question only the
-            canvas can answer, so what was left out gets an amber chip """
+        """ The hierarchy from the picked object down, nested the way the relations are, then the
+            zygosities kept. Why a group node returns fewer rows than it used to - a VCF was archived -
+            is a question only the canvas can answer, so what was left out gets an amber chip """
         chips = super().get_node_chips()
         if qc_gene_list_chip := self._get_qc_gene_list_chip():
             chips.append(qc_gene_list_chip)
@@ -637,13 +677,11 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             return chips
 
         data = self._get_card_data()
+        specimens = data["specimens"]
         if self.source_level == SampleSourceLevel.SAMPLE:
             # A hand picked sample leaves nothing out, so there's no tree to walk
             chips.append(self._vcf_chip([data["sample_vcf"]]))
-            return chips
-
-        specimens = data["specimens"]
-        if self.source_level == SampleSourceLevel.EXTRACTION:
+        elif self.source_level == SampleSourceLevel.EXTRACTION:
             extractions = specimens[0]["extractions"] if specimens else []
             chips.extend(self._extraction_chip(e) for e in extractions)
         elif self.source_level == SampleSourceLevel.SPECIMEN:
@@ -653,10 +691,22 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
             if unlinked_vcfs := data["unlinked_vcfs"]:
                 chips.append(self._vcf_chip(unlinked_vcfs))
 
+        if zygosity_chip := self._zygosity_chip(data["zygosities"], data["sample_zygosities"]):
+            chips.append(zygosity_chip)
         if warnings := data["warnings"]:
             chips.append(NodeChip(text="", icon="fa-solid fa-triangle-exclamation", count=len(warnings),
                                   css_class="node-chip-warning", title="\n".join(warnings)))
         return chips
+
+    @classmethod
+    def _zygosity_chip(cls, zygosities: list[str], sample_zygosities: list) -> Optional[NodeChip]:
+        """ The zygosities kept, as glyphs - keeping every one isn't filtering, so it says nothing """
+        if not (zygosities or sample_zygosities):
+            return None
+        labels = dict(Zygosity.CHOICES)
+        lines = ["Zygosity " + (", ".join(labels[z] for z in zygosities) or "any")]
+        lines.extend(f"{name}: " + ", ".join(labels[z] for z in kept) for name, kept in sample_zygosities)
+        return NodeChip(text="", zygosities=tuple(labels[z] for z in zygosities), title="\n".join(lines))
 
     def _get_configuration_check_cohorts(self) -> list:
         if self.is_group_level:
