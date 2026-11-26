@@ -481,23 +481,33 @@ function tagClickHandler() {
    every tag is capped at the same width - the widest that still fits them all - so the longest names
    give way first and a short one keeps its whole name. As the cap narrows past reading, a tag is just
    its colour; the names are in the tooltips, and hovering lifts the set out at full size.
-   Measured from the tags' own widths against the cell's - the columns are fixed width - and redone
-   whenever a cell's tags change. A cell that isn't laid out yet (a grid drawn while hidden) has no
-   width to measure, so it's fitted once it has one. @see .grid-tags */
-const unmeasuredGridTagsObserver = new ResizeObserver(function(entries) {
-    const laidOut = [];
+   Measured from the tags' own widths against the cell's, and redone whenever a cell's tags change or
+   its width does - a column dragged wider or narrower, or a grid drawn while hidden getting a width
+   once it's shown. @see .grid-tags */
+const gridTagsCellWidths = new WeakMap();
+const gridTagsCellObserver = new ResizeObserver(function(entries) {
+    const resized = [];
     for (const entry of entries) {
-        if (entry.contentRect.width > 0 || !entry.target.isConnected) {  // Fitted, or redrawn away
-            unmeasuredGridTagsObserver.unobserve(entry.target);
-            if (entry.target.isConnected) {
-                laidOut.push(entry.target);
+        const width = entry.contentRect.width;
+        if (width !== gridTagsCellWidths.get(entry.target)) {  // Not a height change, or re-observing
+            gridTagsCellWidths.set(entry.target, width);
+            if (width > 0) {
+                resized.push(entry.target);
             }
         }
     }
-    if (laidOut.length) {
-        fitGridTags($(laidOut).children(".grid-tags"));
+    if (resized.length) {
+        fitGridTags($(resized).children(".grid-tags"));
     }
 });
+
+// Observing a cell fits it (a first observation always reports), so this is also how a draw's cells are fitted
+function observeGridTagsCells() {
+    gridTagsCellObserver.disconnect();  // Drops the cells earlier draws removed
+    $(".grid-tags").parent().each(function() {
+        gridTagsCellObserver.observe(this);
+    });
+}
 
 function fitGridTags(containers) {
     const MIN_TAG_WIDTH = 6;
@@ -524,9 +534,7 @@ function fitGridTags(containers) {
     containers.removeClass("grid-tags-measuring");
     containers.each(function(i) {
         const cap = capsByContainer[i];
-        if (cap === undefined) {
-            unmeasuredGridTagsObserver.observe(this.parentElement);
-        } else if (cap !== null) {
+        if (cap !== undefined && cap !== null) {  // undefined: no width yet, the observer fits it when it has one
             const width = Math.max(cap, MIN_TAG_WIDTH);
             this.style.setProperty("--grid-tag-cap", width + "px");
             $(this).addClass("grid-tags-crowded").toggleClass("grid-tags-compact", width < COMPACT_TAG_WIDTH);
@@ -558,7 +566,7 @@ function gridTagWidthCap(tagWidths, available) {
 // Kicked off after every grid draw, alongside the page's own gridComplete
 function gridCompleteExtra() {
     FloatingPanel.hide();  // A tag entry or sort menu raised off the last draw's cells is stale now
-    fitGridTags($(".grid-tags"));
+    observeGridTagsCells();
     const aWin = getAnalysisWindow();
     if (!aWin.variantTagsReadOnly) {
         $(".grid-tag-deletable").click(tagClickHandler);
