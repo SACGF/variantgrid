@@ -3,16 +3,17 @@ Creating the VCF and Sample rows from an uploaded file's header: create_vcf_from
 create_vcf_from_vcf read the header only, resolve_genome_build (header, then what was declared at
 upload, then the source's fallback), configure_vcf_from_header binds the sample FORMAT fields
 (overridable per source through VCFSourceSettings in handle_vcf_source), clear_format_fields_not_in_records
-unbinds the ones no record uses once preprocess has read them all, create_cohort_genotype_collection_from_vcf
-makes the automatic cohort, and uploaded_vcf_configured_signal lets seqauto link sequencing records. import_vcf_file
-is the per-split-file genotype import that runs in parallel. Steps are wired in
-upload/import_task_factories/.
+unbinds the ones no record uses once preprocess has read them all, set_sample_ploidy_from_header keeps a
+ploidy caller's sex karyotype, create_cohort_genotype_collection_from_vcf makes the automatic cohort, and
+uploaded_vcf_configured_signal lets seqauto link sequencing records. import_vcf_file is the per-split-file
+genotype import that runs in parallel. Steps are wired in upload/import_task_factories/.
 """
 import logging
 import os
 import re
 import sys
 import traceback
+from dataclasses import asdict
 from typing import Any, Optional
 
 import cyvcf2
@@ -22,6 +23,7 @@ from django.db.models.query_utils import Q
 from django.urls.base import reverse
 from django.utils import timezone
 
+from library.genomics.ploidy_vcf_header import read_ploidy_header
 from library.genomics.vcf_enums import VCFConstant
 from library.guardian_utils import assign_permission_to_user_and_groups
 from library.utils import invert_dict
@@ -40,6 +42,7 @@ from snpdb.models import (
     VCFSourceSettings,
 )
 from snpdb.models.models_genome import GenomeBuild
+from snpdb.models.models_vcf import SamplePloidy
 from snpdb.tasks.cohort_genotype_tasks import create_cohort_genotype_collection
 from snpdb.vcf_utils import (
     cyvcf2_get_contig_lengths_dict,
@@ -398,7 +401,19 @@ def configure_vcf_from_header(vcf, vcf_reader):
         }
         Sample.objects.update_or_create(vcf=vcf, vcf_sample_name=sample_name, defaults=sample_defaults)
 
+    set_sample_ploidy_from_header(vcf)
     handle_vcf_source(vcf)
+
+
+def set_sample_ploidy_from_header(vcf):
+    """ A ploidy caller's header is about the one sample it was run on, so a multi-sample VCF's is ignored """
+    samples = list(vcf.sample_set.all())
+    if (ploidy_header := read_ploidy_header(vcf.header)) and len(samples) == 1:
+        SamplePloidy.objects.update_or_create(sample=samples[0], defaults=asdict(ploidy_header))
+    else:
+        if ploidy_header:
+            logging.warning("VCF %d: ignored the ploidy header of a %d sample VCF", vcf.pk, len(samples))
+        SamplePloidy.objects.filter(sample__vcf=vcf).delete()  # A reload's file may no longer have one
 
 
 def handle_vcf_source(vcf):

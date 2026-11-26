@@ -173,7 +173,7 @@ def _xlinked_recessive_errors(proband_sample, proband_sex: Sex, mother_affected:
         error = "X-linked recessive inheritance doesn't currently work with female proband"
         if proband_sample.detected_sex == Sex.MALE:
             # eg a male fetus in a prenatal case entered under the mother's record
-            error += " - though chrX genotypes detected male, so set the proband sex in the wizard"
+            error += " - though the sample's detected sex is male, so set the proband sex in the wizard"
         errors.append(error)
     elif mother_affected:
         errors.append("X-linked recessive inheritance requires an unaffected mother")

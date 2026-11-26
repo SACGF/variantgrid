@@ -69,7 +69,7 @@ class TestXLinkedRecessiveProbandSex(TestCase):
         self._set_detected_male()
         errors = self._get_errors()
         self.assertEqual(1, len(errors))
-        self.assertIn("chrX genotypes detected male", errors[0])
+        self.assertIn("detected sex is male", errors[0])
 
     def test_trio_proband_sex_overrides_patient_record(self):
         """ Scientist resolved the mismatch in the trio wizard """

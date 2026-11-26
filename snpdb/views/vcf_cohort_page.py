@@ -14,7 +14,6 @@ from django.urls.base import reverse
 from annotation.models import AnnotationVersion
 from annotation.tasks.calculate_sample_stats import enqueue_cohort_stats_recompute
 from library.django_utils.data_archive_mixin import DataArchivedError
-from patients.enums import Sex
 from patients.models.models_phenotype import patient_phenotypes_for_samples
 from snpdb.forms import SampleChoiceForm, VCFChoiceForm
 from snpdb.models import (
@@ -58,7 +57,7 @@ def sample_membership_rows(samples: list[Sample]) -> list[dict]:
             "vcf_name": sample.vcf.name,
             "het_hom": f"{stats.het_count:,} / {stats.hom_count:,}" if stats else None,
             "variant_contents": variant_contents_chips(sample_variant_contents.get(sample.pk)),
-            "sex": (stats.chrx_sex_guess if stats else Sex.UNKNOWN).label,
+            "sex": sample.get_detected_sex(stats)[0].label,
             "patient_id": sample.patient_id,
         })
     return rows

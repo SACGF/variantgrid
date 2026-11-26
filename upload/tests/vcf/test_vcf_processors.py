@@ -12,6 +12,7 @@ from library.genomics.vcf_enums import UNDECLARED_FILTERS_INFO, VCFSymbolicAllel
 from library.utils import sha256sum_str
 from snpdb.enums import ImportSource
 from snpdb.models import Sequence, VCFFilter
+from snpdb.models.models_vcf import SamplePloidy
 from upload.enums import ModifiedImportedVariantOperation, UploadedFileTypes
 from upload.models import (
     FileUpload,
@@ -126,6 +127,15 @@ class TestVCFProcessors(TestCase):
         self.assertEqual((1, chrom_gain.pk, 46709982), (variant_hash.position, variant_hash.alt, variant_hash.svlen))
         self.assertEqual("NDC", uploaded_vcf.vcf.copy_number_field)
         self.assertEqual([], processor.whole_chromosome_near_misses)
+
+    def test_dragen_ploidy_header_is_the_samples_karyotype(self):
+        """ #2911 - the header's estimated sex karyotype is kept on the sample """
+        vcf_filename = os.path.join(self.TEST_DATA_DIR, "dragen_ploidy", "trisomy21.ploidy.vcf")
+        upload_step = self._create_fake_upload_step(vcf_filename)
+        vcf = create_vcf_from_vcf(upload_step, cyvcf2.VCF(vcf_filename))
+        ploidy = SamplePloidy.objects.get(sample__vcf=vcf)
+        self.assertEqual(("XY", "XY", 35.1771), (ploidy.sex_karyotype, ploidy.reference_sex_karyotype,
+                                                 ploidy.autosome_depth_of_coverage))
 
     def test_whole_chromosome_near_miss_is_reported(self):
         """ #2908 - a <DUP> over 92% of chr2 is stored as written, and the uploader and Rollbar are told """

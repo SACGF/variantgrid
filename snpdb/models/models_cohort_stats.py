@@ -32,12 +32,16 @@ MIN_CHRX_VARIANTS_FOR_SEX_GUESS = 30
 CHRX_FEMALE_MAX_HOM_HET_RATIO = 1.5
 CHRX_MALE_MIN_HOM_HET_RATIO = 5
 
-DETECTED_SEX_HELP = (
+CHRX_SEX_HELP = (
     "Sex called from the sample's chrX hom/het genotype ratio - males are hemizygous so have almost "
     f"no heterozygous chrX calls. Above {CHRX_MALE_MIN_HOM_HET_RATIO} is male, below "
     f"{CHRX_FEMALE_MAX_HOM_HET_RATIO} is female, in between is unknown, and it takes at least "
     f"{MIN_CHRX_VARIANTS_FOR_SEX_GUESS} chrX calls to call it at all. Structural variants and the "
     "pseudoautosomal regions aren't counted."
+)
+DETECTED_SEX_HELP = (
+    "A ploidy caller's sex karyotype estimated from depth (a DRAGEN ploidy VCF's header), for this sample or "
+    f"another sample of the same extraction. Without one: {CHRX_SEX_HELP}"
 )
 
 
@@ -168,8 +172,12 @@ class CohortGenotypeStats(TimeStampedModel):
         return Sex.UNKNOWN
 
     @property
+    def chrx_sex_help(self) -> str:
+        return f"{CHRX_SEX_HELP} {self.chrx_sex_detail}"
+
+    @property
     def chrx_sex_detail(self) -> str:
-        """ The chrX counts chrx_sex_guess was made on - shown alongside DETECTED_SEX_HELP """
+        """ The chrX counts chrx_sex_guess was made on - shown alongside CHRX_SEX_HELP """
         detail = f"This sample: {self.x_hom_count} hom / {self.x_het_count} het"
         ratio = self.chrx_hom_het_ratio
         if ratio is not None:

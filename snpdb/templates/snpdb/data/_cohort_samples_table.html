@@ -65,7 +65,7 @@
             {% endif %}
                 <td class="vcf-sample-name">{{ form.vcf_sample_name }}{{ form.vcf_sample_name.errors }}</td>
                 <td class="sample-name">{{ form.name }}{{ form.name.errors }}</td>
-                <td>{% detected_sex sample_genotype_stats|get_item:form.instance.pk %}</td>
+                <td>{% detected_sex form.instance sample_genotype_stats|get_item:form.instance.pk %}</td>
                 <td>
                     <div class="sample-patient display-flex">
                         <a class="patient-link" title="View patient">{% preview_icon_for_model "patients.Patient" %}</a>

@@ -111,7 +111,7 @@
                                     </div>
                                     <span class="proband-affected text-muted small">Always</span>
                                 </td>
-                                <td>{% detected_sex row.sample.get_genotype_stats %}</td>
+                                <td>{% detected_sex row.sample %}</td>
                                 <td>{% if row.sample.patient %}<a href="{{ row.sample.patient.get_absolute_url }}">{{ row.sample.patient }}</a>{% endif %}</td>
                                 <td id='patient-results-{{ row.index }}'></td>
                             </tr>

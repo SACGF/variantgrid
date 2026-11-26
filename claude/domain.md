@@ -89,6 +89,11 @@ a Sample is one sample column of it. `VCF.has_sample_columns`, `has_genotype` (G
 are separate facts - a depth-only caller has sample columns without a genotype. Permissions cascade from the VCF; deleting from the UI is a soft delete
 (`ImportStatus.MARKED_FOR_DELETION`) finished by a celery task. Uploads arrive through the upload app (below).
 
+**Detected sex / sex karyotype** - `snpdb/models/models_vcf.py:Sample.get_detected_sex`. A sample's sex from its DNA, to set
+against the patient record: a ploidy caller's sex karyotype (`snpdb/models/models_vcf.py:SamplePloidy`, read from a DRAGEN
+ploidy VCF's `##estimatedSexKaryotype`) for the sample or another of the same extraction, else the chrX hom/het guess
+(`snpdb/models/models_cohort_stats.py:CohortGenotypeStats.chrx_sex_guess`). Any Y is male, X alone female, so XXY is male.
+
 **Cohort / CohortSample** - `snpdb/models/models_cohort.py:Cohort`, `CohortSample`. An ordered set of Samples. Every VCF has
 an automatic cohort of all its samples; custom cohorts pick across VCFs. Membership changes go through
 `Cohort.set_samples` (one version bump, one genotype rebuild), never a bulk update. A Cohort also carries its own

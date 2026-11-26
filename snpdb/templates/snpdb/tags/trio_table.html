@@ -32,7 +32,7 @@
                         <span class="text-muted">Unaffected</span>
                     {% endif %}
                 </td>
-                <td>{% detected_sex sample.get_genotype_stats %}</td>
+                <td>{% detected_sex sample %}</td>
                 <td>
                     {% if sample.patient %}
                         {% preview_icon sample.patient %}
