@@ -1,7 +1,8 @@
 """
 The imported VCF and its samples: `VCF` (header, which FORMAT/INFO fields carried depths, genotype, copy number,
 import status, archive state), `Sample`, the header's `VCFInfo` / `VCFFormat` / `VCFFilter`, `SampleFilePath`
-(BAM/CRAM), per-sample stats and locus counts, and `VCFSourceSettings` (import tweaks keyed on the `source`
+(BAM/CRAM), `SamplePloidy` (a ploidy caller's sex karyotype, which `Sample.detected_sex` prefers),
+per-sample stats and locus counts, and `VCFSourceSettings` (import tweaks keyed on the `source`
 header). The `has_*` properties say which genotype data the file actually had, so callers can hide filters that
 would mean nothing. Permission can be granted on a whole VCF or a single sample, so use `Sample.filter_for_user`,
 never a VCF lookup alone; both hide VCFs in a deletion state.
@@ -18,7 +19,7 @@ from django.contrib.auth.models import Group, User
 from django.contrib.postgres.fields.array import ArrayField
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied, ValidationError
 from django.db import models
-from django.db.models import Field, Lookup
+from django.db.models import Case, Field, Lookup, When
 from django.db.models.deletion import CASCADE, SET_NULL
 from django.db.models.functions import Substr
 from django.db.models.query_utils import Q
@@ -42,6 +43,9 @@ from snpdb.enums import ImportStatus, SampleFileType, VariantOrigin, VCFInfoType
 from snpdb.models.models import CodeVersionMixin, LabProject
 from snpdb.models.models_genome import GenomeBuild
 from snpdb.models.models_variant import AlleleSource, Variant
+
+# One or more X then any Ys - the X0 of monosomy X is matched separately
+SEX_KARYOTYPE_PATTERN = re.compile(r"(X+)(Y*)")
 
 
 @Field.register_lookup
@@ -486,12 +490,32 @@ class Sample(GuardianPermissionsMixin, SortByPKMixin, SvgSymbolPreviewIconMixin,
                                                    filter_key__isnull=True, passing_filter=False).first()
 
     @cached_property
+    def ploidy(self) -> Optional['SamplePloidy']:
+        """ A ploidy caller's result for this sample's DNA: its own, else the latest from another sample of the
+            same extraction - a DRAGEN ploidy VCF is a separate upload from the small variant VCF. Not from the
+            patient's other samples, whose specimens can differ (mosaicism, a tumour that has lost chrY) """
+        ploidy_qs = SamplePloidy.objects.select_related("sample")
+        if self.extraction_id:
+            ploidy_qs = ploidy_qs.filter(Q(sample=self) | Q(sample__extraction_id=self.extraction_id))
+        else:
+            ploidy_qs = ploidy_qs.filter(sample=self)
+        own_first = Case(When(sample=self, then=0), default=1)
+        return ploidy_qs.order_by(own_first, "-sample_id").first()
+
+    def get_detected_sex(self, genotype_stats: Optional['CohortGenotypeStats'] = None) -> tuple[Sex, str]:
+        """ (sex, what it was detected from): the ploidy caller's sex karyotype (@see ploidy), else the chrX
+            hom/het guess. Pass genotype_stats already fetched for a table of samples to save the lookup """
+        if (ploidy := self.ploidy) and (sex := ploidy.sex) != Sex.UNKNOWN:
+            return sex, ploidy.get_sex_detail(self)
+        if stats := genotype_stats or self.get_genotype_stats():
+            return stats.chrx_sex_guess, stats.chrx_sex_detail
+        return Sex.UNKNOWN, "No sex karyotype or chrX genotype counts for this sample"
+
+    @cached_property
     def detected_sex(self) -> Sex:
-        """ Sex we detect from the sample's chrX genotypes - UNKNOWN if we have too little data.
+        """ Sex we detect from the sample's DNA - UNKNOWN if we have too little data (@see get_detected_sex).
             Compare against patient.sex (which comes from the patient record system) """
-        if stats := self.get_genotype_stats():
-            return stats.chrx_sex_guess
-        return Sex.UNKNOWN
+        return self.get_detected_sex()[0]
 
     @property
     def patient_sex(self) -> Sex:
@@ -732,6 +756,36 @@ class SampleFilePath(models.Model):
         else:
             label = ''
         return f"{self.sample}: {label}{self.file_path}"
+
+
+class SamplePloidy(models.Model):
+    """ A ploidy caller's whole-sample result, read from its VCF's header on import (@see
+        library.genomics.ploidy_vcf_header). The sex karyotype is estimated from depth, so unlike the chrX
+        hom/het guess it works on any sample and can say XXY or X0 """
+    sample = models.OneToOneField(Sample, on_delete=CASCADE, primary_key=True)
+    sex_karyotype = models.TextField()
+    # The karyotype the caller normalised depth against, so a sex chromosome's NDC is relative to its copies here
+    reference_sex_karyotype = models.TextField(null=True, blank=True)
+    autosome_depth_of_coverage = models.FloatField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.sample}: {self.sex_karyotype}"
+
+    @property
+    def sex(self) -> Sex:
+        """ Any Y is male (XY, XXY, XYY), X alone female (XX, XXX, X0) """
+        karyotype = self.sex_karyotype.upper()
+        if karyotype in ("X0", "XO"):
+            return Sex.FEMALE
+        if m := SEX_KARYOTYPE_PATTERN.fullmatch(karyotype):
+            return Sex.MALE if m.group(2) else Sex.FEMALE
+        return Sex.UNKNOWN
+
+    def get_sex_detail(self, for_sample: Sample) -> str:
+        detail = f"Sex karyotype {self.sex_karyotype}, estimated from depth by the ploidy caller (VCF header)"
+        if self.sample_id != for_sample.pk:
+            detail += f" of sample {self.sample.name}, which shares this sample's extraction"
+        return detail
 
 
 class VCFAlleleSource(AlleleSource):

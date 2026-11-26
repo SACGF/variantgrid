@@ -238,8 +238,20 @@ $(document).ready(function() {
                     <div id="patient-phenotype-text" class="text-muted"></div>
                     <a class="cross-link" id="patient-phenotype-link">View Patient</a>
                 {% endlabelled %}
-                {% detected_sex_help sample_genotype_stats as detected_sex_help_text %}
+                {% detected_sex_help sample sample_genotype_stats as detected_sex_help_text %}
                 {% labelled id="detected-sex" label="Detected Sex" help=detected_sex_help_text %}{{ sample.detected_sex.label }}{% endlabelled %}
+                {% with ploidy=sample.ploidy %}
+                    {% if ploidy %}
+                        {% labelled id="sex-karyotype" label="Sex Karyotype" help="Estimated from depth by the ploidy caller, read from its VCF header" %}
+                            {{ ploidy.sex_karyotype }}
+                            {% if ploidy.reference_sex_karyotype %}<span class="text-muted">(reference {{ ploidy.reference_sex_karyotype }})</span>{% endif %}
+                            {% if ploidy.sample_id != sample.pk %}from <a href="{% url 'view_sample' ploidy.sample_id %}">{{ ploidy.sample.name }}</a>, which shares this sample's extraction{% endif %}
+                        {% endlabelled %}
+                        {% if ploidy.autosome_depth_of_coverage is not None %}
+                            {% labelled label="Autosome Depth" help="Mean autosome depth of coverage the ploidy caller normalised against" %}{{ ploidy.autosome_depth_of_coverage|floatformat:1 }}x{% endlabelled %}
+                        {% endif %}
+                    {% endif %}
+                {% endwith %}
                 {% if annotated_download_files and not sample.vcf.data_archived %}
                     <div class="form-group-row row">
                         <label class="col-form-label col-12 col-md-3 text-md-right">Download</label>
@@ -312,11 +324,11 @@ $(document).ready(function() {
 
         {% if sample_genotype_stats and sample.has_genotype %}
             <div class="card stats-card">
-                <div class="card-header" data-help="{% detected_sex_help sample_genotype_stats %}">Sex</div>
+                <div class="card-header" data-help="{{ sample_genotype_stats.chrx_sex_help }}">Sex</div>
                 <div class="card-body">
                     <table class="table df-table">
                         <tbody>
-                            <tr><th>Detected Sex<td>{{ sample_genotype_stats.chrx_sex_guess.label }}
+                            <tr><th>chrX Sex Guess<td>{{ sample_genotype_stats.chrx_sex_guess.label }}
                             <tr><th>chrX Hom<td>{{ sample_genotype_stats.x_hom_count|intcomma }}
                             <tr><th>chrX Het<td>{{ sample_genotype_stats.x_het_count|intcomma }}
                             <tr><th>chrX unknown zygosity<td>{{ sample_genotype_stats.x_unk_count|intcomma }}

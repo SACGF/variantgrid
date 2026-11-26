@@ -4,8 +4,7 @@ from django.template.library import Library
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
-from patients.enums import Sex
-from snpdb.models import DETECTED_SEX_HELP, CohortGenotypeStats, Duo, Quad, Trio
+from snpdb.models import DETECTED_SEX_HELP, CohortGenotypeStats, Duo, Quad, Sample, Trio
 from snpdb.variant_contents import get_sample_variant_contents
 
 register = Library()
@@ -59,17 +58,18 @@ def trio_short_description(trio: Trio):
 
 
 @register.simple_tag
-def detected_sex_help(stats: Optional[CohortGenotypeStats] = None):
+def detected_sex_help(sample: Optional[Sample] = None, stats: Optional[CohortGenotypeStats] = None):
     """ Tooltip explaining how Sample.detected_sex is worked out - hang it off a label or column header.
-        Pass the sample's stats to have the chrX counts it was called on spelled out too """
-    if stats:
-        return f"{DETECTED_SEX_HELP} {stats.chrx_sex_detail}"
+        Pass the sample (and its stats, if already fetched) to have what it was detected from spelled out too """
+    if sample:
+        _, detail = sample.get_detected_sex(stats)
+        return f"{DETECTED_SEX_HELP} {detail}"
     return DETECTED_SEX_HELP
 
 
 @register.inclusion_tag("snpdb/tags/detected_sex.html", takes_context=False)
-def detected_sex(stats: Optional[CohortGenotypeStats]):
-    """ Detected sex as a table cell value, with this sample's chrX counts on hover """
-    sex = stats.chrx_sex_guess if stats else Sex.UNKNOWN
-    detail = stats.chrx_sex_detail if stats else "No chrX genotype counts for this sample"
+def detected_sex(sample: Sample, stats: Optional[CohortGenotypeStats] = None):
+    """ Detected sex as a table cell value, with what it was detected from on hover. Pass stats already
+        fetched for a table of samples to save the lookup """
+    sex, detail = sample.get_detected_sex(stats)
     return {"sex": sex, "detail": detail}

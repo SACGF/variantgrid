@@ -42,7 +42,7 @@ def family_name_suggestions(samples: list[Sample]) -> list[str]:
 
 
 def _confident_sex(sample: Sample) -> Sex:
-    """ The sex the wizard works from: the patient record, or the chrX call when the record has none.
+    """ The sex the wizard works from: the patient record, or the detected sex when the record has none.
         The record wins a disagreement - it is the one a person can correct """
     patient_sex = sample.patient_sex
     if patient_sex != Sex.UNKNOWN:
@@ -54,6 +54,7 @@ def _sample_sexes(samples: list[Sample]) -> list[dict]:
     """ The proband and the roles on offer are picked client side, so hand the JS every sample's sexes """
     return [{"patient_sex": s.patient_sex.value, "patient_sex_label": s.patient_sex.label,
              "detected_sex": s.detected_sex.value, "detected_sex_label": s.detected_sex.label,
+             "detected_sex_source": "sex karyotype" if s.ploidy and s.ploidy.sex != Sex.UNKNOWN else "chrX genotypes",
              "sex": _confident_sex(s).value, "sex_label": _confident_sex(s).label}
             for s in samples]
 

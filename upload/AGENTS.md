@@ -119,7 +119,9 @@ Gotchas:
   one a `<DUP>`/`<DEL>` over the whole contig, which the canonicaliser stores as a whole-chromosome Variant
   (@see snpdb.whole_chromosome_variants). Its NDC (depth against the expected ploidy, 1.5 for a trisomy) is the VCF's
   copy ratio field, so SampleNode's gain/loss thresholds pick mosaics. A euploid sample's file imports with no
-  variants; the header's sex karyotype and the euploid chromosomes' depths are not stored.
+  variants. The header's estimated sex karyotype, reference karyotype and autosome depth are kept as the sample's
+  SamplePloidy (vcf/vcf_import.py:set_sample_ploidy_from_header, single-sample VCFs only, replaced on reload); the
+  euploid chromosomes' depths are not stored.
 - A `<DUP>`/`<DEL>` from any caller that covers most of a chromosome without being whole-chromosome
   (snpdb/whole_chromosome_variants.py:is_whole_chromosome_near_miss) is stored as written, with an import message and a
   Rollbar report (vcf/abstract_bulk_vcf_processor.py:AbstractBulkVCFProcessor.get_ref_alt_svlen).
