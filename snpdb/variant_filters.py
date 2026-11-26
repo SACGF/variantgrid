@@ -120,8 +120,8 @@ VARIANT_TYPE_LABELS = {
     VariantType.FUSION: "Fusion",
     VariantType.COPY_NUMBER: "Gene copy number",
     VariantType.SPLICE: "Gene splice",
-    VCFSymbolicAllele.CHROM_GAIN: "Chrom gain",
-    VCFSymbolicAllele.CHROM_LOSS: "Chrom loss",
+    VCFSymbolicAllele.DUP_CHROM: "Chrom gain",
+    VCFSymbolicAllele.DEL_CHROM: "Chrom loss",
 }
 
 # The types offered on the All Variants page - reference variants are always excluded there, and the

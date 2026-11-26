@@ -12,9 +12,11 @@ from annotation.annotation_pipeline_routing import pipeline_type_variant_q
 from annotation.models.models_version import VariantAnnotationVersion
 from annotation.pipelines import blocking_pipeline_types
 from library.django_utils.django_file_utils import get_import_processing_filename
+from library.log_utils import report_message
 from snpdb.models import Variant, VariantCoordinate
 from snpdb.variant_pk_lookup import VariantPKLookup
 from snpdb.vcf_utils import vcf_get_ref_alt_svlen_and_modification
+from snpdb.whole_chromosome_variants import WHOLE_CHROMOSOME_ALT_FOR_SV_ALT
 from upload.enums import ModifiedImportedVariantOperation, UploadStepTaskType, VCFPipelineStage
 from upload.models import ModifiedImportedVariant, SimpleVCFImportInfo, UploadStep
 from upload.tasks.vcf.import_sql_copy_task import ImportModifiedImportedVariantSQLCopyTask
@@ -41,6 +43,7 @@ class AbstractBulkVCFProcessor(abc.ABC):
         self.modified_imported_variants = []
         self.variant_pk_lookup = VariantPKLookup(upload_step.genome_build)
         self.svlen_modifications = Counter()
+        self.whole_chromosome_near_misses: list[VariantCoordinate] = []
 
     @abc.abstractmethod
     def process_entry(self, variant: cyvcf2.Variant) -> tuple[VariantCoordinate, str]:
@@ -57,6 +60,21 @@ class AbstractBulkVCFProcessor(abc.ABC):
             for modification, count in self.svlen_modifications.items():
                 SimpleVCFImportInfo.add_message_count(count, message_string=modification, upload_step=self.upload_step,
                                                       type=SimpleVCFImportInfo.SVLEN_MODIFIED, has_more_details=True)
+        if self.whole_chromosome_near_misses:
+            self._report_whole_chromosome_near_misses()
+
+    def _report_whole_chromosome_near_misses(self):
+        """ The rule's borderline cases go to the uploader, who knows what was called, and to Rollbar, so devs can
+            decide whether VARIANT_WHOLE_CHROMOSOME_END_SLACK is too tight - @see snpdb.whole_chromosome_variants """
+        for variant_coordinate in self.whole_chromosome_near_misses:
+            message = (f"{variant_coordinate} covers most of chr{variant_coordinate.chrom} and was stored as a gain or "
+                       "loss of part of it. If it is the whole chromosome, ask an administrator to store it as one")
+            SimpleVCFImportInfo.objects.create(type=SimpleVCFImportInfo.WHOLE_CHROMOSOME_NEAR_MISS,
+                                               message_string=message, upload_step=self.upload_step)
+        report_message("VCF import: <DUP>/<DEL> covering most of a chromosome, stored as partial",
+                       extra_data={"upload_pipeline_id": self.upload_pipeline.pk,
+                                   "genome_build": self.genome_build.name,
+                                   "variants": [str(vc) for vc in self.whole_chromosome_near_misses]})
 
     @property
     def genome_build(self):
@@ -74,6 +92,11 @@ class AbstractBulkVCFProcessor(abc.ABC):
                                                                                old_variant_info=ModifiedImportedVariant.BCFTOOLS_OLD_VARIANT_TAG)
         if modification:
             self.svlen_modifications[modification] += 1
+        if alt in WHOLE_CHROMOSOME_ALT_FOR_SV_ALT and svlen is not None:
+            contig = self.genome_build.chrom_contig_mappings[variant.CHROM]
+            variant_coordinate = VariantCoordinate(chrom=contig.name, position=variant.POS, ref=ref, alt=alt, svlen=svlen)
+            if variant_coordinate.is_whole_chromosome_near_miss(self.genome_build):
+                self.whole_chromosome_near_misses.append(variant_coordinate)
         return ref, alt, svlen
 
     def set_max_variant(self, variant_hashes, variant_ids):

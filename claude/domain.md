@@ -32,9 +32,10 @@ insertion that isn't a dup) goes to the STRUCTURAL_VARIANT pipeline from the ver
 every such rule by size. Gene-level events are Variants on a fake contig - guard
 coordinate and size code with `Variant.get_gene_level_q`.
 
-**Whole-chromosome variant** - a chromosome gained or lost (trisomy 21, monosomy X): `<CHROM_GAIN>` / `<CHROM_LOSS>` at
+**Whole-chromosome variant** - a chromosome gained or lost (trisomy 21, monosomy X): `<DUP:CHROM>` / `<DEL:CHROM>` at
 position 1 of the chromosome's real contig, `svlen` the contig's length - 1, so one Variant per chromosome per build
-and direction. The canonicaliser turns any caller's `<DUP>` / `<DEL>` spanning the chromosome's euchromatic bands into it
+and direction. The canonicaliser turns any caller's `<DUP>` / `<DEL>` reaching to within 1 Mb of each end of the chromosome's
+euchromatin into it
 (`snpdb/whole_chromosome_variants.py`); `Variant.get_whole_chromosome_q` is the predicate. The copy number is the
 sample's, in its FORMAT fields.
 

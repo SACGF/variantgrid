@@ -82,7 +82,7 @@ class AnnotationPipelineRoutingTest(TestCase):
 
     def test_whole_chromosome_is_sv_not_annotsv(self):
         """ #2908 - neither VEP nor AnnotSV can parse the alt """
-        vc = VariantCoordinate(chrom="21", position=1, ref="N", alt=VCFSymbolicAllele.CHROM_GAIN, svlen=48129894)
+        vc = VariantCoordinate(chrom="21", position=1, ref="N", alt=VCFSymbolicAllele.DUP_CHROM, svlen=48129894)
         whole_chromosome = slowly_create_test_variant_from_coordinate(vc, self.grch37)
         self._assert_routing_agrees({whole_chromosome: STRUCTURAL}, self.SV_MIN_SIZE)
         qs = Variant.objects.filter(pk__in=[whole_chromosome.pk, self.long_del.pk])

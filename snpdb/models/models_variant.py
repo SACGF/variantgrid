@@ -61,6 +61,7 @@ from snpdb.models.models_genome import Contig, Cytoband, GenomeBuild, GenomeBuil
 from snpdb.whole_chromosome_variants import (
     WHOLE_CHROMOSOME_ALT_FOR_SV_ALT,
     WHOLE_CHROMOSOME_POSITION,
+    is_whole_chromosome_near_miss,
     whole_chromosome_alt,
     whole_chromosome_svlen,
 )
@@ -79,7 +80,7 @@ VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([G
 # As gnomAD formats it: "1-169519049-T-C"
 VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)\s*-\s*(\d+)\s*-\s*([GATC]+)\s*-\s*([GATC]+)", re.IGNORECASE)
 # This is our internal format for symbolic (ie <DEL>/<DUP> etc)
-VARIANT_SYMBOLIC_PATTERN = re.compile(r"^((?:chr)?(?:MT|[XYM]|\d+))\s*:\s*(\d+)\s*-\s*(\d+)\s*<(DEL|DUP|INS|INV|CNV|CHROM_GAIN|CHROM_LOSS)>$", re.IGNORECASE)
+VARIANT_SYMBOLIC_PATTERN = re.compile(r"^((?:chr)?(?:MT|[XYM]|\d+))\s*:\s*(\d+)\s*-\s*(\d+)\s*<(DEL|DUP|INS|INV|CNV|DUP:CHROM|DEL:CHROM)>$", re.IGNORECASE)
 # Gene-level - the position is a gene id and the alt carries the partner. @see snpdb.gene_level_variants
 VARIANT_GENE_LEVEL_PATTERN = re.compile(
     rf"^{GENE_LEVEL_CONTIG_NAME}\s*:\s*(\d+)\s*-\s*\d+\s*({GENE_LEVEL_ALT_PATTERN.pattern})$")
@@ -599,7 +600,8 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         if self.is_whole_chromosome:
             alt = self.alt
         elif self.alt in WHOLE_CHROMOSOME_ALT_FOR_SV_ALT and (contig := genome_build.chrom_contig_mappings.get(self.chrom)):
-            alt = whole_chromosome_alt(self.alt, self.position, self.end, Cytoband.get_euchromatic_bounds(contig.pk))
+            alt = whole_chromosome_alt(self.alt, self.position, self.end,
+                                       Cytoband.get_whole_chromosome_span(genome_build, contig))
         else:
             return None
         if alt is None:
@@ -608,6 +610,14 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         ref = self.ref if self.position == WHOLE_CHROMOSOME_POSITION else None
         whole_chromosome = VariantCoordinate.whole_chromosome(genome_build, self.chrom, alt, ref=ref)
         return self if whole_chromosome == self else whole_chromosome
+
+    def is_whole_chromosome_near_miss(self, genome_build: GenomeBuild) -> bool:
+        """ A <DUP>/<DEL> covering most of its chromosome without being whole-chromosome -
+            @see snpdb.whole_chromosome_variants.is_whole_chromosome_near_miss """
+        if self.svlen is None or not (contig := genome_build.chrom_contig_mappings.get(self.chrom)):
+            return False
+        return is_whole_chromosome_near_miss(self.alt, self.position, self.end,
+                                             Cytoband.get_whole_chromosome_span(genome_build, contig))
 
     @staticmethod
     def whole_chromosome(genome_build: GenomeBuild, chrom: str, alt: str,

@@ -29,13 +29,13 @@ class VCFSymbolicAllele:
     DUP = "<DUP>"
     INS = "<INS>"
     INV = "<INV>"
-    # A whole chromosome gained or lost (aneuploidy). Ours rather than VCF spec alts, like the gene-level
-    # ones - @see snpdb.whole_chromosome_variants
-    CHROM_GAIN = "<CHROM_GAIN>"
-    CHROM_LOSS = "<CHROM_LOSS>"
+    # A whole chromosome gained or lost (aneuploidy) - our own subtypes of the spec's DUP/DEL,
+    # @see snpdb.whole_chromosome_variants
+    DUP_CHROM = "<DUP:CHROM>"
+    DEL_CHROM = "<DEL:CHROM>"
 
 
-WHOLE_CHROMOSOME_ALTS = (VCFSymbolicAllele.CHROM_GAIN, VCFSymbolicAllele.CHROM_LOSS)
+WHOLE_CHROMOSOME_ALTS = (VCFSymbolicAllele.DUP_CHROM, VCFSymbolicAllele.DEL_CHROM)
 
 
 class GeneIdNamespace(models.TextChoices):
@@ -133,11 +133,12 @@ class VCFConstant:
     ALT_DEPTH_FIELD = "AO"  # FreeBayes - Alternate allele observation count
     REF_DEPTH_FIELD = "RO"  # FreeBayes - Reference allele observation count
     # The FORMAT (or, for a single-sample VCF, INFO) keys a caller writes copy number under, best
-    # first: CN is an integer copy number, SM a linear copy ratio (DRAGEN), FC a fold change (Pisces)
-    COPY_NUMBER_FIELDS = ("CN", "SM", "FC")
+    # first: CN is an integer copy number, SM a linear copy ratio (DRAGEN), FC a fold change (Pisces),
+    # NDC DRAGEN's ploidy caller's depth over the chromosome against its expected ploidy (1.5 for a trisomy)
+    COPY_NUMBER_FIELDS = ("CN", "SM", "FC", "NDC")
     # Which of those is a ratio against the normal rather than an absolute count. They are different
     # quantities, so a classification stores each under its own evidence key (copy_number / fold_change)
-    COPY_NUMBER_FIELD_IS_RATIO = {"CN": False, "SM": True, "FC": True}
+    COPY_NUMBER_FIELD_IS_RATIO = {"CN": False, "SM": True, "FC": True, "NDC": True}
 
 
 class VariantClass(models.TextChoices):

@@ -1,5 +1,5 @@
 """
-Moves stored whole-chromosome <DUP>/<DEL> Variants to their whole-chromosome form (<CHROM_GAIN>/<CHROM_LOSS> at
+Moves stored whole-chromosome <DUP>/<DEL> Variants to their whole-chromosome form (<DUP:CHROM>/<DEL:CHROM> at
 position 1, svlen the contig's length - 1), imported before the canonicaliser knew one (#2908,
 @see snpdb.whole_chromosome_variants).
 
@@ -39,7 +39,7 @@ def _move_variant(variant: Variant, whole_chromosome: VariantCoordinate):
 
 
 class Command(BaseCommand):
-    help = "Move stored whole-chromosome <DUP>/<DEL> variants to <CHROM_GAIN>/<CHROM_LOSS>, keeping their pks"
+    help = "Move stored whole-chromosome <DUP>/<DEL> variants to <DUP:CHROM>/<DEL:CHROM>, keeping their pks"
     category = "one-off"
 
     def add_arguments(self, parser):

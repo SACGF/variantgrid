@@ -117,8 +117,12 @@ Gotchas:
 - A DRAGEN ploidy VCF (`##source=DRAGEN_PLOIDY`, test_data/vcf/dragen_ploidy/) is an ordinary genotype VCF with no
   `GT`: each euploid chromosome is a reference span (ALT `.` with END), skipped by vcf_clean_and_filter, and an aneuploid
   one a `<DUP>`/`<DEL>` over the whole contig, which the canonicaliser stores as a whole-chromosome Variant
-  (@see snpdb.whole_chromosome_variants). A euploid sample's file imports with no variants. The header's sex
-  karyotype and the per-chromosome depths are not stored.
+  (@see snpdb.whole_chromosome_variants). Its NDC (depth against the expected ploidy, 1.5 for a trisomy) is the VCF's
+  copy ratio field, so SampleNode's gain/loss thresholds pick mosaics. A euploid sample's file imports with no
+  variants; the header's sex karyotype and the euploid chromosomes' depths are not stored.
+- A `<DUP>`/`<DEL>` from any caller that covers most of a chromosome without being whole-chromosome
+  (snpdb/whole_chromosome_variants.py:is_whole_chromosome_near_miss) is stored as written, with an import message and a
+  Rollbar report (vcf/abstract_bulk_vcf_processor.py:AbstractBulkVCFProcessor.get_ref_alt_svlen).
 - DRAGEN TSO 500's run-level files (CombinedVariantOutput, MetricsOutput) write sequencing records, so their importers
   are seqauto's (seqauto/import_task_factories.py, registered through settings.IMPORT_TASK_FACTORY_IMPORTS);
   its AllFusions, SpliceGirl and CNV VCFs write variants and are imported here.

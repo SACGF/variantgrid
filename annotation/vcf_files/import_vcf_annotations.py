@@ -28,8 +28,8 @@ from snpdb.vcf_utils import cyvcf2_header_types
 
 # VEP never sees one, so it is classed here, as gene-level copy number is (annotation.gene_level_annotation)
 WHOLE_CHROMOSOME_VARIANT_CLASS = {
-    VCFSymbolicAllele.CHROM_GAIN: VariantClass.COPY_NUMBER_GAIN,
-    VCFSymbolicAllele.CHROM_LOSS: VariantClass.COPY_NUMBER_LOSS,
+    VCFSymbolicAllele.DUP_CHROM: VariantClass.COPY_NUMBER_GAIN,
+    VCFSymbolicAllele.DEL_CHROM: VariantClass.COPY_NUMBER_LOSS,
 }
 
 

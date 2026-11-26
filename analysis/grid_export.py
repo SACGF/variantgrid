@@ -185,6 +185,7 @@ COPY_NUMBER_FORMAT_DESCRIPTIONS = {
     "CN": "Copy number",
     "SM": "Linear copy ratio over the segment",
     "FC": "Fold change over the segment",
+    "NDC": "Normalized depth of coverage",
 }
 
 

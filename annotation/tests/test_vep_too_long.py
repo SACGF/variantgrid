@@ -59,7 +59,7 @@ class VEPTooLongTestBase(TestCase):
         cls.snv = slowly_create_test_variant("1", 100000, 'A', 'T', cls.grch37)
         cls.long_sv = create_deletion(200000, -5 * SV_MAX_SIZE)
         cls.short_sv = create_deletion(300000, -SV_MAX_SIZE // 2)
-        chr21_gain = VariantCoordinate(chrom="21", position=1, ref="N", alt=VCFSymbolicAllele.CHROM_GAIN,
+        chr21_gain = VariantCoordinate(chrom="21", position=1, ref="N", alt=VCFSymbolicAllele.DUP_CHROM,
                                        svlen=48129894)
         cls.whole_chromosome = slowly_create_test_variant_from_coordinate(chr21_gain, cls.grch37)
 

@@ -9,7 +9,7 @@ canonicaliser every insert and lookup goes through (models_variant.py:VariantCoo
 gives a whole-chromosome gain or loss a single representation:
 
   * the chromosome's real contig, position 1, ref the fasta base there (N on every standard human contig)
-  * alt <CHROM_GAIN> or <CHROM_LOSS> (library/genomics/vcf_enums.py:WHOLE_CHROMOSOME_ALTS) - gain/loss rather
+  * alt <DUP:CHROM> or <DEL:CHROM> (library/genomics/vcf_enums.py:WHOLE_CHROMOSOME_ALTS) - gain/loss rather
     than trisomy/monosomy because the copy number is the sample's, not the variant's (as GeneLevelSymbolicAlt)
   * svlen = contig length - 1, positive for both, so end = the contig length
 
@@ -20,20 +20,29 @@ position and end, and the gene overlaps come from the interval like any other SV
 
 ## What makes a record whole-chromosome
 
-whole_chromosome_alt(): a <DUP> or <DEL> whose span reaches both the first and the last euchromatic band of its
-contig - the cytoband file's bands stained gneg or gpos* (models_genome.py:Cytoband.get_euchromatic_bounds). <DUP>
-becomes <CHROM_GAIN>, <DEL> <CHROM_LOSS>. <CNV> has no direction and stays as it is, and a contig with no
-cytobands (MT, scaffolds, the gene-level contig) has no whole-chromosome form.
+whole_chromosome_alt(): a <DUP> or <DEL> reaching within settings.VARIANT_WHOLE_CHROMOSOME_END_SLACK (1 Mb) of
+each end of the chromosome's whole-chromosome span (models_genome.py:Cytoband.get_whole_chromosome_span): from the
+start of its first euchromatic band (stained gneg or gpos*) to the end of its last, less chrY's pseudoautosomal
+regions. <DUP> becomes <DUP:CHROM>, <DEL> <DEL:CHROM>. <CNV> has no direction and stays as it is, and a contig with
+no cytobands (MT, scaffolds, the gene-level contig) has no whole-chromosome form.
 
-Bands rather than a fraction of the contig's length, because a CNV caller starts at the first mappable
-sequence: another caller's whole chr21 starts near 13 Mb (the p arm is gvar/stalk/acen bands), only 72% of
-the contig, while a 223 Mb chr2 <DUP> ending 18 Mb short (92% of the contig) is not the whole chromosome.
-DRAGEN's 1..length records satisfy it trivially. A chromosome arm is still a focal SV.
+The span is what callers cover. DRAGEN's ploidy caller writes 1..contig length. A segmenting caller starts at its
+first usable bin: past the telomere's N on most chromosomes, anywhere from the first non-N base to the start of
+the q arm on an acrocentric (chr21 has sequence from 5 Mb, euchromatin from 13 Mb), and outside the PARs on chrY,
+which analysis-set references mask. The slack is smaller than the terminal bands, so a call missing one
+(eg a chr21 dup ending before q22.3) is a partial gain or loss, as is any arm.
+
+A <DUP>/<DEL> that misses the slack but covers VARIANT_WHOLE_CHROMOSOME_NEAR_MISS_FRACTION (90%) of the span
+(is_whole_chromosome_near_miss) is stored as written, and the VCF import says it may have been a whole
+chromosome (upload/vcf/abstract_bulk_vcf_processor.py) and reports it to Rollbar. If it was, raising the slack
+in the deployment's settings and running one_off_whole_chromosome_variants moves it.
 
 
 ## What it costs, and where that is paid
 
-The alt is ours, so nothing external can read it: VEP and AnnotSV never see one
+The alts are our own subtypes of the VCF spec's DUP/DEL ("Implementations are free to define their own
+subtypes"), so a reader of an exported VCF sees a duplication or deletion. Nothing external annotates them: VEP
+and AnnotSV never see one
 (annotation/annotation_pipeline_routing.py, annotation/annotation_version_querysets.py:vep_too_long_q - it gets
 a TOO_LONG row with a VariantGeneOverlap per gene and no overlapping_symbols), it has no g.HGVS, c.HGVS or ClinGen
 allele (VariantCoordinate.can_be_made_explicit whitelists DEL/DUP/INV), and liftover maps it to the same
@@ -47,12 +56,14 @@ whose samples grid is everyone with that event.
 import re
 from typing import Optional
 
+from django.conf import settings
+
 from library.genomics.vcf_enums import VCFSymbolicAllele
 
 # The SV a caller writes, to the whole-chromosome alt it becomes
 WHOLE_CHROMOSOME_ALT_FOR_SV_ALT = {
-    VCFSymbolicAllele.DUP: VCFSymbolicAllele.CHROM_GAIN,
-    VCFSymbolicAllele.DEL: VCFSymbolicAllele.CHROM_LOSS,
+    VCFSymbolicAllele.DUP: VCFSymbolicAllele.DUP_CHROM,
+    VCFSymbolicAllele.DEL: VCFSymbolicAllele.DEL_CHROM,
 }
 
 WHOLE_CHROMOSOME_POSITION = 1
@@ -63,24 +74,40 @@ WHOLE_CHROMOSOME_SEARCH_PATTERN = re.compile(
     rf"^(?:(trisomy|monosomy)\s*{_SEARCH_CHROM}|{_SEARCH_CHROM}\s+(gain|loss)|(gain|loss)\s+of\s+{_SEARCH_CHROM})$",
     re.IGNORECASE)
 _SEARCH_WORD_ALTS = {
-    "trisomy": VCFSymbolicAllele.CHROM_GAIN,
-    "gain": VCFSymbolicAllele.CHROM_GAIN,
-    "monosomy": VCFSymbolicAllele.CHROM_LOSS,
-    "loss": VCFSymbolicAllele.CHROM_LOSS,
+    "trisomy": VCFSymbolicAllele.DUP_CHROM,
+    "gain": VCFSymbolicAllele.DUP_CHROM,
+    "monosomy": VCFSymbolicAllele.DEL_CHROM,
+    "loss": VCFSymbolicAllele.DEL_CHROM,
 }
 
 
-def whole_chromosome_alt(alt: str, position: int, end: int,
-                         euchromatic_bounds: Optional[tuple[int, int]]) -> Optional[str]:
-    """ <CHROM_GAIN>/<CHROM_LOSS> for a <DUP>/<DEL> spanning the contig's euchromatin, else None.
-        euchromatic_bounds is Cytoband.get_euchromatic_bounds - None for a contig with no bands """
+def _uncalled_ends(position: int, end: int, span: tuple[int, int]) -> tuple[int, int]:
+    """ How far short of each end of span a record stops """
+    span_start, span_end = span
+    return max(0, position - span_start), max(0, span_end - end)
+
+
+def whole_chromosome_alt(alt: str, position: int, end: int, span: Optional[tuple[int, int]]) -> Optional[str]:
+    """ <DUP:CHROM>/<DEL:CHROM> for a <DUP>/<DEL> reaching within VARIANT_WHOLE_CHROMOSOME_END_SLACK of each end
+        of span, else None. span is Cytoband.get_whole_chromosome_span - None for a contig with no bands """
     whole_alt = WHOLE_CHROMOSOME_ALT_FOR_SV_ALT.get(alt)
-    if whole_alt is None or euchromatic_bounds is None:
+    if whole_alt is None or span is None:
         return None
-    first_band_end, last_band_start = euchromatic_bounds
-    if position <= first_band_end and end >= last_band_start:
+    slack = settings.VARIANT_WHOLE_CHROMOSOME_END_SLACK
+    if all(uncalled <= slack for uncalled in _uncalled_ends(position, end, span)):
         return whole_alt
     return None
+
+
+def is_whole_chromosome_near_miss(alt: str, position: int, end: int, span: Optional[tuple[int, int]]) -> bool:
+    """ A <DUP>/<DEL> that isn't whole-chromosome but covers VARIANT_WHOLE_CHROMOSOME_NEAR_MISS_FRACTION of span -
+        possibly a caller's whole chromosome that the end slack is too tight for """
+    if alt not in WHOLE_CHROMOSOME_ALT_FOR_SV_ALT or span is None or whole_chromosome_alt(alt, position, end, span):
+        return False
+    span_start, span_end = span
+    span_length = span_end - span_start
+    covered = span_length - sum(_uncalled_ends(position, end, span))
+    return covered >= settings.VARIANT_WHOLE_CHROMOSOME_NEAR_MISS_FRACTION * span_length
 
 
 def whole_chromosome_svlen(contig_length: int) -> int:
@@ -89,7 +116,7 @@ def whole_chromosome_svlen(contig_length: int) -> int:
 
 
 def parse_whole_chromosome_search(text: str) -> Optional[tuple[str, str]]:
-    """ (chrom, whole-chromosome alt) from a search, eg "trisomy 21" -> ("21", "<CHROM_GAIN>") """
+    """ (chrom, whole-chromosome alt) from a search, eg "trisomy 21" -> ("21", "<DUP:CHROM>") """
     if m := WHOLE_CHROMOSOME_SEARCH_PATTERN.fullmatch(text.strip()):
         g = m.groups()  # One (word, chrom) pair per alternative in the pattern
         for word, chrom in ((g[0], g[1]), (g[3], g[2]), (g[4], g[5])):

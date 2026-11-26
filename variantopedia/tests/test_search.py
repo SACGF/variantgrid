@@ -59,7 +59,7 @@ class TestSearch(TestCase):
 
     def test_search_whole_chromosome(self):
         """ #2908 - the samples of the one whole-chromosome Variant are everyone with the event """
-        vc = VariantCoordinate(chrom="21", position=1, ref="N", alt=VCFSymbolicAllele.CHROM_GAIN, svlen=48129894)
+        vc = VariantCoordinate(chrom="21", position=1, ref="N", alt=VCFSymbolicAllele.DUP_CHROM, svlen=48129894)
         variant = slowly_create_test_variant_from_coordinate(vc, GenomeBuild.grch37())
         for search_string in ["trisomy 21", "chr21 gain", "gain of chromosome 21"]:
             with self.subTest(search_string):

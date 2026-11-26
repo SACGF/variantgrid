@@ -389,9 +389,9 @@ def get_display_examples() -> list[dict]:
             chrom="17", position=37844000, alt=VCFSymbolicAllele.CNV, svlen=120000,
             overlapping_symbols="ERBB2,GRB7,MIEN1,PGAP3")),
         ("Whole chromosome gain", "Trisomy 21", _grid_row(
-            chrom="21", position=1, ref="N", alt=VCFSymbolicAllele.CHROM_GAIN, svlen=48129894)),
+            chrom="21", position=1, ref="N", alt=VCFSymbolicAllele.DUP_CHROM, svlen=48129894)),
         ("Whole chromosome loss", "Monosomy X", _grid_row(
-            chrom="X", position=1, ref="N", alt=VCFSymbolicAllele.CHROM_LOSS, svlen=155270559)),
+            chrom="X", position=1, ref="N", alt=VCFSymbolicAllele.DEL_CHROM, svlen=155270559)),
     ]
     if settings.VARIANT_GENE_LEVEL_ENABLED:
         # HGNC ids: ABL1 76, BCR 1014, EGFR 3236, PTEN 9588, AR 644, MET 7029

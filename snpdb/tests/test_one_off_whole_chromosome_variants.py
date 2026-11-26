@@ -27,7 +27,7 @@ class OneOffWholeChromosomeVariantsTest(TestCase):
         cls.focal_dup = stored_dup("21", 1, GRCH38_CHR21_LENGTH // 2 + 1)  # A candidate, not the whole chromosome
         cls.chr22_dup = stored_dup("22", 1, GRCH38_CHR22_LENGTH - 1)
         cls.chr22_gain = slowly_create_test_variant_from_coordinate(
-            VariantCoordinate(chrom="22", position=1, ref="N", alt=VCFSymbolicAllele.CHROM_GAIN,
+            VariantCoordinate(chrom="22", position=1, ref="N", alt=VCFSymbolicAllele.DUP_CHROM,
                               svlen=GRCH38_CHR22_LENGTH - 1), grch38)
 
     def _run(self, **kwargs) -> str:
@@ -49,7 +49,7 @@ class OneOffWholeChromosomeVariantsTest(TestCase):
         chr22_before = self._coordinate(self.chr22_dup)
         output = self._run()
 
-        self.assertEqual(("21", 1, "N", VCFSymbolicAllele.CHROM_GAIN, GRCH38_CHR21_LENGTH - 1),
+        self.assertEqual(("21", 1, "N", VCFSymbolicAllele.DUP_CHROM, GRCH38_CHR21_LENGTH - 1),
                          self._coordinate(self.chr21_dup))
         self.assertEqual(GRCH38_CHR21_LENGTH, Variant.objects.get(pk=self.chr21_dup.pk).end)
         self.assertEqual(focal_before, self._coordinate(self.focal_dup))

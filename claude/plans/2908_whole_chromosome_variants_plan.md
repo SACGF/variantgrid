@@ -31,11 +31,11 @@ A whole-chromosome event is a coordinate Variant on its real contig, with the ki
 ```python
 class VCFSymbolicAllele:
     ...
-    # A whole chromosome gained or lost (aneuploidy). Not VCF spec alts - ours, like the gene-level ones
-    CHROM_GAIN = "<CHROM_GAIN>"
-    CHROM_LOSS = "<CHROM_LOSS>"
+    # A whole chromosome gained or lost (aneuploidy) - our own subtypes of the spec's DUP/DEL
+    DUP_CHROM = "<DUP:CHROM>"
+    DEL_CHROM = "<DEL:CHROM>"
 
-WHOLE_CHROMOSOME_ALTS = (VCFSymbolicAllele.CHROM_GAIN, VCFSymbolicAllele.CHROM_LOSS)
+WHOLE_CHROMOSOME_ALTS = (VCFSymbolicAllele.DUP_CHROM, VCFSymbolicAllele.DEL_CHROM)
 ```
 
 | Field | Value |
@@ -43,7 +43,7 @@ WHOLE_CHROMOSOME_ALTS = (VCFSymbolicAllele.CHROM_GAIN, VCFSymbolicAllele.CHROM_L
 | `Locus.contig` | the chromosome, per build |
 | `Locus.position` | 1 |
 | `Locus.ref` | the fasta base at position 1 (N on every standard human contig) |
-| `Variant.alt` | `<CHROM_GAIN>` or `<CHROM_LOSS>` |
+| `Variant.alt` | `<DUP:CHROM>` or `<DEL:CHROM>` |
 | `Variant.svlen` | `contig.length - 1`, positive for both |
 | `Variant.end` | `contig.length` |
 
@@ -62,15 +62,24 @@ node ("Chrom gain" / "Chrom loss", `snpdb/variant_filters.py:VARIANT_TYPE_LABELS
 
 ### What makes a record whole-chromosome
 
-`<DUP>` or `<DEL>` whose span reaches both the first and the last euchromatic band of its contig - the finest-level
-`snpdb/models/models_genome.py:Cytoband` rows with a `gneg` or `gpos*` stain. `<DUP>` becomes `<CHROM_GAIN>`,
-`<DEL>` becomes `<CHROM_LOSS>`. `<CNV>` has no direction and stays as it is; a contig with no cytobands (MT,
-scaffolds, the gene-level contig) has no whole-chromosome form.
+`<DUP>` or `<DEL>` reaching to within `settings.VARIANT_WHOLE_CHROMOSOME_END_SLACK` (1 Mb) of each end of
+`snpdb/models/models_genome.py:Cytoband.get_whole_chromosome_span`: the start of the first euchromatic band (`gneg` or
+`gpos*`) to the end of the last, with chrY trimmed to the region between its PARs
+(`CHRY_PSEUDOAUTOSOMAL_REGIONS`, masked with N in the analysis-set references callers use). `<DUP>` becomes
+`<DUP:CHROM>`, `<DEL>` becomes `<DEL:CHROM>`. `<CNV>` has no direction and stays as it is; a contig with no cytobands
+(MT, scaffolds, the gene-level contig) has no whole-chromosome form.
 
-Bands rather than a fraction of contig length, because CNV callers start at the first mappable sequence: a
-whole-chromosome call on chr21 from another caller starts near 13 Mb (the p arm is `gvar`/`stalk`/`acen`), 72% of
-the contig, while the 223 Mb chr2 test `<DUP>` on vg-test2 (92% of chr2, ending 18 Mb short) is not whole-chromosome.
-DRAGEN's `1..length` records satisfy it trivially.
+That span is what callers cover. DRAGEN's ploidy caller writes `1..length`. A segmenting caller starts at its first
+usable bin: past the 10-60 kb telomere N on most chromosomes; on an acrocentric anywhere from the first non-N base to
+the q arm (GRCh38 chr21 has sequence from 5.01 Mb, euchromatin from 13.0 Mb); on chrY between the PARs, ending at
+the q12 heterochromatin (26.6 Mb). The slack is smaller than any terminal band but Yp11.32 (inside PAR1), so a call
+that misses one - a chr21 `<DUP>` ending before q22.3 - stays a partial gain, as does any arm.
+
+A `<DUP>`/`<DEL>` that misses the slack but covers `VARIANT_WHOLE_CHROMOSOME_NEAR_MISS_FRACTION` (90%) of the span
+(`is_whole_chromosome_near_miss`, eg the 223 Mb chr2 `<DUP>` on vg-test2) is stored as written, and the VCF import
+adds a `SimpleVCFImportInfo` (`WHOLE_CHROMOSOME_NEAR_MISS`) telling the uploader to ask an administrator if it is the
+whole chromosome, and reports it to Rollbar. Raising the slack in the deployment's settings and running
+`one_off_whole_chromosome_variants` moves such a variant.
 
 ## Changes
 
@@ -79,9 +88,9 @@ DRAGEN's `1..length` records satisfy it trivially.
 - `library/genomics/vcf_enums.py`: the two alts and `WHOLE_CHROMOSOME_ALTS`.
 - `snpdb/whole_chromosome_variants.py` (new file): owns the rule and the reasoning. It imports nothing from
   `snpdb.models` (models_variant imports it, and anything under `snpdb.models` would be an import cycle), so the rule is
-  pure: `whole_chromosome_alt(alt, position, end, euchromatic_bounds)` returns the whole-chromosome alt or None.
-  The bounds - (first euchromatic band end, last euchromatic band start) - come from
-  `snpdb/models/models_genome.py:Cytoband.get_euchromatic_bounds`, cached per contig.
+  pure: `whole_chromosome_alt(alt, position, end, span)` returns the whole-chromosome alt or None, and
+  `is_whole_chromosome_near_miss` the borderline test. The span comes from
+  `snpdb/models/models_genome.py:Cytoband.get_whole_chromosome_span`, the band query cached per contig.
   `snpdb/models/models_variant.py:VariantCoordinate.whole_chromosome(genome_build, chrom, alt, ref=None)` builds the
   canonical coordinate (ref read from the fasta unless the record was already at position 1). The module also holds
   the search pattern and `parse_whole_chromosome_search`.
@@ -115,6 +124,12 @@ DRAGEN's `1..length` records satisfy it trivially.
   number does (`annotation/gene_level_annotation.py`). The skipped-row insert writes `variant_class` beside
   `vep_skipped_reason` for that.
 
+- Counted as SVs elsewhere: `annotation/tasks/calculate_sample_stats.py` counts `<DUP:CHROM>` with insertions and
+  `<DEL:CHROM>` with deletions (variant class copy_number_gain / copy_number_loss), and `beacon/query_targets.py`
+  queries them as EFO copy number gain / loss.
+- `library/genomics/vcf_enums.py:VCFConstant.COPY_NUMBER_FIELDS` gains `NDC` (a ratio), so the ploidy VCF's depth
+  against the expected ploidy is the sample's copy ratio in grids, exports and SampleNode's gain/loss thresholds.
+
 ### 3. Liftover
 
 A whole chromosome maps to the same chromosome in the other build with no tool:
@@ -128,7 +143,7 @@ import like any other.
 ### 4. Display, search, nearby
 
 - Kind badge (`VariantGridFormat.variantKind` in `variantgrid/static_files/default_static/js/variantgrid_formats.js`):
-  `<CHROM_GAIN>` / `<CHROM_LOSS>` show `GAIN chr21` / `LOSS chrX` with the title "Whole chromosome gain/loss", with
+  `<DUP:CHROM>` / `<DEL:CHROM>` show `GAIN chr21` / `LOSS chrX` with the title "Whole chromosome gain/loss", with
   their own css class beside the dup/del ones in the scss.
 - Variant Types page (`variantopedia/variant_types.py`): a "Whole chromosome gain / loss" kind with its outcome
   (symbolic, SV pipeline, genes by overlap, liftover by same chromosome).
@@ -154,12 +169,14 @@ needs no re-route; the moved variant's existing VariantAnnotation row keeps its 
 
 ### 6. Tests kept
 
-- snpdb: the rule (DRAGEN full span; chr21 from 13 Mb; chr2 ending short; `<CNV>`; contig without bands),
+- snpdb: the rule and near miss (DRAGEN full span; chr21 from its first non-N base and from 21q; a chr21 `<DUP>`
+  stopping short of q22.3; a long arm; chrY between its PARs; chr2 ending short, a near miss; `<CNV>`; contig without bands),
   canonical form idempotent, string round trip, no HGVS / ClinGen.
 - annotation: routing (SV yes, AnnotSV no), always-too-long predicate, overlaps written with empty `overlapping_symbols`.
 - snpdb liftover: destination coordinate from the same chromosome; missing contig is an error.
 - upload: `trisomy21.ploidy.vcf` through `vcf_clean_and_filter` keeps the one record, and the processor test
-  (`upload/tests/vcf/test_vcf_processors.py:TestVCFProcessors` pattern) resolves it to the `<CHROM_GAIN>` coordinate.
+  (`upload/tests/vcf/test_vcf_processors.py:TestVCFProcessors` pattern) resolves it to the `<DUP:CHROM>` coordinate
+  with NDC as the copy number field; `whole_chromosome_near_miss.vcf` gets the import message and Rollbar report.
 - variantopedia search (`test_search.py`): "trisomy 21" finds it. variantopedia: nearby tab over the length cap runs no
   query. Variant page: the whole-chromosome warning (`annotation/tests/test_vep_too_long.py`).
 - The one-off command's test lives with it.
@@ -181,8 +198,10 @@ git log, and a deployed card is never edited.
   DRAGEN-specific import path exists.
 - **General guard**: the canonical form plus the AnnotSV subtraction and the nearby length cap bound the cost for any
   source. A chromosome arm is still a focal SV.
-- **Mosaicism and the euploid chromosomes' depths**: the euploid records are reference spans and stay dropped, so
-  per-chromosome NDC below DRAGEN's calling threshold is not stored. That, the header's
+- **Mosaicism and the euploid chromosomes' depths**: a mosaic and a full trisomy are the same Variant; the called
+  record's NDC is the sample's copy ratio, so SampleNode's ratio thresholds tell them apart (about 1.15 vs 1.5). The
+  euploid records are reference spans and stay dropped, so per-chromosome NDC below DRAGEN's calling threshold is not
+  stored. That, the header's
   `estimatedSexKaryotype` / `referenceSexKaryotype` / `autosomeDepthOfCoverage`, and a sex-mismatch flag are a
   per-sample QC record (the #1904 shape), a separate piece of work from the variant representation.
 - **XXY**: a chrX gain finds XXY and XXX alike; telling them apart needs the sex karyotype above.

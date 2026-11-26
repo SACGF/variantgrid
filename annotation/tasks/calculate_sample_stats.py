@@ -369,7 +369,8 @@ _ZYGOSITY_FIELD_INDEXES = {
 # The aggregate classifies a row by the first of these in its zygosity string, else unknown
 _AGGREGATE_ZYGOSITY_PRIORITY = (Zygosity.HOM_ALT, Zygosity.HET, Zygosity.HOM_REF)
 
-_SYMBOLIC_INSERTIONS = {VCFSymbolicAllele.DUP, VCFSymbolicAllele.INS}
+_SYMBOLIC_INSERTIONS = {VCFSymbolicAllele.DUP, VCFSymbolicAllele.DUP_CHROM, VCFSymbolicAllele.INS}
+_SYMBOLIC_DELETIONS = {VCFSymbolicAllele.DEL, VCFSymbolicAllele.DEL_CHROM}
 _FUSION_KINDS = {GeneLevelSymbolicAlt.FUSION, GeneLevelSymbolicAlt.FUSION_UNORDERED}
 
 
@@ -379,7 +380,7 @@ def _variant_class_field(flags: VariantFlags) -> str:
     if alt := flags.symbolic_alt:
         if alt in _SYMBOLIC_INSERTIONS:
             return "insertions_count"
-        if alt == VCFSymbolicAllele.DEL:
+        if alt in _SYMBOLIC_DELETIONS:
             return "deletions_count"
         if (gene_level := GeneLevelSymbolicAlt.parse(alt)) and gene_level[0] in _FUSION_KINDS:
             return "fusions_count"
@@ -790,6 +791,10 @@ def _get_variant_class(alt: str, hgvs_g: str) -> Optional[VariantClass]:
             variant_type = VariantClass.DELETION
         elif alt == VCFSymbolicAllele.DUP:
             variant_type = VariantClass.DUPLICATION
+        elif alt == VCFSymbolicAllele.DUP_CHROM:
+            variant_type = VariantClass.COPY_NUMBER_GAIN
+        elif alt == VCFSymbolicAllele.DEL_CHROM:
+            variant_type = VariantClass.COPY_NUMBER_LOSS
     elif hgvs_g:
         if "delins" in hgvs_g:
             variant_type = VariantClass.INDEL

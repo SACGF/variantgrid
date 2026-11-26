@@ -427,7 +427,7 @@ def search_variant_whole_chromosome(search_input: SearchInputInstance):
         variants_qs = get_visible_variants(search_input, genome_build)
         for variant in variants_qs.filter(locus__contig=contig, locus__position=WHOLE_CHROMOSOME_POSITION,
                                           alt__seq=alt):
-            message = f"Whole chromosome {'gain' if alt == VCFSymbolicAllele.CHROM_GAIN else 'loss'} of chr{chrom}"
+            message = f"Whole chromosome {'gain' if alt == VCFSymbolicAllele.DUP_CHROM else 'loss'} of chr{chrom}"
             yield SearchResult(variant.preview, messages=[SearchMessage(message, severity=LogLevel.INFO)])
 
 

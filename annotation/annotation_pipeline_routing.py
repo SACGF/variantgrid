@@ -22,7 +22,7 @@ pipeline when their longer allele (ref or alt) reaches VariantAnnotationVersion.
 written to VEP and AnnotSV as the sequence. The field is null on versions made before it existed, which route
 explicit variants to STANDARD at any length - so nothing they annotated moves.
 
-A whole chromosome gained or lost (<CHROM_GAIN>/<CHROM_LOSS>, @see snpdb.whole_chromosome_variants) is a
+A whole chromosome gained or lost (<DUP:CHROM>/<DEL:CHROM>, @see snpdb.whole_chromosome_variants) is a
 STRUCTURAL_VARIANT that VEP is never given (annotation_version_querysets.vep_too_long_q) and AnnotSV is not
 routed: neither can parse the alt, and ranking the genes of a whole chromosome says nothing.
 """

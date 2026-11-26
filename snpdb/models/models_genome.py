@@ -44,6 +44,14 @@ CHRX_PSEUDOAUTOSOMAL_REGIONS = {
     "T2T-CHM13v2.0": [(1, 2_394_410), (153_925_835, 154_259_566)],
 }
 
+# chrY's pseudoautosomal regions (1-based, inclusive). Analysis-set references - what callers align to - mask them
+# with N, since those reads map to chrX, so a caller's whole chrY is the male-specific region between them
+CHRY_PSEUDOAUTOSOMAL_REGIONS = {
+    "GRCh37": [(10_001, 2_649_520), (59_034_050, 59_363_566)],
+    "GRCh38": [(10_001, 2_781_479), (56_887_903, 57_217_415)],
+    "T2T-CHM13v2.0": [(1, 2_458_320), (62_122_810, 62_460_029)],
+}
+
 
 class GenomeBuild(models.Model, SortMetaOrderingMixin, PreviewModelMixin):
     """ There is only 1 patch version of a genome build on the system
@@ -483,14 +491,14 @@ class GenomeBuildContig(models.Model):
 
 
 @lru_cache
-def _get_euchromatic_bounds(contig_id: int) -> Optional[tuple[int, int]]:
+def _get_euchromatic_span(contig_id: int) -> Optional[tuple[int, int]]:
     """ Cytobands are seed data, so cached per contig """
     bands = Cytoband.objects.filter(contig_id=contig_id).filter(Q(stain="gneg") | Q(stain__startswith="gpos"))
     bands = bands.order_by("start")
-    first_band_end = bands.values_list("end", flat=True).first()
-    if first_band_end is None:
+    first_band_start = bands.values_list("start", flat=True).first()
+    if first_band_start is None:
         return None
-    return first_band_end, bands.values_list("start", flat=True).last()
+    return first_band_start, bands.values_list("end", flat=True).last()
 
 
 class Cytoband(models.Model, PreviewModelMixin):
@@ -523,10 +531,15 @@ class Cytoband(models.Model, PreviewModelMixin):
         return Cytoband.objects.filter(contig=contig).exclude(stain="").select_related("contig").order_by("start")
 
     @staticmethod
-    def get_euchromatic_bounds(contig_id: int) -> Optional[tuple[int, int]]:
-        """ (end of the first euchromatic band - gneg/gpos* - start of the last), None for a contig with no
-            bands. What a whole chromosome spans - @see snpdb.whole_chromosome_variants """
-        return _get_euchromatic_bounds(contig_id)
+    def get_whole_chromosome_span(genome_build: GenomeBuild, contig: Contig) -> Optional[tuple[int, int]]:
+        """ (start, end) of what a caller covers calling the whole chromosome: the start of the first euchromatic
+            band (gneg/gpos*) to the end of the last, less chrY's pseudoautosomal regions. None for a contig with
+            no bands - @see snpdb.whole_chromosome_variants """
+        span = _get_euchromatic_span(contig.pk)
+        if span and contig.name == "Y" and (pars := CHRY_PSEUDOAUTOSOMAL_REGIONS.get(genome_build.name)):
+            (_, par1_end), (par2_start, _) = pars  # One at each tip
+            span = (max(span[0], par1_end + 1), min(span[1], par2_start - 1))
+        return span
 
     @staticmethod
     def get_band_range_name(cytobands: list['Cytoband']) -> Optional[str]:

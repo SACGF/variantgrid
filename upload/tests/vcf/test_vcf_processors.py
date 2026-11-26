@@ -112,9 +112,9 @@ class TestVCFProcessors(TestCase):
         self._test_genotype_processor(vcf_filename, BulkGenotypeVCFProcessor)
 
     def test_dragen_ploidy_record_is_whole_chromosome(self):
-        """ #2908 - the trisomy's <DUP> over all of chr21 resolves to the <CHROM_GAIN> Variant """
-        chrom_gain = Sequence.objects.get_or_create(seq=VCFSymbolicAllele.CHROM_GAIN,
-                                                    seq_sha256_hash=sha256sum_str(VCFSymbolicAllele.CHROM_GAIN))[0]
+        """ #2908 - the trisomy's <DUP> over all of chr21 resolves to the <DUP:CHROM> Variant """
+        chrom_gain = Sequence.objects.get_or_create(seq=VCFSymbolicAllele.DUP_CHROM,
+                                                    seq_sha256_hash=sha256sum_str(VCFSymbolicAllele.DUP_CHROM))[0]
         Sequence.objects.get_or_create(seq="N", seq_sha256_hash=sha256sum_str("N"))
         vcf_filename = os.path.join(self.TEST_DATA_DIR, "dragen_ploidy", "trisomy21.ploidy.vcf")
         vcf_reader = cyvcf2.VCF(vcf_filename)
@@ -124,6 +124,24 @@ class TestVCFProcessors(TestCase):
         dup = next(v for v in vcf_reader if v.ALT)  # The pipeline drops the reference spans before this
         _variant_coordinate, variant_hash = processor.process_entry(dup)
         self.assertEqual((1, chrom_gain.pk, 46709982), (variant_hash.position, variant_hash.alt, variant_hash.svlen))
+        self.assertEqual("NDC", uploaded_vcf.vcf.copy_number_field)
+        self.assertEqual([], processor.whole_chromosome_near_misses)
+
+    def test_whole_chromosome_near_miss_is_reported(self):
+        """ #2908 - a <DUP> over 92% of chr2 is stored as written, and the uploader and Rollbar are told """
+        vcf_filename = os.path.join(self.TEST_DATA_DIR, "whole_chromosome_near_miss.vcf")
+        vcf_reader = cyvcf2.VCF(vcf_filename)
+        upload_step, uploaded_vcf = self._create_fake_upload_step_and_vcf(vcf_filename, vcf_reader)
+        processor = BulkGenotypeVCFProcessor(upload_step, uploaded_vcf.vcf.cohort.cohort_genotype_collection,
+                                             uploaded_vcf, None)
+        for v in vcf_reader:
+            processor.process_entry(v)
+        with patch("upload.vcf.abstract_bulk_vcf_processor.report_message") as report_message:
+            processor._report_whole_chromosome_near_misses()
+
+        info = SimpleVCFImportInfo.objects.get(type=SimpleVCFImportInfo.WHOLE_CHROMOSOME_NEAR_MISS)
+        self.assertTrue(info.message.startswith("2:1000-223001000 <DUP> covers most of chr2"))
+        self.assertEqual(["2:1000-223001000 <DUP>"], report_message.call_args.kwargs["extra_data"]["variants"])
 
     def test_genotype_processor_several_batches(self):
         """ Each batch must start with empty per-variant lists, or the 2nd fails the length check """

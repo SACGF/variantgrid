@@ -961,8 +961,8 @@ const SV_KIND_CSS = {'DEL': 'del', 'DUP': 'dup', 'INV': 'inv', 'CNV': 'cnv', 'IN
 // A whole chromosome gained or lost is named by its chromosome rather than its size - @see
 // snpdb/whole_chromosome_variants.py
 const WHOLE_CHROMOSOME_KINDS = {
-    'CHROM_GAIN': {code: 'GAIN', css: 'chrom-gain', title: 'Whole chromosome gain'},
-    'CHROM_LOSS': {code: 'LOSS', css: 'chrom-loss', title: 'Whole chromosome loss'},
+    'DUP:CHROM': {code: 'GAIN', css: 'chrom-gain', title: 'Whole chromosome gain'},
+    'DEL:CHROM': {code: 'LOSS', css: 'chrom-loss', title: 'Whole chromosome loss'},
 };
 
 // Returns {code, cssClass, title}, or null for a variant with an explicit ref/alt
@@ -983,7 +983,7 @@ VariantGridFormat.variantKind = (alt, svlen, chrom, position) => {
             title: label ? `${geneLevel.title} - ${label}` : geneLevel.title,
         };
     }
-    const wholeChromosome = WHOLE_CHROMOSOME_KINDS[kind];
+    const wholeChromosome = WHOLE_CHROMOSOME_KINDS[altParts.join(':')];
     if (wholeChromosome) {
         const contig = _contigLabel(chrom);
         return {
