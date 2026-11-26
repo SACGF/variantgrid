@@ -39,7 +39,7 @@ euchromatin into it
 (`snpdb/whole_chromosome_variants.py`); `Variant.get_whole_chromosome_q` is the predicate. It has no HGVS and is named by
 ISCN, `+21` / `-X` (`Variant.whole_chromosome_label`, "+21 GAIN"). The copy number is the sample's, in its FORMAT fields.
 A ploidy caller's euploid chromosome is `<CNV:CHROM>` with a HOM_REF genotype ("chr21 NORMAL"): a reference call, so a
-sample tested and found euploid can be found, and SampleNode shows it only with ref ticked.
+sample tested and found euploid can be found.
 
 **Gene-level ID** - `genes/models/models_gene_level.py:GeneLevelId`, the number a gene-level Variant carries as its
 `Locus.position` and inside its alt. The HGNC id where the gene has one, otherwise a local id above 1,000,000; anything

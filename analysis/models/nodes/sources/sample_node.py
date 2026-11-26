@@ -96,9 +96,6 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
                             ("zygosity_het", Zygosity.HET),
                             ("zygosity_hom", Zygosity.HOM_ALT),
                             ("zygosity_unk", Zygosity.UNKNOWN_ZYGOSITY)]
-    # A VCF without GT holds reference calls (ALT '.', HOM_REF - eg a ploidy caller's euploid chromosomes) and
-    # calls of no zygosity, so its zygosity is ref or not: any of these ticked keeps its calls
-    NO_GENOTYPE_CALL_ZYGOSITIES = (Zygosity.HET, Zygosity.HOM_ALT, Zygosity.UNKNOWN_ZYGOSITY)
     # Levels that resolve to a set of samples. Specimen/Patient join here with their own resolvers
     SOURCE_LEVEL_FIELDS = {
         SampleSourceLevel.SAMPLE: "sample",
@@ -308,25 +305,16 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
     # ── Query ─────────────────────────────────────────────────────────────────
 
     def _get_zygosities(self, sample: Optional[Sample] = None) -> list[str]:
-        """ Empty means no zygosity filter. A sample without GT is filtered as ref or not
-            (NO_GENOTYPE_CALL_ZYGOSITIES) """
-        if sample and (override := self.get_sample_filter(sample)) and override.zygosity is not None:
-            zygosities = list(override.zygosity)
-        else:
-            zygosities = list(self.get_node_zygosity())
+        """ Empty means no zygosity filter - a VCF without GT has nothing to filter on """
         if sample and not sample.has_genotype:
-            keeps_calls = any(z in zygosities for z in self.NO_GENOTYPE_CALL_ZYGOSITIES)
-            return [code for _, code in self.ZYGOSITY_FIELD_CODES
-                    if (code == Zygosity.HOM_REF and code in zygosities)
-                    or (keeps_calls and code in self.NO_GENOTYPE_CALL_ZYGOSITIES)]
-        return zygosities
+            return []
+
+        if sample and (override := self.get_sample_filter(sample)) and override.zygosity is not None:
+            return list(override.zygosity)
+        return list(self.get_node_zygosity())
 
     def get_zygosity_description(self, sample: Optional[Sample] = None):
-        sample = sample or self.sample
-        zygosities = self._get_zygosities(sample)
-        if sample and not sample.has_genotype:
-            # Its calls are what the node shows by default - only reference calls alone need saying
-            return dict(Zygosity.CHOICES)[Zygosity.HOM_REF] if zygosities == [Zygosity.HOM_REF] else ''
+        zygosities = self._get_zygosities(sample or self.sample)
         if len(zygosities) != len(Zygosity.CHOICES):  # Subset
             zyg_dict = dict(Zygosity.CHOICES)
             zyg = ','.join([zyg_dict[z] for z in zygosities])
@@ -446,8 +434,9 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
         if (override := self.get_sample_filter(sample)) and override.has_allele_frequency:
             sample_description += f" AF {override.get_allele_frequency_description()}"
 
-        if zyg := self.get_zygosity_description(sample):
-            sample_description += f" ({zyg})"
+        if sample.has_genotype:
+            if zyg := self.get_zygosity_description(sample):
+                sample_description += f" ({zyg})"
         return f"{sample_description}, from VCF {sample.vcf}"
 
     def _get_method_summary(self):
@@ -470,8 +459,9 @@ class SampleNode(SampleMixin, GeneCoverageMixin, AnalysisNode):
                     name_parts.append("(no samples)")
         elif self.sample:
             name_parts.append(self.sample.name)
-            if zyg := self.get_zygosity_description():
-                name_parts.append(f"({zyg})")
+            if self.sample.has_genotype:
+                if zyg := self.get_zygosity_description():
+                    name_parts.append(f"({zyg})")
 
         if name_parts:
             if filter_description := self.get_filter_description():
