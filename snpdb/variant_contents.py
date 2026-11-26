@@ -1,5 +1,5 @@
-""" What kinds of call a sample or a VCF holds (snpdb.enums.VariantContent: Small, CNV, SV, Fusion, Gene CN,
-    Splice), read from the per-sample stats (#2759). DRAGEN writes a small variant, CNV and SV VCF per patient,
+""" What kinds of call a sample or a VCF holds (snpdb.enums.VariantContent: Small, CNV, SV, Chrom CN, Fusion,
+    Gene CN, Splice), read from the per-sample stats (#2759). DRAGEN writes a small variant, CNV and SV VCF per patient,
     all naming the sample alike, so this is what tells them apart wherever samples and VCFs are listed.
 
     A sample whose stats predate the counts (CohortGenotypeStats.VARIANT_CONTENTS_STATS_VERSION) has no
@@ -29,8 +29,8 @@ VARIANT_CONTENTS_HELP_LINES = [
 ]
 VARIANT_CONTENTS_HELP = "\n".join(VARIANT_CONTENTS_HELP_LINES)
 
-_COUNT_FIELDS = ("variant_count", "structural_count", "fusions_count", "gene_copy_number_count",
-                 "gene_splice_count")
+_COUNT_FIELDS = ("variant_count", "structural_count", "whole_chromosome_count", "fusions_count",
+                 "gene_copy_number_count", "gene_splice_count")
 
 
 def latest_sample_variant_stats(samples: Union[Iterable[Sample], QuerySet[Sample]]) -> QuerySet[CohortGenotypeStats]:
