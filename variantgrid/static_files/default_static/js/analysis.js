@@ -92,15 +92,20 @@ function resizeGrid() {
     wrapper.each(function() {
         const scrollBody = $(".dataTables_scrollBody", this);
         if (available !== null && scrollBody.length) {
-            // Everything but the rows - toolbar, column headers, pager
-            const chrome = $(this).outerHeight(true) - scrollBody.outerHeight();
-            const fitHeight = Math.max(available - chrome - GRID_BOTTOM_MARGIN, minHeight);
+            const wrapperElement = $(this);
+            const fitHeight = function() {
+                // Everything but the rows - toolbar, column headers, pager
+                const chrome = wrapperElement.outerHeight(true) - scrollBody.outerHeight();
+                return Math.max(available - chrome - GRID_BOTTOM_MARGIN, minHeight);
+            };
             const horizontalScrollBar = scrollBody[0].offsetHeight - scrollBody[0].clientHeight;
-            const rowsOverflow = scrollBody[0].scrollHeight + horizontalScrollBar > fitHeight;
+            const rowsOverflow = scrollBody[0].scrollHeight + horizontalScrollBar > fitHeight();
+            // Showing the toggle can wrap the CSV / VCF buttons onto a second line, so the rows' room is
+            // measured once the toggle is in place
+            updateGridFitLink(wrapperElement, rowsOverflow);
             const fitted = gridFitsToWindow();
-            scrollBody.css("max-height", fitted ? fitHeight + "px" : "");
+            scrollBody.css("max-height", fitted ? fitHeight() + "px" : "");
             $("#node-grid-container").toggleClass("grid-fitted", fitted);
-            updateGridFitLink($(this), rowsOverflow);
         }
         const table = $("table.dataTable", this).first();
         if (table.length && $.fn.DataTable.isDataTable(table)) {
