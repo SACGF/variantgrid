@@ -90,6 +90,12 @@ function renderChip(chip) {
 	if (chip.count) {
 		$("<span/>", {class: "node-chip-count", text: "\u00d7" + chip.count}).appendTo(label);
 	}
+	if (chip.zygosities && chip.zygosities.length) {
+		const glyphs = $("<span/>", {class: "node-chip-zygosities"}).appendTo(label);
+		for (const zygosity of chip.zygosities) {
+			glyphs.append(zygosityGlyph(zygosity));
+		}
+	}
 	// Only colour fits on the card - the hover card spells each one out (renderHoverCardChip)
 	if (chip.dots && chip.dots.length) {
 		const dots = $("<span/>", {class: "node-chip-dots"}).appendTo(label);

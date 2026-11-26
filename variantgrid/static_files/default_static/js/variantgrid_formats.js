@@ -386,6 +386,12 @@ const ZYGOSITY_GLYPH_CSS = {
     '?': 'zyg-unknown',
 };
 
+// One zygosity (a Zygosity.CHOICES label) as its glyph - the grid's sample cell and the analysis
+// SampleNode's zygosity chip
+function zygosityGlyph(zygosity) {
+    return `<svg class='zyg-glyph ${ZYGOSITY_GLYPH_CSS[zygosity]}' viewBox='0 0 16 16'>${ZYGOSITY_GLYPHS[zygosity]}</svg>`;
+}
+
 function _hasSampleValue(value) {
     return value != null && value !== '' && value !== '.';
 }
@@ -413,8 +419,7 @@ function _genotypeQualityCss(value, thresholds, higherIsBetter) {
 }
 
 VariantGridFormat.sampleZygosity = (zygosity, type, rowData, ctx) => {
-    const glyph = ZYGOSITY_GLYPHS[zygosity];
-    if (!glyph) {
+    if (!ZYGOSITY_GLYPHS[zygosity]) {
         // '.' - the sample has no call for this variant at all
         return '';
     }
@@ -480,7 +485,7 @@ VariantGridFormat.sampleZygosity = (zygosity, type, rowData, ctx) => {
     }
 
     return `<span class='sample-zygosity' title='${escapeHtml(detail.join(' · '))}'>`
-         + `<svg class='zyg-glyph ${ZYGOSITY_GLYPH_CSS[zygosity]}' viewBox='0 0 16 16'>${glyph}</svg>`
+         + zygosityGlyph(zygosity)
          + (values ? `<span class='zyg-values'>${values}</span>` : '')
          + copyNumberHtml + quality + filtersHtml + '</span>';
 };

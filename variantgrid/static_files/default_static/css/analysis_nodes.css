@@ -435,6 +435,28 @@ button.add-analysis-variable-button {
 	background: var(--variant-content-color);
 }
 
+/* NodeChip.zygosities - the zygosities a SampleNode keeps, as the grid's glyphs (global/_variant_grid.scss .sample-zygosity),
+   the grey darker to show on the chip */
+.node-chip-zygosities {
+	display: inline-flex;
+	gap: 1px;
+}
+
+.node-chip-zygosities .zyg-glyph {
+	width: 8px;
+	height: 8px;
+}
+
+.node-chip-zygosities .zyg-het,
+.node-chip-zygosities .zyg-hom-alt {
+	color: #3a6ea5;
+}
+
+.node-chip-zygosities .zyg-ref,
+.node-chip-zygosities .zyg-unknown {
+	color: #8a929b;
+}
+
 .node-chip[class*="variant-content-"] {
 	border-color: var(--variant-content-color);
 	background: var(--variant-content-color);

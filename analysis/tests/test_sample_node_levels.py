@@ -275,18 +275,23 @@ class TestSampleNodeLevels(SampleNodeLevelsTestCase):
         node = self._extraction_node(zygosity_het=False, zygosity_hom=False)
         self.assertEqual(self._pks(node), {self.v_snv.pk, self.v_ref.pk, self.v_cnv.pk, self.v_both.pk})
 
-    def test_vcf_without_gt_has_no_zygosity_filter_but_keeps_depth(self):
-        """ A depth-only caller (TSO 500 splice variants) stores every zygosity as unknown, so the
-            node's ticked zygosities are ignored for it while its AD threshold still applies """
+    def test_vcf_without_gt_shows_reference_genotypes_only_with_ref_ticked(self):
+        """ A VCF without GT stores unknown zygosity, or HOM_REF where the importer wrote a reference genotype
+            (#2915), so ref is the one zygosity choice that applies: everything else comes through whatever
+            is ticked. Its AD threshold still applies """
         VCF.objects.filter(pk=self.snv_sample.vcf_id).update(genotype_field=None)
         self.snv_sample.vcf.refresh_from_db()
         self.assertFalse(self.snv_sample.has_genotype)
         self.assertTrue(self.snv_sample.has_depth)
 
         node = self._extraction_node(min_ad=10)  # HET + HOM_ALT
-        self.assertEqual(node._get_zygosities(self.snv_sample), [])
-        # snv: v_ref (HOM_REF, AD=45) now comes through, v_both (AD=5) is dropped by depth
-        self.assertEqual(self._pks(node), {self.v_snv.pk, self.v_ref.pk, self.v_cnv.pk, self.v_both.pk})
+        self.assertEqual(node._get_zygosities(self.snv_sample), ["E", "O", "U"])
+        # snv: v_ref (HOM_REF) is left out, v_both (AD=5) is dropped by depth and comes from the cnv caller
+        self.assertEqual(self._pks(node), {self.v_snv.pk, self.v_cnv.pk, self.v_both.pk})
+
+        node = self._extraction_node(min_ad=10, zygosity_ref=True, zygosity_het=False, zygosity_hom=False)
+        self.assertEqual(node._get_zygosities(self.snv_sample), ["R", "E", "O", "U"])
+        self.assertEqual(self._pks(node), {self.v_snv.pk, self.v_ref.pk})
 
     # ── Per sample overrides ─────────────────────────────────────────────────
 
@@ -527,26 +532,52 @@ class TestSampleNodeLevels(SampleNodeLevelsTestCase):
 
         self.assertIsNone(node.get_patient())
         self.assertEqual(node.get_node_icon(), SampleNode.get_node_class_icon())
-        self.assertEqual([(c.text, c.title) for c in node.get_node_chips()],
+        self.assertEqual([(c.text, c.title) for c in node.get_node_chips() if not c.zygosities],
                          [("VCF", str(loose.vcf))])
 
+    @staticmethod
+    def _hierarchy_chips(node) -> list:
+        return [c for c in node.get_node_chips() if not c.zygosities]
+
     def test_chips_are_the_hierarchy_from_the_picked_object_down(self):
-        sample_chips = self._node(SampleSourceLevel.SAMPLE, self.snv_sample).get_node_chips()
+        sample_chips = self._hierarchy_chips(self._node(SampleSourceLevel.SAMPLE, self.snv_sample))
         self.assertEqual([(c.text, c.title) for c in sample_chips],
                          [("VCF", str(self.snv_sample.vcf))])
 
-        extraction_chips = self._extraction_node().get_node_chips()
+        extraction_chips = self._hierarchy_chips(self._extraction_node())
         self.assertEqual([c.text for c in extraction_chips], ["DNA"])
         vcf_chip = extraction_chips[0].children[0]
         self.assertEqual((vcf_chip.text, vcf_chip.count), ("VCF", 2))
 
-        specimen_chips = self._node(SampleSourceLevel.SPECIMEN, self.specimen).get_node_chips()
+        specimen_chips = self._hierarchy_chips(self._node(SampleSourceLevel.SPECIMEN, self.specimen))
         self.assertEqual([c.text for c in specimen_chips], [self.specimen.reference_id])
         self.assertEqual([c.text for c in specimen_chips[0].children], ["DNA", "RNA"])
 
-        patient_chips = self._node(SampleSourceLevel.PATIENT, self.patient).get_node_chips()
+        patient_chips = self._hierarchy_chips(self._node(SampleSourceLevel.PATIENT, self.patient))
         self.assertEqual([c.text for c in patient_chips],
                          [self.specimen.reference_id, self.blood_specimen.reference_id, "VCF"])
+
+    def test_zygosity_chip_draws_the_zygosities_kept(self):
+        """ Keeping every zygosity isn't filtering, so it has no chip. A group lists the samples it filters
+            differently - here a VCF without GT, whose calls are unknown zygosity or a reference genotype (#2915) """
+        def zygosity_chips(node):
+            return [c for c in node.get_node_chips() if c.zygosities]
+
+        default_chips = zygosity_chips(self._node(SampleSourceLevel.SAMPLE, self.snv_sample))
+        self.assertEqual([("HET", "HOM_ALT")], [c.zygosities for c in default_chips])
+        every = {"zygosity_ref": True, "zygosity_unk": True}
+        self.assertEqual([], zygosity_chips(self._node(SampleSourceLevel.SAMPLE, self.snv_sample, **every)))
+
+        VCF.objects.filter(pk=self.snv_sample.vcf_id).update(genotype_field=None)
+        self.snv_sample.vcf.refresh_from_db()
+        no_gt_chips = zygosity_chips(self._node(SampleSourceLevel.SAMPLE, self.snv_sample))
+        self.assertEqual([("?",)], [c.zygosities for c in no_gt_chips])
+        self.assertEqual([], zygosity_chips(self._node(SampleSourceLevel.SAMPLE, self.snv_sample, zygosity_ref=True)))
+
+        [group_chip] = zygosity_chips(self._extraction_node())
+        self.assertEqual(("HET", "HOM_ALT"), group_chip.zygosities)
+        self.assertEqual(["Zygosity HET, HOM_ALT", f"{self.snv_sample.name}: ?"],
+                         group_chip.title.split("\n"))
 
     def test_vcf_chip_dots_tell_callers_with_the_same_sample_name_apart(self):
         """ #2759 - every DRAGEN VCF names the sample alike, so the dots say which caller's calls a node reads.

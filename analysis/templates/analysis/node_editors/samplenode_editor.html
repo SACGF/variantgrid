@@ -883,7 +883,8 @@
                 <td> {{ form.zygosity_unk }}
         </table>
     {% else %}
-        <span class='editor-note'>VCF has no GT field, so there is no zygosity to filter on.</span>
+        <span class='editor-note'>VCF has no GT field, so there is no het or hom to filter on.</span>
+        <label class='editor-note' title="Calls the importer stored with a reference genotype (ALT '.')">{{ form.zygosity_ref }} Ref - also show reference calls</label>
     {% endif %}
     {% if has_depth %}
         <a id='view-allele-frequency-filter-link' class="hover-link" href='javascript:viewAlleleFrequencyFilter()'>Allele Frequency...</a>
