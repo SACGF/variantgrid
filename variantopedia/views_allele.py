@@ -38,7 +38,8 @@ def get_allele_short_label(allele: Allele, preferred_genome_build: GenomeBuild) 
         if va := variant_allele.variant.variantannotation_set.filter(version=vav).first():
             return va.get_short_label()
     if preferred_first:
-        return VariantAnnotation.get_hgvs_g(preferred_first[0].variant) or str(allele)
+        variant = preferred_first[0].variant
+        return variant.whole_chromosome_label or VariantAnnotation.get_hgvs_g(variant) or str(allele)
     return str(allele)
 
 

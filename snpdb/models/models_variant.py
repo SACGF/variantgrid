@@ -63,6 +63,8 @@ from snpdb.whole_chromosome_variants import (
     WHOLE_CHROMOSOME_POSITION,
     is_whole_chromosome_near_miss,
     whole_chromosome_alt,
+    whole_chromosome_iscn,
+    whole_chromosome_label,
     whole_chromosome_svlen,
 )
 
@@ -934,6 +936,16 @@ class Variant(PreviewModelMixin, models.Model):
     def is_whole_chromosome(self) -> bool:
         """ @see snpdb.whole_chromosome_variants, and get_whole_chromosome_q for the queryset form """
         return self.alt.seq in WHOLE_CHROMOSOME_ALTS
+
+    @property
+    def whole_chromosome_iscn(self) -> Optional[str]:
+        """ "+21" / "-X" for a whole-chromosome variant, else None - @see snpdb.whole_chromosome_variants """
+        return whole_chromosome_iscn(self.locus.contig.name, self.alt.seq)
+
+    @property
+    def whole_chromosome_label(self) -> Optional[str]:
+        """ "+21 GAIN" for a whole-chromosome variant, else None - its name where HGVS would be """
+        return whole_chromosome_label(self.locus.contig.name, self.alt.seq)
 
     @staticmethod
     def annotate_variant_string(qs, name="variant_string", path_to_variant=""):

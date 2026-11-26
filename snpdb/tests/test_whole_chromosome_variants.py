@@ -10,6 +10,7 @@ from snpdb.tests.utils.vcf_testing_utils import (
     create_mock_allele,
     slowly_create_test_variant_from_coordinate,
 )
+from snpdb.whole_chromosome_variants import whole_chromosome_label
 
 GRCH38_CHR21_LENGTH = 46709983
 GRCH37_CHR21_LENGTH = 48129895
@@ -68,6 +69,14 @@ class WholeChromosomeCanonicalFormTest(TestCase):
         self.assertFalse(variant.can_make_g_hgvs)
         self.assertFalse(variant.can_have_c_hgvs)
         self.assertFalse(variant.can_have_clingen_allele)
+
+    def test_named_by_iscn(self):
+        """ #2910 - with no HGVS, it is named by ISCN wherever HGVS would name it """
+        variant = slowly_create_test_variant_from_coordinate(self.chr21_gain, self.grch38)
+        self.assertEqual("+21", variant.whole_chromosome_iscn)
+        self.assertEqual("+21 GAIN", variant.whole_chromosome_label)
+        self.assertEqual("-X LOSS", whole_chromosome_label("chrX", VCFSymbolicAllele.DEL_CHROM))
+        self.assertIsNone(whole_chromosome_label("21", VCFSymbolicAllele.DUP))
 
 
 class WholeChromosomeLiftoverTest(TestCase):

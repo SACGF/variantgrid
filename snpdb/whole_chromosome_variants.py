@@ -49,9 +49,15 @@ allele (VariantCoordinate.can_be_made_explicit whitelists DEL/DUP/INV), and lift
 chromosome in the other build with no tool (snpdb/liftover.py, AlleleConversionTool.WHOLE_CHROMOSOME).
 Variant.get_whole_chromosome_q() / is_whole_chromosome are the predicates.
 
-Searching "trisomy 21", "monosomy X", "chr21 gain" or "loss of chrX" finds the build's whole-chromosome
-Variant (parse_whole_chromosome_search, variantopedia/signals/variant_search.py:search_variant_whole_chromosome),
-whose samples grid is everyone with that event.
+It is named by ISCN's numerical abnormality, the chromosome with + or - (whole_chromosome_iscn: "+21", "-X"),
+as HGVS has no form for it (its complex-variant recommendations defer chromosomal changes to ISCN). With no copy
+number or sex this is the variant-level form: a constitutional monosomy X is "45,X" in a karyotype, which is the
+sample's. Grids, the variant page title and its card show whole_chromosome_label, "+21 GAIN" (#2910).
+
+Searching "trisomy 21", "monosomy X", "chr21 gain", "loss of chrX" or the ISCN ("+21", or as labelled "+21 GAIN")
+finds the build's whole-chromosome Variant (parse_whole_chromosome_search,
+variantopedia/signals/variant_search.py:search_variant_whole_chromosome), whose samples grid is everyone with
+that event.
 """
 import re
 from typing import Optional
@@ -68,16 +74,30 @@ WHOLE_CHROMOSOME_ALT_FOR_SV_ALT = {
 
 WHOLE_CHROMOSOME_POSITION = 1
 
+# ISCN's sign for a whole chromosome gained or lost, and the word the label and badge say
+_ISCN_SIGNS = {
+    VCFSymbolicAllele.DUP_CHROM: "+",
+    VCFSymbolicAllele.DEL_CHROM: "-",
+}
+_LABEL_WORDS = {
+    VCFSymbolicAllele.DUP_CHROM: "GAIN",
+    VCFSymbolicAllele.DEL_CHROM: "LOSS",
+}
+
 _SEARCH_CHROM = r"(?:chr(?:omosome)?\s*)?([0-9]{1,2}|X|Y)"
-# "trisomy 21", "monosomy X", "chr21 gain", "gain of chr21"
+# "trisomy 21", "monosomy X", "chr21 gain", "gain of chr21", and the ISCN "+21" / "-X" alone or as labelled
+# ("+21 GAIN")
 WHOLE_CHROMOSOME_SEARCH_PATTERN = re.compile(
-    rf"^(?:(trisomy|monosomy)\s*{_SEARCH_CHROM}|{_SEARCH_CHROM}\s+(gain|loss)|(gain|loss)\s+of\s+{_SEARCH_CHROM})$",
+    rf"^(?:(trisomy|monosomy)\s*{_SEARCH_CHROM}|{_SEARCH_CHROM}\s+(gain|loss)|(gain|loss)\s+of\s+{_SEARCH_CHROM}"
+    rf"|([+-])\s*([0-9]{{1,2}}|X|Y)(?:\s+(?:gain|loss))?)$",
     re.IGNORECASE)
 _SEARCH_WORD_ALTS = {
     "trisomy": VCFSymbolicAllele.DUP_CHROM,
     "gain": VCFSymbolicAllele.DUP_CHROM,
+    "+": VCFSymbolicAllele.DUP_CHROM,
     "monosomy": VCFSymbolicAllele.DEL_CHROM,
     "loss": VCFSymbolicAllele.DEL_CHROM,
+    "-": VCFSymbolicAllele.DEL_CHROM,
 }
 
 
@@ -115,11 +135,26 @@ def whole_chromosome_svlen(contig_length: int) -> int:
     return contig_length - WHOLE_CHROMOSOME_POSITION
 
 
+def whole_chromosome_iscn(chrom: str, alt: str) -> Optional[str]:
+    """ ISCN for a whole-chromosome alt, eg ("21", "<DUP:CHROM>") -> "+21", ("chrX", "<DEL:CHROM>") -> "-X".
+        None for any other alt """
+    if sign := _ISCN_SIGNS.get(alt):
+        return sign + re.sub(r"^chr", "", chrom, flags=re.IGNORECASE)
+    return None
+
+
+def whole_chromosome_label(chrom: str, alt: str) -> Optional[str]:
+    """ "+21 GAIN" - as the grid's label and badge (variantgrid_formats.js:WHOLE_CHROMOSOME_KINDS) """
+    if iscn := whole_chromosome_iscn(chrom, alt):
+        return f"{iscn} {_LABEL_WORDS[alt]}"
+    return None
+
+
 def parse_whole_chromosome_search(text: str) -> Optional[tuple[str, str]]:
     """ (chrom, whole-chromosome alt) from a search, eg "trisomy 21" -> ("21", "<DUP:CHROM>") """
     if m := WHOLE_CHROMOSOME_SEARCH_PATTERN.fullmatch(text.strip()):
         g = m.groups()  # One (word, chrom) pair per alternative in the pattern
-        for word, chrom in ((g[0], g[1]), (g[3], g[2]), (g[4], g[5])):
+        for word, chrom in ((g[0], g[1]), (g[3], g[2]), (g[4], g[5]), (g[6], g[7])):
             if word:
                 return chrom.upper(), _SEARCH_WORD_ALTS[word.lower()]
     return None

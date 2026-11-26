@@ -9,6 +9,15 @@
 	font-weight: 600;
 }
 
+// A whole chromosome's ISCN ("+21"), in the colour of the GAIN / LOSS badge beside it
+.rv-chrom-gain {
+	color: #1a56b8;
+}
+
+.rv-chrom-loss {
+	color: #b3261e;
+}
+
 .rv-hgvs {
 	font-family: ui-monospace, Menlo, Consolas, monospace;
 	font-size: 11px;

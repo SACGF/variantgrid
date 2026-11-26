@@ -797,10 +797,12 @@ class VariantAnnotation(AbstractVariantAnnotation):
 
     def get_short_label(self) -> str:
         """ Falls back to g.HGVS, which only this (per-variant) annotation has - calculated for a row
-            VEP skipped (eg an SV over its size cap), which has none of its own """
+            VEP skipped (eg an SV over its size cap), which has none of its own. A whole chromosome has
+            neither, and is named by its ISCN ("+21 GAIN") """
         if self.hgvs_p or self.has_hgvs_c:
             return super().get_short_label()
-        return self.hgvs_g or VariantAnnotation.get_hgvs_g(self.variant) or str(self.variant)
+        return (self.hgvs_g or self.variant.whole_chromosome_label or VariantAnnotation.get_hgvs_g(self.variant)
+                or str(self.variant))
 
     @staticmethod
     def get_hgvs_g(variant: Variant) -> Optional[str]:
