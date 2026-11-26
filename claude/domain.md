@@ -49,7 +49,7 @@ written `BCR::ABL1`) or a `genes/models/models_gene_level.py:GeneCopyNumberEvent
 segment and copy ratio are per observation, on the `CohortGenotype`.
 
 **Variant kind** - what the grids' kind badge says a row is, read off the alt: `FUSION` / `GAIN` / `LOSS` for a gene-level
-alt (`library/genomics/vcf_enums.py:GeneLevelSymbolicAlt`), `GAIN chr21` / `LOSS chrX` for a whole-chromosome variant,
+alt (`library/genomics/vcf_enums.py:GeneLevelSymbolicAlt`), `GAIN` / `LOSS` in a solid fill for a whole-chromosome variant (labelled by its chromosome, `chr21`),
 `DEL` / `DUP` / `INV` / `CNV` / `INS` with the size from `svlen` for a symbolic one, and nothing at all for a small variant. Not VEP's `variant_class`
 (`library/genomics/vcf_enums.py:VariantClass`): VEP calls a 1 Mb `<DEL>` and a 1 bp deletion the same class, so the
 badge answers "is this a small variant?" where `variant_class` answers "what sort of change?". The variant type

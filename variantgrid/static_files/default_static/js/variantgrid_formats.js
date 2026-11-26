@@ -958,8 +958,8 @@ const GENE_LEVEL_KINDS = {
 const SPLICE_COORDINATE_LABEL = /^.+_([0-9]{1,2}|MT|M|X|Y)_[0-9]+_[0-9]+$/i;
 const SPLICE_DISPLAY_SUFFIX = / splice$/;
 const SV_KIND_CSS = {'DEL': 'del', 'DUP': 'dup', 'INV': 'inv', 'CNV': 'cnv', 'INS': 'ins'};
-// A whole chromosome gained or lost is named by its chromosome rather than its size - @see
-// snpdb/whole_chromosome_variants.py
+// A whole chromosome gained or lost, as a gene-level one is: the label names the chromosome and the badge says
+// GAIN / LOSS, solid so it stands out from a focal SV - @see snpdb/whole_chromosome_variants.py
 const WHOLE_CHROMOSOME_KINDS = {
     'DUP:CHROM': {code: 'GAIN', css: 'chrom-gain', title: 'Whole chromosome gain'},
     'DEL:CHROM': {code: 'LOSS', css: 'chrom-loss', title: 'Whole chromosome loss'},
@@ -985,9 +985,8 @@ VariantGridFormat.variantKind = (alt, svlen, chrom, position) => {
     }
     const wholeChromosome = WHOLE_CHROMOSOME_KINDS[altParts.join(':')];
     if (wholeChromosome) {
-        const contig = _contigLabel(chrom);
         return {
-            code: contig ? `${wholeChromosome.code} ${contig}` : wholeChromosome.code,
+            code: wholeChromosome.code,
             cssClass: `rv-kind-${wholeChromosome.css}`,
             title: wholeChromosome.title,
         };
@@ -1041,6 +1040,16 @@ VariantGridFormat.representativeVariantLabel = (variantId, rowData) => {
     const hgvsG = rowData["variantannotation__hgvs_g"];
     const symbol = rowData["variantannotation__symbol"];
     const overlappingSymbols = rowData["variantannotation__overlapping_symbols"];
+
+    // 0. A whole chromosome gained or lost is named by its chromosome ("chr21", the badge beside it says GAIN),
+    // as a gene-level copy number call is by its gene. Searching the row's "chr21 GAIN" finds it
+    const wholeChromosome = (alt != null) ? WHOLE_CHROMOSOME_KINDS[String(alt).slice(1, -1)] : null;
+    if (wholeChromosome && chrom != null) {
+        const contig = _contigLabel(chrom);
+        const end = position + Math.abs(svlen || 0);
+        return {html: `<span class='rv-gene'>${escapeHtml(contig)}</span>`,
+                title: `${wholeChromosome.title} - ${contig}:${position}-${end}`};
+    }
 
     // 1. c.HGVS on the representative transcript - gene symbol leads, transcript is in the expanded row.
     // A small variant is named for the pick alone; an SV for the genes it spans, as in 2

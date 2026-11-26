@@ -143,8 +143,9 @@ import like any other.
 ### 4. Display, search, nearby
 
 - Kind badge (`VariantGridFormat.variantKind` in `variantgrid/static_files/default_static/js/variantgrid_formats.js`):
-  `<DUP:CHROM>` / `<DEL:CHROM>` show `GAIN chr21` / `LOSS chrX` with the title "Whole chromosome gain/loss", with
-  their own css class beside the dup/del ones in the scss.
+  `<DUP:CHROM>` / `<DEL:CHROM>` show `GAIN` / `LOSS` with the title "Whole chromosome gain/loss", in their own solid
+  css class beside the dup/del ones in the scss. `representativeVariantLabel` names the row by its chromosome, so it
+  reads "chr21 [GAIN]" as a gene-level call reads "RAF1 [GAIN]", and the row's text is a search that finds it.
 - Variant Types page (`variantopedia/variant_types.py`): a "Whole chromosome gain / loss" kind with its outcome
   (symbolic, SV pipeline, genes by overlap, liftover by same chromosome).
 - Search (`variantopedia/signals/variant_search.py:search_variant_whole_chromosome`, beside the variant coordinate
