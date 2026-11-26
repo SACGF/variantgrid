@@ -275,18 +275,24 @@ class TestSampleNodeLevels(SampleNodeLevelsTestCase):
         node = self._extraction_node(zygosity_het=False, zygosity_hom=False)
         self.assertEqual(self._pks(node), {self.v_snv.pk, self.v_ref.pk, self.v_cnv.pk, self.v_both.pk})
 
-    def test_vcf_without_gt_has_no_zygosity_filter_but_keeps_depth(self):
-        """ A depth-only caller (TSO 500 splice variants) stores every zygosity as unknown, so the
-            node's ticked zygosities are ignored for it while its AD threshold still applies """
+    def test_vcf_without_gt_filters_ref_or_not_and_keeps_depth(self):
+        """ #2915 - without GT the only zygosity is a reference call (ALT '.', HOM_REF - a ploidy caller's euploid
+            chromosomes) or not, so het or hom ticked keeps every call and ref adds the reference calls. Its AD
+            threshold still applies """
         VCF.objects.filter(pk=self.snv_sample.vcf_id).update(genotype_field=None)
         self.snv_sample.vcf.refresh_from_db()
         self.assertFalse(self.snv_sample.has_genotype)
         self.assertTrue(self.snv_sample.has_depth)
 
         node = self._extraction_node(min_ad=10)  # HET + HOM_ALT
-        self.assertEqual(node._get_zygosities(self.snv_sample), [])
-        # snv: v_ref (HOM_REF, AD=45) now comes through, v_both (AD=5) is dropped by depth
-        self.assertEqual(self._pks(node), {self.v_snv.pk, self.v_ref.pk, self.v_cnv.pk, self.v_both.pk})
+        self.assertEqual(node._get_zygosities(self.snv_sample), ["E", "O", "U"])
+        # snv: v_ref (HOM_REF) is left out, v_both (AD=5) is dropped by depth
+        self.assertEqual(self._pks(node), {self.v_snv.pk, self.v_cnv.pk, self.v_both.pk})
+        self.assertEqual(node.get_zygosity_description(self.snv_sample), "")
+
+        node = self._extraction_node(min_ad=10, zygosity_ref=True, zygosity_het=False, zygosity_hom=False)
+        self.assertEqual(node._get_zygosities(self.snv_sample), ["R"])
+        self.assertEqual(node.get_zygosity_description(self.snv_sample), "REF")
 
     # ── Per sample overrides ─────────────────────────────────────────────────
 

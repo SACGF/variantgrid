@@ -883,7 +883,10 @@
                 <td> {{ form.zygosity_unk }}
         </table>
     {% else %}
-        <span class='editor-note'>VCF has no GT field, so there is no zygosity to filter on.</span>
+        <span class='editor-note' title="A VCF without GT has calls of no zygosity, which are always shown, and reference calls (ALT '.'), eg a ploidy caller's euploid chromosomes">
+            VCF has no GT field, so its calls are all shown.
+            <label>{{ form.zygosity_ref }} Ref - also show its reference calls</label>
+        </span>
     {% endif %}
     {% if has_depth %}
         <a id='view-allele-frequency-filter-link' class="hover-link" href='javascript:viewAlleleFrequencyFilter()'>Allele Frequency...</a>

@@ -10,7 +10,11 @@ from snpdb.tests.utils.vcf_testing_utils import (
     create_mock_allele,
     slowly_create_test_variant_from_coordinate,
 )
-from snpdb.whole_chromosome_variants import whole_chromosome_label
+from snpdb.whole_chromosome_variants import (
+    parse_whole_chromosome_search,
+    whole_chromosome_iscn,
+    whole_chromosome_label,
+)
 
 GRCH38_CHR21_LENGTH = 46709983
 GRCH37_CHR21_LENGTH = 48129895
@@ -77,6 +81,12 @@ class WholeChromosomeCanonicalFormTest(TestCase):
         self.assertEqual("+21 GAIN", variant.whole_chromosome_label)
         self.assertEqual("-X LOSS", whole_chromosome_label("chrX", VCFSymbolicAllele.DEL_CHROM))
         self.assertIsNone(whole_chromosome_label("21", VCFSymbolicAllele.DUP))
+
+    def test_euploid_is_named_by_its_chromosome(self):
+        """ #2915 - a euploid chromosome has no ISCN abnormality, and its label finds it again """
+        self.assertIsNone(whole_chromosome_iscn("21", VCFSymbolicAllele.CNV_CHROM))
+        self.assertEqual("chr21 NORMAL", whole_chromosome_label("21", VCFSymbolicAllele.CNV_CHROM))
+        self.assertEqual(("21", VCFSymbolicAllele.CNV_CHROM), parse_whole_chromosome_search("chr21 NORMAL"))
 
 
 class WholeChromosomeLiftoverTest(TestCase):

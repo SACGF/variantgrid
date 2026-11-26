@@ -1359,10 +1359,11 @@ VARIANT_WHOLE_CHROMOSOME_END_SLACK = 1_000_000
 VARIANT_WHOLE_CHROMOSOME_NEAR_MISS_FRACTION = 0.9
 # Any other symbolic ALT is dropped at import (vcf_clean_alts). <INS> is left out on purpose: Manta's often has no
 # SVLEN and END=POS, so it would store with svlen 0 and unrelated insertions would collapse into one Variant.
-# <DUP:CHROM>/<DEL:CHROM> are ours (@see snpdb.whole_chromosome_variants) - here so our own VCFs re-import
+# The whole-chromosome alts are ours (@see snpdb.whole_chromosome_variants) - here so our own VCFs re-import
 VARIANT_SYMBOLIC_ALT_VALID_TYPES = {VCFSymbolicAllele.CNV, VCFSymbolicAllele.DEL,
                                     VCFSymbolicAllele.DUP, VCFSymbolicAllele.INV,
-                                    VCFSymbolicAllele.DUP_CHROM, VCFSymbolicAllele.DEL_CHROM}
+                                    VCFSymbolicAllele.DUP_CHROM, VCFSymbolicAllele.DEL_CHROM,
+                                    VCFSymbolicAllele.CNV_CHROM}
 
 # VCF 4.3 defines SVLEN as negative for DELs, but 4.4+ it's always positive
 # This is for our internal storage in Variant records

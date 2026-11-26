@@ -18,6 +18,7 @@ Which we unfortunately see sometimes.
 import re
 import sys
 from collections import Counter
+from typing import Optional
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
@@ -27,13 +28,14 @@ from library.genomics.vcf_enums import (
     UNDECLARED_FILTERS_SEPARATOR,
     VCFColumns,
 )
-from snpdb.models import GenomeBuild, GenomeFasta
+from snpdb.models import Cytoband, GenomeBuild, GenomeFasta
 from snpdb.vcf_utils import (
     UnsortedVCFError,
     VCFSortChecker,
     parse_vcf_info_column,
     vcf_header_filter_ids,
 )
+from snpdb.whole_chromosome_variants import is_whole_chromosome_span
 
 REFERENCE_SPAN_SKIP_REASON = "reference call over a span (ALT='.' with END)"
 
@@ -74,6 +76,8 @@ class Command(BaseCommand):
         chrom_to_contig_id = genome_build.get_chrom_contig_id_mappings(standard_contigs_only=True)
         contig_lengths = {contig_id: int(length) for contig_id, length in genome_build.contigs.values_list("pk", "length")}
         contig_to_fasta_names = genome_fasta.get_contig_id_to_name_mappings()
+        whole_chromosome_spans = {contig.pk: Cytoband.get_whole_chromosome_span(genome_build, contig)
+                                  for contig in genome_build.contigs.filter(pk__in=chrom_to_contig_id.values())}
 
         if vcf_filename == '-':
             f = sys.stdin
@@ -137,9 +141,11 @@ class Command(BaseCommand):
                         skipped_records[skip_reason] += 1
                         continue
 
-                if self._is_reference_span(columns):
-                    skipped_records[REFERENCE_SPAN_SKIP_REASON] += 1
-                    continue
+                if (end := self._reference_span_end(columns)) is not None:
+                    # A euploid chromosome from a ploidy caller is kept - @see snpdb.whole_chromosome_variants
+                    if not is_whole_chromosome_span(position, end, whole_chromosome_spans.get(contig_id)):
+                        skipped_records[REFERENCE_SPAN_SKIP_REASON] += 1
+                        continue
 
                 # Check ref bases are ok
                 # Alts are checked in 'vcf_remove_non_standard_alts', which happens after split multi-allelic
@@ -204,18 +210,24 @@ class Command(BaseCommand):
         return value + newline
 
     @staticmethod
-    def _is_reference_span(columns: list[str]) -> bool:
-        """ A reference call over a span is a no-call region, not a variant - the same statement we already
-            make about gVCF reference blocks. This is 406 of 500 records in a real TSO 500 cnv.vcf.
+    def _reference_span_end(columns: list[str]) -> Optional[int]:
+        """ END of a reference call over a span, else None. A span is a no-call region, not a variant - the same
+            statement we already make about gVCF reference blocks - so is skipped unless it is a whole chromosome.
+            This is 406 of 500 records in a real TSO 500 cnv.vcf.
 
             SVTYPE present means the caller is describing an event rather than a segmentation interval
             (e.g. an 'Undetermined' per-gene CNV call), so those are kept. A reference record at a single
             position - no END - is a normal reference variant and also kept. """
 
         if columns[VCFColumns.ALT] != ".":
-            return False
+            return None
         info = parse_vcf_info_column(columns[VCFColumns.INFO])
-        return "END" in info and "SVTYPE" not in info
+        if "SVTYPE" in info:
+            return None
+        try:
+            return int(info["END"])
+        except (KeyError, ValueError):
+            return None
 
     @staticmethod
     def _get_defined_vcf_filters(vcf_header_lines) -> set:

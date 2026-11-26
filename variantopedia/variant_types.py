@@ -254,8 +254,9 @@ def get_variant_type_rows() -> list[dict]:
             rows = [_band_row(b, sized, i == 0, i == len(bands) - 1) for i, b in enumerate(bands)]
             groups.append({"kind": name, "bands": rows})
     if settings.VARIANT_SYMBOLIC_ALT_ENABLED:
-        # A <DUP>/<DEL> spanning a chromosome's euchromatin, whoever called it (@see snpdb.whole_chromosome_variants)
-        groups.append({"kind": "Whole chromosome gain / loss",
+        # A <DUP>/<DEL> spanning a chromosome's euchromatin, whoever called it, and a ploidy caller's euploid
+        # reference span (@see snpdb.whole_chromosome_variants)
+        groups.append({"kind": "Whole chromosome gain / loss / normal",
                        "bands": [{"name": "", "range": "",
                                   "stored_as": f"Symbolic {'/'.join(WHOLE_CHROMOSOME_ALTS)} at position 1 + SVLEN "
                                                f"to the chromosome's end",
@@ -392,6 +393,8 @@ def get_display_examples() -> list[dict]:
             chrom="21", position=1, ref="N", alt=VCFSymbolicAllele.DUP_CHROM, svlen=48129894)),
         ("Whole chromosome loss", "Monosomy X", _grid_row(
             chrom="X", position=1, ref="N", alt=VCFSymbolicAllele.DEL_CHROM, svlen=155270559)),
+        ("Whole chromosome normal", "Euploid chr21 (a reference call)", _grid_row(
+            chrom="21", position=1, ref="N", alt=VCFSymbolicAllele.CNV_CHROM, svlen=48129894)),
     ]
     if settings.VARIANT_GENE_LEVEL_ENABLED:
         # HGNC ids: ABL1 76, BCR 1014, EGFR 3236, PTEN 9588, AR 644, MET 7029

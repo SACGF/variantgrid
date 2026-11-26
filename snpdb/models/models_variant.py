@@ -82,7 +82,7 @@ VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([G
 # As gnomAD formats it: "1-169519049-T-C"
 VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)\s*-\s*(\d+)\s*-\s*([GATC]+)\s*-\s*([GATC]+)", re.IGNORECASE)
 # This is our internal format for symbolic (ie <DEL>/<DUP> etc)
-VARIANT_SYMBOLIC_PATTERN = re.compile(r"^((?:chr)?(?:MT|[XYM]|\d+))\s*:\s*(\d+)\s*-\s*(\d+)\s*<(DEL|DUP|INS|INV|CNV|DUP:CHROM|DEL:CHROM)>$", re.IGNORECASE)
+VARIANT_SYMBOLIC_PATTERN = re.compile(r"^((?:chr)?(?:MT|[XYM]|\d+))\s*:\s*(\d+)\s*-\s*(\d+)\s*<(DEL|DUP|INS|INV|CNV|DUP:CHROM|DEL:CHROM|CNV:CHROM)>$", re.IGNORECASE)
 # Gene-level - the position is a gene id and the alt carries the partner. @see snpdb.gene_level_variants
 VARIANT_GENE_LEVEL_PATTERN = re.compile(
     rf"^{GENE_LEVEL_CONTIG_NAME}\s*:\s*(\d+)\s*-\s*\d+\s*({GENE_LEVEL_ALT_PATTERN.pattern})$")

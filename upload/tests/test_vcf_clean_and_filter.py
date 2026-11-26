@@ -303,7 +303,8 @@ class TestVCFCleanAndFilterRecordFormatFields(TestCase):
 class TestVCFCleanAndFilterDragenPloidy(TestCase):
     """ A DRAGEN ploidy VCF (#2908): the euploid chromosomes are reference spans, the aneuploid one a <DUP> """
 
-    def test_only_the_aneuploid_record_kept(self):
+    def test_every_whole_chromosome_record_kept(self):
+        """ #2915 - a euploid chromosome's reference span is kept, where any other span is skipped """
         genome_build = GenomeBuild.grch38()
         _write_placeholder_fasta_grch38(genome_build)
         vcf_filename = os.path.join(settings.BASE_DIR, "upload", "test_data", "vcf", "dragen_ploidy",
@@ -314,6 +315,8 @@ class TestVCFCleanAndFilterDragenPloidy(TestCase):
             call_command("vcf_clean_and_filter", vcf=vcf_filename, genome_build=genome_build.name,
                          skipped_records_stats_file=stats_filename)
         records = [line.split("\t") for line in stdout.getvalue().splitlines() if not line.startswith("#")]
-        self.assertEqual([("NC_000021.9", "1", "N", "<DUP>")], [tuple(r[:2] + r[3:5]) for r in records])
-        with open(stats_filename, encoding="utf-8") as f:
-            self.assertEqual(f"{REFERENCE_SPAN_SKIP_REASON}\t23", f.read().strip())
+        alts = {r[0]: r[4] for r in records}
+        self.assertEqual(24, len(alts))
+        self.assertEqual("<DUP>", alts.pop("NC_000021.9"))
+        self.assertEqual({"."}, set(alts.values()))
+        self.assertFalse(os.path.exists(stats_filename))

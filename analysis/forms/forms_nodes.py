@@ -1272,7 +1272,8 @@ class SampleNodeForm(GenomeBuildAutocompleteForwardMixin, SampleFiltersMixin, VC
 
         remove_fields = []
         if has_genotype is False:
-            remove_fields.extend(SampleNodeForm.GENOTYPE_FIELDS)
+            # Without GT only ref or not can be told apart (SampleNode.NO_GENOTYPE_CALL_ZYGOSITIES)
+            remove_fields.extend(f for f in SampleNodeForm.GENOTYPE_FIELDS if f != "zygosity_ref")
         if has_depth is False:
             remove_fields.extend(SampleNodeForm.DEPTH_FIELDS)
         if has_copy_ratio is False:

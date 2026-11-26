@@ -29,13 +29,14 @@ class VCFSymbolicAllele:
     DUP = "<DUP>"
     INS = "<INS>"
     INV = "<INV>"
-    # A whole chromosome gained or lost (aneuploidy) - our own subtypes of the spec's DUP/DEL,
-    # @see snpdb.whole_chromosome_variants
+    # A whole chromosome gained or lost (aneuploidy), or measured at the expected copy number - our own subtypes
+    # of the spec's DUP/DEL/CNV, @see snpdb.whole_chromosome_variants
     DUP_CHROM = "<DUP:CHROM>"
     DEL_CHROM = "<DEL:CHROM>"
+    CNV_CHROM = "<CNV:CHROM>"
 
 
-WHOLE_CHROMOSOME_ALTS = (VCFSymbolicAllele.DUP_CHROM, VCFSymbolicAllele.DEL_CHROM)
+WHOLE_CHROMOSOME_ALTS = (VCFSymbolicAllele.DUP_CHROM, VCFSymbolicAllele.DEL_CHROM, VCFSymbolicAllele.CNV_CHROM)
 
 
 class GeneIdNamespace(models.TextChoices):
