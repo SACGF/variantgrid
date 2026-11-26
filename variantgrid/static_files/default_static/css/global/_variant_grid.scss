@@ -610,11 +610,11 @@ table.variantgrid-datatable {
 		}
 	}
 
-	// A row can carry more tags than the column is wide. The cell shows the tags that fit whole and a
-	// +N for the rest (@see markHiddenGridTags) rather than one cut off at the column edge; the first
-	// tag always shows, shrinking to fit. Hovering lifts the whole set out of the clip, over the cells
-	// to its right on the row's hover colour, so the hidden tags (and their delete X) can be read and
-	// clicked
+	// A row can carry more tags than the column is wide. Rather than run past the column edge they share
+	// it: every tag is capped at the same width (@see fitGridTags), so long names give way first, and as
+	// the cap narrows past reading a tag is only its colour. Hovering lifts the whole set out of the clip
+	// at full size, over the cells to its right on the row's hover colour, so every name (and its delete
+	// X) can be read and clicked
 	.grid-tags {
 		position: relative;
 		display: flex;
@@ -631,27 +631,30 @@ table.variantgrid-datatable {
 		}
 	}
 
-	// Each tag at its full width, to see which fit
+	// Each tag at its full width, to see whether they fit
 	.grid-tags-measuring > .grid-tag {
 		flex-shrink: 0;
 	}
 
-	.grid-tags > .grid-tag-hidden {
-		display: none;
+	.grid-tags-crowded > .grid-tag {
+		max-width: var(--grid-tag-cap);
 	}
 
-	.grid-tags-overflow {
-		padding-right: 22px;
-	}
+	// The cap is narrower than any name, so every tag is a swatch the cap wide - its colour is set with
+	// !important (@see render_user_tag_styles), so the text goes by size rather than colour
+	:not(:hover) > .grid-tags-compact > .grid-tag {
+		width: var(--grid-tag-cap);
 
-	.grid-tags-more {
-		position: absolute;
-		top: 0;
-		right: 0;
-		width: 22px;
-		text-align: center;
-		font-size: 10px;
-		color: #6c757d;
+		.user-tag-colored {
+			flex: 1;
+			margin-right: 2px;
+			padding: 0;
+			font-size: 0;
+		}
+
+		.grid-tag-sample-marker {
+			display: none;
+		}
 	}
 
 	td.dt-tags,
@@ -662,17 +665,12 @@ table.variantgrid-datatable {
 			> .grid-tags {
 				z-index: 3;
 				width: max-content;
-				padding-right: 0;
 				overflow: visible;
 				background: #f8f8f8;
 
-				> .grid-tag-hidden {
-					display: flex;
+				> .grid-tag {
+					max-width: none;
 				}
-			}
-
-			.grid-tags-more {
-				display: none;
 			}
 		}
 	}
