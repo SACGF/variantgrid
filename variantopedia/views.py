@@ -500,9 +500,11 @@ def variant_details_annotation_version(request, variant_id, annotation_version_i
                                                           splice_event_variant),
         "splice_event_civic_url": splice_event.civic_url if splice_event else None,
         # Names the page and the analysis' variant details tab, which have no room for a transcript.
-        # A splice event is called by its name ("AR-V7 splice variant"), not by a c.HGVS it has none of
+        # A splice event is called by its name ("AR-V7 splice variant"), not by a c.HGVS it has none of,
+        # and a whole chromosome by its ISCN ("+21 GAIN")
         "variant_short_label": splice_event_variant.display if splice_event_variant else
-            (variant_annotation.get_short_label() if variant_annotation else hgvs_g or str(variant)),
+            (variant_annotation.get_short_label() if variant_annotation else
+             variant.whole_chromosome_label or hgvs_g or str(variant)),
         "variant_tag_stale_days": user_settings.tag_config.variant_tag_stale_days if user_settings.tag_config else None,
         "visible_fields": variant_annotation.visible_columns if variant_annotation else frozenset(),
         "vts": vts,

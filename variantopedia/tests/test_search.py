@@ -61,11 +61,12 @@ class TestSearch(TestCase):
         """ #2908 - the samples of the one whole-chromosome Variant are everyone with the event """
         vc = VariantCoordinate(chrom="21", position=1, ref="N", alt=VCFSymbolicAllele.DUP_CHROM, svlen=48129894)
         variant = slowly_create_test_variant_from_coordinate(vc, GenomeBuild.grch37())
-        for search_string in ["trisomy 21", "chr21 gain", "gain of chromosome 21"]:
+        for search_string in ["trisomy 21", "chr21 gain", "gain of chromosome 21", "+21", "+21 GAIN"]:
             with self.subTest(search_string):
                 self._assert_found_of_type(search_data(self.user, search_string, False), variant,
                                            Variant.preview_category())
-        self.assertFalse(search_data(self.user, "monosomy 21", False).results)
+        for search_string in ["monosomy 21", "-21"]:
+            self.assertFalse(search_data(self.user, search_string, False).results)
 
     def test_search_hgvs(self):
         HGVS_NAMES = [

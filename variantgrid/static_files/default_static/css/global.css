@@ -886,6 +886,14 @@ table.as_table td {
   font-weight: 600;
 }
 
+.rv-chrom-gain {
+  color: #1a56b8;
+}
+
+.rv-chrom-loss {
+  color: #b3261e;
+}
+
 .rv-hgvs {
   font-family: ui-monospace, Menlo, Consolas, monospace;
   font-size: 11px;
