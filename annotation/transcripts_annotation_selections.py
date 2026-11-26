@@ -105,9 +105,13 @@ class VariantTranscriptSelections:
                 self.gene_overlaps = self._get_gene_overlaps(variant, vav)
             if self.variant_annotation.vep_skipped_reason == VEPSkippedReason.TOO_LONG:
                 # Deliberate - gene overlaps were still resolved locally (#1271)
-                sv_max_size = vav.sv_max_size or settings.ANNOTATION_VEP_SV_MAX_SIZE
-                self.warning_messages.append(self._too_long_warning(sv_max_size, len(self.gene_overlaps),
-                                                                    self.variant_annotation.has_annotsv))
+                if variant.is_whole_chromosome:
+                    warning = self._whole_chromosome_warning(len(self.gene_overlaps))
+                else:
+                    sv_max_size = vav.sv_max_size or settings.ANNOTATION_VEP_SV_MAX_SIZE
+                    warning = self._too_long_warning(sv_max_size, len(self.gene_overlaps),
+                                                     self.variant_annotation.has_annotsv)
+                self.warning_messages.append(warning)
             elif self.variant_annotation.vep_skipped_reason:
                 annotation_error = "Unable to annotate variant"
                 if self.variant_annotation.vep_skipped_reason != VEPSkippedReason.UNKNOWN:
@@ -164,7 +168,16 @@ class VariantTranscriptSelections:
                  cls._gene_overlaps_summary(num_gene_overlaps)]
         if has_annotsv:
             parts.append("Annotated by AnnotSV")
-        msg = ". ".join(parts)
+        return cls._with_variant_types_link(". ".join(parts))
+
+    @classmethod
+    def _whole_chromosome_warning(cls, num_gene_overlaps: int) -> str:
+        """ @see snpdb.whole_chromosome_variants """
+        msg = f"Whole chromosome - not annotated by VEP. Genes assigned by overlap ({num_gene_overlaps} genes)"
+        return cls._with_variant_types_link(msg)
+
+    @staticmethod
+    def _with_variant_types_link(msg: str) -> str:
         if get_visible_url_names()["variant_types"]:
             msg = format_html('{} - see <a href="{}">Variant Types</a>', msg, reverse("variant_types"))
         return msg

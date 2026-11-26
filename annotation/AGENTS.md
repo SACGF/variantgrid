@@ -55,7 +55,9 @@ Patterns here:
   anything else symbolic is the SV pipeline, an explicit variant whose ref or alt reaches
   explicit_structural_variant_min_size is the SV pipeline (dumped as its sequence; null on VAVs made before #1708, so
   they never move one; its alt__in Length(seq) subquery relies on snpdb_sequence's expression index on length(seq)
-  to stay a hashed subplan, #2635). Branch on the run's pipeline_type, never on variant.is_symbolic.
+  to stay a hashed subplan, #2635). A whole-chromosome variant (<DUP:CHROM>/<DEL:CHROM>) is the SV pipeline but never
+  AnnotSV, and always on the TOO_LONG side of annotation/annotation_version_querysets.py:vep_too_long_q whatever
+  ANNOTATION_VEP_SV_MAX_SIZE is - neither tool can parse the alt. Branch on the run's pipeline_type, never on variant.is_symbolic.
 - A variant changed in place (alt or svlen, keeping its pk) keeps the annotation of the pipeline that routed it
   before, and the scheduler never revisits its range. Re-route it without new range locks (overlapping locks
   break the gap report and run links): run VEP over just those variants with the new pipeline's get_vep_command,

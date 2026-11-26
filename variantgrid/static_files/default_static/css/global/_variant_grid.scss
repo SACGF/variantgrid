@@ -66,6 +66,17 @@
 	color: #00695c;
 }
 
+// A whole chromosome gained or lost - the dup/del colours reversed, so it stands out from a focal SV
+.rv-kind-chrom-loss {
+	background: #b3261e;
+	color: #fdecea;
+}
+
+.rv-kind-chrom-gain {
+	background: #1a56b8;
+	color: #e8f0fe;
+}
+
 // What kinds of call a VCF or sample holds (snpdb VariantContent, #2759): a chip per kind on the VCF and
 // sample pages and grids, and the dots on an analysis node's VCF chip (analysis_nodes.css). A kind the kind
 // badge above also shows wears that badge's text colour; small variants have no badge, so stay neutral, and

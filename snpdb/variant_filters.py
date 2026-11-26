@@ -17,7 +17,7 @@ from django.db.models import Max, Min, Q
 
 from annotation.models import AnnotationVersion, VariantGeneOverlap, VariantTranscriptAnnotation
 from genes.models import Gene, GeneSymbol, TranscriptVersion
-from library.genomics.vcf_enums import GeneLevelSymbolicAlt
+from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VCFSymbolicAllele
 from snpdb.enums import SequenceRole
 from snpdb.models.models_genome import Contig, Cytoband, GenomeBuild
 from snpdb.models.models_user_settings import AllVariantsFilter
@@ -120,6 +120,8 @@ VARIANT_TYPE_LABELS = {
     VariantType.FUSION: "Fusion",
     VariantType.COPY_NUMBER: "Gene copy number",
     VariantType.SPLICE: "Gene splice",
+    VCFSymbolicAllele.DUP_CHROM: "Chrom gain",
+    VCFSymbolicAllele.DEL_CHROM: "Chrom loss",
 }
 
 # The types offered on the All Variants page - reference variants are always excluded there, and the

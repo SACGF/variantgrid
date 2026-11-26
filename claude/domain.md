@@ -32,6 +32,13 @@ insertion that isn't a dup) goes to the STRUCTURAL_VARIANT pipeline from the ver
 every such rule by size. Gene-level events are Variants on a fake contig - guard
 coordinate and size code with `Variant.get_gene_level_q`.
 
+**Whole-chromosome variant** - a chromosome gained or lost (trisomy 21, monosomy X): `<DUP:CHROM>` / `<DEL:CHROM>` at
+position 1 of the chromosome's real contig, `svlen` the contig's length - 1, so one Variant per chromosome per build
+and direction. The canonicaliser turns any caller's `<DUP>` / `<DEL>` reaching to within 1 Mb of each end of the chromosome's
+euchromatin into it
+(`snpdb/whole_chromosome_variants.py`); `Variant.get_whole_chromosome_q` is the predicate. The copy number is the
+sample's, in its FORMAT fields.
+
 **Gene-level ID** - `genes/models/models_gene_level.py:GeneLevelId`, the number a gene-level Variant carries as its
 `Locus.position` and inside its alt. The HGNC id where the gene has one, otherwise a local id above 1,000,000; anything
 leaving the deployment sends `symbol_str`, never the number.
@@ -42,8 +49,8 @@ written `BCR::ABL1`) or a `genes/models/models_gene_level.py:GeneCopyNumberEvent
 segment and copy ratio are per observation, on the `CohortGenotype`.
 
 **Variant kind** - what the grids' kind badge says a row is, read off the alt: `FUSION` / `GAIN` / `LOSS` for a gene-level
-alt (`library/genomics/vcf_enums.py:GeneLevelSymbolicAlt`), `DEL` / `DUP` / `INV` / `CNV` / `INS` with the size from `svlen`
-for a symbolic one, and nothing at all for a small variant. Not VEP's `variant_class`
+alt (`library/genomics/vcf_enums.py:GeneLevelSymbolicAlt`), `GAIN` / `LOSS` in a solid fill for a whole-chromosome variant (labelled by its chromosome, `chr21`),
+`DEL` / `DUP` / `INV` / `CNV` / `INS` with the size from `svlen` for a symbolic one, and nothing at all for a small variant. Not VEP's `variant_class`
 (`library/genomics/vcf_enums.py:VariantClass`): VEP calls a 1 Mb `<DEL>` and a 1 bp deletion the same class, so the
 badge answers "is this a small variant?" where `variant_class` answers "what sort of change?". The variant type
 filters (the All Variants grid, the All Variants and Effect nodes) read the same alt as the badge

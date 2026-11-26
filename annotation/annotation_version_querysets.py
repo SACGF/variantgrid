@@ -15,7 +15,6 @@ from functools import reduce
 from typing import Optional, TypeVar
 
 from django.db.models import Model, QuerySet
-from django.db.models.functions.math import Abs
 from django.db.models.query_utils import Q
 
 from annotation.annotation_pipeline_routing import pipeline_type_variant_q
@@ -24,16 +23,33 @@ from annotation.models.models import VariantAnnotation
 from annotation.models.models_annotation_version import AnnotationVersion
 from library.django_utils.data_archive_mixin import DataArchivedError
 from library.django_utils.django_queryset_sql_transformer import get_queryset_with_transformer_hook
+from library.genomics.vcf_enums import WHOLE_CHROMOSOME_ALTS
 from snpdb.models import GenomeBuild, Variant
 
 
-def filter_vep_sv_max_size(qs: QuerySet[Variant], sv_max_size: int, too_long: bool) -> QuerySet[Variant]:
-    """ Split variants on VEP's SV size cap (ANNOTATION_VEP_SV_MAX_SIZE). The dump leaves the too-long ones
-        out (VEP would only skip them), and they get vep_skipped_reason=TOO_LONG rows instead (#2104) """
-    qs = qs.annotate(abs_svlen=Abs("svlen"))
+def vep_too_long_q(sv_max_size: Optional[int]) -> Q:
+    """ The SVs VEP is never given, which get vep_skipped_reason=TOO_LONG rows instead (#2104): over VEP's SV
+        size cap (ANNOTATION_VEP_SV_MAX_SIZE, falsy for none), and every whole-chromosome variant whatever the
+        cap - VEP can't parse the alt (@see snpdb.whole_chromosome_variants). is_vep_too_long is the per-variant twin """
+    q = Variant.get_whole_chromosome_q()
+    if sv_max_size:
+        q |= Q(svlen__gt=sv_max_size) | Q(svlen__lt=-sv_max_size)
+    return q
+
+
+def is_vep_too_long(alt: str, svlen: Optional[int], sv_max_size: Optional[int]) -> bool:
+    """ Per-variant twin of vep_too_long_q """
+    if alt in WHOLE_CHROMOSOME_ALTS:
+        return True
+    return bool(sv_max_size) and svlen is not None and abs(svlen) > sv_max_size
+
+
+def filter_vep_sv_max_size(qs: QuerySet[Variant], sv_max_size: Optional[int], too_long: bool) -> QuerySet[Variant]:
+    """ Split variants on vep_too_long_q - the dump leaves the too-long ones out (VEP would only skip them) """
+    q_too_long = vep_too_long_q(sv_max_size)
     if too_long:
-        return qs.filter(abs_svlen__gt=sv_max_size)
-    return qs.filter(Q(svlen__isnull=True) | Q(abs_svlen__lte=sv_max_size))
+        return qs.filter(q_too_long)
+    return qs.exclude(q_too_long)
 
 
 def get_variant_queryset_for_latest_annotation_version(genome_build: GenomeBuild) -> QuerySet[Variant]:

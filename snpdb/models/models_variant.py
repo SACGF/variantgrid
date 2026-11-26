@@ -5,7 +5,8 @@ the locus contig) and the build-independent Allele linked per build by VariantAl
 is the value object between HGVS, VCF and the database - canonicalise with as_internal_canonical_form
 before lookup or insert. Also the liftover records (LiftoverRun, AlleleLiftover, the AlleleSource
 family) and VariantCollection (a partitioned set of variants used as a cache). Gene-level variants
-are a declared hack: read snpdb/gene_level_variants.py before touching get_gene_level_q. Bulk
+are a declared hack: read snpdb/gene_level_variants.py before touching get_gene_level_q; a whole chromosome
+gained or lost has one canonical form, @see snpdb/whole_chromosome_variants.py. Bulk
 insert goes through snpdb/variant_pk_lookup.py, not this module.
 """
 import logging
@@ -44,6 +45,7 @@ from library.genomics import format_chrom
 from library.genomics.vcf_enums import (
     GENE_LEVEL_ALT_PATTERN,
     INFO_LIFTOVER_SWAPPED_REF_ALT,
+    WHOLE_CHROMOSOME_ALTS,
     GeneLevelSymbolicAlt,
     VCFSymbolicAllele,
 )
@@ -55,7 +57,14 @@ from snpdb.enums import AlleleConversionTool, AlleleOrigin, ProcessingStatus, Se
 from snpdb.gene_level_variants import GENE_LEVEL_CONTIG_NAME, GENE_LEVEL_REF, GENE_LEVEL_SVLEN
 from snpdb.models.models import Wiki
 from snpdb.models.models_clingen_allele import ClinGenAllele
-from snpdb.models.models_genome import Contig, GenomeBuild, GenomeBuildContig
+from snpdb.models.models_genome import Contig, Cytoband, GenomeBuild, GenomeBuildContig
+from snpdb.whole_chromosome_variants import (
+    WHOLE_CHROMOSOME_ALT_FOR_SV_ALT,
+    WHOLE_CHROMOSOME_POSITION,
+    is_whole_chromosome_near_miss,
+    whole_chromosome_alt,
+    whole_chromosome_svlen,
+)
 
 # VCF spec's reference alt (our Variant.REFERENCE_ALT is "=")
 VCF_REFERENCE_ALT = "."
@@ -71,7 +80,7 @@ VARIANT_VCF_PATTERN = re.compile(r"((?:chr)?\S*)\s+(\d+)\s+\.?\s*([GATC]+)\s+([G
 # As gnomAD formats it: "1-169519049-T-C"
 VARIANT_GNOMAD_PATTERN = re.compile(r"(?:chr)?(\S*)\s*-\s*(\d+)\s*-\s*([GATC]+)\s*-\s*([GATC]+)", re.IGNORECASE)
 # This is our internal format for symbolic (ie <DEL>/<DUP> etc)
-VARIANT_SYMBOLIC_PATTERN = re.compile(r"^((?:chr)?(?:MT|[XYM]|\d+))\s*:\s*(\d+)\s*-\s*(\d+)\s*<(DEL|DUP|INS|INV|CNV)>$", re.IGNORECASE)
+VARIANT_SYMBOLIC_PATTERN = re.compile(r"^((?:chr)?(?:MT|[XYM]|\d+))\s*:\s*(\d+)\s*-\s*(\d+)\s*<(DEL|DUP|INS|INV|CNV|DUP:CHROM|DEL:CHROM)>$", re.IGNORECASE)
 # Gene-level - the position is a gene id and the alt carries the partner. @see snpdb.gene_level_variants
 VARIANT_GENE_LEVEL_PATTERN = re.compile(
     rf"^{GENE_LEVEL_CONTIG_NAME}\s*:\s*(\d+)\s*-\s*\d+\s*({GENE_LEVEL_ALT_PATTERN.pattern})$")
@@ -486,6 +495,11 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
         return None
 
     @property
+    def is_whole_chromosome(self) -> bool:
+        """ Coordinate-level twin of Variant.is_whole_chromosome - @see snpdb.whole_chromosome_variants """
+        return self.alt in WHOLE_CHROMOSOME_ALTS
+
+    @property
     def is_gene_level(self) -> bool:
         """ Coordinate-level twin of Variant.is_gene_level - keyed on the alt, since a bare coordinate
             has no contig role to read. No coordinate means nothing can be read off a reference """
@@ -563,10 +577,13 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
 
     def as_internal_canonical_form(self, genome_build: GenomeBuild) -> 'VariantCoordinate':
         """ Make sure we only have 1 representation for a variant - symbolic only at or beyond
-            VARIANT_SYMBOLIC_ALT_SIZE (as_internal_symbolic), otherwise explicit where it can be, and a
-            symbolic svlen with its canonical sign (canonical_svlen) """
+            VARIANT_SYMBOLIC_ALT_SIZE (as_internal_symbolic), otherwise explicit where it can be, a
+            symbolic svlen with its canonical sign (canonical_svlen), and a whole chromosome gained or
+            lost as its whole-chromosome coordinate (@see snpdb.whole_chromosome_variants) """
         if not self.is_symbolic:
             return self.as_internal_symbolic(genome_build)
+        if whole_chromosome := self._as_whole_chromosome(genome_build):
+            return whole_chromosome
         if self.can_be_made_explicit and abs(self.svlen) < settings.VARIANT_SYMBOLIC_ALT_SIZE:
             return self.as_external_explicit(genome_build)
         canonical_svlen = self.canonical_svlen(self.alt, self.svlen)
@@ -574,6 +591,44 @@ class VariantCoordinate(FormerTuple, pydantic.BaseModel):
             return VariantCoordinate(chrom=self.chrom, position=self.position, ref=self.ref, alt=self.alt,
                                      svlen=canonical_svlen)
         return self
+
+    def _as_whole_chromosome(self, genome_build: GenomeBuild) -> Optional['VariantCoordinate']:
+        """ The whole-chromosome coordinate for a whole-chromosome alt (re-anchored, so it is idempotent) or a
+            <DUP>/<DEL> spanning the chromosome, None for anything else """
+        if self.svlen is None:
+            return None
+        if self.is_whole_chromosome:
+            alt = self.alt
+        elif self.alt in WHOLE_CHROMOSOME_ALT_FOR_SV_ALT and (contig := genome_build.chrom_contig_mappings.get(self.chrom)):
+            alt = whole_chromosome_alt(self.alt, self.position, self.end,
+                                       Cytoband.get_whole_chromosome_span(genome_build, contig))
+        else:
+            return None
+        if alt is None:
+            return None
+        # A record at position 1 has already had its ref checked against the fasta (bcftools norm --check-ref)
+        ref = self.ref if self.position == WHOLE_CHROMOSOME_POSITION else None
+        whole_chromosome = VariantCoordinate.whole_chromosome(genome_build, self.chrom, alt, ref=ref)
+        return self if whole_chromosome == self else whole_chromosome
+
+    def is_whole_chromosome_near_miss(self, genome_build: GenomeBuild) -> bool:
+        """ A <DUP>/<DEL> covering most of its chromosome without being whole-chromosome -
+            @see snpdb.whole_chromosome_variants.is_whole_chromosome_near_miss """
+        if self.svlen is None or not (contig := genome_build.chrom_contig_mappings.get(self.chrom)):
+            return False
+        return is_whole_chromosome_near_miss(self.alt, self.position, self.end,
+                                             Cytoband.get_whole_chromosome_span(genome_build, contig))
+
+    @staticmethod
+    def whole_chromosome(genome_build: GenomeBuild, chrom: str, alt: str,
+                         ref: Optional[str] = None) -> 'VariantCoordinate':
+        """ The one coordinate of a whole-chromosome gain or loss - @see snpdb.whole_chromosome_variants.
+            ref defaults to the fasta's base at position 1 """
+        contig = genome_build.chrom_contig_mappings[chrom]
+        if ref is None:
+            ref = genome_build.genome_fasta.fasta[chrom][0:WHOLE_CHROMOSOME_POSITION].upper()
+        return VariantCoordinate(chrom=chrom, position=WHOLE_CHROMOSOME_POSITION, ref=ref, alt=alt,
+                                 svlen=whole_chromosome_svlen(contig.length))
 
     @staticmethod
     def canonical_svlen(alt: str, svlen: Optional[int]) -> Optional[int]:
@@ -868,6 +923,17 @@ class Variant(PreviewModelMixin, models.Model):
     def is_gene_level(self) -> bool:
         """ @see snpdb.gene_level_variants, and get_gene_level_q for the queryset form """
         return self.locus.contig.is_gene_level
+
+    @staticmethod
+    def get_whole_chromosome_q(path_to_variant: str = "") -> Q:
+        """ A whole chromosome gained or lost - @see snpdb.whole_chromosome_variants. alt_id IN (subquery)
+            rather than a join to Sequence (#1887) """
+        return Q(**{f"{path_to_variant}alt__in": Sequence.objects.filter(seq__in=WHOLE_CHROMOSOME_ALTS)})
+
+    @property
+    def is_whole_chromosome(self) -> bool:
+        """ @see snpdb.whole_chromosome_variants, and get_whole_chromosome_q for the queryset form """
+        return self.alt.seq in WHOLE_CHROMOSOME_ALTS
 
     @staticmethod
     def annotate_variant_string(qs, name="variant_string", path_to_variant=""):

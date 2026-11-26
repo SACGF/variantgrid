@@ -20,9 +20,15 @@ from typing import Optional
 from django.conf import settings
 
 from annotation.annotation_pipeline_routing import pipeline_type_for_alt
+from annotation.annotation_version_querysets import is_vep_too_long
 from annotation.enums import VariantAnnotationPipelineType
 from library.genomics import format_bp
-from library.genomics.vcf_enums import GeneIdNamespace, GeneLevelSymbolicAlt, VCFSymbolicAllele
+from library.genomics.vcf_enums import (
+    WHOLE_CHROMOSOME_ALTS,
+    GeneIdNamespace,
+    GeneLevelSymbolicAlt,
+    VCFSymbolicAllele,
+)
 from snpdb.models import ClinGenAllele, VariantCoordinate
 
 _CHROM = "1"
@@ -131,10 +137,9 @@ class Band:
 def _outcome(vc: VariantCoordinate) -> Outcome:
     sv_min_size = settings.ANNOTATION_STRUCTURAL_VARIANT_MIN_SIZE
     pipeline_type = pipeline_type_for_alt(vc.ref, vc.alt, vc.svlen, sv_min_size, sv_min_size)
-    # As annotation_version_querysets.filter_vep_sv_max_size - VEP is never given these
-    sv_max_size = settings.ANNOTATION_VEP_SV_MAX_SIZE
+    # VEP is never given these
     vep_too_long = (pipeline_type == VariantAnnotationPipelineType.STRUCTURAL_VARIANT
-                    and bool(sv_max_size) and vc.svlen is not None and abs(vc.svlen) > sv_max_size)
+                    and is_vep_too_long(vc.alt, vc.svlen, settings.ANNOTATION_VEP_SV_MAX_SIZE))
     return Outcome(symbolic=vc.is_symbolic, pipeline=pipeline_type, vep_too_long=vep_too_long)
 
 
@@ -248,6 +253,15 @@ def get_variant_type_rows() -> list[dict]:
         for name, bands in named:
             rows = [_band_row(b, sized, i == 0, i == len(bands) - 1) for i, b in enumerate(bands)]
             groups.append({"kind": name, "bands": rows})
+    if settings.VARIANT_SYMBOLIC_ALT_ENABLED:
+        # A <DUP>/<DEL> spanning a chromosome's euchromatin, whoever called it (@see snpdb.whole_chromosome_variants)
+        groups.append({"kind": "Whole chromosome gain / loss",
+                       "bands": [{"name": "", "range": "",
+                                  "stored_as": f"Symbolic {'/'.join(WHOLE_CHROMOSOME_ALTS)} at position 1 + SVLEN "
+                                               f"to the chromosome's end",
+                                  "pipeline": f"{VariantAnnotationPipelineType.STRUCTURAL_VARIANT.label} - "
+                                              f"not annotated by VEP or AnnotSV",
+                                  "detail": "Overlapping genes only. Lifted over to the same chromosome"}]})
     if settings.VARIANT_GENE_LEVEL_ENABLED:
         # A gene id where a coordinate goes, the same in every build (@see snpdb.gene_level_variants)
         groups.append({"kind": "Gene-level event (fusion, copy number, splicing)",
@@ -280,6 +294,8 @@ def _clingen_limit() -> str:
 def _no_g_hgvs_kinds() -> str:
     alts = [kind.coordinate(1).alt for _, kinds in _kind_groups() for kind in kinds
             if not kind.coordinate(1).can_be_made_explicit]
+    if settings.VARIANT_SYMBOLIC_ALT_ENABLED:
+        alts.append("whole chromosome gains / losses")
     if settings.VARIANT_GENE_LEVEL_ENABLED:
         alts.append("gene-level events")
     if len(alts) > 1:
@@ -372,6 +388,10 @@ def get_display_examples() -> list[dict]:
         ("Copy number", "ERBB2 amplicon", _grid_row(
             chrom="17", position=37844000, alt=VCFSymbolicAllele.CNV, svlen=120000,
             overlapping_symbols="ERBB2,GRB7,MIEN1,PGAP3")),
+        ("Whole chromosome gain", "Trisomy 21", _grid_row(
+            chrom="21", position=1, ref="N", alt=VCFSymbolicAllele.DUP_CHROM, svlen=48129894)),
+        ("Whole chromosome loss", "Monosomy X", _grid_row(
+            chrom="X", position=1, ref="N", alt=VCFSymbolicAllele.DEL_CHROM, svlen=155270559)),
     ]
     if settings.VARIANT_GENE_LEVEL_ENABLED:
         # HGNC ids: ABL1 76, BCR 1014, EGFR 3236, PTEN 9588, AR 644, MET 7029

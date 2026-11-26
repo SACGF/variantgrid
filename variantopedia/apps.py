@@ -28,6 +28,7 @@ class VariantopediaConfig(AppConfig):
             search_variant_splice_event,
             search_variant_symbolic,
             search_variant_variant,
+            search_variant_whole_chromosome,
             variant_cosmic_search,
             variant_search_vcf,
         )
@@ -38,5 +39,5 @@ class VariantopediaConfig(AppConfig):
             variant_search_vcf, search_variant_gnomad, search_variant_variant, search_variant_symbolic,
             search_variant_db_snp, search_hgvs, search_variant_id, search_allele_id, search_variant_gene_fusion,
             search_variant_gene_copy_number, search_variant_splice_event, search_variant_label_abbreviated,
-            search_variant_label_span,
+            search_variant_label_span, search_variant_whole_chromosome,
         )

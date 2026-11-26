@@ -27,6 +27,7 @@ from genes.hgvs import (
 )
 from library.enums.log_level import LogLevel
 from library.genomics import format_chrom
+from library.genomics.vcf_enums import VCFSymbolicAllele
 from library.preview_request import PreviewData
 from snpdb.clingen_allele import get_clingen_allele
 from snpdb.models import (
@@ -55,6 +56,11 @@ from snpdb.search import (
     search_receiver,
 )
 from snpdb.variant_coordinate_search import get_results_from_variant_coordinate
+from snpdb.whole_chromosome_variants import (
+    WHOLE_CHROMOSOME_POSITION,
+    WHOLE_CHROMOSOME_SEARCH_PATTERN,
+    parse_whole_chromosome_search,
+)
 
 COSMIC_PATTERN = re.compile(r"^(COS[VM])[0-9]{3,}$", re.IGNORECASE)
 
@@ -400,6 +406,29 @@ def search_variant_variant(search_input: SearchInputInstance):
 )
 def search_variant_symbolic(search_input: SearchInputInstance):
     return yield_search_variant_match(search_input, VariantCoordinate.from_symbolic_match)
+
+
+@search_receiver(
+    search_type=Variant,
+    pattern=WHOLE_CHROMOSOME_SEARCH_PATTERN,
+    sub_name="Whole chromosome",
+    example=SearchExample(
+        note="A whole chromosome gained or lost - its samples are everyone with it",
+        examples=["trisomy 21", "monosomy X", "chr21 gain", "loss of chrX"]
+    )
+)
+def search_variant_whole_chromosome(search_input: SearchInputInstance):
+    """ Lookup only - @see snpdb.whole_chromosome_variants """
+    chrom, alt = parse_whole_chromosome_search(search_input.search_string)
+    for genome_build in search_input.genome_builds:
+        contig = genome_build.chrom_contig_mappings.get(chrom) or genome_build.chrom_contig_mappings.get(f"chr{chrom}")
+        if contig is None:
+            continue
+        variants_qs = get_visible_variants(search_input, genome_build)
+        for variant in variants_qs.filter(locus__contig=contig, locus__position=WHOLE_CHROMOSOME_POSITION,
+                                          alt__seq=alt):
+            message = f"Whole chromosome {'gain' if alt == VCFSymbolicAllele.DUP_CHROM else 'loss'} of chr{chrom}"
+            yield SearchResult(variant.preview, messages=[SearchMessage(message, severity=LogLevel.INFO)])
 
 
 # What the Variant column writes for a variant (VariantGridFormat.representativeVariantLabel in

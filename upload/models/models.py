@@ -676,6 +676,7 @@ class VCFImportInfo(models.Model):
 class SimpleVCFImportInfo(VCFImportInfo):
     ANNOTATION_SKIPPED = "annotation_skipped"
     SVLEN_MODIFIED = "svlen_modified"
+    WHOLE_CHROMOSOME_NEAR_MISS = "whole_chromosome_near_miss"
     CONFLICTING_GENOTYPES = "conflicting_genotypes"
     CONFLICTING_GENOTYPES_MESSAGE = ("VCF records that normalise to the same variant had different genotypes (eg a "
                                      "caller writing an indel at two positions) - kept the first, removed the later")

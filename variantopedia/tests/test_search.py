@@ -4,10 +4,14 @@ from django.test import TestCase, override_settings
 from annotation.fake_data import get_fake_annotation_version
 from genes.fake_data import create_fake_transcript_version
 from genes.models import Gene, GeneSymbol, Transcript, TranscriptVersion
+from library.genomics.vcf_enums import VCFSymbolicAllele
 from snpdb.fake_data import create_fake_duo, create_fake_quad, create_fake_trio
 from snpdb.models import ClinGenAllele, Duo, GenomeBuild, Quad, Trio, Variant, VariantCoordinate
 from snpdb.search import search_data
-from snpdb.tests.utils.vcf_testing_utils import slowly_create_test_variant
+from snpdb.tests.utils.vcf_testing_utils import (
+    slowly_create_test_variant,
+    slowly_create_test_variant_from_coordinate,
+)
 from upload.models import ModifiedImportedVariant
 
 VARIANT_CHROM = "1"
@@ -52,6 +56,16 @@ class TestSearch(TestCase):
         search_results = search_data(self.user, f"{VARIANT_CHROM}:{VARIANT_POSITION}-{VARIANT_POSITION + 100} <INS>", False)
         self.assertFalse(search_results.results)
         self.assertTrue(any("<INS> variants are not supported" in m.message for m in search_results.messages_overall))
+
+    def test_search_whole_chromosome(self):
+        """ #2908 - the samples of the one whole-chromosome Variant are everyone with the event """
+        vc = VariantCoordinate(chrom="21", position=1, ref="N", alt=VCFSymbolicAllele.DUP_CHROM, svlen=48129894)
+        variant = slowly_create_test_variant_from_coordinate(vc, GenomeBuild.grch37())
+        for search_string in ["trisomy 21", "chr21 gain", "gain of chromosome 21"]:
+            with self.subTest(search_string):
+                self._assert_found_of_type(search_data(self.user, search_string, False), variant,
+                                           Variant.preview_category())
+        self.assertFalse(search_data(self.user, "monosomy 21", False).results)
 
     def test_search_hgvs(self):
         HGVS_NAMES = [

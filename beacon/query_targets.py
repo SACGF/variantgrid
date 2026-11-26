@@ -71,6 +71,8 @@ class CnvBeaconTarget(BeaconQueryTarget):
     VARIANT_TYPE_EFO = {
         VCFSymbolicAllele.DEL: "EFO:0030067",  # copy number loss
         VCFSymbolicAllele.DUP: "EFO:0030070",  # copy number gain
+        VCFSymbolicAllele.DEL_CHROM: "EFO:0030067",
+        VCFSymbolicAllele.DUP_CHROM: "EFO:0030070",
     }
     EFO_LABELS = {
         "EFO:0030067": "copy number loss",

@@ -21,6 +21,10 @@ isn't an inversion is stored as its sequence however long it is (#1708). Those g
 pipeline when their longer allele (ref or alt) reaches VariantAnnotationVersion.explicit_structural_variant_min_size,
 written to VEP and AnnotSV as the sequence. The field is null on versions made before it existed, which route
 explicit variants to STANDARD at any length - so nothing they annotated moves.
+
+A whole chromosome gained or lost (<DUP:CHROM>/<DEL:CHROM>, @see snpdb.whole_chromosome_variants) is a
+STRUCTURAL_VARIANT that VEP is never given (annotation_version_querysets.vep_too_long_q) and AnnotSV is not
+routed: neither can parse the alt, and ranking the genes of a whole chromosome says nothing.
 """
 from typing import Optional
 
@@ -108,5 +112,8 @@ def pipeline_type_variant_q(pipeline_type: VariantAnnotationPipelineType, struct
                            VariantAnnotationPipelineType.ANNOTSV):
         # AnnotSV annotates the same variants VEP's SV pipeline does - a different tool, not a different
         # class of variant. The overlap the docstring above allows for.
-        return q_sv & ~q_gene_level
+        q_sv &= ~q_gene_level
+        if pipeline_type == VariantAnnotationPipelineType.ANNOTSV:
+            q_sv &= ~Variant.get_whole_chromosome_q()
+        return q_sv
     raise ValueError(f"Unrecognised {pipeline_type=}")
