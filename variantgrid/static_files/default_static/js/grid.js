@@ -277,7 +277,7 @@ function appendVariantTaggingPill(cell, variantId, tag, response) {
     const newTag = $(getVariantTagHtml(variantId, tag, false, options));
     newTag.click(tagClickHandler);
     cell.append(newTag);
-    markHiddenGridTags(cell);
+    fitGridTags(cell);
 }
 
 
@@ -468,7 +468,7 @@ function tagClickHandler() {
         const removeTagCallback = function () {
             const gridTags = gridTag.parent();
             gridTag.remove();
-            markHiddenGridTags(gridTags);
+            fitGridTags(gridTags);
         };
         removeVariantTag(gridTag.attr('variant_id'), gridTag.attr('tag_id'),
                          gridTag.attr('variant_tag_id'), removeTagCallback);
@@ -477,55 +477,88 @@ function tagClickHandler() {
 }
 
 
-/* A cell shows only the tags that fit whole, and a +N for the rest, rather than one cut off at the column
-   edge. Measured from the tags' own widths against the cell's - the columns are fixed width - so it's
-   right whether or not the cell is hovered (and lifted), and is redone whenever a cell's tags change.
-   The first tag always shows, shrunk if it has to be. @see .grid-tags */
-function markHiddenGridTags(containers) {
-    const MORE_WIDTH = 22;  // .grid-tags-overflow's padding, which the +N sits in
-    // Measure every cell, then change every cell, so the grid lays out twice rather than once a cell
-    containers.removeClass("grid-tags-overflow").addClass("grid-tags-measuring");
-    containers.children(".grid-tags-more").remove();
-    containers.children(".grid-tag-hidden").removeClass("grid-tag-hidden");
-    const hiddenTagsByContainer = containers.get().map(function(container) {
-        const cell = container.parentElement;
-        const cellStyle = getComputedStyle(cell);
-        const available = cell.clientWidth - parseFloat(cellStyle.paddingLeft) - parseFloat(cellStyle.paddingRight);
-        const items = Array.from(container.children);
-        const total = items.reduce((width, item) => width + item.offsetWidth, 0);
-        if (total <= available) {
-            return [];
-        }
-        const hidden = [];
-        let right = 0;
-        let firstTag = true;
-        for (const item of items) {
-            right += item.offsetWidth;
-            if (item.classList.contains("grid-tag")) {
-                if (!firstTag && right > available - MORE_WIDTH) {
-                    hidden.push(item);
-                }
-                firstTag = false;
+/* A cell's tags share its width rather than running past the column edge: when they don't all fit,
+   every tag is capped at the same width - the widest that still fits them all - so the longest names
+   give way first and a short one keeps its whole name. As the cap narrows past reading, a tag is just
+   its colour; the names are in the tooltips, and hovering lifts the set out at full size.
+   Measured from the tags' own widths against the cell's - the columns are fixed width - and redone
+   whenever a cell's tags change. A cell that isn't laid out yet (a grid drawn while hidden) has no
+   width to measure, so it's fitted once it has one. @see .grid-tags */
+const unmeasuredGridTagsObserver = new ResizeObserver(function(entries) {
+    const laidOut = [];
+    for (const entry of entries) {
+        if (entry.contentRect.width > 0 || !entry.target.isConnected) {  // Fitted, or redrawn away
+            unmeasuredGridTagsObserver.unobserve(entry.target);
+            if (entry.target.isConnected) {
+                laidOut.push(entry.target);
             }
         }
-        return hidden;
+    }
+    if (laidOut.length) {
+        fitGridTags($(laidOut).children(".grid-tags"));
+    }
+});
+
+function fitGridTags(containers) {
+    const MIN_TAG_WIDTH = 6;
+    const COMPACT_TAG_WIDTH = 24;  // Narrower than this a tag shows no text - an ellipsis alone reads as noise
+    // Measure every cell, then change every cell, so the grid lays out twice rather than once a cell
+    containers.removeClass("grid-tags-crowded grid-tags-compact").addClass("grid-tags-measuring");
+    const capsByContainer = containers.get().map(function(container) {
+        const cell = container.parentElement;
+        if (!cell.clientWidth) {
+            return undefined;
+        }
+        const cellStyle = getComputedStyle(cell);
+        let available = cell.clientWidth - parseFloat(cellStyle.paddingLeft) - parseFloat(cellStyle.paddingRight);
+        const tagWidths = [];
+        for (const item of container.children) {
+            if (item.classList.contains("grid-tag")) {
+                tagWidths.push(item.offsetWidth);
+            } else {
+                available -= item.offsetWidth;  // Quick tag buttons keep their size
+            }
+        }
+        return gridTagWidthCap(tagWidths, available);
     });
     containers.removeClass("grid-tags-measuring");
     containers.each(function(i) {
-        const hidden = hiddenTagsByContainer[i];
-        if (hidden.length) {
-            $(hidden).addClass("grid-tag-hidden");
-            $(this).addClass("grid-tags-overflow");
-            $("<span/>", {"class": "grid-tags-more", text: "+" + hidden.length}).appendTo(this);
+        const cap = capsByContainer[i];
+        if (cap === undefined) {
+            unmeasuredGridTagsObserver.observe(this.parentElement);
+        } else if (cap !== null) {
+            const width = Math.max(cap, MIN_TAG_WIDTH);
+            this.style.setProperty("--grid-tag-cap", width + "px");
+            $(this).addClass("grid-tags-crowded").toggleClass("grid-tags-compact", width < COMPACT_TAG_WIDTH);
         }
     });
+}
+
+
+/* The one width every tag is capped at so they all fit in available, or null when they fit as they are.
+   Tags narrower than the cap keep their own width and leave the rest to share what they don't use */
+function gridTagWidthCap(tagWidths, available) {
+    const total = tagWidths.reduce((sum, width) => sum + width, 0);
+    if (total <= available) {
+        return null;
+    }
+    const widths = [...tagWidths].sort((a, b) => a - b);
+    let remaining = available;
+    for (let i=0 ; i<widths.length ; ++i) {
+        const share = Math.floor(remaining / (widths.length - i));
+        if (widths[i] > share) {
+            return share;
+        }
+        remaining -= widths[i];
+    }
+    return null;
 }
 
 
 // Kicked off after every grid draw, alongside the page's own gridComplete
 function gridCompleteExtra() {
     FloatingPanel.hide();  // A tag entry or sort menu raised off the last draw's cells is stale now
-    markHiddenGridTags($(".grid-tags"));
+    fitGridTags($(".grid-tags"));
     const aWin = getAnalysisWindow();
     if (!aWin.variantTagsReadOnly) {
         $(".grid-tag-deletable").click(tagClickHandler);
