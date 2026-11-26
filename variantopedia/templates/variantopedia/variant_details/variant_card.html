@@ -63,7 +63,7 @@
             {% if variant.svlen %}
                 <!-- You can't see ref base in variant coordinate for symbolics - so explicitly show to help admins debug stuff -->
                 {% labelled label="Reference" admin_only=True %}{{ variant.locus.ref }}{% endlabelled %}
-                {% labelled label="SVLEN" help="Structural Variant Length - Difference in length between REF and ALT alleles" %}{{ variant.svlen }} {% variant_kind_badge variant %}{% endlabelled %}
+                {% labelled label="SVLEN" help="Structural Variant Length - Difference in length between REF and ALT alleles" %}{{ variant.svlen }}{% if not variant.is_gene_level and not variant.is_whole_chromosome %} {% variant_kind_badge variant %}{% endif %}{% endlabelled %}
             {% endif %}
             {% labelled label="Genome Build" %}{{ genome_build }}{% endlabelled %}
             {% if variant.can_have_c_hgvs and variant_show_canonical_hgvs %}

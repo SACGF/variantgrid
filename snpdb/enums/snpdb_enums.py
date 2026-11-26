@@ -469,6 +469,7 @@ class VariantContent(models.TextChoices):
     SMALL = "small", "Small"
     CNV = "cnv", "CNV"
     SV = "sv", "SV"
+    WHOLE_CHROMOSOME = "chrom_cn", "Chrom CN"
     FUSION = "fusion", "Fusion"
     GENE_COPY_NUMBER = "gene_cn", "Gene CN"
     SPLICE = "splice", "Splice"
@@ -483,6 +484,7 @@ VARIANT_CONTENT_DESCRIPTIONS = {
     VariantContent.SMALL: "SNVs and indels written out as ref and alt sequence",
     VariantContent.CNV: "Copy number calls: DEL / DUP / CNV from a caller that reports copy number",
     VariantContent.SV: "Structural variants: DEL / DUP / INV from a caller that doesn't report copy number",
+    VariantContent.WHOLE_CHROMOSOME: "Whole chromosome gains and losses",
     VariantContent.FUSION: "Gene fusions",
     VariantContent.GENE_COPY_NUMBER: "Gene-level copy number gains and losses",
     VariantContent.SPLICE: "Gene-level splice variants",

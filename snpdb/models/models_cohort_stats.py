@@ -63,8 +63,9 @@ class CohortGenotypeStats(TimeStampedModel):
     deletions_count = models.IntegerField(default=0)
     fusions_count = models.IntegerField(default=0)  # gene-level events, @see snpdb.gene_level_variants
     # The class counts above fold these in with SNVs and indels, so they're counted again on their own
-    structural_count = models.IntegerField(default=0)  # symbolic alts with coordinates (<DEL>, <DUP>, <INV>...)
+    structural_count = models.IntegerField(default=0)  # <DEL>, <DUP>, <INV>... short of a whole chromosome
     gene_copy_number_count = models.IntegerField(default=0)
+    whole_chromosome_count = models.IntegerField(default=0)  # @see snpdb.whole_chromosome_variants
     gene_splice_count = models.IntegerField(default=0)
     ref_count = models.IntegerField(default=0)
     het_count = models.IntegerField(default=0)
@@ -111,13 +112,15 @@ class CohortGenotypeStats(TimeStampedModel):
     def get_variant_content_q(content: VariantContent) -> Q:
         """ get_variant_contents as a filter: the per-sample rows whose sample holds content """
         gene_level_count = F("fusions_count") + F("gene_copy_number_count") + F("gene_splice_count")
+        symbolic_count = F("structural_count") + F("whole_chromosome_count") + gene_level_count
         structural = Q(structural_count__gt=0)
         has_copy_number = Q(sample__vcf__copy_number_field__gt="")
         no_copy_number = Q(sample__vcf__copy_number_field__isnull=True) | Q(sample__vcf__copy_number_field="")
         content_q = {
-            VariantContent.SMALL: Q(variant_count__gt=F("structural_count") + gene_level_count),
+            VariantContent.SMALL: Q(variant_count__gt=symbolic_count),
             VariantContent.CNV: structural & has_copy_number,
             VariantContent.SV: structural & no_copy_number,
+            VariantContent.WHOLE_CHROMOSOME: Q(whole_chromosome_count__gt=0),
             VariantContent.FUSION: Q(fusions_count__gt=0),
             VariantContent.GENE_COPY_NUMBER: Q(gene_copy_number_count__gt=0),
             VariantContent.SPLICE: Q(gene_splice_count__gt=0),
@@ -128,9 +131,11 @@ class CohortGenotypeStats(TimeStampedModel):
         """ Count per kind of call, leaving out the kinds with none. has_copy_number (the VCF declares a
             copy number field) is what makes its structural variants a CNV caller's rather than an SV caller's """
         gene_level_count = self.fusions_count + self.gene_copy_number_count + self.gene_splice_count
+        symbolic_count = self.structural_count + self.whole_chromosome_count + gene_level_count
         counts = {
-            VariantContent.SMALL: self.variant_count - self.structural_count - gene_level_count,
+            VariantContent.SMALL: self.variant_count - symbolic_count,
             VariantContent.CNV if has_copy_number else VariantContent.SV: self.structural_count,
+            VariantContent.WHOLE_CHROMOSOME: self.whole_chromosome_count,
             VariantContent.FUSION: self.fusions_count,
             VariantContent.GENE_COPY_NUMBER: self.gene_copy_number_count,
             VariantContent.SPLICE: self.gene_splice_count,

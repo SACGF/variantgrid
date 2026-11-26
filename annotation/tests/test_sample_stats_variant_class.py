@@ -17,6 +17,7 @@ from genes.tests.gene_level_test_utils import (
     create_gene_copy_number_event,
     create_splice_event_variant,
 )
+from library.genomics.vcf_enums import VCFSymbolicAllele
 from patients.enums import Zygosity
 from snpdb.enums import VariantContent
 from snpdb.fake_data import create_fake_cohort
@@ -77,16 +78,20 @@ class SampleStatsVariantClassTest(TestCase):
         proband_het = Zygosity.HET + Zygosity.MISSING + Zygosity.MISSING
         symbolic_del = slowly_create_test_variant_from_coordinate(
             VariantCoordinate(chrom="3", position=5000, ref="N", alt="<DEL>", svlen=-2000), self.genome_build)
-        for variant in [slowly_create_test_variant("1", 1000, "A", "T", self.genome_build), symbolic_del,
+        chr21_gain = slowly_create_test_variant_from_coordinate(
+            VariantCoordinate(chrom="21", position=1, ref="N", alt=VCFSymbolicAllele.DUP_CHROM, svlen=48129894),
+            self.genome_build)
+        for variant in [slowly_create_test_variant("1", 1000, "A", "T", self.genome_build), symbolic_del, chr21_gain,
                         create_gene_copy_number_event("EGFR", GeneCopyNumberEventKind.GAIN).variant,
                         create_splice_event_variant("AR", "V7").variant]:
             self._add_genotype(variant, proband_het)
 
         stats = self._stats_by_sample_name()["proband"]
-        self.assertEqual((4, 1, 1, 1), (stats.variant_count, stats.structural_count,
-                                        stats.gene_copy_number_count, stats.gene_splice_count))
-        self.assertEqual({VariantContent.SMALL: 1, VariantContent.CNV: 1, VariantContent.GENE_COPY_NUMBER: 1,
-                          VariantContent.SPLICE: 1}, stats.get_variant_contents(has_copy_number=True))
+        self.assertEqual((5, 1, 1, 1, 1), (stats.variant_count, stats.structural_count, stats.whole_chromosome_count,
+                                           stats.gene_copy_number_count, stats.gene_splice_count))
+        self.assertEqual({VariantContent.SMALL: 1, VariantContent.CNV: 1, VariantContent.WHOLE_CHROMOSOME: 1,
+                          VariantContent.GENE_COPY_NUMBER: 1, VariantContent.SPLICE: 1},
+                         stats.get_variant_contents(has_copy_number=True))
         self.assertIn(VariantContent.SV, stats.get_variant_contents(has_copy_number=False))
 
     def test_totals_only_count_the_samples_own_calls(self):

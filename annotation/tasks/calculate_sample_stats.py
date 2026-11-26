@@ -22,7 +22,12 @@ from annotation.models.models_annotation_run import VCFAnnotationStats
 from eventlog.models import create_event
 from library.django_utils.database_utils import pg_settings
 from library.enums.log_level import LogLevel
-from library.genomics.vcf_enums import GeneLevelSymbolicAlt, VariantClass, VCFSymbolicAllele
+from library.genomics.vcf_enums import (
+    WHOLE_CHROMOSOME_ALTS,
+    GeneLevelSymbolicAlt,
+    VariantClass,
+    VCFSymbolicAllele,
+)
 from library.log_utils import get_traceback
 from snpdb.enums import ImportStatus, SequenceRole, SomaticClinicalSignificance
 from snpdb.models import (
@@ -190,6 +195,7 @@ _COUNTER_FIELDS = (
     "structural_count",
     "gene_copy_number_count",
     "gene_splice_count",
+    "whole_chromosome_count",
     "ref_count",
     "het_count",
     "hom_count",
@@ -403,6 +409,8 @@ def _symbolic_kind_field(flags: VariantFlags) -> Optional[str]:
         return None
     if gene_level := GeneLevelSymbolicAlt.parse(alt):
         return _GENE_LEVEL_KIND_FIELDS.get(gene_level[0])
+    if alt in WHOLE_CHROMOSOME_ALTS:
+        return "whole_chromosome_count"
     return "structural_count"
 
 
@@ -645,7 +653,8 @@ def persist_cohort_stats(cgc, annotation_version, code_version, has_filters,
 
     GENOTYPE_FIELDS = (
         "variant_count", "snp_count", "insertions_count", "deletions_count", "fusions_count",
-        "structural_count", "gene_copy_number_count", "gene_splice_count", "ref_count", "het_count", "hom_count", "unk_count",
+        "structural_count", "gene_copy_number_count", "gene_splice_count", "whole_chromosome_count",
+        "ref_count", "het_count", "hom_count", "unk_count",
         "x_hom_count", "x_het_count", "x_unk_count",
     )
     VARIANT_ANN_FIELDS = (

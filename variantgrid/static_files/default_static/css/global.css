@@ -970,6 +970,10 @@ table.as_table td {
   --variant-content-color: #a15c00;
 }
 
+.variant-content-chrom_cn {
+  --variant-content-color: #1a56b8;
+}
+
 .variant-content-fusion {
   --variant-content-color: #5e35b1;
 }
